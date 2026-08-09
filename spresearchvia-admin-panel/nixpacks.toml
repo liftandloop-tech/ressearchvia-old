@@ -1,0 +1,16 @@
+[phases.setup]
+nixpkgsArchive = "nixos-unstable"
+nixPkgs = ["flutter"]
+
+[phases.install]
+cmds = [
+  "flutter config --enable-web",
+  "flutter pub get"
+]
+
+[phases.build]
+cmds = [
+  "flutter build web --release --no-tree-shake-icons --no-wasm-dry-run",
+  "mkdir -p dist",
+  "cp -r build/web/* dist/"
+]

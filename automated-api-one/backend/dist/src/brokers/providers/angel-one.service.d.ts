@@ -1,0 +1,61 @@
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { BrokerClient, OrderRequest, OrderResponse, SessionResponse, PositionResponse, HoldingResponse, FundsResponse, BrokerHealthResponse, BrokerCapabilities, BrokerTrade, BrokerLtp, ProfileResponse, BrokerCallbackData, BrokerSession } from '../interfaces/broker-client.interface';
+import { BrokerAdapter } from '../interfaces/broker-adapter.interface';
+import { RedisService } from '../../infrastructure/redis/redis.service';
+import { MetricsService } from '../../infrastructure/metrics/metrics.service';
+import { CircuitBreakerService } from '../../infrastructure/circuit-breaker/circuit-breaker.service';
+import { BrokerRateLimiterService } from '../../infrastructure/redis/broker-rate-limiter.service';
+import { InstrumentsService } from '../../instruments/instruments.service';
+export declare class AngelOneService extends BrokerAdapter implements BrokerClient {
+    private readonly httpService;
+    private readonly configService;
+    private readonly redisService;
+    private readonly metrics;
+    private readonly circuitBreaker;
+    private readonly rateLimiter;
+    private readonly instrumentsService;
+    private readonly logger;
+    private readonly isMock;
+    private readonly baseUrl;
+    constructor(httpService: HttpService, configService: ConfigService, redisService: RedisService, metrics: MetricsService, circuitBreaker: CircuitBreakerService, rateLimiter: BrokerRateLimiterService, instrumentsService: InstrumentsService);
+    private getHeaders;
+    capabilities(): BrokerCapabilities;
+    healthCheck(): Promise<BrokerHealthResponse>;
+    generateSession(credentials: {
+        clientCode: string;
+        password: string;
+        totpKey: string;
+    }): Promise<SessionResponse>;
+    getAuthorizationUrl(state: string): Promise<string>;
+    completeAuthorization(callbackData: BrokerCallbackData): Promise<BrokerSession>;
+    validateSession(token: string): Promise<boolean>;
+    getMargin(token: string, clientCode: string): Promise<number>;
+    getProfile(token: string): Promise<ProfileResponse>;
+    getOrders(token: string, clientCode: string): Promise<any[]>;
+    placeOrder(token: string, clientCode: string, order: OrderRequest): Promise<OrderResponse>;
+    getOrderStatus(token: string, clientCode: string, brokerOrderId: string): Promise<OrderResponse>;
+    getLtp(exchange: string, symbol: string, token?: string, symbolToken?: string): Promise<{
+        ltp: number;
+        close: number;
+        open: number;
+        high: number;
+        low: number;
+    } | null>;
+    getPositions(token: string, clientCode: string): Promise<PositionResponse[]>;
+    getHoldings(token: string, clientCode: string): Promise<HoldingResponse[]>;
+    getFunds(token: string, clientCode: string): Promise<FundsResponse>;
+    refreshSession(token: string, refreshToken: string): Promise<SessionResponse>;
+    modifyOrder(token: string, clientCode: string, orderId: string, variety: string, order: {
+        quantity: number;
+        price?: number;
+        ordertype?: string;
+        producttype?: string;
+        duration?: string;
+    }): Promise<OrderResponse>;
+    cancelOrder(token: string, clientCode: string, orderId: string, variety: string): Promise<OrderResponse>;
+    getTradeBook(token: string, clientCode: string): Promise<BrokerTrade[]>;
+    getLtpData(token: string, exchange: string, symbol: string, symbolToken: string): Promise<BrokerLtp>;
+    getOrderDetails(token: string, clientCode: string, orderId: string): Promise<OrderResponse>;
+    private mapOrderStatus;
+}

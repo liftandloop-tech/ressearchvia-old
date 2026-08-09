@@ -1,0 +1,98 @@
+[{
+  "_id": {
+    "$oid": "6990582719e0550821bb9436"
+  },
+  "segmentName": "EQUITY CASH",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:10:31.600Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:10:31.600Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6990583319e0550821bb943b"
+  },
+  "segmentName": "FUTURE DERIVATIVES",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:10:43.478Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:10:43.478Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6990584819e0550821bb9447"
+  },
+  "segmentName": "STOCK OPTION",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:11:04.324Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:11:04.324Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6990585219e0550821bb945a"
+  },
+  "segmentName": "INDEX OPTION",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:11:14.170Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:11:14.170Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6990586219e0550821bb94bb"
+  },
+  "segmentName": "MCX COMMODITY",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:11:30.488Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:11:30.488Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6990586d19e0550821bb94ce"
+  },
+  "segmentName": "NCDEX COMMODITY",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:11:41.166Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:11:41.166Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6990588019e0550821bb9544"
+  },
+  "segmentName": "CURRENCY DERIVATIVIS",
+  "segmentDiscription": "",
+  "segmentStatus": "active",
+  "createdAt": {
+    "$date": "2026-02-14T11:12:00.272Z"
+  },
+  "updatedAt": {
+    "$date": "2026-02-14T11:12:00.272Z"
+  }
+}]

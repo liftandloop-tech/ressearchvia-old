@@ -1,0 +1,78 @@
+import { PrismaService } from '../prisma.service';
+import { RiskEvent } from '@prisma/client';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { ConsentsService } from '../consents/consents.service';
+import { BrokerSessionService } from '../brokers/services/broker-session.service';
+import { BrokerFactory } from '../brokers/factory/broker.factory';
+import { AuditService } from '../audit/audit.service';
+import { RiskDecision } from './interfaces/risk-decision.interface';
+import { RedisService } from '../infrastructure/redis/redis.service';
+import { QueueService } from '../infrastructure/queues/queues.service';
+import { MetricsService } from '../infrastructure/metrics/metrics.service';
+import { OutboxService } from '../infrastructure/outbox/outbox.service';
+export declare class RiskService {
+    private readonly prisma;
+    private readonly subscriptionsService;
+    private readonly consentsService;
+    private readonly brokerSessionService;
+    private readonly brokerFactory;
+    private readonly auditService;
+    private readonly redisService;
+    private readonly queueService;
+    private readonly metrics;
+    private readonly outboxService;
+    private readonly logger;
+    constructor(prisma: PrismaService, subscriptionsService: SubscriptionsService, consentsService: ConsentsService, brokerSessionService: BrokerSessionService, brokerFactory: BrokerFactory, auditService: AuditService, redisService: RedisService, queueService: QueueService, metrics: MetricsService, outboxService: OutboxService);
+    validateExecution(userId: string, segmentId: string, estimatedCost: number): Promise<RiskDecision>;
+    private logRejectedRisk;
+    getRiskEvents(userId: string, limit?: number, offset?: number): Promise<{
+        data: RiskEvent[];
+        total: number;
+    }>;
+    getRiskEventsForSegment(userId: string, segmentId: string, page?: number, limit?: number): Promise<any>;
+    getRiskStatus(userId: string): Promise<any[]>;
+    getRiskStatusForSegment(userId: string, segmentId: string): Promise<{
+        locked: boolean;
+        dailyLoss: number;
+        dailyLossLimit: number;
+    }>;
+    resetRiskLock(userId: string, segmentId: string): Promise<any>;
+    unlockSegment(userId: string, segmentId: string, targetUserId?: string, isAdmin?: boolean): Promise<any>;
+    validateCapital(userId: string, segmentId: string, estimatedCost: number, availableMargin: number): Promise<boolean>;
+    validateLossLimit(userId: string, segmentId: string): Promise<boolean>;
+    evaluateRisk(userId: string, symbol: string, quantity: number, price: number, brokerId: string, segmentId: string): Promise<RiskDecision>;
+    private logViolation;
+    private logEvaluation;
+    recalculateRiskSnapshot(userId: string): Promise<any>;
+    cleanupEvaluations(): Promise<void>;
+    createProfile(data: {
+        userId?: string;
+        segmentId?: string;
+        brokerId?: string;
+        priority?: number;
+        maxCapitalPerUser: number;
+        maxCapitalPerSegment: number;
+        maxDailyLoss: number;
+        maxOpenPositions: number;
+        maxPositionSize: number;
+        maxExposurePerSymbol: number;
+        maxExposurePerBroker: number;
+        maxConcurrentOrders: number;
+    }): Promise<any>;
+    updateProfile(id: string, data: {
+        userId?: string;
+        segmentId?: string;
+        brokerId?: string;
+        priority?: number;
+        maxCapitalPerUser?: number;
+        maxCapitalPerSegment?: number;
+        maxDailyLoss?: number;
+        maxOpenPositions?: number;
+        maxPositionSize?: number;
+        maxExposurePerSymbol?: number;
+        maxExposurePerBroker?: number;
+        maxConcurrentOrders?: number;
+    }): Promise<any>;
+    getViolations(userId?: string): Promise<any[]>;
+    getSnapshots(userId?: string): Promise<any[]>;
+}

@@ -1,0 +1,94 @@
+[{
+  "_id": {
+    "$oid": "6a02c49e57c6cd316fbadcd5"
+  },
+  "userId": {
+    "$oid": "6a02bf4c57c6cd316fbabc0a"
+  },
+  "type": "PLAN",
+  "resourceId": {
+    "$oid": "699057bb19e0550821bb93fe"
+  },
+  "segmentId": {
+    "$oid": "6990585219e0550821bb945a"
+  },
+  "startDate": {
+    "$date": "2026-05-12T06:11:42.012Z"
+  },
+  "endDate": {
+    "$date": "2026-05-17T06:11:42.012Z"
+  },
+  "status": "ACTIVE",
+  "grantedBy": "ADMIN",
+  "grantReason": "REGISTRATION_TRIAL",
+  "sourceRefId": "6a02c2ed57c6cd316fbad4df",
+  "remarks": "",
+  "createdAt": {
+    "$date": "2026-05-12T06:11:42.017Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-12T06:11:42.017Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6a0d37890a5a5d46b89d4de8"
+  },
+  "userId": {
+    "$oid": "6a02bf4c57c6cd316fbabc0a"
+  },
+  "type": "PLAN",
+  "resourceId": {
+    "$oid": "699057aa19e0550821bb93f6"
+  },
+  "segmentId": {
+    "$oid": "6990585219e0550821bb945a"
+  },
+  "startDate": {
+    "$date": "2026-05-20T04:24:41.022Z"
+  },
+  "endDate": {
+    "$date": "2026-06-20T04:24:41.022Z"
+  },
+  "status": "ACTIVE",
+  "grantedBy": "ADMIN",
+  "grantReason": "OFFLINE_PAYMENT",
+  "sourceRefId": "6a0d36bf0a5a5d46b89d45f9",
+  "remarks": "Received",
+  "createdAt": {
+    "$date": "2026-05-20T04:24:41.042Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-20T04:24:41.042Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6a02c49d57c6cd316fbadccd"
+  },
+  "userId": {
+    "$oid": "6a02bf4c57c6cd316fbabc0a"
+  },
+  "type": "REGISTRATION",
+  "resourceId": null,
+  "segmentId": {
+    "$oid": "6990585219e0550821bb945a"
+  },
+  "startDate": {
+    "$date": "2026-05-12T06:11:41.951Z"
+  },
+  "endDate": {
+    "$date": "2027-05-12T06:11:41.951Z"
+  },
+  "status": "ACTIVE",
+  "grantedBy": "ADMIN",
+  "grantReason": "OFFLINE_PAYMENT",
+  "sourceRefId": "6a02c2ed57c6cd316fbad4df",
+  "remarks": "Received 2000+3000",
+  "createdAt": {
+    "$date": "2026-05-12T06:11:41.993Z"
+  },
+  "updatedAt": {
+    "$date": "2026-05-12T06:11:41.993Z"
+  }
+}]

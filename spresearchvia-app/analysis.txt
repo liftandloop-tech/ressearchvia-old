@@ -1,0 +1,50 @@
+Analyzing spresearchvia-app...                                  
+
+warning • The value of the local variable 'orderData' isn't used • lib/controllers/registration_screen.controller.dart:259:16 • unused_local_variable
+warning • Unused import: '../../core/routes/app_routes.dart' • lib/screens/auth/otp_verification.screen.dart:5:8 • unused_import
+warning • The value of the local variable 'aadharController' isn't used • lib/screens/auth/signup.screen.dart:34:33 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/dashboard.screen.dart:293:59 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/dashboard.screen.dart:305:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/dashboard.screen.dart:336:59 • deprecated_member_use
+warning • The value of the local variable 'validity' isn't used • lib/screens/dashboard/widgets/premium_plan_card.dart:124:11 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/widgets/premium_plan_card.dart:200:93 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/widgets/premium_plan_card.dart:241:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/dashboard/widgets/premium_plan_card.dart:316:43 • deprecated_member_use
+warning • The value of the local variable 'hasResDtls' isn't used • lib/screens/kyc/digio_connect_screen.dart:65:15 • unused_local_variable
+warning • The value of the local variable 'startPan' isn't used • lib/screens/kyc/digio_connect_screen.dart:68:15 • unused_local_variable
+warning • Unused import: '../auth/set_mpin.screen.dart' • lib/screens/kyc/kyc_document_upload.screen.dart:10:8 • unused_import
+warning • The value of the local variable 'isNameReadOnly' isn't used • lib/screens/kyc/kyc_fallback_form_screen.dart:217:23 • unused_local_variable
+warning • Unused import: '../auth/login.screen.dart' • lib/screens/kyc/kyc_intro.dart:4:8 • unused_import
+warning • Unused import: 'digio_connect_screen.dart' • lib/screens/kyc/kyc_intro.dart:5:8 • unused_import
+warning • Unused import: 'digio_connect_screen.dart' • lib/screens/kyc/sebi_compilance_check.dart:8:8 • unused_import
+warning • Unused import: 'kyc_fallback_form_screen.dart' • lib/screens/kyc/sebi_compilance_check.dart:9:8 • unused_import
+warning • Unused import: '../../controllers/user.controller.dart' • lib/screens/kyc/sebi_compilance_check.dart:10:8 • unused_import
+warning • Unused import: 'kyc_intro.dart' • lib/screens/kyc/sebi_compilance_check.dart:11:8 • unused_import
+warning • Unused import: '../../core/theme/app_theme.dart' • lib/screens/kyc/video_recorder.screen.dart:12:8 • unused_import
+warning • The declaration '_maskAadhar' isn't referenced • lib/screens/profile/profile.screen.dart:19:10 • unused_element
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/research/research_reports.screen.dart:119:85 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/research/widgets/report_card.dart:105:37 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/research/widgets/report_card.dart:115:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/research/widgets/report_card.dart:125:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/research/widgets/trading_call_tab.dart:35:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rm/contact_rm.screen.dart:130:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rm/contact_rm.screen.dart:147:51 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rm/contact_rm.screen.dart:187:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rm/contact_rm.screen.dart:210:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rm/contact_rm.screen.dart:366:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/rm/contact_rm.screen.dart:378:34 • deprecated_member_use
+warning • Unused import: 'package:intl/intl.dart' • lib/screens/subscription/choose_plan.screen.dart:3:8 • unused_import
+warning • Unused import: '../../widgets/active_plan_card.dart' • lib/screens/subscription/choose_plan.screen.dart:5:8 • unused_import
+warning • Unused import: '../../core/models/plan.dart' • lib/screens/subscription/choose_plan.screen.dart:6:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/subscription/choose_plan.screen.dart:60:85 • deprecated_member_use
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/subscription/confirm_payment.screen.dart:560:35 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/subscription/confirm_payment.screen.dart:561:35 • deprecated_member_use
+   info • 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/subscription/confirm_payment.screen.dart:574:35 • deprecated_member_use
+   info • 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre • lib/screens/subscription/confirm_payment.screen.dart:575:35 • deprecated_member_use
+warning • The value of the local variable 'fatherName' isn't used • lib/screens/subscription/receipt.screen.dart:211:12 • unused_local_variable
+warning • The value of the local variable 'address' isn't used • lib/screens/subscription/receipt.screen.dart:212:12 • unused_local_variable
+warning • The value of the local variable 'pan' isn't used • lib/screens/subscription/receipt.screen.dart:214:12 • unused_local_variable
+warning • The value of the local variable 'aadhaar' isn't used • lib/screens/subscription/receipt.screen.dart:216:12 • unused_local_variable
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/tabs.screen.dart:94:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/tabs.screen.dart:96:58 • deprecated_member_use
+

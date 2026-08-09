@@ -1,0 +1,65 @@
+{
+    "_id": {
+        "$oid": "69b0f5b86b123edffea89181"
+    },
+    "userId": {
+        "$oid": "69a936852fd274e236d3f927"
+    },
+    "purchaseType": "REGISTRATION",
+    "planId": null,
+    "baseAmount": 5000,
+    "gstAmount": 900,
+    "totalAmount": 5900,
+    "razorpayOrderId": "BANK_bank_reg_36d3f927_1773204920638",
+    "paymentId": null,
+    "proofImage": null,
+    "proofImages": [],
+    "status": "VERIFICATION_PENDING",
+    "paymentMethod": "BANK_TRANSFER",
+    "preferredSegmentId": "6990585219e0550821bb945a",
+    "preferredPlanId": "699057bb19e0550821bb93fe",
+    "transactionDate": null,
+    "utrNumber": null,
+    "amountPaid": 1,
+    "remainingAmount": 0,
+    "isPartial": true,
+    "originalPlanAmount": 5900,
+    "originalDuration": 365,
+    "partialTotalTarget": 5900,
+    "perDayCharge": 0,
+    "maxAllowedDays": 0,
+    "serviceStartDate": null,
+    "currentExpiryDate": null,
+    "gstRateUsed": 18,
+    "walletBalance": 0,
+    "notes": "",
+    "isCorrected": false,
+    "discount": 0,
+    "correctionVersion": 0,
+    "partialPaymentsHistory": [
+        {
+            "amountPaid": 1,
+            "transactionDate": {
+                "$date": "2026-03-10T00:00:00.000Z"
+            },
+            "proofImage": "uploads/receipts/file-1773206347973-523663450.jpg",
+            "proofImages": [
+                "uploads/receipts/file-1773206347973-523663450.jpg"
+            ],
+            "utrNumber": "647080",
+            "status": "PENDING",
+            "calculatedDaysAdded": 0,
+            "note": "",
+            "_id": {
+                "$oid": "69b0fb4c6b123edffea8940d"
+            }
+        }
+    ],
+    "correctionHistory": [],
+    "createdAt": {
+        "$date": "2026-03-11T04:55:20.639Z"
+    },
+    "updatedAt": {
+        "$date": "2026-03-11T11:37:20.382Z"
+    }
+}

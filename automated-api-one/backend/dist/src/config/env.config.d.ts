@@ -1,0 +1,39 @@
+import { z } from 'zod';
+export declare const envSchema: z.ZodObject<{
+    NODE_ENV: z.ZodDefault<z.ZodEnum<{
+        development: "development";
+        production: "production";
+        test: "test";
+    }>>;
+    PORT: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    DATABASE_URL: z.ZodString;
+    REDIS_HOST: z.ZodDefault<z.ZodString>;
+    REDIS_PORT: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    REDIS_USERNAME: z.ZodOptional<z.ZodString>;
+    REDIS_PASSWORD: z.ZodOptional<z.ZodString>;
+    JWT_SECRET: z.ZodString;
+    JWT_REFRESH_SECRET: z.ZodString;
+    MOCK_BROKERS: z.ZodDefault<z.ZodPreprocess<z.ZodCoercedBoolean<unknown>>>;
+    ANGEL_ONE_API_KEY: z.ZodOptional<z.ZodString>;
+    ANGEL_ONE_REDIRECT_URL: z.ZodOptional<z.ZodString>;
+    MSG91_API_KEY: z.ZodOptional<z.ZodString>;
+    FCM_PROJECT_ID: z.ZodOptional<z.ZodString>;
+    FCM_PRIVATE_KEY: z.ZodOptional<z.ZodString>;
+    RESEND_API_KEY: z.ZodOptional<z.ZodString>;
+    OUTBOX_BATCH_SIZE: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    ORDER_PLACEMENT_CONCURRENCY: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    ORDER_MONITORING_CONCURRENCY: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    BROKER_TIMEOUT_MS: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    BROKER_RATE_LIMIT_PER_MINUTE: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    SIGNAL_PROCESSING_LIMIT: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    CIRCUIT_BREAKER_RESET_TIMEOUT_MS: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    AUTOMATED_API_KEY: z.ZodDefault<z.ZodString>;
+    LL_BACKEND_URL: z.ZodDefault<z.ZodString>;
+    RISK_DEFAULT_MODE: z.ZodDefault<z.ZodEnum<{
+        BLOCK: "BLOCK";
+        ALLOW: "ALLOW";
+    }>>;
+}, z.core.$strip>;
+export type EnvConfig = z.infer<typeof envSchema>;
+export declare function validateEnv(config: Record<string, unknown>): EnvConfig;

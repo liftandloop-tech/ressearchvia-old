@@ -1,0 +1,257 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: trading-postgres-prod
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: productionpasswordchange
+      POSTGRES_DB: trading_platform_prod
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_prod_data:/data
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-api-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=super_secret_high_entropy_prod_key_value_here
+      - PORT=3000
+      - NODE_ENV=production
+      - CONTAINER_ROLE=api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  signal-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-signal-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  order-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-order-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  outbox-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-outbox-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  websocket-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-websocket-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  report-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-report-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  position-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-position-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  cron-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-cron-worker-prod
+    environment:
+      - DATABASE_URL=postgresql://postgres:productionpasswordchange@postgres:5432/trading_platform_prod?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - CONTAINER_ROLE=cron
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep node"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: trading-prometheus
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: trading-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: always
+
+  loki:
+    image: grafana/loki:latest
+    container_name: trading-loki
+    ports:
+      - "3100:3100"
+    restart: always
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  prometheus_data:
+  grafana_data:

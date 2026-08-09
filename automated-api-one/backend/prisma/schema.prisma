@@ -1,0 +1,1191 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  mobile                  String                   @unique @db.VarChar(15)
+  mpinHash                String                   @map("mpin_hash")
+  firstName               String?                  @map("first_name") @db.VarChar(100)
+  lastName                String?                  @map("last_name") @db.VarChar(100)
+  email                   String?                  @db.VarChar(255)
+  status                  UserStatus               @default(ACTIVE)
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  deletedAt               DateTime?                @map("deleted_at")
+  quietEnd                String?                  @map("quiet_end") @db.VarChar(5)
+  quietHoursEnabled       Boolean                  @default(false) @map("quiet_hours_enabled")
+  quietStart              String?                  @map("quiet_start") @db.VarChar(5)
+  quietTimezone           String?                  @map("quiet_timezone") @db.VarChar(50)
+  analyticsSnapshots      AnalyticsSnapshot[]
+  auditLogs               AuditLog[]
+  consents                Consent[]
+  dailyPortfolioSnapshots DailyPortfolioSnapshot[]
+  equityCurvePoints       EquityCurvePoint[]
+  notificationPreferences NotificationPreference[]
+  notifications           Notification[]
+  paymentIntents          PaymentIntent[]
+  reconciliationIssues    ReconciliationIssue[]
+  reconciliationShards    ReconciliationShard[]
+  reconciliationSnapshots ReconciliationSnapshot[]
+  reportExports           ReportExport[]
+  reports                 Report[]
+  riskEvaluations         RiskEvaluation[]
+  riskEvents              RiskEvent[]
+  riskProfiles            RiskProfile[]
+  riskSnapshot            RiskSnapshot?
+  riskViolations          RiskViolation[]
+  multipliers             SegmentMultiplier[]
+  segmentPerformances     SegmentPerformance[]
+  subscriptions           Subscription[]
+  trades                  Trade[]
+  userBrokers             UserBroker[]
+  devices                 UserDevice[]
+  kyc                     UserKyc?
+  userPerformance         UserPerformance?
+  segments                UserSegment[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model UserDevice {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  deviceId    String    @map("device_id") @db.VarChar(255)
+  deviceName  String?   @map("device_name") @db.VarChar(255)
+  platform    String?   @db.VarChar(50)
+  lastLoginAt DateTime  @default(now()) @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deletedAt])
+  @@map("user_devices")
+}
+
+model Broker {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  code                    BrokerCode               @unique
+  name                    String                   @db.VarChar(100)
+  status                  BrokerStatus             @default(ACTIVE)
+  consents                Consent[]
+  reconciliationIssues    ReconciliationIssue[]
+  reconciliationSnapshots ReconciliationSnapshot[]
+  riskProfiles            RiskProfile[]
+  userBrokers             UserBroker[]
+
+  @@map("brokers")
+}
+
+model UserBroker {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  brokerId       String          @map("broker_id") @db.Uuid
+  brokerClientId String          @map("broker_client_id") @db.VarChar(100)
+  apiKey         String?         @map("api_key")          // Per-user API key (e.g. Zebu appkey)
+  vendorCode     String?         @map("vendor_code")      // Per-user vendor code (e.g. Zebu vc)
+  accessToken    String?         @map("access_token")
+  refreshToken   String?         @map("refresh_token")
+  tokenExpiry    DateTime?       @map("token_expiry")
+  status         BrokerStatus    @default(ACTIVE)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  deletedAt      DateTime?       @map("deleted_at")
+  sessions       BrokerSession[]
+  broker         Broker          @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, brokerId])
+  @@index([deletedAt])
+  @@map("user_brokers")
+}
+
+
+model Subscription {
+  id        String             @id @default(uuid()) @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  planId    String             @map("plan_id") @db.Uuid
+  startDate DateTime           @map("start_date") @db.Date
+  endDate   DateTime           @map("end_date") @db.Date
+  status    SubscriptionStatus @default(ACTIVE)
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+  deletedAt DateTime?          @map("deleted_at")
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([deletedAt])
+  @@map("subscriptions")
+}
+
+model SegmentMaster {
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String               @db.VarChar(100)
+  description         String?
+  segment             Segment
+  status              UserSegmentStatus    @default(ACTIVE)
+  createdBy           String?              @map("created_by") @db.Uuid
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  deletedAt           DateTime?            @map("deleted_at")
+  riskProfiles        RiskProfile[]
+  segmentPerformances SegmentPerformance[]
+  signals             Signal[]
+  userSegments        UserSegment[]
+
+  @@index([deletedAt])
+  @@map("segments")
+}
+
+model UserSegment {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  segmentId      String            @map("segment_id") @db.Uuid
+  capital        Decimal           @db.Decimal(15, 2)
+  backupCapital  Decimal           @map("backup_capital") @db.Decimal(15, 2)
+  baseLot        Int               @map("base_lot")
+  maxMultiplier  Int               @map("max_multiplier")
+  dailyLossLimit Decimal           @map("daily_loss_limit") @db.Decimal(15, 2)
+  status         UserSegmentStatus @default(ACTIVE)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  deletedAt      DateTime?         @map("deleted_at")
+  activatedAt    DateTime?         @map("activated_at")
+  pausedAt       DateTime?         @map("paused_at")
+  lastRiskLockAt DateTime?         @map("last_risk_lock_at")
+  segment        SegmentMaster     @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, segmentId])
+  @@index([userId, status])
+  @@index([deletedAt])
+  @@map("user_segments")
+}
+
+model Consent {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  brokerId    String        @map("broker_id") @db.Uuid
+  consentDate DateTime      @map("consent_date") @db.Date
+  status      ConsentStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  deletedAt   DateTime?     @map("deleted_at")
+  broker      Broker        @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, brokerId, consentDate])
+  @@index([userId, brokerId, consentDate])
+  @@index([deletedAt])
+  @@map("consents")
+}
+
+model Signal {
+  id              String        @id @default(uuid()) @db.Uuid
+  correlationId   String?       @map("correlation_id") @db.VarChar(50)
+  segmentId       String        @map("segment_id") @db.Uuid
+  symbol          String        @db.VarChar(50)
+  exchange        String        @db.VarChar(20)
+  segment         Segment
+  side            Side
+  entryPrice      Decimal       @map("entry_price") @db.Decimal(15, 2)
+  stopLoss        Decimal       @map("stop_loss") @db.Decimal(15, 2)
+  targetPrice     Decimal       @map("target_price") @db.Decimal(15, 2)
+  status          SignalStatus  @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at")
+  metadata        Json?
+  orderType       OrderType     @default(LIMIT) @map("order_type")
+  segmentRelation SegmentMaster @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  trades          Trade[]
+
+  @@index([segmentId, status])
+  @@map("signals")
+}
+
+model Trade {
+  id            String      @id @default(uuid()) @db.Uuid
+  correlationId String?     @map("correlation_id") @db.VarChar(50)
+  userId        String      @map("user_id") @db.Uuid
+  signalId      String      @map("signal_id") @db.Uuid
+  segmentId     String      @map("segment_id") @db.Uuid
+  brokerId      String      @map("broker_id") @db.Uuid
+  quantity      Int
+  multiplier    Int         @default(1)
+  entryPrice    Decimal?    @map("entry_price") @db.Decimal(15, 2)
+  exitPrice     Decimal?    @map("exit_price") @db.Decimal(15, 2)
+  pnl           Decimal?    @db.Decimal(15, 2)
+  status        TradeStatus @default(OPEN)
+  brokerTradeId String?     @map("broker_trade_id") @db.VarChar(100)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  orders        Order[]
+  position      Position?
+  signal        Signal      @relation(fields: [signalId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([signalId])
+  @@index([segmentId, createdAt])
+  @@map("trades")
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  correlationId String?     @map("correlation_id") @db.VarChar(50)
+  tradeId       String      @map("trade_id") @db.Uuid
+  brokerOrderId String?     @map("broker_order_id") @db.VarChar(100)
+  orderType     OrderType   @map("order_type")
+  quantity      Int
+  price         Decimal?    @db.Decimal(15, 2)
+  status        OrderStatus @default(PENDING)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  trade         Trade       @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@index([tradeId])
+  @@index([brokerOrderId])
+  @@map("orders")
+}
+
+model Position {
+  id            String         @id @default(uuid()) @db.Uuid
+  tradeId       String         @unique @map("trade_id") @db.Uuid
+  symbol        String         @db.VarChar(50)
+  quantity      Int
+  avgPrice      Decimal        @map("avg_price") @db.Decimal(15, 2)
+  currentPrice  Decimal        @map("current_price") @db.Decimal(15, 2)
+  unrealizedPnl Decimal        @map("unrealized_pnl") @db.Decimal(15, 2)
+  realizedPnl   Decimal        @map("realized_pnl") @db.Decimal(15, 2)
+  status        PositionStatus @default(OPEN)
+  trade         Trade          @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+
+  @@index([tradeId])
+  @@map("positions")
+}
+
+model SegmentMultiplier {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  segmentId         String   @map("segment_id") @db.Uuid
+  currentLot        Int      @map("current_lot")
+  lossStreak        Int      @default(0) @map("loss_streak")
+  currentMultiplier Int      @default(1) @map("current_multiplier")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, segmentId])
+  @@map("segment_multipliers")
+}
+
+model RiskEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  segmentId String   @map("segment_id") @db.Uuid
+  eventType String   @map("event_type") @db.VarChar(100)
+  message   String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([segmentId, createdAt])
+  @@map("risk_events")
+}
+
+model Notification {
+  id         String                 @id @default(uuid()) @db.Uuid
+  userId     String                 @map("user_id") @db.Uuid
+  type       NotificationType
+  title      String                 @db.VarChar(200)
+  message    String
+  delivered  Boolean                @default(false)
+  createdAt  DateTime               @default(now()) @map("created_at")
+  batchKey   String?                @map("batch_key")
+  deliveries NotificationDelivery[]
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, delivered])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  correlationId String?  @map("correlation_id") @db.VarChar(50)
+  userId        String?  @map("user_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(100)
+  entityType    String?  @map("entity_type") @db.VarChar(100)
+  entityId      String?  @map("entity_id")
+  metadata      Json?
+  ipAddress     String?  @map("ip_address") @db.VarChar(45)
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AdminUser {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique @db.VarChar(255)
+  passwordHash String      @map("password_hash")
+  totpSecret   String?     @map("totp_secret")
+  role         AdminRole   @default(ADMIN)
+  status       AdminStatus @default(ACTIVE)
+
+  @@map("admin_users")
+}
+
+model Analyst {
+  id     String        @id @default(uuid()) @db.Uuid
+  name   String        @db.VarChar(100)
+  email  String        @unique @db.VarChar(255)
+  status AnalystStatus @default(ACTIVE)
+
+  @@map("analysts")
+}
+
+model Report {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  reportType  String      @map("report_type") @db.VarChar(100)
+  fileUrl     String?     @map("file_url")
+  status      ReportState @default(REQUESTED)
+  error       String?
+  generatedAt DateTime    @default(now()) @map("generated_at")
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model ReportExport {
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     String?     @map("user_id") @db.Uuid
+  exportType String      @map("export_type") @db.VarChar(100)
+  fileUrl    String?     @map("file_url")
+  status     ExportState @default(REQUESTED)
+  error      String?
+  createdAt  DateTime    @default(now()) @map("created_at")
+  user       User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("report_exports")
+}
+
+model AnalyticsSnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  segmentId       String   @map("segment_id") @db.Uuid
+  date            DateTime @db.Date
+  realizedPnl     Decimal  @map("realized_pnl") @db.Decimal(15, 2)
+  unrealizedPnl   Decimal  @map("unrealized_pnl") @db.Decimal(15, 2)
+  winRate         Decimal  @map("win_rate") @db.Decimal(5, 2)
+  totalTrades     Int      @map("total_trades")
+  winningTrades   Int      @map("winning_trades")
+  losingTrades    Int      @map("losing_trades")
+  roi             Decimal  @map("roi") @db.Decimal(15, 2)
+  drawdown        Decimal  @map("drawdown") @db.Decimal(15, 2)
+  snapshotVersion Int      @default(1) @map("snapshot_version")
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, segmentId, date])
+  @@index([userId, date])
+  @@index([segmentId, date])
+  @@index([userId, segmentId, date])
+  @@index([segmentId, date, roi])
+  @@map("analytics_snapshots")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  correlationId String?      @map("correlation_id") @db.VarChar(50)
+  eventType     String       @map("event_type") @db.VarChar(100)
+  eventKey      String?      @map("event_key") @db.VarChar(255)
+  aggregateId   String?      @map("aggregate_id") @db.VarChar(100)
+  payload       Json
+  version       Int          @default(1)
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  processedAt   DateTime?    @map("processed_at")
+
+  @@index([status, createdAt])
+  @@map("outbox_events")
+}
+
+model BrokerSession {
+  id           String              @id @default(uuid()) @db.Uuid
+  userBrokerId String              @map("user_broker_id") @db.Uuid
+  accessToken  String              @map("access_token")
+  refreshToken String?             @map("refresh_token")
+  expiresAt    DateTime            @map("expires_at")
+  status       BrokerSessionStatus @default(ACTIVE)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  userBroker   UserBroker          @relation(fields: [userBrokerId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("broker_sessions")
+}
+
+model IdempotencyKey {
+  id        String            @id @default(uuid()) @db.Uuid
+  key       String            @unique
+  type      String            @db.VarChar(50)
+  status    IdempotencyStatus @default(PENDING)
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  @@index([type, createdAt])
+  @@map("idempotency_keys")
+}
+
+model QueueJob {
+  id        String         @id @default(uuid()) @db.Uuid
+  queueName String         @map("queue_name") @db.VarChar(100)
+  jobId     String         @map("job_id") @db.VarChar(100)
+  payload   Json
+  status    QueueJobStatus @default(ACTIVE)
+  attempts  Int            @default(0)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  @@unique([queueName, jobId])
+  @@index([queueName, status])
+  @@map("queue_jobs")
+}
+
+model SegmentExecution {
+  id                   String      @id @default(uuid()) @db.Uuid
+  correlationId        String?     @map("correlation_id") @db.VarChar(50)
+  segmentId            String      @map("segment_id") @db.Uuid
+  signalId             String      @map("signal_id") @db.Uuid
+  state                SignalState @default(RECEIVED)
+  totalUsers           Int         @map("total_users")
+  processedUsers       Int         @default(0) @map("processed_users")
+  successfulUsers      Int         @default(0) @map("successful_users")
+  failedUsers          Int         @default(0) @map("failed_users")
+  startedAt            DateTime    @default(now()) @map("started_at")
+  completedAt          DateTime?   @map("completed_at")
+  errorSummary         String?     @map("error_summary")
+  processingDurationMs Int?        @map("processing_duration_ms")
+
+  @@index([segmentId, startedAt])
+  @@map("segment_executions")
+}
+
+model OperationsAudit {
+  id           String           @id @default(uuid()) @db.Uuid
+  operationId  String           @unique @map("operation_id")
+  operatorId   String           @map("operator_id") @db.Uuid
+  action       OperationsAction
+  status       OperationStatus
+  resourceType String           @map("resource_type") @db.VarChar(100)
+  resourceId   String           @map("resource_id") @db.VarChar(100)
+  metadata     Json?
+  errorMessage String?          @map("error_message")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@index([operatorId, createdAt])
+  @@index([action, createdAt])
+  @@index([status, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("operations_audits")
+}
+
+model ReconciliationRun {
+  id              String                @id @default(uuid()) @db.Uuid
+  startedAt       DateTime              @map("started_at")
+  completedAt     DateTime?             @map("completed_at")
+  status          ReconciliationStatus
+  totalChecked    Int                   @map("total_checked")
+  mismatchesFound Int                   @map("mismatches_found")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  issues          ReconciliationIssue[]
+  shards          ReconciliationShard[]
+
+  @@map("reconciliation_runs")
+}
+
+model ReconciliationShard {
+  id          String               @id @default(uuid()) @db.Uuid
+  runId       String               @map("run_id") @db.Uuid
+  userId      String               @map("user_id") @db.Uuid
+  status      ReconciliationStatus
+  startedAt   DateTime?            @map("started_at")
+  completedAt DateTime?            @map("completed_at")
+  issuesFound Int                  @default(0) @map("issues_found")
+  run         ReconciliationRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, userId])
+  @@map("reconciliation_shards")
+}
+
+model ReconciliationIssue {
+  id              String                    @id @default(uuid()) @db.Uuid
+  runId           String                    @map("run_id") @db.Uuid
+  userId          String                    @map("user_id") @db.Uuid
+  brokerId        String                    @map("broker_id") @db.Uuid
+  issueType       ReconciliationIssueType   @map("issue_type")
+  severity        Severity
+  resourceId      String                    @map("resource_id") @db.VarChar(100)
+  brokerValue     Json                      @map("broker_value")
+  dbValue         Json                      @map("db_value")
+  status          ReconciliationIssueStatus @default(OPEN)
+  fingerprint     String                    @unique @db.VarChar(64)
+  firstSeenAt     DateTime                  @default(now()) @map("first_seen_at")
+  lastSeenAt      DateTime                  @default(now()) @map("last_seen_at")
+  occurrenceCount Int                       @default(1) @map("occurrence_count")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  broker          Broker                    @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+  run             ReconciliationRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reconciliation_issues")
+}
+
+model ReconciliationSnapshot {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  brokerId         String   @map("broker_id") @db.Uuid
+  openIssues       Int      @map("open_issues")
+  lastReconciledAt DateTime @map("last_reconciled_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  broker           Broker   @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, brokerId])
+  @@map("reconciliation_snapshots")
+}
+
+model RiskProfile {
+  id                   String         @id @default(uuid()) @db.Uuid
+  userId               String?        @map("user_id") @db.Uuid
+  segmentId            String?        @map("segment_id") @db.Uuid
+  brokerId             String?        @map("broker_id") @db.Uuid
+  priority             Int            @default(0)
+  version              Int            @default(1)
+  maxCapitalPerUser    Decimal        @map("max_capital_per_user") @db.Decimal(15, 2)
+  maxCapitalPerSegment Decimal        @map("max_capital_per_segment") @db.Decimal(15, 2)
+  maxDailyLoss         Decimal        @map("max_daily_loss") @db.Decimal(15, 2)
+  maxOpenPositions     Int            @map("max_open_positions")
+  maxPositionSize      Int            @map("max_position_size")
+  maxExposurePerSymbol Decimal        @map("max_exposure_per_symbol") @db.Decimal(15, 2)
+  maxExposurePerBroker Decimal        @map("max_exposure_per_broker") @db.Decimal(15, 2)
+  maxConcurrentOrders  Int            @map("max_concurrent_orders")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+  broker               Broker?        @relation(fields: [brokerId], references: [id], onDelete: Cascade)
+  segment              SegmentMaster? @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  user                 User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("risk_profiles")
+}
+
+model RiskViolation {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  ruleViolated   RiskRule            @map("rule_violated")
+  severity       Severity
+  status         RiskViolationStatus @default(OPEN)
+  details        Json
+  blockedOrderId String?             @map("blocked_order_id") @db.VarChar(100)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("risk_violations")
+}
+
+model RiskSnapshot {
+  id                      String    @id @default(uuid()) @db.Uuid
+  userId                  String    @unique @map("user_id") @db.Uuid
+  state                   RiskState @default(HEALTHY)
+  profileVersion          Int       @default(1) @map("profile_version")
+  currentCapitalUsed      Decimal   @map("current_capital_used") @db.Decimal(15, 2)
+  dailyLoss               Decimal   @map("daily_loss") @db.Decimal(15, 2)
+  openPositionsCount      Int       @map("open_positions_count")
+  exposurePerSymbol       Json      @map("exposure_per_symbol")
+  exposurePerBroker       Json      @map("exposure_per_broker")
+  concurrentOrdersCount   Int       @map("concurrent_orders_count")
+  lastRecalculatedAt      DateTime? @map("last_recalculated_at")
+  lastRecalculationStatus String?   @map("last_recalculation_status") @db.VarChar(50)
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("risk_snapshots")
+}
+
+model RiskEvaluation {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  approved       Boolean
+  profileVersion Int      @map("profile_version")
+  orderValue     Decimal  @map("order_value") @db.Decimal(15, 2)
+  evaluatedRules Json     @map("evaluated_rules")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("risk_evaluations")
+}
+
+model DailyPortfolioSnapshot {
+  id                 String   @id @default(uuid()) @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  date               DateTime @db.Date
+  equity             Decimal  @db.Decimal(15, 2)
+  realizedPnl        Decimal  @map("realized_pnl") @db.Decimal(15, 2)
+  unrealizedPnl      Decimal  @map("unrealized_pnl") @db.Decimal(15, 2)
+  drawdown           Decimal  @db.Decimal(15, 2)
+  openPositionsCount Int      @map("open_positions_count")
+  volumeTraded       Decimal  @map("volume_traded") @db.Decimal(15, 2)
+  version            Int      @default(1) @map("version")
+  createdAt          DateTime @default(now()) @map("created_at")
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_portfolio_snapshots")
+}
+
+model EquityCurvePoint {
+  id          String                @id @default(uuid()) @db.Uuid
+  userId      String                @map("user_id") @db.Uuid
+  timestamp   DateTime              @default(now()) @map("timestamp")
+  equityValue Decimal               @map("equity_value") @db.Decimal(15, 2)
+  sourceType  EquityCurveSourceType @map("source_type")
+  details     Json?
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@map("equity_curve_points")
+}
+
+model SegmentPerformance {
+  id                  String        @id @default(uuid()) @db.Uuid
+  userId              String        @map("user_id") @db.Uuid
+  segmentId           String        @map("segment_id") @db.Uuid
+  totalTrades         Int           @map("total_trades")
+  winRate             Decimal       @map("win_rate") @db.Decimal(5, 2)
+  netPnL              Decimal       @map("net_pnl") @db.Decimal(15, 2)
+  maxDrawdown         Decimal       @map("max_drawdown") @db.Decimal(15, 2)
+  capitalUsed         Decimal       @map("capital_used") @db.Decimal(15, 2)
+  contributionPercent Decimal       @map("contribution_percent") @db.Decimal(5, 2)
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  segment             SegmentMaster @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, segmentId])
+  @@index([userId, segmentId])
+  @@map("segment_performances")
+}
+
+model UserPerformance {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @unique @map("user_id") @db.Uuid
+  totalPnl      Decimal   @map("total_pnl") @db.Decimal(15, 2)
+  grossProfit   Decimal   @map("gross_profit") @db.Decimal(15, 2)
+  grossLoss     Decimal   @map("gross_loss") @db.Decimal(15, 2)
+  totalTrades   Int       @map("total_trades")
+  winningTrades Int       @map("winning_trades")
+  losingTrades  Int       @map("losing_trades")
+  maxDrawdown   Decimal   @map("max_drawdown") @db.Decimal(15, 2)
+  firstTradeAt  DateTime? @map("first_trade_at")
+  lastTradeAt   DateTime? @map("last_trade_at")
+  version       Int       @default(1) @map("version")
+  calculatedAt  DateTime  @map("calculated_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_performances")
+}
+
+model BenchmarkSnapshot {
+  id            String   @id @default(uuid()) @db.Uuid
+  date          DateTime @db.Date
+  benchmarkName String   @map("benchmark_name") @db.VarChar(50)
+  value         Decimal  @db.Decimal(15, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([benchmarkName, date])
+  @@index([benchmarkName, date])
+  @@map("benchmark_snapshots")
+}
+
+model AnalyticsJobRun {
+  id             String             @id @default(uuid()) @db.Uuid
+  startedAt      DateTime           @map("started_at")
+  completedAt    DateTime?          @map("completed_at")
+  status         AnalyticsRunStatus @default(RUNNING)
+  usersProcessed Int                @default(0) @map("users_processed")
+  failures       Int                @default(0)
+  durationMs     Int?               @map("duration_ms")
+  createdAt      DateTime           @default(now()) @map("created_at")
+
+  @@map("analytics_job_runs")
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  eventType NotificationEvent   @map("event_type")
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventType, channel])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model NotificationDelivery {
+  id             String              @id @default(uuid()) @db.Uuid
+  notificationId String              @map("notification_id") @db.Uuid
+  channel        NotificationChannel
+  status         DeliveryStatus      @default(PENDING)
+  provider       String              @db.VarChar(50)
+  providerId     String?             @map("provider_id") @db.VarChar(100)
+  attempts       Int                 @default(0)
+  idempotencyKey String?             @unique @map("idempotency_key")
+  scheduledFor   DateTime?           @map("scheduled_for")
+  sentAt         DateTime?           @map("sent_at")
+  deliveredAt    DateTime?           @map("delivered_at")
+  failedAt       DateTime?           @map("failed_at")
+  error          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  notification   Notification        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([status, scheduledFor])
+  @@map("notification_deliveries")
+}
+
+model SreAlert {
+  id              String            @id @default(uuid()) @db.Uuid
+  event           NotificationEvent
+  details         Json?
+  severity        AlertSeverity     @default(WARNING)
+  status          AlertStatus       @default(OPEN)
+  fingerprint     String            @unique @db.VarChar(200)
+  occurrenceCount Int               @default(1) @map("occurrence_count")
+  escalationLevel Int               @default(0) @map("escalation_level")
+  lastEscalatedAt DateTime?         @map("last_escalated_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  resolvedAt      DateTime?         @map("resolved_at")
+
+  @@map("sre_alerts")
+}
+
+model UserKyc {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String        @unique @map("user_id") @db.Uuid
+  kycStatus  String        @map("kyc_status") @db.VarChar(50)
+  panNumber  String?       @map("pan_number") @db.VarChar(10)
+  fullName   String?       @map("full_name") @db.VarChar(150)
+  dob        DateTime?     @map("dob")
+  digioDocId String?       @map("digio_doc_id") @db.VarChar(100)
+  videoUrl   String?       @map("video_url")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  documents  KycDocument[]
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_kyc")
+}
+
+model KycDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  kycId        String   @map("kyc_id") @db.Uuid
+  documentType String   @map("document_type") @db.VarChar(50)
+  fileUrl      String   @map("file_url")
+  status       String   @default("PENDING") @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  kyc          UserKyc  @relation(fields: [kycId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_documents")
+}
+
+model PaymentIntent {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  purchaseType       String    @map("purchase_type") @db.VarChar(50)
+  planId             String?   @map("plan_id") @db.Uuid
+  baseAmount         Decimal   @map("base_amount") @db.Decimal(15, 2)
+  gstAmount          Decimal   @map("gst_amount") @db.Decimal(15, 2)
+  totalAmount        Decimal   @map("total_amount") @db.Decimal(15, 2)
+  status             String    @db.VarChar(50)
+  paymentMethod      String?   @map("payment_method") @db.VarChar(50)
+  proofImage         String?   @map("proof_image")
+  preferredSegmentId String?   @map("preferred_segment_id") @db.Uuid
+  preferredPlanId    String?   @map("preferred_plan_id") @db.Uuid
+  isPartial          Boolean   @default(false) @map("is_partial")
+  partialTotalTarget Decimal?  @map("partial_total_target") @db.Decimal(15, 2)
+  perDayCharge       Decimal?  @map("per_day_charge") @db.Decimal(15, 2)
+  maxAllowedDays     Int?      @map("max_allowed_days")
+  amountPaid         Decimal?  @map("amount_paid") @db.Decimal(15, 2)
+  walletBalance      Decimal?  @map("wallet_balance") @db.Decimal(15, 2)
+  serviceStartDate   DateTime? @map("service_start_date")
+  currentExpiryDate  DateTime? @map("current_expiry_date")
+  notes              String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payment_intents")
+}
+
+model ResearchReport {
+  id                String   @id @default(uuid()) @db.Uuid
+  title             String   @db.VarChar(200)
+  description       String
+  reportType        String   @map("report_type") @db.VarChar(100)
+  fileUrl           String?  @map("file_url")
+  youtubeUrl        String?  @map("youtube_url")
+  segmentIds        String[] @map("segment_ids")
+  planIds           String[] @map("plan_ids")
+  publishedStatus   String   @default("published") @map("published_status") @db.VarChar(50)
+  publishedAt       DateTime @default(now()) @map("published_at")
+  updates           Json     @default("[]")
+  automatedSignalId String?  @map("automated_signal_id") @db.VarChar(100)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("research_reports")
+}
+
+model GeneralSetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(100)
+  value       String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("general_settings")
+}
+
+model BrokerAuthState {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @map("user_id") @db.Uuid
+  broker    BrokerCode
+  state     String
+  expiresAt DateTime   @map("expires_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  @@unique([broker, state])
+  @@index([userId])
+  @@map("broker_auth_states")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum BrokerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BrokerCode {
+  ANGEL_ONE
+  ZEBU
+}
+
+enum Segment {
+  INTRADAY
+  DELIVERY
+  FO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum UserSegmentStatus {
+  ACTIVE
+  PAUSED
+  INACTIVE
+}
+
+enum ConsentStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum SignalStatus {
+  DRAFT
+  PUBLISHED
+  EXECUTED
+  COMPLETED
+}
+
+enum Side {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  PENDING
+  OPEN
+  TARGET_HIT
+  STOPLOSS_HIT
+  CLOSED
+  CANCELLED
+  FAILED
+}
+
+enum OrderType {
+  MARKET
+  LIMIT
+  SL
+  STOPLOSS_LIMIT
+  STOPLOSS_MARKET
+}
+
+enum OrderStatus {
+  PENDING
+  PLACED
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+enum PositionStatus {
+  OPEN
+  CLOSED
+}
+
+enum NotificationType {
+  TRADE_EXECUTED
+  TARGET_HIT
+  SL_HIT
+  CONSENT_PENDING
+  CAPITAL_SHORTAGE
+  CONSENT_GRANTED
+  CONSENT_REVOKED
+}
+
+enum AdminRole {
+  SUPERADMIN
+  ADMIN
+  COMPLIANCE
+  SRE
+}
+
+enum AdminStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum AnalystStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum BrokerSessionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum QueueJobStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+  DLQ
+  CANCELLED
+}
+
+enum IdempotencyStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum SignalState {
+  RECEIVED
+  VALIDATED
+  PROCESSING
+  PARTIALLY_COMPLETED
+  COMPLETED
+  FAILED
+}
+
+enum ReportState {
+  REQUESTED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ExportState {
+  REQUESTED
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum OperationsAction {
+  REPLAY_SIGNAL
+  REPLAY_OUTBOX
+  DLQ_REPLAY
+  DLQ_DELETE
+  QUEUE_PAUSE
+  QUEUE_RESUME
+  SEGMENT_UNLOCK
+  BROKER_REFRESH
+  POSITION_REBUILD
+  QUEUE_DRAIN
+  MAINTENANCE_ENABLE
+  MAINTENANCE_DISABLE
+  TRADING_STOP
+  TRADING_START
+  RECONCILIATION_RUN
+  RECONCILIATION_RESOLVE
+  RISK_RECALCULATE
+  RISK_UNBLOCK
+  RISK_GLOBAL_LOCK
+}
+
+enum OperationStatus {
+  SUCCESS
+  FAILED
+  REJECTED
+}
+
+enum NotificationEvent {
+  ORDER_PLACED
+  ORDER_FILLED
+  ORDER_REJECTED
+  RISK_BLOCKED
+  TARGET_HIT
+  STOP_LOSS_HIT
+  PAYMENT_RECEIVED
+  SUBSCRIPTION_EXPIRED
+  BROKER_DISCONNECTED
+  RECONCILIATION_CRITICAL
+  SYSTEM_ALERT
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+  IN_APP
+  WEBSOCKET
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum ReconciliationStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationIssueType {
+  TRADE_MISSING_IN_DB
+  TRADE_MISSING_IN_BROKER
+  ORDER_STATUS_MISMATCH
+  POSITION_QUANTITY_MISMATCH
+  POSITION_PNL_MISMATCH
+  DUPLICATE_TRADE
+  UNKNOWN
+}
+
+enum Severity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum ReconciliationIssueStatus {
+  OPEN
+  INVESTIGATING
+  ESCALATED
+  RESOLVED
+  IGNORED
+}
+
+enum RiskState {
+  HEALTHY
+  WARNING
+  BLOCKED
+}
+
+enum RiskViolationStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum RiskRule {
+  MAX_CAPITAL_USER
+  MAX_CAPITAL_SEGMENT
+  MAX_DAILY_LOSS
+  MAX_OPEN_POSITIONS
+  MAX_POSITION_SIZE
+  MAX_EXPOSURE_SYMBOL
+  MAX_EXPOSURE_BROKER
+  MAX_CONCURRENT_ORDERS
+  NO_PROFILE
+  STALE_SNAPSHOT
+}
+
+enum AnalyticsRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum EquityCurveSourceType {
+  INTRADAY
+  HOURLY
+  DAILY
+}
