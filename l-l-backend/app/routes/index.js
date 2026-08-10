@@ -1,4 +1,5 @@
 import userRoutes from "./userRoutes/index.js"
+import proxyRoutes from "./userRoutes/proxyRoutes.js";
 import userKycRoutes from "./userKycRoutes/index.js";
 import planPurchaseRoutes from "./planPurchaseRoutes/index.js"
 import reportsRoutes from "./reportsRouters/index.js"
@@ -13,10 +14,13 @@ import deviceRoutes from "./deviceRoutes/index.js";
 import activityLogRoutes from "./activityLogRoutes/index.js";
 import leadRoutes from "./leadRoutes/index.js";
 import staffReportRoutes from "./staffReportRoutes/index.js";
+import roleRoutes from "./roleRoutes/index.js";
+import permissionGroupRoutes from "./permissionGroupRoutes/index.js";
 
 const initRoutes = (app) => {
     app.get('/api/health', (req, res) => res.status(200).send({ status: 'OK', uptime: process.uptime() }));
     app.use('/api/user', userRoutes())
+    app.use('/api/user/proxy', proxyRoutes())
     app.use('/api/user/kyc', userKycRoutes())
     app.use('/api/user/purchase', planPurchaseRoutes())
     app.use('/api/reports', reportsRoutes())
@@ -31,5 +35,7 @@ const initRoutes = (app) => {
     app.use('/api/activity-log', activityLogRoutes())
     app.use('/api/leads', leadRoutes())
     app.use('/api/staff-reports', staffReportRoutes())
+    app.use('/api/roles', roleRoutes())
+    app.use('/api/permission-groups', permissionGroupRoutes())
 }
 export default initRoutes;

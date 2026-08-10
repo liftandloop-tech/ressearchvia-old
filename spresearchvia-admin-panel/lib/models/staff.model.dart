@@ -97,6 +97,8 @@ class StaffModel {
     this.emergencyContact,
   });
 
+  String get fullName => name;
+
   static String? _safeString(dynamic value) {
     if (value == null) return null;
     if (value is Map) {

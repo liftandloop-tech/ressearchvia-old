@@ -2,6 +2,8 @@ import leadModel from "../models/leadModel.js";
 import xlsx from "xlsx";
 import fs from "fs";
 import csvParser from "csv-parser";
+import importService from "../services/importService.js";
+import importJobModel from "../models/importJobModel.js";
 
 const leadController = {
     createLead: async (req, res) => {
@@ -57,7 +59,7 @@ const leadController = {
     addFollowUp: async (req, res) => {
         try {
             const { id } = req.params;
-            const { notes, followUpDate } = req.body;
+            const { notes, followUpDate, followUpType, status, nextFollowUpDate } = req.body;
             if (!notes || !followUpDate) {
                 return res.status(400).send({ status: 400, message: "Notes and followUpDate are required", data: {} });
             }
@@ -67,7 +69,13 @@ const leadController = {
                 return res.status(404).send({ status: 404, message: "Lead not found", data: {} });
             }
 
-            lead.followUps.push({ notes, followUpDate });
+            lead.followUps.push({
+                notes,
+                followUpDate,
+                followUpType: followUpType || 'Call',
+                status: status || 'Pending',
+                nextFollowUpDate: nextFollowUpDate || null
+            });
             // Move stage to Contacted if it was New
             if (lead.stage === 'New') {
                 lead.stage = 'Contacted';
@@ -88,59 +96,42 @@ const leadController = {
 
             const filePath = req.file.path;
             const ext = req.file.originalname.split('.').pop().toLowerCase();
-            let leadsToInsert = [];
 
-            if (ext === 'csv') {
-                const results = [];
-                await new Promise((resolve, reject) => {
-                    fs.createReadStream(filePath)
-                        .pipe(csvParser())
-                        .on('data', (data) => results.push(data))
-                        .on('end', resolve)
-                        .on('error', reject);
-                });
+            // Parse file headers, preview values and sheets
+            const { sheetNames, previewRows, columnPreview } = await importService.parseUploadedFile(filePath, ext);
 
-                leadsToInsert = results.map(row => ({
-                    fullName: row.fullName || row.name || row.FullName || row.Name,
-                    mobileNumber: row.mobileNumber || row.phone || row.Mobile || row.Phone,
-                    emailAddress: row.emailAddress || row.email || row.Email || null,
-                    personalDetails: {
-                        city: row.city || null,
-                        state: row.state || null
-                    }
-                }));
-            } else {
-                // Excel parse
-                const workbook = xlsx.readFile(filePath);
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const data = xlsx.utils.sheet_to_json(sheet);
-
-                leadsToInsert = data.map(row => ({
-                    fullName: row.fullName || row.name || row.FullName || row.Name,
-                    mobileNumber: String(row.mobileNumber || row.phone || row.Mobile || row.Phone || ''),
-                    emailAddress: row.emailAddress || row.email || row.Email || null,
-                    personalDetails: {
-                        city: row.city || null,
-                        state: row.state || null
-                    }
-                }));
+            if (columnPreview.length === 0) {
+                // Cleanup temp file
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                return res.status(400).send({ status: 400, message: "File contains no columns or data headers", data: {} });
             }
 
-            // Cleanup temp file
-            fs.unlinkSync(filePath);
+            // Create background job record
+            const job = await importJobModel.create({
+                userId: req.user._id,
+                companyId: req.user.companyId || req.user.company || "default_company",
+                fileName: req.file.originalname,
+                filePath: filePath,
+                status: 'mapping_required',
+                sheetNames,
+                columnPreview,
+                previewRows
+            });
 
-            // Filter out empty names or phones
-            const validLeads = leadsToInsert.filter(l => l.fullName && l.mobileNumber);
-            if (validLeads.length === 0) {
-                return res.status(400).send({ status: 400, message: "No valid lead records found in file", data: {} });
-            }
+            // Calculate matching recommendations
+            const suggestedMapping = importService.calculateSuggestions(columnPreview);
 
-            const createdLeads = await leadModel.insertMany(validLeads);
             res.status(200).send({
                 status: 200,
-                message: `Successfully uploaded ${createdLeads.length} leads`,
-                data: { count: createdLeads.length }
+                message: "File uploaded and parsed successfully",
+                data: {
+                    importId: job._id,
+                    status: job.status,
+                    sheetNames,
+                    columnPreview,
+                    previewRows,
+                    suggestedMapping
+                }
             });
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: {} });
@@ -155,6 +146,39 @@ const leadController = {
             res.status(200).send(csvContent);
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    markAsRead: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const lead = await leadModel.findByIdAndUpdate(id, { isRead: true }, { new: true });
+            if (!lead) {
+                return res.status(404).send({ status: 404, message: "Lead not found" });
+            }
+            res.status(200).send({ status: 200, message: "Lead marked as read", data: { lead } });
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message });
+        }
+    },
+
+    bulkAssign: async (req, res) => {
+        try {
+            const { leadIds, assignedRM } = req.body;
+            if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+                return res.status(400).send({ status: 400, message: "leadIds must be a non-empty array" });
+            }
+
+            const staffId = assignedRM && assignedRM !== 'unassigned' ? assignedRM : null;
+
+            await leadModel.updateMany(
+                { _id: { $in: leadIds } },
+                { $set: { assignedRM: staffId } }
+            );
+
+            res.status(200).send({ status: 200, message: "Leads assigned successfully" });
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message });
         }
     }
 };

@@ -376,3 +376,73 @@ export const paymentGate = (req, res, next) => {
         return res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
+/**
+ * 6. Dynamic Feature and Action Permission Check Middleware
+ * Check if the staff member has a Role with a Permission Group containing [feature] and [action].
+ */
+export const checkPermission = (feature, action) => {
+    return async (req, res, next) => {
+        try {
+            if (!req.user) {
+                return res.status(401).json({ message: "Unauthorized. Token required." });
+            }
+
+            const userType = (req.user.userType || "").toLowerCase();
+            // Super admins and primary admin users bypass permission checks
+            if (userType === 'super_admin' || userType === 'admin') {
+                return next();
+            }
+
+            const userId = req.user._id || req.user.userId;
+            if (!userId) {
+                return res.status(401).json({ message: "User ID not found in token." });
+            }
+
+            // Retrieve staff member and populate role and permission groups
+            const staffMember = await staff.findById(userId)
+                .populate({
+                    path: 'roleId',
+                    populate: {
+                        path: 'permissionGroups'
+                    }
+                });
+
+            if (!staffMember) {
+                return res.status(403).json({ message: "Access Denied. Staff record not found." });
+            }
+
+            // If user's department/role is Admin, bypass
+            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
+            const roleName = (staffMember.role || "").toLowerCase();
+            if (dept === 'admin' || roleName === 'admin' || (staffMember.roleId && staffMember.roleId.name.toLowerCase() === 'admin')) {
+                return next();
+            }
+
+            // If staff has no role assigned, deny access
+            if (!staffMember.roleId) {
+                return res.status(403).json({ message: `Access Denied. No role assigned. Required permission: ${feature}:${action}` });
+            }
+
+            // Iterate over permission groups and check if the permission is granted
+            const hasPermission = staffMember.roleId.permissionGroups.some(group => {
+                return group.permissions.some(perm => {
+                    return perm.feature.toLowerCase() === feature.toLowerCase() &&
+                           perm.actions.some(act => act.toLowerCase() === action.toLowerCase());
+                });
+            });
+
+            if (hasPermission) {
+                return next();
+            }
+
+            return res.status(403).json({
+                message: `Access Denied. You do not have permission to perform this action. Required permission: ${feature}:${action}`
+            });
+        } catch (error) {
+            console.error("Authorization check error:", error);
+            return res.status(500).json({ message: "Internal Server Error" });
+        }
+    };
+};
+

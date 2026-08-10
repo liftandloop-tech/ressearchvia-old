@@ -52,6 +52,7 @@ class MainDashboardController extends GetxController {
     }
 
     if (user?.isDirector == true) {
+      final hasPaymentsPermission = user?.hasPermission('Payments', 'read') ?? false;
       final allowedPrefixes = [
         '/users',
         '/staff',
@@ -59,11 +60,12 @@ class MainDashboardController extends GetxController {
         '/manage-user',
         '/edit-user',
         '/approvals/kyc',
+        if (hasPaymentsPermission) '/approvals/payments',
       ];
       final blockedRoutes = [
         '/users/create',
         '/users/pending-transfers',
-        '/approvals/payments',
+        if (!hasPaymentsPermission) '/approvals/payments',
       ];
 
       bool isAllowed = allowedPrefixes.any(

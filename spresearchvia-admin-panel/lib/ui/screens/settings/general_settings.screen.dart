@@ -5,6 +5,7 @@ import '../../../config/app.config.dart';
 import '../../../controllers/settings/settings.controller.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
+import 'lead_distribution.screen.dart';
 
 class GeneralSettingsScreen extends StatelessWidget {
   const GeneralSettingsScreen({super.key});
@@ -46,7 +47,15 @@ class GeneralSettingsScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 32),
-                      _buildBankDetailsCard(controller),
+                        Wrap(
+                          spacing: 24,
+                          runSpacing: 24,
+                          children: [
+                            _buildBankDetailsCard(controller),
+                            _buildRolesPermissionsCard(),
+                            _buildLeadDistributionCard(),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -567,6 +576,113 @@ class GeneralSettingsScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildRolesPermissionsCard() {
+    return Container(
+      width: 600,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.security_outlined,
+                color: AppTheme.primaryBlue,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Roles & Dynamic Permissions',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Configure dynamic user roles, customize permission groups, and assign granular feature access (Create, Read, Update, Delete) to staff members.',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.gray500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => Get.toNamed('/settings/roles-permissions'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Manage Roles & Permissions'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadDistributionCard() {
+    return Container(
+      width: 600,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bolt_rounded, color: Colors.orange.shade700),
+              const SizedBox(width: 12),
+              const Text(
+                'Lead Distribution',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Configure maximum fresh and unread lead limits per staff member, and set how many leads are pulled per pull action.',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.gray500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => Get.to(() => const LeadDistributionScreen()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Configure Lead Distribution'),
+          ),
+        ],
+      ),
     );
   }
 }

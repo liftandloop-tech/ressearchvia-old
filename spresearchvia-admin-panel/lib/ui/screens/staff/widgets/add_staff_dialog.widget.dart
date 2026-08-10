@@ -112,7 +112,7 @@ class AddStaffDialog extends StatelessWidget {
                   const SizedBox(height: 14),
                   // MPIN field
                   Obx(() {
-                    if (controller.selectedDepartment.value == 'Manager') {
+                    if (controller.selectedDepartment.value.toLowerCase() == 'manager') {
                       return const SizedBox.shrink();
                     }
                     return Column(
@@ -134,8 +134,8 @@ class AddStaffDialog extends StatelessWidget {
                       ],
                     );
                   }),
-                  // Department
-                  _buildLabel('Department', required: true),
+                  // Department / Role
+                  _buildLabel('Role', required: true),
                   const SizedBox(height: 6),
                   Container(
                     height: 40,
@@ -166,7 +166,7 @@ class AddStaffDialog extends StatelessWidget {
                           value: safeValue,
                           isExpanded: true,
                           hint: const Text(
-                            'Select Department',
+                            'Select Role',
                             style: TextStyle(
                               fontSize: 13,
                               color: Color(0xFFADB5BD),
@@ -362,9 +362,31 @@ class AddStaffDialog extends StatelessWidget {
                           children: [
                             _buildLabel('Date of Birth'),
                             const SizedBox(height: 6),
-                            _buildTextField(
+                            TextFormField(
                               controller: controller.dobController,
-                              hint: 'YYYY-MM-DD',
+                              readOnly: true,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.now().subtract(const Duration(days: 365 * 25)),
+                                  firstDate: DateTime(1930),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  controller.dobController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                                }
+                              },
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: 'YYYY-MM-DD',
+                                hintStyle: const TextStyle(color: Color(0xFFADB5BD), fontSize: 13),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                  borderSide: const BorderSide(color: Color(0xFFDEE2E6)),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                suffixIcon: const Icon(Icons.calendar_today, size: 16),
+                              ),
                             ),
                           ],
                         ),

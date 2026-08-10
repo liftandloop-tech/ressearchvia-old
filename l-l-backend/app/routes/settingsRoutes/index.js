@@ -3,10 +3,11 @@ import settingsController from "../../controller/settingsController.js";
 import auth from "../../config/auth.js"; // Assuming auth middleware exists
 
 import upload from "../../config/upload.js";
+import { checkPermission } from "../../middleware/accessMiddleware.js";
 
 const router = express.Router();
 
-router.post("/upload-qr", auth.tokenVerified, (req, res, next) => {
+router.post("/upload-qr", auth.tokenVerified, checkPermission('Settings', 'update'), (req, res, next) => {
     req.uploadType = "image"; // Use custom property — req.query is read-only in Express
     next();
 }, (req, res, next) => {
@@ -19,7 +20,7 @@ router.post("/upload-qr", auth.tokenVerified, (req, res, next) => {
 }, settingsController.uploadQR);
 
 router.get("/:key", settingsController.getSettings);
-router.post("/:key", auth.tokenVerified, settingsController.updateSettings);
+router.post("/:key", auth.tokenVerified, checkPermission('Settings', 'update'), settingsController.updateSettings);
 
 const initSettingsRoutes = () => router;
 

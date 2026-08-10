@@ -89,6 +89,13 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             SettingTile(
+              title: 'Static Proxy IP',
+              subtitle: 'Purchase & manage static proxy IP',
+              icon: Icons.settings_ethernet_outlined,
+              onTap: () => Get.toNamed(AppRoutes.proxySetup),
+            ),
+            const SizedBox(height: 10),
+            SettingTile(
               title: 'Trading Consent',
               subtitle: 'Review & grant daily execution consent',
               icon: Icons.gpp_good_outlined,

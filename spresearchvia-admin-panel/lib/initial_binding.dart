@@ -22,6 +22,7 @@ import 'package:spresearch_web/services/user_payment.service.dart';
 import 'package:spresearch_web/services/notification.service.dart';
 import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/settings.service.dart';
+import 'package:spresearch_web/services/lead.service.dart';
 
 import 'package:spresearch_web/services/api.service.dart';
 
@@ -43,6 +44,7 @@ class InitialBinding extends Bindings {
     Get.put(NotificationService(), permanent: true);
     Get.put(AcquisitionService(), permanent: true);
     Get.put(SettingsService(), permanent: true);
+    Get.put(LeadService(), permanent: true);
 
     // Controllers
     Get.put(AuthController(), permanent: true); // Keep AuthController active

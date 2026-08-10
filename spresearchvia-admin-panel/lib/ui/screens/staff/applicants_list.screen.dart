@@ -195,9 +195,9 @@ class ApplicantsListScreen extends StatelessWidget {
               Obx(
                 () => DropdownButtonFormField<String>(
                   value: controller.selectedDepartment.value.isEmpty ? null : controller.selectedDepartment.value,
-                  hint: const Text('Select Department'),
+                  hint: const Text('Select Role'),
                   decoration: const InputDecoration(border: OutlineInputBorder()),
-                  items: ['Researcher', 'Director', 'Manager', 'Executive']
+                  items: controller.availableDepartments
                       .map((x) => DropdownMenuItem(value: x, child: Text(x)))
                       .toList(),
                   onChanged: (val) => controller.selectedDepartment.value = val ?? '',
@@ -219,7 +219,23 @@ class ApplicantsListScreen extends StatelessWidget {
               // Joining Date
               TextField(
                 controller: controller.joiningDateController,
-                decoration: const InputDecoration(labelText: 'Joining Date', border: OutlineInputBorder()),
+                readOnly: true,
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(1950),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked != null) {
+                    controller.joiningDateController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                  }
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Joining Date',
+                  border: OutlineInputBorder(),
+                  suffixIcon: Icon(Icons.calendar_today),
+                ),
               ),
               const SizedBox(height: 16),
               // View Only toggle

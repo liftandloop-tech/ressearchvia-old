@@ -40,7 +40,7 @@ export declare class ZebuService extends BrokerAdapter implements BrokerClient {
     getMargin(token: string, clientCode: string): Promise<number>;
     getPositions(token: string, clientCode: string): Promise<PositionResponse[]>;
     getHoldings(token: string, clientCode: string): Promise<HoldingResponse[]>;
-    placeOrder(token: string, clientCode: string, order: OrderRequest): Promise<OrderResponse>;
+    placeOrder(token: string, clientCode: string, order: OrderRequest, httpsAgent?: any): Promise<OrderResponse>;
     modifyOrder(token: string, clientCode: string, orderId: string, _variety: string, order: {
         quantity: number;
         price?: number;

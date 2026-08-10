@@ -67,11 +67,17 @@ class LeadModel {
 class FollowUpModel {
   final String notes;
   final DateTime followUpDate;
+  final String followUpType;
+  final String status;
+  final DateTime? nextFollowUpDate;
   final DateTime createdAt;
 
   FollowUpModel({
     required this.notes,
     required this.followUpDate,
+    required this.followUpType,
+    required this.status,
+    this.nextFollowUpDate,
     required this.createdAt,
   });
 
@@ -81,6 +87,11 @@ class FollowUpModel {
       followUpDate: json['followUpDate'] != null
           ? DateTime.tryParse(json['followUpDate'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      followUpType: json['followUpType']?.toString() ?? 'Call',
+      status: json['status']?.toString() ?? 'Pending',
+      nextFollowUpDate: json['nextFollowUpDate'] != null
+          ? DateTime.tryParse(json['nextFollowUpDate'].toString())
+          : null,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),

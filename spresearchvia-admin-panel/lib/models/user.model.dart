@@ -23,6 +23,7 @@ class UserModel {
   final String panCard;
   final String userStatus; // ACTIVE or SUSPENDED
   final bool isViewOnly;
+  final Map<String, dynamic>? rawJson;
 
   UserModel({
     required this.id,
@@ -49,6 +50,7 @@ class UserModel {
     this.panCard = '',
     this.userStatus = 'ACTIVE',
     this.isViewOnly = false,
+    this.rawJson,
   });
 
   String get fullName => lastName.isEmpty ? firstName : '$firstName $lastName';
@@ -134,7 +136,42 @@ class UserModel {
           '',
       userStatus: json['userStatus'] ?? 'ACTIVE',
       isViewOnly: json['isViewOnly'] ?? false,
+      rawJson: json,
     );
+  }
+
+  bool hasPermission(String feature, String action) {
+    if (isAdmin) return true; // System admins bypass permission checks
+    if (rawJson == null) return false;
+
+    // Check roleId
+    final roleId = rawJson!['roleId'];
+    if (roleId is Map) {
+      final groups = roleId['permissionGroups'];
+      if (groups is List) {
+        for (var group in groups) {
+          if (group is Map) {
+            final permissionsList = group['permissions'];
+            if (permissionsList is List) {
+              for (var perm in permissionsList) {
+                if (perm is Map) {
+                  final String permFeature = (perm['feature'] ?? '').toString().toLowerCase();
+                  if (permFeature == feature.toLowerCase()) {
+                    final actions = perm['actions'];
+                    if (actions is List) {
+                      if (actions.any((act) => act.toString().toLowerCase() == action.toLowerCase())) {
+                        return true;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
   }
 
   Map<String, dynamic> toJson() {

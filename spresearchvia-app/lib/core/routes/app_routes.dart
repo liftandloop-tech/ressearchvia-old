@@ -37,6 +37,7 @@ import '../../screens/rm/contact_rm.screen.dart';
 import '../../screens/subscription/billing_history.screen.dart';
 import '../../screens/setting/consent_screen.dart';
 import '../../screens/dashboard/automated_trading_screen.dart';
+import '../../screens/setting/proxy_purchase.screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -78,6 +79,7 @@ class AppRoutes {
   static const String billingHistory = '/billing-history';
   static const String consent = '/consent';
   static const String automatedTrading = '/automated-trading';
+  static const String proxySetup = '/proxy-setup';
 
   static final pages = [
     GetPage(name: splash, page: () => const SplashScreen()),
@@ -141,5 +143,6 @@ class AppRoutes {
     GetPage(name: billingHistory, page: () => const BillingHistoryScreen()),
     GetPage(name: consent, page: () => const ConsentScreen()),
     GetPage(name: automatedTrading, page: () => const AutomatedTradingScreen()),
+    GetPage(name: proxySetup, page: () => const ProxyPurchaseScreen()),
   ];
 }

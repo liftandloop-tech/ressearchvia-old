@@ -1,7 +1,7 @@
 import express from "express";
 import segmentsController from "../../controller/segmentsController.js";
 import auth from "../../config/auth.js"
-import { appAccess, registrationAccess, contentAccess, paymentGate } from "../../middleware/accessMiddleware.js";
+import { appAccess, registrationAccess, contentAccess, paymentGate, checkPermission } from "../../middleware/accessMiddleware.js";
 
 const Router = express.Router();
 
@@ -15,7 +15,7 @@ const SegmentsRoutes = () => {
     Router.post("/reject-bank-transfer", auth.tokenVerified, segmentsController.rejectBankTransfer)
     Router.post("/revert-to-rejected", auth.tokenVerified, segmentsController.revertApproval)
     Router.post("/revert-to-approved", auth.tokenVerified, segmentsController.revertRejection)
-    Router.get("/pending-bank-transfers", auth.tokenVerified, segmentsController.getPendingBankTransfers)
+    Router.get("/pending-bank-transfers", auth.tokenVerified, checkPermission('Payments', 'read'), segmentsController.getPendingBankTransfers)
     Router.get("/hni-requests", auth.tokenVerified, segmentsController.getHniRequests)
     Router.post("/admin-grant-hni-plan", auth.tokenVerified, segmentsController.adminGrantHniPlan)
     Router.get("/segment-user-list", auth.tokenVerified, segmentsController.userSegmentPlanList)

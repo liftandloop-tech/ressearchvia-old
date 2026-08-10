@@ -41,6 +41,7 @@
     "bullmq": "^5.78.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "https-proxy-agent": "^9.1.0",
     "ioredis": "^5.11.1",
     "luxon": "^3.7.2",
     "nestjs-pino": "^4.6.1",
@@ -115,6 +116,9 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^https-proxy-agent$": "<rootDir>/../__mocks__/https-proxy-agent.js"
+    },
     "coverageThreshold": {
       "global": {
         "branches": 70,

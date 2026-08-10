@@ -13,7 +13,7 @@ export declare abstract class BrokerAdapter {
     abstract getMargin(token: string, clientCode: string): Promise<number>;
     abstract getProfile(token: string, clientCode?: string): Promise<any>;
     abstract getOrders(token: string, clientCode: string): Promise<any[]>;
-    abstract placeOrder(token: string, clientCode: string, order: OrderRequest): Promise<OrderResponse>;
+    abstract placeOrder(token: string, clientCode: string, order: OrderRequest, httpsAgent?: any): Promise<OrderResponse>;
     abstract getOrderStatus(token: string, clientCode: string, brokerOrderId: string): Promise<OrderResponse>;
     abstract getPositions(token: string, clientCode: string): Promise<PositionResponse[]>;
     abstract getHoldings(token: string, clientCode: string): Promise<HoldingResponse[]>;

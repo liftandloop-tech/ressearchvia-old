@@ -5,19 +5,20 @@ import staffController from "../../controller/staffController.js";
 import staffDocController from "../../controller/staffDocController.js";
 import staffAttendanceController from "../../controller/staffAttendanceController.js";
 import applicantController from "../../controller/applicantController.js";
+import { checkPermission } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
 const staffRoutes = () => {
     Router.post("/staff-login", staffController.staffLogin)
     Router.post("/staff-mpin-login", staffController.staffMpinLogin)
     Router.post("/staff-otp-verify", staffController.staffOtpVerify)
-    Router.post("/create", auth.tokenVerified, staffController.staffCreate)
-    Router.put("/reset", auth.tokenVerified, staffController.staffReset)
-    Router.delete("/delete", auth.tokenVerified, staffController.cancleStaff)
-    Router.get("/list", auth.tokenVerified, staffController.staffList)
-    Router.delete("/cancle/:id", auth.tokenVerified, staffController.cancleStaff)
-    Router.post("/staff-assignment", auth.tokenVerified, staffController.StaffAssignment)
-    Router.get("/assigned-users", auth.tokenVerified, staffController.getStaffAssignedUsers)
+    Router.post("/create", auth.tokenVerified, checkPermission('Staff', 'create'), staffController.staffCreate)
+    Router.put("/reset", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.staffReset)
+    Router.delete("/delete", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
+    Router.get("/list", auth.tokenVerified, checkPermission('Staff', 'read'), staffController.staffList)
+    Router.delete("/cancle/:id", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
+    Router.post("/staff-assignment", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.StaffAssignment)
+    Router.get("/assigned-users", auth.tokenVerified, checkPermission('Staff', 'read'), staffController.getStaffAssignedUsers)
     Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
 
     // Public applicant routes

@@ -179,7 +179,7 @@ const segmentsController = {
     },
     getPendingBankTransfers: async (req, res) => {
         try {
-            const response = await segmentsService.getPendingBankTransfers({ query: req.query });
+            const response = await segmentsService.getPendingBankTransfers({ query: req.query, user: req.user });
             res.status(response.status).send(response);
         } catch (error) {
             res.status(400).send({ status: 400, message: error.message, data: {} });

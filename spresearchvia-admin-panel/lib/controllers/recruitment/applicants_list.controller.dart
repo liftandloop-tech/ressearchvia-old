@@ -17,6 +17,13 @@ class ApplicantsListController extends GetxController {
   var selectedDepartment = ''.obs;
   var isViewOnly = false.obs;
 
+  List<String> get availableDepartments {
+    if (Get.isRegistered<StaffController>()) {
+      return Get.find<StaffController>().availableDepartments;
+    }
+    return ['Researcher', 'Director', 'Manager', 'Executive'];
+  }
+
   @override
   void onInit() {
     super.onInit();

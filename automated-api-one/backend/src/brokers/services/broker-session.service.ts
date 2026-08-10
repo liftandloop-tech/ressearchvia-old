@@ -46,15 +46,25 @@ export class BrokerSessionService {
     // Write to Redis so resolveBrokerToken finds the token immediately
     if (this.redisService.isHealthy() && session.accessToken) {
       try {
+        const fullBroker = await this.prisma.userBroker.findUnique({
+          where: { id: userBrokerId },
+        });
+
         const sessionKey = RedisKeys.brokerSession(userId, updatedBroker.brokerId);
-        const payload = JSON.stringify({ accessToken: session.accessToken });
+        const payload = JSON.stringify({
+          accessToken: session.accessToken,
+          proxyIp: fullBroker?.proxyIp || null,
+          proxyPort: fullBroker?.proxyPort || null,
+          proxyUsername: fullBroker?.proxyUsername || null,
+          proxyPassword: fullBroker?.proxyPassword || null,
+        });
         // TTL: seconds until midnight IST (expires with session)
         const midnightIst = new Date();
         midnightIst.setUTCHours(18, 30, 0, 0); // midnight IST = 18:30 UTC
         if (midnightIst < new Date()) midnightIst.setUTCDate(midnightIst.getUTCDate() + 1);
         const ttlSeconds = Math.floor((midnightIst.getTime() - Date.now()) / 1000);
         await this.redisService.getClient().set(sessionKey, payload, 'EX', ttlSeconds);
-        this.logger.log(`[BrokerSession] Cached token for user ${userId} in Redis (TTL: ${ttlSeconds}s)`);
+        this.logger.log(`[BrokerSession] Cached token and proxy credentials for user ${userId} in Redis (TTL: ${ttlSeconds}s)`);
       } catch (err) {
         this.logger.warn(`[BrokerSession] Redis write failed for user ${userId}: ${err.message}`);
       }

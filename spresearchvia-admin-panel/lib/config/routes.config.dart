@@ -18,6 +18,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String hniRequests = '/subscriptions/hni-requests';
   static const String settings = '/settings';
+  static const String rolesPermissions = '/settings/roles-permissions';
   static const String pendingPayments = '/approvals/payments';
   static const String userKyc = '/approvals/kyc';
   static const String automatedTrading = '/automated-trading';

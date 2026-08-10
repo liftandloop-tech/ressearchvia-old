@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken"
 import bcrypt from "bcryptjs"
 import mongoose from "mongoose";
 import { logManagerAssigned } from "./activityLogService.js";
+import roleModel from "../models/roleModel.js";
+import roleService from "./roleService.js";
 
 
 
@@ -27,6 +29,19 @@ const staffService = {
 
       if (body.mpin) {
         body.mpin = body.mpin.toString();
+      }
+
+      // Seed default Admin role and group
+      await roleService.seedAdminRole();
+
+      if (!body.roleId) {
+        const dept = (body.deparment || "").toLowerCase();
+        if (dept === 'admin') {
+          const adminRole = await roleModel.findOne({ name: 'Admin' });
+          if (adminRole) {
+            body.roleId = adminRole._id;
+          }
+        }
       }
 
       let staff = await staffModel.findOne({ staffId: body.staffId })
@@ -116,6 +131,27 @@ const staffService = {
       staff.otp = null;
       staff.otpExpires = null;
       await staff.save();
+
+      // Seed default Admin role and group
+      await roleService.seedAdminRole();
+
+      // Auto-assign Admin role to Admin department if not present
+      if (!staff.roleId && (staff.deparment || "").toLowerCase() === 'admin') {
+        const adminRole = await roleModel.findOne({ name: 'Admin' });
+        if (adminRole) {
+          staff.roleId = adminRole._id;
+          await staff.save();
+        }
+      }
+
+      // Populate role details for response
+      staff = await staffModel.findById(staff._id).populate({
+        path: 'roleId',
+        populate: {
+          path: 'permissionGroups'
+        }
+      });
+
       let token = jwt.sign(
         {
           _id: staff._id.toString(),
@@ -170,6 +206,26 @@ const staffService = {
         return { status: 200, message: "Invalid MPIN", data: {} }
       }
 
+      // Seed default Admin role and group
+      await roleService.seedAdminRole();
+
+      // Auto-assign Admin role to Admin department if not present
+      if (!staff.roleId && (staff.deparment || "").toLowerCase() === 'admin') {
+        const adminRole = await roleModel.findOne({ name: 'Admin' });
+        if (adminRole) {
+          staff.roleId = adminRole._id;
+          await staff.save();
+        }
+      }
+
+      // Populate role details for response
+      staff = await staffModel.findById(staff._id).populate({
+        path: 'roleId',
+        populate: {
+          path: 'permissionGroups'
+        }
+      });
+
       let token = jwt.sign(
         {
           _id: staff._id.toString(),
@@ -190,7 +246,7 @@ const staffService = {
       console.log('staffReset query:', query);
       console.log('staffReset body:', body);
       let { id } = query
-      let { fullName, mobileNumber, emailAddress, deparment, designation, role } = body
+      let { fullName, mobileNumber, emailAddress, deparment, designation, role, roleId } = body
       const staff = await staffModel.findOne({ _id: id })
       if (!staff || staff == null) {
         return { status: 200, message: "staff not exist", data: {} }
@@ -230,6 +286,10 @@ const staffService = {
 
       if (body.status) {
         staff.status = body.status;
+      }
+
+      if (roleId !== undefined) {
+        staff.roleId = roleId || null;
       }
 
       console.log('body.isViewOnly value:', body.isViewOnly, 'type:', typeof body.isViewOnly);

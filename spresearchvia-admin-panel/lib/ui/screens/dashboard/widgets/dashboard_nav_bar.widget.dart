@@ -54,7 +54,12 @@ class DashboardNavBar extends StatelessWidget {
               if (item['title'] == 'Users' && item.containsKey('children')) {
                 final children =
                     (item['children'] as List<Map<String, dynamic>>)
-                        .where((child) => child['title'] != 'Payments')
+                        .where((child) {
+                          if (child['title'] == 'Payments') {
+                            return user?.hasPermission('Payments', 'read') ?? false;
+                          }
+                          return true;
+                        })
                         .toList();
                 return {...item, 'children': children};
               }

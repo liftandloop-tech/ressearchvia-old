@@ -8,6 +8,17 @@ const settingsController = {
             // Return default if not found
             if (!settings) {
                 // Return default values based on key
+                if (key === 'lead_distribution') {
+                    return res.status(200).send({
+                        status: 200,
+                        data: {
+                            freshMaxPerStaff: 100,
+                            freshPullSize: 20,
+                            unreadMaxPerStaff: 50,
+                            unreadPullSize: 10
+                        }
+                    });
+                }
                 if (key === 'expiry_alerts') {
                     return res.status(200).send({
                         status: 200,

@@ -45,7 +45,7 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
         const mockVal = this.configService.get('MOCK_BROKERS', true);
         this.isMock = mockVal === true || mockVal === 'true';
     }
-    getHeaders(token) {
+    getHeaders(token, proxyIp) {
         const apiKey = this.configService.get('ANGEL_ONE_API_KEY') || '';
         const headers = {
             'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             'X-SourceID': 'WEB',
             'X-PrivateKey': apiKey,
             'X-ClientLocalIP': '192.168.1.100',
-            'X-ClientPublicIP': '106.193.147.98',
+            'X-ClientPublicIP': proxyIp || '106.193.147.98',
             'X-MACaddress': '02:00:00:00:00:00',
         };
         if (token) {
@@ -292,7 +292,7 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             return [];
         }
     }
-    async placeOrder(token, clientCode, order) {
+    async placeOrder(token, clientCode, order, httpsAgent) {
         if (this.isMock) {
             const mockId = `mock_order_${Math.floor(100000 + Math.random() * 900000)}`;
             this.logger.log(`[SANDBOX MOCK] Placed order ${mockId} for ${clientCode}: ${order.side} ${order.quantity} x ${order.symbol} (${order.orderType})`);
@@ -306,6 +306,17 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             let variety = 'ROBO';
             let ordertype = order.orderType;
             const symbolToken = this.instrumentsService.findToken(order.symbol, order.exchange) || 'DUMMY_TOKEN';
+            let proxyIp;
+            if (httpsAgent && httpsAgent.options) {
+                const proxyUrl = httpsAgent.options.href || httpsAgent.options.host || httpsAgent.options.hostname;
+                if (proxyUrl) {
+                    try {
+                        const parsed = new URL(httpsAgent.options.href || `http://${proxyUrl}`);
+                        proxyIp = parsed.hostname;
+                    }
+                    catch (_) { }
+                }
+            }
             const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${angel_one_endpoints_1.AngelOneEndpoints.PLACE_ORDER}`, {
                 variety,
                 tradingsymbol: order.symbol,
@@ -323,7 +334,8 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
                 trailingStopLoss: order.trailingStopLoss?.toString(),
                 scripconsent: 'yes',
             }, {
-                headers: this.getHeaders(token),
+                headers: this.getHeaders(token, proxyIp),
+                ...(httpsAgent ? { httpsAgent } : {}),
             }));
             if (response.data && response.data.status === true) {
                 return {

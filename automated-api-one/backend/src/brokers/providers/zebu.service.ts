@@ -470,6 +470,7 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
     token: string,
     clientCode: string,
     order: OrderRequest,
+    httpsAgent?: any,
   ): Promise<OrderResponse> {
     if (this.isMock) {
       const mockId = `mock_zebu_order_${Math.floor(100000 + Math.random() * 900000)}`;
@@ -533,6 +534,7 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
         const response = await firstValueFrom(
           this.httpService.post(`${this.baseUrl}${ZebuEndpoints.PLACE_ORDER}`, body, {
             headers: this.getHeaders(),
+            ...(httpsAgent ? { httpsAgent } : {}),
           }),
         );
 

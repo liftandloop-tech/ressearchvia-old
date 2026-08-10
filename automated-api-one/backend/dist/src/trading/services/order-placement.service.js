@@ -64,8 +64,8 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
             return { success: false, reason: `Risk Engine block: ${riskDecision.reason}` };
         }
         await this.rateLimiter.throttle(brokerCode);
-        const accessToken = await this.resolveBrokerToken(userId, brokerId, brokerClientId);
-        if (!accessToken) {
+        const tokenInfo = await this.resolveBrokerToken(userId, brokerId, brokerClientId);
+        if (!tokenInfo || !tokenInfo.accessToken) {
             this.logger.warn(`[${correlationId}] No active broker session for user ${userId}`);
             return { success: false, reason: 'No active broker session' };
         }
@@ -77,7 +77,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
             this.metrics.incrementBrokerCalls(brokerCode);
             this.metrics.incrementOrderPlacementAttempts();
             const orderResult = await this.circuitBreaker.execute(brokerCode, () => Promise.race([
-                adapter.placeOrder(accessToken, brokerClientId, {
+                adapter.placeOrder(tokenInfo.accessToken, brokerClientId, {
                     symbol,
                     exchange,
                     side,
@@ -87,7 +87,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
                     triggerPrice: stopLoss,
                     squareoff: targetPrice ? Math.abs(entryPrice - targetPrice) : undefined,
                     stoploss: stopLoss ? Math.abs(entryPrice - stopLoss) : undefined,
-                }),
+                }, tokenInfo.proxyAgent),
                 new Promise((_, reject) => setTimeout(() => reject(new Error(`Broker API timeout after ${this.brokerTimeoutMs}ms`)), this.brokerTimeoutMs)),
             ]));
             if (orderResult.status === 'REJECTED' || !orderResult.brokerOrderId) {
@@ -178,7 +178,8 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
         return { success: true, tradeId, orderId, brokerOrderId };
     }
     async resolveBrokerToken(userId, brokerId, brokerClientId) {
-        this.logger.log(`[resolveBrokerToken] Resolving token for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
+        this.logger.log(`[resolveBrokerToken] Resolving token & proxy for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
+        const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
         if (this.redisService.isHealthy()) {
             try {
                 const sessionKey = redis_keys_1.RedisKeys.brokerSession(userId, brokerId);
@@ -188,7 +189,14 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
                     const session = JSON.parse(cachedRaw);
                     if (session?.accessToken) {
                         this.logger.debug(`Broker session for user ${userId} resolved from Redis cache`);
-                        return session.accessToken;
+                        const agent = createProxyAgent({
+                            proxyIp: session.proxyIp || null,
+                            proxyPort: session.proxyPort || null,
+                            proxyHostname: null,
+                            proxyUsername: session.proxyUsername || null,
+                            proxyPassword: session.proxyPassword || null,
+                        });
+                        return { accessToken: session.accessToken, proxyAgent: agent };
                     }
                 }
             }
@@ -201,10 +209,19 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
         }
         const userBroker = await this.prisma.userBroker.findFirst({
             where: { userId, brokerId },
-            select: { accessToken: true },
         });
         this.logger.log(`[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`);
-        return userBroker?.accessToken ?? null;
+        if (userBroker) {
+            const agent = createProxyAgent({
+                proxyIp: userBroker.proxyIp,
+                proxyPort: userBroker.proxyPort,
+                proxyHostname: userBroker.proxyHostname,
+                proxyUsername: userBroker.proxyUsername,
+                proxyPassword: userBroker.proxyPassword,
+            });
+            return { accessToken: userBroker.accessToken, proxyAgent: agent };
+        }
+        return { accessToken: null };
     }
 };
 exports.OrderPlacementService = OrderPlacementService;

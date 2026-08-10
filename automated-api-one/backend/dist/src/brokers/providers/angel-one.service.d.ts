@@ -33,7 +33,7 @@ export declare class AngelOneService extends BrokerAdapter implements BrokerClie
     getMargin(token: string, clientCode: string): Promise<number>;
     getProfile(token: string): Promise<ProfileResponse>;
     getOrders(token: string, clientCode: string): Promise<any[]>;
-    placeOrder(token: string, clientCode: string, order: OrderRequest): Promise<OrderResponse>;
+    placeOrder(token: string, clientCode: string, order: OrderRequest, httpsAgent?: any): Promise<OrderResponse>;
     getOrderStatus(token: string, clientCode: string, brokerOrderId: string): Promise<OrderResponse>;
     getLtp(exchange: string, symbol: string, token?: string, symbolToken?: string): Promise<{
         ltp: number;

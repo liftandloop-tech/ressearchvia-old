@@ -85,8 +85,8 @@ export class OrderPlacementService {
     await this.rateLimiter.throttle(brokerCode);
 
     // 2. Resolve broker access token — Redis first, DB fallback
-    const accessToken = await this.resolveBrokerToken(userId, brokerId, brokerClientId);
-    if (!accessToken) {
+    const tokenInfo = await this.resolveBrokerToken(userId, brokerId, brokerClientId);
+    if (!tokenInfo || !tokenInfo.accessToken) {
       this.logger.warn(`[${correlationId}] No active broker session for user ${userId}`);
       return { success: false, reason: 'No active broker session' };
     }
@@ -104,7 +104,7 @@ export class OrderPlacementService {
         brokerCode,
         () =>
           Promise.race([
-            adapter.placeOrder(accessToken, brokerClientId, {
+            adapter.placeOrder(tokenInfo.accessToken!, brokerClientId, {
               symbol,
               exchange,
               side,
@@ -114,7 +114,7 @@ export class OrderPlacementService {
               triggerPrice: stopLoss,
               squareoff: targetPrice ? Math.abs(entryPrice - targetPrice) : undefined,
               stoploss: stopLoss ? Math.abs(entryPrice - stopLoss) : undefined,
-            }),
+            }, tokenInfo.proxyAgent),
             new Promise<never>((_, reject) =>
               setTimeout(
                 () => reject(new Error(`Broker API timeout after ${this.brokerTimeoutMs}ms`)),
@@ -256,8 +256,12 @@ export class OrderPlacementService {
     userId: string,
     brokerId: string,
     brokerClientId: string,
-  ): Promise<string | null> {
-    this.logger.log(`[resolveBrokerToken] Resolving token for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
+  ): Promise<{ accessToken: string | null; proxyAgent?: any }> {
+    this.logger.log(`[resolveBrokerToken] Resolving token & proxy for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
+    
+    // Create HttpsProxyAgent helper inside this file or import it
+    const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+
     // 1. Try Redis cache (populated by BrokerSessionService on broker connect/refresh)
     if (this.redisService.isHealthy()) {
       try {
@@ -265,14 +269,20 @@ export class OrderPlacementService {
         const cachedRaw = await this.redisService.getClient().get(sessionKey);
         this.logger.log(`[resolveBrokerToken] Redis check for key=${sessionKey}: exists=${!!cachedRaw}`);
         if (cachedRaw) {
-          const session = JSON.parse(cachedRaw) as { accessToken: string };
+          const session = JSON.parse(cachedRaw) as { accessToken: string; proxyIp?: string; proxyPort?: number; proxyUsername?: string; proxyPassword?: string };
           if (session?.accessToken) {
             this.logger.debug(`Broker session for user ${userId} resolved from Redis cache`);
-            return session.accessToken;
+            const agent = createProxyAgent({
+              proxyIp: session.proxyIp || null,
+              proxyPort: session.proxyPort || null,
+              proxyHostname: null,
+              proxyUsername: session.proxyUsername || null,
+              proxyPassword: session.proxyPassword || null,
+            });
+            return { accessToken: session.accessToken, proxyAgent: agent };
           }
         }
       } catch (err) {
-        // Redis read failure — continue to DB fallback
         this.logger.warn(`Redis broker session read failed for user ${userId}: ${err.message}. Falling back to DB.`);
       }
     } else {
@@ -282,10 +292,20 @@ export class OrderPlacementService {
     // 2. DB fallback
     const userBroker = await this.prisma.userBroker.findFirst({
       where: { userId, brokerId },
-      select: { accessToken: true },
     });
     this.logger.log(`[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`);
 
-    return userBroker?.accessToken ?? null;
+    if (userBroker) {
+      const agent = createProxyAgent({
+        proxyIp: userBroker.proxyIp,
+        proxyPort: userBroker.proxyPort,
+        proxyHostname: userBroker.proxyHostname,
+        proxyUsername: userBroker.proxyUsername,
+        proxyPassword: userBroker.proxyPassword,
+      });
+      return { accessToken: userBroker.accessToken, proxyAgent: agent };
+    }
+
+    return { accessToken: null };
   }
 }

@@ -208,4 +208,139 @@ describe('OrderPlacementService', () => {
       expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
   });
+
+  // ─── Proxy agent construction (resolveBrokerToken) ────────────────────────
+  describe('proxy agent construction in resolveBrokerToken', () => {
+    // Access the private method via type-casting
+    const resolve = (svc: OrderPlacementService, uid: string, bid: string, cid: string) =>
+      (svc as any).resolveBrokerToken(uid, bid, cid);
+
+    it('should build an HttpsProxyAgent when Redis cache has proxy fields', async () => {
+      mockRedisService.isHealthy.mockReturnValue(true);
+      mockRedisClient.get.mockResolvedValue(
+        JSON.stringify({
+          accessToken: 'REDIS_TOKEN',
+          proxyIp: '10.0.0.1',
+          proxyPort: 3128,
+          proxyUsername: 'u1',
+          proxyPassword: 'p1',
+        }),
+      );
+
+      const result = await resolve(service, 'user1', 'broker1', 'client1');
+
+      expect(result.accessToken).toBe('REDIS_TOKEN');
+      expect(result.proxyAgent).toBeDefined();
+      // The proxy URL inside the agent should contain the correct hostname
+      const proxyUrl: URL = result.proxyAgent.proxy;
+      expect(proxyUrl.hostname).toBe('10.0.0.1');
+      expect(proxyUrl.port).toBe('3128');
+    });
+
+    it('should return undefined proxyAgent when Redis cache has no proxy IP', async () => {
+      mockRedisService.isHealthy.mockReturnValue(true);
+      mockRedisClient.get.mockResolvedValue(
+        JSON.stringify({ accessToken: 'REDIS_TOKEN' }),
+      );
+
+      const result = await resolve(service, 'user1', 'broker1', 'client1');
+
+      expect(result.accessToken).toBe('REDIS_TOKEN');
+      expect(result.proxyAgent).toBeUndefined();
+    });
+
+    it('should build proxy agent from DB when Redis misses', async () => {
+      mockRedisService.isHealthy.mockReturnValue(true);
+      mockRedisClient.get.mockResolvedValue(null);
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'DB_TOKEN',
+        proxyIp: '20.30.40.50',
+        proxyPort: 8080,
+        proxyHostname: 'proxy.example.com',
+        proxyUsername: 'dbuser',
+        proxyPassword: 'dbpass',
+      });
+
+      const result = await resolve(service, 'user1', 'broker1', 'client1');
+
+      expect(result.accessToken).toBe('DB_TOKEN');
+      expect(result.proxyAgent).toBeDefined();
+      const proxyUrl: URL = result.proxyAgent.proxy;
+      expect(proxyUrl.hostname).toBe('20.30.40.50');
+    });
+
+    it('should return no proxyAgent when DB record has no proxy fields', async () => {
+      mockRedisService.isHealthy.mockReturnValue(true);
+      mockRedisClient.get.mockResolvedValue(null);
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'DB_TOKEN',
+        proxyIp: null,
+        proxyPort: null,
+        proxyHostname: null,
+        proxyUsername: null,
+        proxyPassword: null,
+      });
+
+      const result = await resolve(service, 'user1', 'broker1', 'client1');
+
+      expect(result.accessToken).toBe('DB_TOKEN');
+      expect(result.proxyAgent).toBeUndefined();
+    });
+  });
+
+  // ─── Proxy agent forwarded to adapter ─────────────────────────────────────
+  describe('proxy agent forwarded to adapter.placeOrder', () => {
+    it('should pass a proxyAgent to adapter.placeOrder when DB has proxy credentials', async () => {
+      mockRedisService.isHealthy.mockReturnValue(false); // force DB path
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'token-with-proxy',
+        proxyIp: '11.22.33.44',
+        proxyPort: 3128,
+        proxyHostname: null,
+        proxyUsername: 'pu',
+        proxyPassword: 'pp',
+      });
+      mockAdapter.placeOrder.mockResolvedValue({ brokerOrderId: 'PROXY-ORDER-001' });
+      mockCircuitBreaker.execute.mockImplementation((_b, fn) => fn());
+      mockPrisma.$transaction.mockResolvedValue({
+        trade: mockTrade,
+        order: mockOrder,
+        outboxEvent: { id: 'ob1', eventType: 'TRADE_OPENED', eventKey: null },
+      });
+
+      await service.placeEntryOrder(ctx);
+
+      expect(mockAdapter.placeOrder).toHaveBeenCalled();
+      const callArgs = mockAdapter.placeOrder.mock.calls[0];
+      // 4th argument is httpsAgent
+      const passedAgent = callArgs[3];
+      expect(passedAgent).toBeDefined();
+    });
+
+    it('should pass undefined httpsAgent to adapter.placeOrder when no proxy is configured', async () => {
+      mockRedisService.isHealthy.mockReturnValue(false);
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'token-no-proxy',
+        proxyIp: null,
+        proxyPort: null,
+        proxyHostname: null,
+        proxyUsername: null,
+        proxyPassword: null,
+      });
+      mockAdapter.placeOrder.mockResolvedValue({ brokerOrderId: 'NO-PROXY-ORDER' });
+      mockCircuitBreaker.execute.mockImplementation((_b, fn) => fn());
+      mockPrisma.$transaction.mockResolvedValue({
+        trade: mockTrade,
+        order: mockOrder,
+        outboxEvent: { id: 'ob2', eventType: 'TRADE_OPENED', eventKey: null },
+      });
+
+      await service.placeEntryOrder(ctx);
+
+      expect(mockAdapter.placeOrder).toHaveBeenCalled();
+      const callArgs = mockAdapter.placeOrder.mock.calls[0];
+      const passedAgent = callArgs[3];
+      expect(passedAgent).toBeUndefined();
+    });
+  });
 });

@@ -5,10 +5,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/services/role_permission.service.dart';
+import 'package:spresearch_web/models/role.model.dart';
 
 class StaffController extends GetxController {
   late final StaffService _staffService;
   late final AuthController _authController;
+  final _rolePermissionService = Get.put(RolePermissionService());
+  var rolesList = <String>[].obs;
 
   final nameController = TextEditingController();
   final mobileController = TextEditingController();
@@ -59,6 +63,21 @@ class StaffController extends GetxController {
       }
     }
     fetchStaffList();
+    fetchRolesList();
+  }
+
+  Future<void> fetchRolesList() async {
+    try {
+      final response = await _rolePermissionService.getRoles();
+      if (!response.status.hasError && response.body != null) {
+        final list = (response.body['data'] as List? ?? [])
+            .map((item) => RoleModel.fromJson(item).name)
+            .toList();
+        rolesList.assignAll(list);
+      }
+    } catch (e) {
+      debugPrint('Error fetching roles: $e');
+    }
   }
 
   @override
@@ -298,8 +317,8 @@ class StaffController extends GetxController {
       }
     }
 
-    // Validate MPIN (Only for Researcher and Director)
-    if (selectedDepartment.value != 'Manager') {
+    // Validate MPIN (Only for non-Managers)
+    if (selectedDepartment.value.toLowerCase() != 'manager') {
       if (mpinController.text.isNotEmpty) {
         if (mpinController.text.length < 4) {
           Get.snackbar(
@@ -324,7 +343,7 @@ class StaffController extends GetxController {
     }
 
     // Validate Assigned Director if Manager
-    if (selectedDepartment.value == 'Manager') {
+    if (selectedDepartment.value.toLowerCase() == 'manager') {
       if (isDirectorLoggedIn) {
         // Auto-assign current director
         // No validation needed here as we handle it in data preparation
@@ -382,15 +401,50 @@ class StaffController extends GetxController {
       }
     }
 
-    if (selectedDepartment.value == 'Select Department') {
+    if (selectedDepartment.value.isEmpty || selectedDepartment.value == 'Select Department') {
       Get.snackbar(
         'Validation Error',
-        'Please select a department',
+        'Please select a role',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
       );
       return;
+    }
+
+    Map<String, String>? permanentAddressObj;
+    if (permanentAddressController.text.trim().isNotEmpty) {
+      final text = permanentAddressController.text.trim();
+      if (text.startsWith('{') && text.endsWith('}')) {
+        final map = <String, String>{};
+        final content = text.substring(1, text.length - 1);
+        final parts = content.split(',');
+        for (final part in parts) {
+          final kv = part.split(':');
+          if (kv.length >= 2) {
+            final key = kv[0].trim();
+            final val = kv.sublist(1).join(':').trim();
+            map[key] = val;
+          }
+        }
+        permanentAddressObj = {
+          "street": map["street"] ?? "",
+          "city": map["city"] ?? "",
+          "state": map["state"] ?? "",
+          "zip": map["zip"] ?? "",
+        };
+      } else {
+        final parts = text.split(',');
+        final street = parts.isNotEmpty ? parts[0].trim() : "";
+        final city = parts.length > 1 ? parts[1].trim() : "";
+        final state = parts.length > 2 ? parts[2].trim() : "";
+        permanentAddressObj = {
+          "street": street,
+          "city": city,
+          "state": state,
+          "zip": "",
+        };
+      }
     }
 
     isLoading.value = true;
@@ -412,16 +466,16 @@ class StaffController extends GetxController {
         if (previousCompanyController.text.trim().isNotEmpty) "previousCompany": previousCompanyController.text.trim(),
         if (lastCtcController.text.trim().isNotEmpty) "lastCtc": lastCtcController.text.trim(),
         if (localAddressController.text.trim().isNotEmpty) "localAddress": localAddressController.text.trim(),
-        if (permanentAddressController.text.trim().isNotEmpty) "permanentAddress": permanentAddressController.text.trim(),
+        if (permanentAddressObj != null) "permanentAddress": permanentAddressObj,
       };
 
-      if (selectedDepartment.value != 'Manager' &&
+      if (selectedDepartment.value.toLowerCase() != 'manager' &&
           mpinController.text.isNotEmpty) {
         data["mpin"] = mpinController.text.trim();
       }
 
       // Handle assigned director
-      if (selectedDepartment.value == 'Manager') {
+      if (selectedDepartment.value.toLowerCase() == 'manager') {
         if (isDirectorLoggedIn) {
           data["assignedDirector"] = _authController.user.value!.id;
           data["assignedDirectorName"] = _authController.user.value!.fullName;
@@ -739,6 +793,9 @@ class StaffController extends GetxController {
   List<String> get availableDepartments {
     if (isDirectorLoggedIn) {
       return ['Manager'];
+    }
+    if (rolesList.isNotEmpty) {
+      return rolesList;
     }
     return ['Researcher', 'Director', 'Manager', 'Executive'];
   }

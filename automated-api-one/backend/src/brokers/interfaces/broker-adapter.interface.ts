@@ -31,6 +31,7 @@ export abstract class BrokerAdapter {
     token: string,
     clientCode: string,
     order: OrderRequest,
+    httpsAgent?: any,
   ): Promise<OrderResponse>;
   abstract getOrderStatus(
     token: string,

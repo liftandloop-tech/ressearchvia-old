@@ -152,8 +152,11 @@ const staffSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-
-
+    roleId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Role',
+        default: null
+    },
 }, { timestamps: true, versionKey: false });
 const staffModel = mongoose.model("staff", staffSchema);
 export default staffModel;

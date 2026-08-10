@@ -55,11 +55,22 @@ class LeadService extends ApiService {
     }
   }
 
-  Future<bool> addFollowUp(String id, String notes, DateTime followUpDate) async {
+  Future<bool> addFollowUp(
+    String id,
+    String notes,
+    DateTime followUpDate, {
+    required String followUpType,
+    required String status,
+    DateTime? nextFollowUpDate,
+  }) async {
     try {
       final response = await post('/leads/follow-up/$id', {
         'notes': notes,
         'followUpDate': followUpDate.toIso8601String(),
+        'followUpType': followUpType,
+        'status': status,
+        if (nextFollowUpDate != null)
+          'nextFollowUpDate': nextFollowUpDate.toIso8601String(),
       });
       return response.statusCode == 200;
     } catch (e) {
@@ -68,20 +79,58 @@ class LeadService extends ApiService {
     }
   }
 
-  Future<({bool success, String? message})> uploadBulkLeads(List<int> bytes, String filename) async {
-    try {
-      final formData = FormData({
-        'file': MultipartFile(bytes, filename: filename),
-      });
-
-      final response = await post('/leads/bulk-upload', formData);
-      if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
-      }
-      return (success: false, message: response.body?['message']?.toString() ?? 'Bulk upload failed');
-    } catch (e) {
-      debugPrint('Error bulk uploading leads: $e');
-      return (success: false, message: e.toString());
-    }
+  Future<Response> uploadBulkLeads(List<int> bytes, String filename) async {
+    final formData = FormData({
+      'file': MultipartFile(bytes, filename: filename),
+    });
+    return post('/leads/bulk-upload', formData);
   }
+
+  Future<Response> startImport(String importId, Map<String, dynamic> data) =>
+      post('/leads/import/$importId/start', data);
+
+  Future<Response> getImportPreview(String importId, Map<String, dynamic> mapping) =>
+      post('/leads/import/$importId/preview', {'mapping': mapping});
+
+  Future<Response> getImportStatus(String importId) =>
+      get('/leads/import/$importId/status');
+
+  Future<Response> getImportErrors(String importId) =>
+      get('/leads/import/$importId/errors');
+
+  Future<Response> getImportFields() =>
+      get('/leads/import-fields');
+
+  Future<Response> getTemplates() =>
+      get('/leads/import/templates');
+
+  Future<Response> saveTemplate(String name, Map<String, dynamic> mappings) =>
+      post('/leads/import/templates', {'name': name, 'mappings': mappings});
+
+  Future<Response> getLeadPools() =>
+      get('/leads/pools');
+
+  Future<Response> createLeadPool(String name, String? description) =>
+      post('/leads/pools', {'name': name, 'description': description});
+
+  Future<Response> pullLeads(String type) =>
+      post('/leads/pull', {'type': type});
+
+  Future<Response> getPullStats() =>
+      get('/leads/pull-stats');
+
+  Future<Response> markLeadRead(String id) =>
+      patch('/leads/$id/read', {});
+
+  Future<Response> getLeadDistributionSettings() =>
+      get('/settings/lead_distribution');
+
+  Future<Response> saveLeadDistributionSettings(Map<String, dynamic> value) =>
+      post('/settings/lead_distribution', {'value': value});
+
+  Future<Response> bulkAssignLeads(List<String> leadIds, String? staffId) =>
+      post('/leads/bulk-assign', {
+        'leadIds': leadIds,
+        'assignedRM': staffId ?? 'unassigned',
+      });
 }

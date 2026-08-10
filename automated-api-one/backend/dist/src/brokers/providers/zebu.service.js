@@ -330,7 +330,7 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             }
         });
     }
-    async placeOrder(token, clientCode, order) {
+    async placeOrder(token, clientCode, order, httpsAgent) {
         if (this.isMock) {
             const mockId = `mock_zebu_order_${Math.floor(100000 + Math.random() * 900000)}`;
             this.logger.log(`[SANDBOX MOCK] Placed Zebu order ${mockId} for ${clientCode}: ${order.side} ${order.quantity} x ${order.symbol}`);
@@ -380,6 +380,7 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 const body = this.buildBody(jData, token);
                 const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER}`, body, {
                     headers: this.getHeaders(),
+                    ...(httpsAgent ? { httpsAgent } : {}),
                 }));
                 const data = response.data;
                 this.logger.log(`[Zebu Mynt API] PlaceOrder response received from ${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER}:\n` +

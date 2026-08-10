@@ -52,7 +52,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     this.isMock = mockVal === true || mockVal === 'true';
   }
 
-  private getHeaders(token?: string) {
+  private getHeaders(token?: string, proxyIp?: string) {
     const apiKey = this.configService.get<string>('ANGEL_ONE_API_KEY') || '';
     const headers: any = {
       'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       'X-SourceID': 'WEB',
       'X-PrivateKey': apiKey,
       'X-ClientLocalIP': '192.168.1.100',
-      'X-ClientPublicIP': '106.193.147.98',
+      'X-ClientPublicIP': proxyIp || '106.193.147.98',
       'X-MACaddress': '02:00:00:00:00:00',
     };
     if (token) {
@@ -367,6 +367,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     token: string,
     clientCode: string,
     order: OrderRequest,
+    httpsAgent?: any,
   ): Promise<OrderResponse> {
     if (this.isMock) {
       const mockId = `mock_order_${Math.floor(100000 + Math.random() * 900000)}`;
@@ -385,6 +386,18 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       let ordertype = order.orderType;
 
       const symbolToken = this.instrumentsService.findToken(order.symbol, order.exchange) || 'DUMMY_TOKEN';
+
+      let proxyIp: string | undefined;
+      if (httpsAgent && httpsAgent.options) {
+        // Extract IP address from HttpsProxyAgent instance configuration parameters
+        const proxyUrl = httpsAgent.options.href || httpsAgent.options.host || httpsAgent.options.hostname;
+        if (proxyUrl) {
+          try {
+            const parsed = new URL(httpsAgent.options.href || `http://${proxyUrl}`);
+            proxyIp = parsed.hostname;
+          } catch (_) {}
+        }
+      }
 
       const response = await firstValueFrom(
         this.httpService.post(
@@ -407,7 +420,8 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
             scripconsent: 'yes',
           },
           {
-            headers: this.getHeaders(token),
+            headers: this.getHeaders(token, proxyIp),
+            ...(httpsAgent ? { httpsAgent } : {}),
           },
         ),
       );

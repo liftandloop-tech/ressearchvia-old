@@ -16,6 +16,8 @@ import HniRequest from "../models/hniRequestModel.js";
 import AdminAuditLog from "../models/adminAuditLogModel.js";
 import { approvePartialPayment } from "./acquisitionService.js";
 import mongoose from "mongoose";
+import staffModel from "../models/staffModel.js";
+import staffAssigmentModel from "../models/staffAssignmentModel.js";
 
 const segmentsService = {
   createSegments: async ({ body }) => {
@@ -874,7 +876,7 @@ const segmentsService = {
     }
   },
 
-  getPendingBankTransfers: async ({ query }) => {
+  getPendingBankTransfers: async ({ query, user }) => {
     try {
       console.log('[getPendingBankTransfers] Called with query:', query);
 
@@ -945,6 +947,30 @@ const segmentsService = {
         }
       } else {
         queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'REJECTED'] };
+      }
+
+      // Restrict payments by staff/director assignment
+      const callerId = user?._id || user?.userId;
+      if (callerId) {
+        const staffMember = await staffModel.findById(callerId);
+        if (staffMember) {
+          const role = (staffMember.userType || "").toLowerCase();
+          const isSystemAdmin = role === 'admin' || role === 'super_admin';
+          if (!isSystemAdmin) {
+            let targetStaffIds = [staffMember._id];
+            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
+            if (dept.includes('director')) {
+              // Find all managers assigned to this director
+              const managers = await staffModel.find({ assignedDirector: staffMember._id }).select('_id');
+              const managerIds = managers.map(m => m._id);
+              targetStaffIds = [...targetStaffIds, ...managerIds];
+            }
+            const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
+            const assignedUserIds = assignments.map(a => a.userId);
+            
+            queryArgs.userId = { $in: assignedUserIds };
+          }
+        }
       }
 
       if (search && search.trim() !== '') {
