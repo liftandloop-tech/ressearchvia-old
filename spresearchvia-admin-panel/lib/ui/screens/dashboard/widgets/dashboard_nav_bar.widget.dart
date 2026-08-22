@@ -42,33 +42,57 @@ class DashboardNavBar extends StatelessWidget {
       final List<Map<String, dynamic>> items;
       if (user?.isAdmin == true) {
         items = allItems;
-      } else if (user?.isResearcher == true) {
-        items = allItems.where((item) => item['title'] == 'Reports' || item['title'] == 'Dashboard').toList();
-      } else if (user?.isDirector == true) {
-        items = allItems
-            .where((item) {
-              final title = item['title'] as String;
-              return title == 'Dashboard' || title == 'Users' || title == 'Staff' || title == 'Reports';
-            })
-            .map((item) {
-              if (item['title'] == 'Users' && item.containsKey('children')) {
-                final children =
-                    (item['children'] as List<Map<String, dynamic>>)
-                        .where((child) {
-                          if (child['title'] == 'Payments') {
-                            return user?.hasPermission('Payments', 'read') ?? false;
-                          }
-                          return true;
-                        })
-                        .toList();
-                return {...item, 'children': children};
-              }
-              return item;
-            })
-            .toList();
       } else {
-        // Normal staff / employee: show only Dashboard
-        items = allItems.where((item) => item['title'] == 'Dashboard').toList();
+        // All non-admin roles (Director, Researcher, Sales, Support, etc.): filter dynamically based on permission groups
+        items = allItems
+            .map((item) {
+              final title = item['title'] as String;
+              if (title == 'Dashboard') return item;
+
+              if (title == 'Users') {
+                final children = ((item['children'] as List<Map<String, dynamic>>?) ?? [])
+                    .where((child) {
+                      final childTitle = child['title'] as String;
+                      if (childTitle == 'All Users') {
+                        return user?.has('users.view') ?? false;
+                      } else if (childTitle == 'User KYC') {
+                        return user?.has('kyc.view') ?? false;
+                      } else if (childTitle == 'Payments') {
+                        return user?.has('payments.view_pending') ?? false;
+                      }
+                      return false;
+                    })
+                    .toList();
+                if (children.isNotEmpty) {
+                  return {...item, 'children': children};
+                }
+                return null;
+              }
+
+              if (title == 'Staff') {
+                return (user?.has('staff.view') ?? false) ? item : null;
+              }
+              if (title == 'Reports') {
+                return (user?.has('reports.view') ?? false) ? item : null;
+              }
+              if (title == 'Notifications') {
+                return (user?.has('notifications.view') ?? false) ? item : null;
+              }
+              if (title == 'Settings') {
+                return (user?.has('settings.view') ?? false) ? item : null;
+              }
+              if (title == 'Leads') {
+                return (user?.has('leads.view_all') ?? user?.has('leads.view_assigned') ?? false) ? item : null;
+              }
+              if (title == 'Job Applicants') {
+                return (user?.has('staff.view_applicants') ?? false) ? item : null;
+              }
+
+              return null;
+            })
+            .where((item) => item != null)
+            .cast<Map<String, dynamic>>()
+            .toList();
       }
 
       return Column(

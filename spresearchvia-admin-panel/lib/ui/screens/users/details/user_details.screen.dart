@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/controllers/users/user_details.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'widgets/user_header.widget.dart';
 import 'widgets/kyc_documents.widget.dart';
 import '../widgets/payment_history.widget.dart';
@@ -72,6 +73,10 @@ class UserDetailsScreen extends StatelessWidget {
                 );
               }
 
+              final currentUser = Get.find<AuthController>().user.value;
+              final canViewKyc = currentUser?.has('kyc.view') ?? false;
+              final canViewPayments = currentUser?.has('payments.view_pending') ?? false;
+
               return Column(
                 children: [
                   const UserHeader(),
@@ -86,10 +91,14 @@ class UserDetailsScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  SizedBox(height: AppTheme.spacing24),
-                  KYCDocuments(controller: controller),
-                  SizedBox(height: AppTheme.spacing20),
-                  PaymentHistory(userId: userId, showEditColumn: false),
+                  if (canViewKyc) ...[
+                    SizedBox(height: AppTheme.spacing24),
+                    KYCDocuments(controller: controller),
+                  ],
+                  if (canViewPayments) ...[
+                    SizedBox(height: AppTheme.spacing20),
+                    PaymentHistory(userId: userId, showEditColumn: false),
+                  ],
                   const SizedBox(height: AppTheme.spacing20),
                   ActivityLog(userId: userId),
                 ],

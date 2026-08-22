@@ -3,6 +3,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'staff_row.widget.dart';
 import 'staff_table_header_cell.widget.dart';
+import 'staff_column_filter.widget.dart';
 
 class StaffTable extends StatelessWidget {
   final List<StaffModel> staffList;
@@ -37,12 +38,27 @@ class StaffTable extends StatelessWidget {
         TableRow(
           decoration: BoxDecoration(color: AppTheme.gray50),
           children: [
-            StaffTableHeaderCell(text: 'Name'),
-            StaffTableHeaderCell(text: 'Mobile No.'),
-            StaffTableHeaderCell(text: 'Email'),
-            StaffTableHeaderCell(text: 'Role'),
-            StaffTableHeaderCell(text: 'Status'),
-            StaffTableHeaderCell(text: 'Actions'),
+            const StaffTableHeaderCell(
+              text: 'Name',
+              filterIcon: StaffColumnFilter(columnKey: 'name', columnName: 'Name'),
+            ),
+            const StaffTableHeaderCell(
+              text: 'Mobile No.',
+              filterIcon: StaffColumnFilter(columnKey: 'mobile', columnName: 'Mobile No.'),
+            ),
+            const StaffTableHeaderCell(
+              text: 'Email',
+              filterIcon: StaffColumnFilter(columnKey: 'email', columnName: 'Email'),
+            ),
+            const StaffTableHeaderCell(
+              text: 'Role',
+              filterIcon: StaffColumnFilter(columnKey: 'role', columnName: 'Role'),
+            ),
+            const StaffTableHeaderCell(
+              text: 'Status',
+              filterIcon: StaffColumnFilter(columnKey: 'status', columnName: 'Status'),
+            ),
+            const StaffTableHeaderCell(text: 'Actions'),
           ],
         ),
         ...staffList.map(

@@ -12,7 +12,8 @@ class ProxyPurchaseScreen extends StatefulWidget {
 
 class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
   final controller = Get.put(ProxyController());
-  double validityMonths = 3.0; // Default validity slider
+  double validityMonths = 3.0; // Default 3 months minimum
+  String selectedBrokerCode = 'angel';
 
   @override
   Widget build(BuildContext context) {
@@ -36,15 +37,11 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final proxy = controller.proxyData.value;
-        if (proxy == null) {
-          return const Center(
-            child: Text(
-              'No linked broker profile found. Please link a broker first.',
-              style: TextStyle(fontFamily: 'Poppins', color: AppTheme.textGrey),
-            ),
-          );
-        }
+        final proxy = controller.proxyData.value ?? {
+          'brokerCode': 'angel',
+          'brokerName': 'Angel One',
+          'hasProxy': false,
+        };
 
         final hasProxy = proxy['hasProxy'] == true;
 
@@ -64,48 +61,57 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
   }
 
   Widget _buildBrokerCard(Map<String, dynamic> proxy) {
+    final brokerName = proxy['brokerName'] ?? 'Broker Account';
+    final hasProxy = proxy['hasProxy'] == true;
+    final isExpired = proxy['status'] == 'expired';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.primaryBlue.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade100,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
+        border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.2)),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
-            child: const Icon(Icons.business, color: AppTheme.primaryBlue),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryBlue.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.hub_outlined, color: AppTheme.primaryBlue, size: 28),
           ),
           const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                proxy['brokerName'] ?? 'Broker',
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.primaryBlue,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  brokerName,
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryBlue,
+                  ),
                 ),
-              ),
-              Text(
-                'Client ID: ${proxy['brokerCode'] ?? ''}',
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  color: AppTheme.textGrey,
+                const SizedBox(height: 4),
+                Text(
+                  hasProxy
+                      ? (isExpired ? 'Proxy Expired' : 'Proxy Active')
+                      : 'No Proxy Configured (Select broker below)',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: hasProxy
+                        ? (isExpired ? Colors.red : AppTheme.primaryGreen)
+                        : AppTheme.textGrey,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -113,14 +119,11 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
   }
 
   Widget _buildActiveProxyDetails(Map<String, dynamic> proxy) {
-    final status = proxy['status'] ?? 'expired';
-    final isExpired = status == 'expired';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Active Proxy Status',
+          'Active Static Proxy IP',
           style: TextStyle(
             fontFamily: 'Poppins',
             fontSize: 15,
@@ -130,55 +133,21 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
         ),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isExpired ? AppTheme.errorBackground : AppTheme.backgroundLightBlue,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isExpired ? AppTheme.errorBorder : AppTheme.borderBlue.withOpacity(0.3),
-            ),
+            border: Border.all(color: AppTheme.borderGrey),
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    proxy['ip'] ?? 'N/A',
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primaryBlue,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isExpired ? AppTheme.error : AppTheme.successGreen,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      status.toUpperCase(),
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Expiry Date: ${proxy['expiry']?.toString().split("T")[0] ?? "N/A"}',
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  color: AppTheme.textGrey,
-                ),
+              _buildDetailRow('IP Address', proxy['ip'] ?? 'N/A', isBold: true),
+              _buildDetailRow('Status', proxy['status']?.toString().toUpperCase() ?? 'N/A'),
+              _buildDetailRow(
+                'Expiry Date',
+                proxy['expiry'] != null
+                    ? proxy['expiry'].toString().split('T')[0]
+                    : 'N/A',
               ),
               const Divider(height: 24),
               _buildDetailRow('Port', proxy['port']?.toString() ?? 'N/A'),
@@ -204,9 +173,55 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
   }
 
   Widget _buildPurchaseFlow(Map<String, dynamic> proxy) {
+    final availableBrokers = (proxy['availableBrokers'] as List<dynamic>?) ?? [
+      {'code': 'angel', 'name': 'Angel One'},
+      {'code': 'zebu', 'name': 'Mynt by Zebu'},
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Text(
+          'Select Target Broker Platform',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primaryBlue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.borderGrey),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedBrokerCode,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.primaryBlue),
+              items: availableBrokers.map((b) {
+                final code = b['code'].toString();
+                final name = b['name'].toString();
+                return DropdownMenuItem<String>(
+                  value: code,
+                  child: Text(name, style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    selectedBrokerCode = val;
+                  });
+                }
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
         const Text(
           'Proxy Allocation Options',
           style: TextStyle(
@@ -223,31 +238,17 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
   }
 
   Widget _buildSliderAndButton({required bool isRenewal}) {
-    final brokerCode = controller.proxyData.value?['brokerCode']?.toString().toLowerCase().replaceAll("_", "") ?? 'angel';
-    final pricing = controller.pricingData.value?[brokerCode]?['ipv4'];
+    const int minMonth = 3;
+    const double baseRatePerMonth = 1.0; // Testing rate
+    const double gstRate = 0.18; // 18% GST
 
-    if (pricing == null) {
-      return const Text('Loading proxy pricing information...');
-    }
-
-    final int minMonth = pricing['min_month'] ?? 3;
-    final List<dynamic> tiers = pricing['price_tiers'] ?? [];
-
-    // Make sure validity is at least minimum months
     if (validityMonths < minMonth) {
       validityMonths = minMonth.toDouble();
     }
 
-    // Determine current rate based on slider value
-    double currentPrice = 0;
-    for (var tier in tiers) {
-      final int tierMin = tier['min_month'];
-      if (validityMonths >= tierMin) {
-        currentPrice = double.tryParse(tier['price'].toString()) ?? 0.0;
-      }
-    }
-
-    final double totalCost = currentPrice * validityMonths;
+    final double baseTotal = baseRatePerMonth * validityMonths;
+    final double gstTotal = baseTotal * gstRate;
+    final double grandTotal = baseTotal + gstTotal;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -264,7 +265,7 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
             children: [
               const Text('Duration:', style: TextStyle(fontFamily: 'Poppins')),
               Text(
-                '${validityMonths.round()} Months',
+                '${validityMonths.round()} Month${validityMonths.round() > 1 ? 's' : ''}',
                 style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
@@ -277,7 +278,7 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
             value: validityMonths,
             min: minMonth.toDouble(),
             max: 12.0,
-            divisions: 12 - minMonth,
+            divisions: 9,
             activeColor: AppTheme.primaryBlue,
             inactiveColor: AppTheme.borderGrey,
             onChanged: (val) {
@@ -287,14 +288,49 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
             },
           ),
           const SizedBox(height: 12),
-          _buildDetailRow('Per Month Rate', '₹${currentPrice.toStringAsFixed(0)}'),
-          _buildDetailRow('Total Cost', '₹${totalCost.toStringAsFixed(0)}', isBold: true),
+          _buildDetailRow('Base Price', '₹1 / month'),
+          _buildDetailRow('GST (18%)', '₹0.18 / month'),
+          _buildDetailRow('Subtotal (${validityMonths.round()} mo)', '₹${baseTotal.toStringAsFixed(2)}'),
+          _buildDetailRow('GST Amount', '₹${gstTotal.toStringAsFixed(2)}'),
+          const Divider(height: 16),
+          _buildDetailRow('Total Payable', '₹${grandTotal.toStringAsFixed(2)}', isBold: true),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Important Note: This is a non-refundable fee used to purchase the static IP for automated trading. Subscribers cannot demand a refund once purchased.',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                _showConfirmationDialog(validityMonths.round(), totalCost, isRenewal);
+                controller.startProxyPurchaseFlow(
+                  validityMonths.round(),
+                  isRenewal: isRenewal,
+                  brokerCode: selectedBrokerCode,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryGreen,
@@ -302,7 +338,9 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
-                isRenewal ? 'Renew Proxy' : 'Purchase & Generate Static IP',
+                isRenewal
+                    ? 'Renew Proxy (Pay ₹${grandTotal.toStringAsFixed(2)})'
+                    : 'Pay ₹${grandTotal.toStringAsFixed(2)} via Razorpay',
                 style: const TextStyle(color: Colors.white, fontFamily: 'Poppins', fontWeight: FontWeight.w600),
               ),
             ),
@@ -327,36 +365,6 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
               color: isBold ? AppTheme.primaryGreen : AppTheme.primaryBlue,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  void _showConfirmationDialog(int months, double amount, bool isRenewal) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Confirm Action', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
-        content: Text(
-          'An amount of ₹${amount.toStringAsFixed(0)} will be deducted from your wallet balance to ${isRenewal ? "renew" : "issue"} the proxy for $months months.',
-          style: const TextStyle(fontFamily: 'Poppins'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel', style: TextStyle(fontFamily: 'Poppins', color: AppTheme.textGrey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              if (isRenewal) {
-                controller.renewProxy(months);
-              } else {
-                controller.issueProxy(months);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
-            child: const Text('Confirm', style: TextStyle(color: Colors.white, fontFamily: 'Poppins')),
-          )
         ],
       ),
     );

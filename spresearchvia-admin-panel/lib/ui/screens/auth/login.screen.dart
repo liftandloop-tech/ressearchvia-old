@@ -14,6 +14,9 @@ class Login extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Get.isRegistered<LoginController>()) {
+      Get.delete<LoginController>();
+    }
     final controller = Get.put(LoginController());
 
     return SelectionArea(

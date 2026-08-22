@@ -30,11 +30,13 @@ const leadPullController = {
                 assignedRM: null
             });
 
-            // Count staff's currently assigned fresh leads
+            // Count staff's currently assigned fresh leads (only active unworked fresh leads: stage 'New' and no follow-ups)
             const myFresh = await leadModel.countDocuments({
                 companyId,
                 leadPoolId: freshPool._id,
-                assignedRM: staffId
+                assignedRM: staffId,
+                stage: 'New',
+                $or: [{ followUps: { $exists: false } }, { followUps: { $size: 0 } }]
             });
 
             // Count staff's unread leads across any pool
@@ -74,11 +76,13 @@ const leadPullController = {
                 const freshMax = config.freshMaxPerStaff || 100;
                 const freshPullSize = config.freshPullSize || 20;
 
-                // Count current fresh leads held by this staff member
+                // Count current fresh leads held by this staff member (only active unworked fresh leads: stage 'New' and no follow-ups)
                 const myFresh = await leadModel.countDocuments({
                     companyId,
                     leadPoolId: freshPool._id,
-                    assignedRM: staffId
+                    assignedRM: staffId,
+                    stage: 'New',
+                    $or: [{ followUps: { $exists: false } }, { followUps: { $size: 0 } }]
                 });
 
                 const remainingCapacity = Math.max(0, freshMax - myFresh);

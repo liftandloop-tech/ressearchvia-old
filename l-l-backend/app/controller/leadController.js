@@ -1,4 +1,5 @@
 import leadModel from "../models/leadModel.js";
+import staffModel from "../models/staffModel.js";
 import xlsx from "xlsx";
 import fs from "fs";
 import csvParser from "csv-parser";
@@ -33,6 +34,34 @@ const leadController = {
             const { page = 1, limit = 10, search = "", stage = "", assignedRM = "" } = req.query;
             const query = {};
 
+            // Data-Scope Enforcement: If user has leads.view_assigned but not leads.view_all, restrict query to assignedRM
+            const callerId = req.user?._id || req.user?.userId;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+            if (!isSuper && callerId) {
+                const staffMember = await staffModel.findById(callerId).populate({
+                    path: 'roleId',
+                    populate: { path: 'permissionGroups' }
+                });
+
+                if (staffMember) {
+                    const dept = (staffMember.deparment || staffMember.department || "").toLowerCase();
+                    const isStaffAdmin = dept === 'admin' || dept === 'super_admin' || staffMember.role === 'Admin' || (staffMember.roleId && staffMember.roleId.name.toLowerCase() === 'admin');
+
+                    if (!isStaffAdmin && staffMember.roleId && staffMember.roleId.permissionGroups) {
+                        const hasViewAll = staffMember.roleId.permissionGroups.some(g =>
+                            g.permissions?.some(p => p.actions?.includes('leads.view_all'))
+                        );
+                        const hasViewAssigned = staffMember.roleId.permissionGroups.some(g =>
+                            g.permissions?.some(p => p.actions?.includes('leads.view_assigned') || p.actions?.includes('read'))
+                        );
+
+                        if (hasViewAssigned && !hasViewAll) {
+                            query.assignedRM = staffMember._id;
+                        }
+                    }
+                }
+            }
+
             if (search) {
                 query.$or = [
                     { fullName: { $regex: search, $options: "i" } },
@@ -41,7 +70,7 @@ const leadController = {
                 ];
             }
             if (stage) query.stage = stage;
-            if (assignedRM) query.assignedRM = assignedRM;
+            if (assignedRM && !query.assignedRM) query.assignedRM = assignedRM;
 
             const total = await leadModel.countDocuments(query);
             const leads = await leadModel.find(query)

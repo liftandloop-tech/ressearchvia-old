@@ -75,16 +75,7 @@ class ReportsScreen extends StatelessWidget {
                               ),
                               tooltip: 'Refresh Reports',
                             ),
-                            if (Get.find<AuthController>()
-                                        .user
-                                        .value
-                                        ?.isDirector !=
-                                    true &&
-                                Get.find<AuthController>()
-                                        .user
-                                        .value
-                                        ?.isViewOnly !=
-                                    true) ...[
+                            if (Get.find<AuthController>().user.value?.has('reports.create') ?? false) ...[
                               const SizedBox(width: 12),
                               Button(
                                 title: AppStrings.uploadReport,

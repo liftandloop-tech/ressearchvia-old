@@ -85,12 +85,21 @@ class LeadManagementScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Fresh Lead Pull Panel (only shown to regular staff/RMs, not admins/directors)
-            if (Get.find<AuthController>().user.value?.isAdmin == false &&
-                Get.find<AuthController>().user.value?.isDirector == false) ...[
-              _buildPullPanel(controller),
-              const SizedBox(height: 24),
-            ],
+            // Fresh Lead Pull Panel (shown to regular staff/RMs who have pull permission or non-admin staff)
+            Builder(
+              builder: (context) {
+                final currentUser = Get.find<AuthController>().user.value;
+                final isStaffRM = (currentUser?.isAdmin ?? false) == false && (currentUser?.isDirector ?? false) == false;
+                final canPull = isStaffRM || (currentUser?.has('leads.pull') ?? false);
+                if (!canPull) return const SizedBox();
+                return Column(
+                  children: [
+                    _buildPullPanel(controller),
+                    const SizedBox(height: 24),
+                  ],
+                );
+              },
+            ),
 
             // Filters Bar
             Card(
@@ -124,7 +133,8 @@ class LeadManagementScreen extends StatelessWidget {
                     Expanded(
                       child: Obx(
                         () => DropdownButtonFormField<String>(
-                          value: controller.selectedStage.value.isEmpty ? null : controller.selectedStage.value,
+                          isExpanded: true,
+                          value: controller.selectedStage.value,
                           hint: const Text('Filter Stage'),
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
@@ -133,8 +143,11 @@ class LeadManagementScreen extends StatelessWidget {
                             ),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
-                          items: ['New', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid']
-                              .map((stage) => DropdownMenuItem(value: stage, child: Text(stage)))
+                          items: ['All Stages', 'New', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid']
+                              .map((stage) => DropdownMenuItem(
+                                    value: stage == 'All Stages' ? '' : stage,
+                                    child: Text(stage),
+                                  ))
                               .toList(),
                           onChanged: (val) => controller.updateFilters(stage: val ?? ''),
                         ),

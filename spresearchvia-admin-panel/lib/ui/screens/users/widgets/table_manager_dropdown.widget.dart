@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/user.controller.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import '../../../../models/user.model.dart';
 import '../../../../models/staff.model.dart';
 
@@ -138,11 +139,13 @@ class TableManagerDropdown extends StatelessWidget {
                 ),
               ),
             ],
-            onChanged: (value) {
-              if (value != null && value != 'unassigned') {
-                userManagementController.assignManager(user.id, value);
-              }
-            },
+            onChanged: (Get.find<AuthController>().user.value?.hasPermission('Users', 'assignRM') ?? false)
+                ? (value) {
+                    if (value != null && value != 'unassigned') {
+                      userManagementController.assignManager(user.id, value);
+                    }
+                  }
+                : null,
           ),
         ),
       );

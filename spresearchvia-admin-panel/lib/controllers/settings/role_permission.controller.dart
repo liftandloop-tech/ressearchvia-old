@@ -23,7 +23,90 @@ class RolePermissionController extends GetxController {
     'Settings'
   ];
 
-  final List<String> availableActions = ['create', 'read', 'update', 'delete'];
+  final List<String> availableActions = [];
+
+  List<String> getFeatureActions(String feature) {
+    switch (feature) {
+      case 'Leads':
+        return [
+          'leads.create',
+          'leads.create_pool',
+          'leads.bulk_upload',
+          'leads.view_all',
+          'leads.view_assigned',
+          'leads.view_pools',
+          'leads.view_import_status',
+          'leads.update_all',
+          'leads.update_assigned',
+          'leads.bulk_assign',
+          'leads.follow_up_all',
+          'leads.follow_up_assigned',
+          'leads.pull',
+          'leads.view_pull_stats'
+        ];
+      case 'Reports':
+        return [
+          'reports.create',
+          'reports.view',
+          'reports.update',
+          'reports.change_public_status',
+          'reports.delete'
+        ];
+      case 'Users':
+        return [
+          'users.create',
+          'users.view',
+          'users.view_assigned',
+          'users.update',
+          'users.suspend_activate',
+          'users.generate_temp_pin',
+          'users.delete'
+        ];
+      case 'Staff':
+        return [
+          'staff.create',
+          'staff.view',
+          'staff.update',
+          'staff.reset',
+          'staff.assignment',
+          'staff.delete',
+          'staff.upload_video',
+          'staff.upload_document',
+          'staff.view_applicants',
+          'staff.approve_applicant'
+        ];
+      case 'KYC':
+        return [
+          'kyc.view',
+          'kyc.download_document',
+          'kyc.change_status',
+          'kyc.update_gate_status',
+          'kyc.update_file'
+        ];
+      case 'Payments':
+        return [
+          'payments.view_pending',
+          'payments.bypass'
+        ];
+      case 'Notifications':
+        return [
+          'notifications.view',
+          'notifications.send',
+          'notifications.send_bulk_email',
+          'notifications.preview',
+          'notifications.view_scheduled',
+          'notifications.cancel_scheduled'
+        ];
+      case 'Settings':
+        return [
+          'settings.view',
+          'settings.update',
+          'settings.upload_payment_qr'
+        ];
+      default:
+        return [];
+    }
+  }
 
   @override
   void onInit() {

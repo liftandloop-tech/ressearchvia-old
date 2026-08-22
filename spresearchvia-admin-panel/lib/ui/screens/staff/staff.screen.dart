@@ -7,6 +7,8 @@ import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
 import 'widgets/staff_section.widget.dart';
 import 'widgets/add_staff_dialog.widget.dart';
+import 'widgets/staff_table.widget.dart';
+import 'widgets/staff_pagination.widget.dart';
 
 class StaffScreen extends StatelessWidget {
   const StaffScreen({super.key});
@@ -54,6 +56,23 @@ class StaffScreen extends StatelessWidget {
                           const Spacer(),
                           Row(
                             children: [
+                              Obx(() {
+                                final hasActiveFilters = controller.filterName.value.isNotEmpty ||
+                                    controller.filterMobile.value.isNotEmpty ||
+                                    controller.filterEmail.value.isNotEmpty ||
+                                    controller.filterSelectedRoles.isNotEmpty ||
+                                    controller.filterSelectedStatuses.isNotEmpty;
+                                if (!hasActiveFilters) return const SizedBox.shrink();
+                                return TextButton.icon(
+                                  onPressed: () => controller.clearAllFilters(),
+                                  icon: const Icon(Icons.clear_all, color: AppTheme.errorRed, size: 18),
+                                  label: const Text(
+                                    'Clear Filters',
+                                    style: TextStyle(color: AppTheme.errorRed, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                );
+                              }),
+                              const SizedBox(width: 8),
                               IconButton(
                                 onPressed: () => controller.fetchStaffList(),
                                 icon: Icon(
@@ -76,146 +95,141 @@ class StaffScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 32),
-                      Obx(
-                        () => controller.isAdminLoggedIn
-                            ? Column(
-                                children: [
-                                  StaffSection(
-                                    title: AppStrings.researchers,
-                                    count: controller.allResearchers.length,
-                                    isExpanded:
-                                        controller.researchersExpanded.value,
-                                    onToggle: () =>
-                                        controller.researchersExpanded.toggle(),
-                                    subtitle: AppStrings.researchTeam,
-                                    paginatedStaff:
-                                        controller.paginatedResearchers,
-                                    currentPage:
-                                        controller.researchersPage.value,
-                                    totalPages:
-                                        controller.researchersTotalPages,
-                                    totalItems:
-                                        controller.allResearchers.length,
-                                    itemsPerPage: controller.itemsPerPage,
-                                    onPageChange: (page) =>
-                                        controller.researchersPage.value = page,
-                                    onEdit: (staff) {
-                                      controller.populateForEdit(staff);
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AddStaffDialog(
-                                          controller: controller,
-                                        ),
-                                      );
-                                    },
-                                    onDelete: (staff) {
-                                      controller.deleteStaff(
-                                        staff.id,
-                                        staff.name,
-                                      );
-                                    },
-                                    onStatusToggle: (staff, isActive) =>
-                                        controller.toggleStaffStatus(
-                                          staff.id,
-                                          isActive,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      Obx(
-                        () => StaffSection(
-                          title: AppStrings.directors,
-                          count: controller.availableDirectors.length,
-                          isExpanded: controller.directorsExpanded.value,
-                          onToggle: () => controller.directorsExpanded.toggle(),
-                          subtitle: AppStrings.managementTeam,
-                          paginatedStaff: controller.paginatedDirectors,
-                          currentPage: controller.directorsPage.value,
-                          totalPages: controller.directorsTotalPages,
-                          totalItems: controller.availableDirectors.length,
-                          itemsPerPage: controller.itemsPerPage,
-                          onPageChange: (page) =>
-                              controller.directorsPage.value = page,
-                          onEdit: (staff) {
-                            controller.populateForEdit(staff);
-                            showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  AddStaffDialog(controller: controller),
-                            );
-                          },
-                          onDelete: (staff) {
-                            controller.deleteStaff(staff.id, staff.name);
-                          },
-                          onStatusToggle: (staff, isActive) =>
-                              controller.toggleStaffStatus(staff.id, isActive),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Obx(
-                        () => StaffSection(
-                          title: AppStrings.managers,
-                          count: controller.allManagers.length,
-                          isExpanded: controller.managersExpanded.value,
-                          onToggle: () => controller.managersExpanded.toggle(),
-                          subtitle: AppStrings.operationsTeam,
-                          paginatedStaff: controller.paginatedManagers,
-                          currentPage: controller.managersPage.value,
-                          totalPages: controller.managersTotalPages,
-                          totalItems: controller.allManagers.length,
-                          itemsPerPage: controller.itemsPerPage,
-                          onPageChange: (page) =>
-                              controller.managersPage.value = page,
-                          onEdit: (staff) {
-                            // No need to populate manually, screen handles it via ID
-                            Get.toNamed('/staff/edit/${staff.id}');
-                          },
-                          onDelete: (staff) {
-                            controller.deleteStaff(staff.id, staff.name);
-                          },
-                          onStatusToggle: (staff, isActive) =>
-                              controller.toggleStaffStatus(staff.id, isActive),
-                        ),
-                      ),
-                      Obx(
-                        () => controller.otherStaff.isNotEmpty
-                            ? Column(
-                                children: [
-                                  const SizedBox(height: 16),
-                                  StaffSection(
-                                    title: 'Other Staff',
-                                    count: controller.otherStaff.length,
-                                    isExpanded: controller.otherStaffExpanded.value,
-                                    onToggle: () => controller.otherStaffExpanded.toggle(),
-                                    subtitle: 'Other Department Staff',
-                                    paginatedStaff: controller.paginatedOtherStaff,
-                                    currentPage: controller.otherStaffPage.value,
-                                    totalPages: controller.otherStaffTotalPages,
-                                    totalItems: controller.otherStaff.length,
-                                    itemsPerPage: controller.itemsPerPage,
-                                    onPageChange: (page) =>
-                                        controller.otherStaffPage.value = page,
-                                    onEdit: (staff) {
-                                      Get.toNamed('/staff/edit/${staff.id}');
-                                    },
-                                    onDelete: (staff) {
-                                      controller.deleteStaff(staff.id, staff.name);
-                                    },
-                                    onStatusToggle: (staff, isActive) =>
-                                        controller.toggleStaffStatus(staff.id, isActive),
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
-                      ),
+                      const SizedBox(height: 24),
+                      // Active Filter Chips
+                      Obx(() {
+                        final chips = <Widget>[];
+                        
+                        if (controller.filterName.value.isNotEmpty) {
+                          chips.add(Chip(
+                            label: Text('Name: ${controller.filterName.value}', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterName.value = '',
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        if (controller.filterMobile.value.isNotEmpty) {
+                          chips.add(Chip(
+                            label: Text('Mobile: ${controller.filterMobile.value}', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterMobile.value = '',
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        if (controller.filterEmail.value.isNotEmpty) {
+                          chips.add(Chip(
+                            label: Text('Email: ${controller.filterEmail.value}', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterEmail.value = '',
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        for (final role in controller.filterSelectedRoles) {
+                          chips.add(Chip(
+                            label: Text('Role: $role', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterSelectedRoles.remove(role),
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        for (final status in controller.filterSelectedStatuses) {
+                          chips.add(Chip(
+                            label: Text('Status: $status', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterSelectedStatuses.remove(status),
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+
+                        if (chips.isEmpty) return const SizedBox.shrink();
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: chips,
+                            ),
+                          ),
+                        );
+                      }),
+                      // Staff Table Card
+                      Obx(() {
+                        final paginatedList = controller.paginatedStaffList;
+                        final filteredList = controller.filteredStaffList;
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.gray200),
+                          ),
+                          child: paginatedList.isEmpty
+                              ? _buildEmptyState()
+                              : Column(
+                                  children: [
+                                    StaffTable(
+                                      staffList: paginatedList,
+                                      onEdit: (staff) {
+                                        controller.populateForEdit(staff);
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AddStaffDialog(
+                                            controller: controller,
+                                          ),
+                                        );
+                                      },
+                                      onDelete: (staff) {
+                                        controller.deleteStaff(staff.id, staff.name);
+                                      },
+                                      onStatusToggle: (staff, isActive) =>
+                                          controller.toggleStaffStatus(staff.id, isActive),
+                                    ),
+                                    StaffPagination(
+                                      title: 'Staff',
+                                      currentPage: controller.currentPage.value,
+                                      totalPages: controller.totalPages,
+                                      totalItems: filteredList.length,
+                                      itemsPerPage: controller.itemsPerPage,
+                                      currentItemsCount: paginatedList.length,
+                                      onPageChange: (page) =>
+                                          controller.currentPage.value = page,
+                                    ),
+                                  ],
+                                ),
+                        );
+                      }),
                     ],
                   ),
                 ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.people_outline, size: 64, color: AppTheme.gray400),
+          const SizedBox(height: 16),
+          const Text(
+            'No staff members found',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Try adjusting your filters or add a new staff member',
+            style: TextStyle(fontSize: 14, color: AppTheme.textTertiary),
+          ),
+        ],
       ),
     );
   }

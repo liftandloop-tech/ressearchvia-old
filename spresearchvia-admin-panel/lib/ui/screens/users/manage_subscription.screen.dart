@@ -5,6 +5,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/subscription/manage_subscription.controller.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'widgets/current_subscription_details.widget.dart';
 import 'widgets/subscription_actions.widget.dart';
 import 'widgets/custom_plans.widget.dart';
@@ -20,6 +21,10 @@ class ManageSubscriptionScreen extends StatelessWidget {
     final controller = Get.put(ManageSubscriptionController());
 
     controller.fetchUserSubscriptions(userId);
+
+    final currentUser = Get.find<AuthController>().user.value;
+    final canViewPayments = currentUser?.has('payments.view_pending') ?? false;
+    final canUpdateSub = (currentUser?.isAdmin ?? false) || (currentUser?.has('settings.update') ?? false);
 
     return Scaffold(
       backgroundColor: AppTheme.gray50,
@@ -170,8 +175,10 @@ class ManageSubscriptionScreen extends StatelessWidget {
               }),
             ),
             const SizedBox(height: 24),
-            RegistrationPlanActions(controller: controller),
-            const SizedBox(height: 24),
+            if (canUpdateSub) ...[
+              RegistrationPlanActions(controller: controller),
+              const SizedBox(height: 24),
+            ],
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -181,10 +188,10 @@ class ManageSubscriptionScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const SizedBox(height: 24),
-            // HNI Customised Plans section removed as per request
-            PaymentHistory(userId: userId),
-            const SizedBox(height: 32),
+            if (canViewPayments) ...[
+              PaymentHistory(userId: userId),
+              const SizedBox(height: 32),
+            ],
           ],
         ),
       ),

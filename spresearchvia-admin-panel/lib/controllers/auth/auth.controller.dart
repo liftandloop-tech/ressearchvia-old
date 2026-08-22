@@ -17,7 +17,7 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _checkAuth();
+    checkAuth();
   }
 
   @override
@@ -26,7 +26,7 @@ class AuthController extends GetxController {
     super.onClose();
   }
 
-  Future<void> _checkAuth() async {
+  Future<void> checkAuth() async {
     try {
       final token = await _authService.getToken();
       final storedUser = await _authService.getUser();

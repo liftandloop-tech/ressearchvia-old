@@ -445,20 +445,31 @@ class RolesPermissionsScreen extends StatelessWidget {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                final success = await controller.saveRole(
-                  id: role?.id,
-                  name: nameCtrl.text,
-                  description: descCtrl.text,
-                  groupIds: selectedGroups.toList(),
-                );
-                if (success) Get.back();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, foregroundColor: Colors.white),
-              child: const Text('Save'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            Obx(() {
+              final isSaving = controller.isLoading.value;
+              return ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final success = await controller.saveRole(
+                          id: role?.id,
+                          name: nameCtrl.text,
+                          description: descCtrl.text,
+                          groupIds: selectedGroups.toList(),
+                        );
+                        if (success && context.mounted) Navigator.pop(context);
+                      },
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, foregroundColor: Colors.white),
+                child: isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Save'),
+              );
+            }),
           ],
         );
       }),
@@ -530,14 +541,18 @@ class RolesPermissionsScreen extends StatelessWidget {
                                 style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                               ),
                             ),
-                            Row(
-                              children: controller.availableActions.map((action) {
-                                return Obx(() {
-                                  final actionsList = permissionsMap[feature]!;
-                                  final isChecked = actionsList.contains(action);
-                                  return Padding(
-                                    padding: const EdgeInsets.only(left: 12),
-                                    child: Row(
+                            Expanded(
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                alignment: WrapAlignment.end,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: controller.getFeatureActions(feature).map((action) {
+                                  return Obx(() {
+                                    final actionsList = permissionsMap[feature]!;
+                                    final isChecked = actionsList.contains(action);
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Checkbox(
                                           value: isChecked,
@@ -550,12 +565,15 @@ class RolesPermissionsScreen extends StatelessWidget {
                                             }
                                           },
                                         ),
-                                        Text(action, style: const TextStyle(fontSize: 12)),
+                                        Text(
+                                          action,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                        ),
                                       ],
-                                    ),
-                                  );
-                                });
-                              }).toList(),
+                                    );
+                                  });
+                                }).toList(),
+                              ),
                             ),
                           ],
                         ),
@@ -568,28 +586,39 @@ class RolesPermissionsScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              // Build permissions list for saving
-              final List<PermissionItem> saveList = [];
-              permissionsMap.forEach((feature, actionsRx) {
-                if (actionsRx.isNotEmpty) {
-                  saveList.add(PermissionItem(feature: feature, actions: actionsRx.toList()));
-                }
-              });
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          Obx(() {
+            final isSaving = controller.isLoading.value;
+            return ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      // Build permissions list for saving
+                      final List<PermissionItem> saveList = [];
+                      permissionsMap.forEach((feature, actionsRx) {
+                        if (actionsRx.isNotEmpty) {
+                          saveList.add(PermissionItem(feature: feature, actions: actionsRx.toList()));
+                        }
+                      });
 
-              final success = await controller.savePermissionGroup(
-                id: group?.id,
-                name: nameCtrl.text,
-                description: descCtrl.text,
-                permissions: saveList,
-              );
-              if (success) Get.back();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, foregroundColor: Colors.white),
-            child: const Text('Save'),
-          ),
+                      final success = await controller.savePermissionGroup(
+                        id: group?.id,
+                        name: nameCtrl.text,
+                        description: descCtrl.text,
+                        permissions: saveList,
+                      );
+                      if (success && context.mounted) Navigator.pop(context);
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, foregroundColor: Colors.white),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Save'),
+            );
+          }),
         ],
       ),
     );

@@ -83,13 +83,12 @@ class KYCDocuments extends StatelessWidget {
                       ].contains(currentStatus)
                       ? currentStatus
                       : 'PENDING',
-                  icon:
-                      Get.find<AuthController>().user.value?.isDirector == true
-                      ? const SizedBox.shrink()
-                      : Icon(
+                  icon: (Get.find<AuthController>().user.value?.hasPermission('KYC', 'update') ?? false)
+                      ? Icon(
                           Icons.arrow_drop_down,
                           color: Colors.grey.shade600,
-                        ),
+                        )
+                      : const SizedBox.shrink(),
                   items: [
                     DropdownMenuItem(
                       value: 'PENDING',
@@ -125,13 +124,12 @@ class KYCDocuments extends StatelessWidget {
                       ),
                     ),
                   ],
-                  onChanged:
-                      Get.find<AuthController>().user.value?.isDirector == true
-                      ? null
-                      : (val) {
+                  onChanged: (Get.find<AuthController>().user.value?.hasPermission('KYC', 'update') ?? false)
+                      ? (val) {
                           if (val != null && val != currentStatus)
                             onChanged(val);
-                        },
+                        }
+                      : null,
                 ),
               ),
             ),
@@ -267,7 +265,7 @@ class KYCDocuments extends StatelessWidget {
                         label: "Front Side",
                         imageUrl: aadhaarFrontUrl,
                       ),
-                      if (!isDirector)
+                      if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
                         Positioned(
                           top: 4,
                           left: 4,
@@ -297,7 +295,7 @@ class KYCDocuments extends StatelessWidget {
                         label: "Back Side",
                         imageUrl: aadhaarBackUrl,
                       ),
-                      if (!isDirector)
+                      if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
                         Positioned(
                           top: 4,
                           left: 4,
@@ -345,7 +343,7 @@ class KYCDocuments extends StatelessWidget {
               child: Stack(
                 children: [
                   KycDocPlaceholder(label: "PAN Card", imageUrl: panUrl),
-                  if (!isDirector)
+                  if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
                     Positioned(
                       top: 4,
                       left: 4,
@@ -387,7 +385,7 @@ class KYCDocuments extends StatelessWidget {
                     color: Colors.grey.shade700,
                   ),
                 ),
-                if (!isDirector)
+                if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
                   TextButton.icon(
                     onPressed: () => controller.updateDocument('video'),
                     icon: const Icon(Icons.edit, size: 16),

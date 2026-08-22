@@ -122,7 +122,7 @@ class StaffModel {
       name: _safeString(json['fullName'] ?? json['name']) ?? '',
       mobile: _safeString(json['mobileNumber'] ?? json['mobile']) ?? '',
       email: _safeString(json['emailAddress'] ?? json['email']) ?? '',
-      role: _safeString(json['role'] ?? json['designation'] ?? json['position']) ?? 'Staff',
+      role: _safeString(json['deparment'] ?? json['department'] ?? json['role'] ?? json['designation'] ?? json['position']) ?? 'Staff',
       status: _safeString(json['status']) ?? 'Active',
       department: _safeString(json['deparment'] ?? json['department'] ?? json['team']) ?? '',
       joiningDate: json['joiningDate'] != null

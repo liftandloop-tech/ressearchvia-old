@@ -16,8 +16,9 @@ class ReportActions extends StatelessWidget {
     final navController = Get.find<ReportsNavigationController>();
     final reportController = Get.find<ReportController>();
 
-    final isDirector =
-        Get.find<AuthController>().user.value?.isDirector == true;
+    final currentUser = Get.find<AuthController>().user.value;
+    final canUpdate = currentUser?.has('reports.update') ?? false;
+    final canDelete = currentUser?.has('reports.delete') ?? false;
     return Row(
       children: [
         IconButton(
@@ -31,8 +32,7 @@ class ReportActions extends StatelessWidget {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
         ),
-        if (!isDirector &&
-            Get.find<AuthController>().user.value?.isViewOnly != true) ...[
+        if (canUpdate) ...[
           const SizedBox(width: 12),
           IconButton(
             onPressed: () =>
@@ -46,6 +46,8 @@ class ReportActions extends StatelessWidget {
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
+        ],
+        if (canDelete) ...[
           const SizedBox(width: 12),
           IconButton(
             onPressed: () {

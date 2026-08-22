@@ -123,12 +123,4 @@ class LoginController extends GetxController {
     }
   }
 
-  @override
-  void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
-    mobileController.dispose();
-    mpinController.dispose();
-    super.onClose();
-  }
 }

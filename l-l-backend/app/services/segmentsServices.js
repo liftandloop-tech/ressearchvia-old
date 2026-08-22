@@ -952,10 +952,11 @@ const segmentsService = {
       // Restrict payments by staff/director assignment
       const callerId = user?._id || user?.userId;
       if (callerId) {
-        const staffMember = await staffModel.findById(callerId);
+        const staffMember = await staffModel.findById(callerId).populate('roleId');
         if (staffMember) {
-          const role = (staffMember.userType || "").toLowerCase();
-          const isSystemAdmin = role === 'admin' || role === 'super_admin';
+          const roleName = (staffMember.roleId?.roleName || "").toLowerCase();
+          const dept = (staffMember.deparment || "").toLowerCase();
+          const isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
           if (!isSystemAdmin) {
             let targetStaffIds = [staffMember._id];
             const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();

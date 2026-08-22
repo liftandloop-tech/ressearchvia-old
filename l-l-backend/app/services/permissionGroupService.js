@@ -1,24 +1,35 @@
 import permissionGroupModel from "../models/permissionGroupModel.js";
+import { PERMISSION_REGISTRY } from "../config/permissionRegistry.js";
 
 const permissionGroupService = {
     seedAdminGroup: async () => {
         try {
             const adminGroup = await permissionGroupModel.findOne({ name: 'admin' });
-            const allFeatures = ['Leads', 'Reports', 'Users', 'Staff', 'KYC', 'Payments', 'Notifications', 'Settings'];
-            const fullPermissions = allFeatures.map(feature => ({
+
+            // Build full permissions list grouped by feature using canonical keys
+            const featureMap = {};
+            Object.keys(PERMISSION_REGISTRY).forEach(key => {
+                const item = PERMISSION_REGISTRY[key];
+                if (!featureMap[item.feature]) {
+                    featureMap[item.feature] = [];
+                }
+                featureMap[item.feature].push(key);
+            });
+
+            const fullPermissions = Object.entries(featureMap).map(([feature, actions]) => ({
                 feature,
-                actions: ['create', 'read', 'update', 'delete']
+                actions
             }));
 
             if (!adminGroup) {
                 await permissionGroupModel.create({
                     name: 'admin',
-                    description: 'Default Admin Group with all permissions',
+                    description: 'Default Admin Group with all canonical permissions',
                     permissions: fullPermissions
                 });
                 console.log('Default "admin" permission group seeded successfully.');
             } else {
-                // Ensure it has all permissions
+                // Ensure default admin group always possesses all permissions
                 adminGroup.permissions = fullPermissions;
                 await adminGroup.save();
             }

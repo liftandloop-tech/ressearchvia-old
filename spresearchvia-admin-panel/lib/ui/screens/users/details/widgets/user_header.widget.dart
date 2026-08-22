@@ -76,7 +76,7 @@ class UserHeader extends StatelessWidget {
                 ],
               ),
             ),
-            if (authController.user.value?.isDirector == false) ...[
+            if (authController.user.value?.has('users.update') ?? false) ...[
               UserHeaderButton(
                 title: 'Edit Profile',
                 color: AppTheme.primaryBlue,
@@ -93,6 +93,8 @@ class UserHeader extends StatelessWidget {
                     .showManageSubscription(userDetails.id),
               ),
               SizedBox(width: AppTheme.spacing12),
+            ],
+            if (authController.user.value?.has('users.generate_temp_pin') ?? false) ...[
               UserHeaderButton(
                 title: 'Generate Temp PIN',
                 color: Colors.amber.shade800,
@@ -100,6 +102,8 @@ class UserHeader extends StatelessWidget {
                 onPressed: () => controller.generateTempPin(),
               ),
               SizedBox(width: AppTheme.spacing12),
+            ],
+            if (authController.user.value?.has('users.suspend_activate') ?? false) ...[
               if (userDetails.status.toUpperCase() == 'SUSPENDED')
                 UserHeaderButton(
                   title: 'Activate Account',

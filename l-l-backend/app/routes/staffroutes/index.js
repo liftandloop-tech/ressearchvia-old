@@ -5,7 +5,7 @@ import staffController from "../../controller/staffController.js";
 import staffDocController from "../../controller/staffDocController.js";
 import staffAttendanceController from "../../controller/staffAttendanceController.js";
 import applicantController from "../../controller/applicantController.js";
-import { checkPermission } from "../../middleware/accessMiddleware.js";
+import { checkPermission, adminOnly } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
 const staffRoutes = () => {
@@ -15,10 +15,10 @@ const staffRoutes = () => {
     Router.post("/create", auth.tokenVerified, checkPermission('Staff', 'create'), staffController.staffCreate)
     Router.put("/reset", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.staffReset)
     Router.delete("/delete", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
-    Router.get("/list", auth.tokenVerified, checkPermission('Staff', 'read'), staffController.staffList)
+    Router.get("/list", auth.tokenVerified, adminOnly, staffController.staffList)
     Router.delete("/cancle/:id", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
     Router.post("/staff-assignment", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.StaffAssignment)
-    Router.get("/assigned-users", auth.tokenVerified, checkPermission('Staff', 'read'), staffController.getStaffAssignedUsers)
+    Router.get("/assigned-users", auth.tokenVerified, checkPermission('Users', 'read'), staffController.getStaffAssignedUsers)
     Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
 
     // Public applicant routes

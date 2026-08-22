@@ -2,7 +2,7 @@ import express from "express";
 import auth from "../../config/auth.js"
 import usersController from "../../controller/userController.js"
 import upload from "../../config/upload.js";
-import { appAccess, adminOnly, adminStrictOnly } from "../../middleware/accessMiddleware.js";
+import { appAccess, adminOnly, adminStrictOnly, checkPermission } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
 const usersRoutes = () => {
@@ -19,21 +19,21 @@ const usersRoutes = () => {
   Router.post("/accept-disclaimer", auth.tokenVerified, usersController.acceptDisclaimer)
 
   // Admin Routes (appAccess skips for admin, but good to have if we want to enforce user status)
-  Router.get("/user-list", auth.tokenVerified, adminOnly, usersController.userList)
-  Router.delete("/delete-user/:id", auth.tokenVerified, adminStrictOnly, usersController.userDelete)
-  Router.put("/suspend-user/:id", auth.tokenVerified, adminStrictOnly, usersController.userSuspend)
-  Router.put("/activate-user/:id", auth.tokenVerified, adminStrictOnly, usersController.userActivate)
+  Router.get("/user-list", auth.tokenVerified, adminOnly, checkPermission('Users', 'read'), usersController.userList)
+  Router.delete("/delete-user/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'delete'), usersController.userDelete)
+  Router.put("/suspend-user/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'update'), usersController.userSuspend)
+  Router.put("/activate-user/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'update'), usersController.userActivate)
   Router.get("/user-details/:id", auth.tokenVerified, (req, res, next) => {
-    // Allow if Admin, Director, Researcher OR if accessing own data
+    // Allow if Admin or if accessing own data
     if (
       req.user?.userType === 'admin' ||
       req.user?.userType === 'super_admin' ||
-      req.user?.userType === 'Director' ||
       req.user?._id == req.params?.id
     ) {
       return next();
     }
-    return res.status(403).json({ message: "Access Denied" });
+    // Check dynamic permission
+    return checkPermission('Users', 'read')(req, res, next);
   }, usersController.userDetails)
   Router.get("/dashboard-count", auth.tokenVerified, adminOnly, usersController.dashboardCount)
 
@@ -42,11 +42,11 @@ const usersRoutes = () => {
   Router.put("/update/:id", auth.tokenVerified, appAccess, usersController.updateProfile)
 
   // CRITICAL SECURITY FIX: Lock down Admin Provisioning
-  Router.post("/admin-create", auth.tokenVerified, adminStrictOnly, usersController.adminCreate)
-  Router.put("/admin-update-user/:id", auth.tokenVerified, adminStrictOnly, usersController.adminUpdateUser)
+  Router.post("/admin-create", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'create'), usersController.adminCreate)
+  Router.put("/admin-update-user/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'update'), usersController.adminUpdateUser)
   Router.post("/admin-login", usersController.adminLogin) // Login must be public
-  Router.post("/bypass-payment", auth.tokenVerified, adminStrictOnly, usersController.bypassPayment)
-  Router.put("/generate-temp-pin/:id", auth.tokenVerified, adminStrictOnly, usersController.adminGenerateTempPin)
+  Router.post("/bypass-payment", auth.tokenVerified, adminStrictOnly, checkPermission('Payments', 'update'), usersController.bypassPayment)
+  Router.put("/generate-temp-pin/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'update'), usersController.adminGenerateTempPin)
 
 
   return Router

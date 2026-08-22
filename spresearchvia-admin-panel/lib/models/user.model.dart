@@ -57,9 +57,23 @@ class UserModel {
   String get createdAt => registrationDate;
   String get formattedPhone => mobile;
 
-  bool get isAdmin =>
-      subscriptionPlan.toLowerCase() == 'admin' ||
-      subscriptionPlan.toLowerCase() == 'super_admin';
+  bool get isAdmin {
+    final dept = subscriptionPlan.toLowerCase();
+    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
+    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
+    String roleIdName = '';
+    if (rawJson?['roleId'] is Map) {
+      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
+    }
+    return dept == 'admin' ||
+        dept == 'super_admin' ||
+        roleStr == 'admin' ||
+        roleStr == 'super_admin' ||
+        userTypeStr == 'admin' ||
+        userTypeStr == 'super_admin' ||
+        roleIdName == 'admin' ||
+        roleIdName == 'super_admin';
+  }
 
   bool get isResearcher => subscriptionPlan.toLowerCase() == 'researcher';
 
@@ -140,9 +154,13 @@ class UserModel {
     );
   }
 
-  bool hasPermission(String feature, String action) {
+  bool hasPermission(String target, [String? optionalAction]) {
     if (isAdmin) return true; // System admins bypass permission checks
     if (rawJson == null) return false;
+
+    final String requiredKey = optionalAction == null
+        ? target.toLowerCase()
+        : '${target.toLowerCase()}.${optionalAction.toLowerCase()}';
 
     // Check roleId
     final roleId = rawJson!['roleId'];
@@ -155,11 +173,52 @@ class UserModel {
             if (permissionsList is List) {
               for (var perm in permissionsList) {
                 if (perm is Map) {
-                  final String permFeature = (perm['feature'] ?? '').toString().toLowerCase();
-                  if (permFeature == feature.toLowerCase()) {
-                    final actions = perm['actions'];
-                    if (actions is List) {
-                      if (actions.any((act) => act.toString().toLowerCase() == action.toLowerCase())) {
+                  final actions = perm['actions'];
+                  if (actions is List) {
+                    final String permFeature = (perm['feature'] ?? '').toString().toLowerCase();
+                    final List<String> actList = actions.map((a) => a.toString().toLowerCase()).toList();
+
+                    // 1. Direct canonical key match
+                    if (actList.contains(requiredKey)) {
+                      return true;
+                    }
+
+                    // 2. Feature-based alias resolution for canonical view permissions
+                    final reqFeature = requiredKey.split('.').first;
+                    if (permFeature == reqFeature) {
+                      if (requiredKey.startsWith('leads.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('leads.view_all') || actList.contains('leads.view_assigned'))) {
+                        return true;
+                      }
+                      if (requiredKey.startsWith('users.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('users.view') || actList.contains('users.view_all') || actList.contains('users.view_assigned'))) {
+                        return true;
+                      }
+                      if (requiredKey.startsWith('reports.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('reports.view'))) {
+                        return true;
+                      }
+                      if (requiredKey.startsWith('kyc.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('kyc.view'))) {
+                        return true;
+                      }
+                      if (requiredKey.startsWith('payments.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('payments.view_pending'))) {
+                        return true;
+                      }
+                      if (requiredKey.startsWith('staff.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('staff.view'))) {
+                        return true;
+                      }
+                      if (requiredKey.startsWith('settings.view') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('settings.view'))) {
+                        return true;
+                      }
+                    }
+
+                    // Fallback check if feature and action were provided
+                    if (optionalAction != null && permFeature == target.toLowerCase()) {
+                      if (actList.contains(optionalAction.toLowerCase())) {
                         return true;
                       }
                     }
@@ -170,9 +229,13 @@ class UserModel {
           }
         }
       }
+      return false; // Has roleId but permission not found in groups
     }
+
     return false;
   }
+
+  bool has(String permissionKey) => hasPermission(permissionKey);
 
   Map<String, dynamic> toJson() {
     return {

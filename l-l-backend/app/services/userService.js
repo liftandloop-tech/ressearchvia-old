@@ -17,11 +17,13 @@ import mongoose from "mongoose";
 import deviceModel from "../models/deviceModel.js";
 import userDocUploadModel from "../models/userDocUploadModel.js";
 import paymentIntentModel from "../models/paymentIntentModel.js";
-import { logUserLogin, logAppSessionStart, logUserLogout, logAdminProfileEdit, logKycStatusChange, logAccountSuspended, logTempPinGenerated, logAliasLogin } from "./activityLogService.js";
+import { logUserLogin, logAppSessionStart, logUserLogout, logAdminProfileEdit, logKycStatusChange, logAccountSuspended, logTempPinGenerated, logAliasLogin, logAuditTrail } from "./activityLogService.js";
 
 // Helper function for Canonical Onboarding Logic
 import { grantEntitlement } from "./entitlementService.js";
 import staffService from "./staffService.js";
+import staffModel from "../models/staffModel.js";
+import staffAssigmentModel from "../models/staffAssignmentModel.js";
 
 /* ==========================================================================
    HELPER FUNCTIONS (Refactored to reduce redundancy)
@@ -1590,12 +1592,40 @@ const userService = {
       search = search ? search.trim() : "";
       page = page ? parseInt(page) : "";
       pageSize = pageSize ? parseInt(pageSize) : "";
+
+      // Restrict users list by staff/director assignment
+      let assignedUserIds = null;
+      if (currentUserId) {
+        const isStaff = await staffModel.findById(currentUserId).populate('roleId');
+        if (isStaff) {
+          const roleName = (isStaff.roleId?.roleName || "").toLowerCase();
+          const dept = (isStaff.deparment || "").toLowerCase();
+          const isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
+          if (!isSystemAdmin) {
+            let targetStaffIds = [isStaff._id];
+            if (dept.includes('director')) {
+              const managers = await staffModel.find({ assignedDirector: isStaff._id }).select('_id');
+              const managerIds = managers.map(m => m._id);
+              targetStaffIds = [...targetStaffIds, ...managerIds];
+            }
+            const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
+            assignedUserIds = assignments.map(a => a.userId);
+          }
+        }
+      }
+
+      const matchStage = {
+        userType: { $ne: "admin" },
+        _id: { $ne: currentUserId ? new mongoose.Types.ObjectId(currentUserId) : null }
+      };
+
+      if (assignedUserIds !== null) {
+        matchStage._id.$in = assignedUserIds;
+      }
+
       const aggregationPipeline = [
         {
-          $match: {
-            userType: { $ne: "admin" },
-            _id: { $ne: currentUserId ? new mongoose.Types.ObjectId(currentUserId) : null }
-          },
+          $match: matchStage,
         },
         {
           $lookup: {
@@ -2024,6 +2054,18 @@ const userService = {
         req
       });
 
+      // --- AUDIT TRAIL LOG ---
+      logAuditTrail({
+        actorUserId: adminUser?._id,
+        action: 'USER_SUSPENDED',
+        resourceType: 'User',
+        resourceId: user._id.toString(),
+        oldValue: { userStatus: 'ACTIVE' },
+        newValue: { userStatus: 'SUSPENDED', reason: body.reason },
+        metadata: { mobileNumber: user.mobileNumber },
+        req
+      });
+
       return { status: 200, message: "User account suspended successfully", data: { user } };
     } catch (error) {
       return { status: 400, message: error.message, data: {} };
@@ -2181,15 +2223,39 @@ const userService = {
     }
   },
 
-  dashboardCount: async ({ }) => {
+  dashboardCount: async (req) => {
     try {
-      const userCount = await userModel.countDocuments();
-      const activeSubcription = await planPurchaseModel.countDocuments({
-        status: "active",
-      });
-      const pandingKyc = await userKycModel.countDocuments({
-        kycStatus: "pending",
-      });
+      const currentUserId = req?.user?._id;
+      let userQuery = {};
+      let kycQuery = { kycStatus: "pending" };
+      let planQuery = { status: "active" };
+
+      if (currentUserId) {
+        const isStaff = await staffModel.findById(currentUserId).populate('roleId');
+        if (isStaff) {
+          const roleName = (isStaff.roleId?.roleName || "").toLowerCase();
+          const dept = (isStaff.deparment || "").toLowerCase();
+          const isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
+          if (!isSystemAdmin) {
+            let targetStaffIds = [isStaff._id];
+            if (dept.includes('director')) {
+              const managers = await staffModel.find({ assignedDirector: isStaff._id }).select('_id');
+              const managerIds = managers.map(m => m._id);
+              targetStaffIds = [...targetStaffIds, ...managerIds];
+            }
+            const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
+            const assignedUserIds = assignments.map(a => a.userId);
+            
+            userQuery = { _id: { $in: assignedUserIds } };
+            kycQuery = { userId: { $in: assignedUserIds }, kycStatus: "pending" };
+            planQuery = { userId: { $in: assignedUserIds }, status: "active" };
+          }
+        }
+      }
+
+      const userCount = await userModel.countDocuments(userQuery);
+      const activeSubcription = await planPurchaseModel.countDocuments(planQuery);
+      const pandingKyc = await userKycModel.countDocuments(kycQuery);
       return {
         status: 200,
         message: "counts",

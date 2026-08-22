@@ -1,4 +1,41 @@
 import UserActivityLog from "../models/userActivityLogModel.js";
+import AuditLog from "../models/auditLogModel.js";
+
+/**
+ * Audit Trail Logger for sensitive administrative and security operations.
+ * Immutable, fire-and-forget safe.
+ */
+export const logAuditTrail = async ({
+    actorUserId,
+    action,
+    resourceType,
+    resourceId = null,
+    oldValue = null,
+    newValue = null,
+    metadata = {},
+    req = null,
+    correlationId = null,
+    success = true
+}) => {
+    try {
+        if (!actorUserId) return;
+        await AuditLog.create({
+            actorUserId,
+            action,
+            resourceType,
+            resourceId,
+            oldValue,
+            newValue,
+            metadata,
+            ipAddress: req ? (req.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip) : null,
+            userAgent: req ? req.headers?.['user-agent'] : null,
+            correlationId: correlationId || req?.headers?.['x-correlation-id'] || null,
+            success
+        });
+    } catch (err) {
+        console.error(`[AuditLog] Failed to record audit entry (${action}):`, err);
+    }
+};
 
 /**
  * ActivityLogService — Compliance-grade logger.

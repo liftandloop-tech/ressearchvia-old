@@ -3,13 +3,11 @@ import mongoose from "mongoose";
 const permissionSchema = new mongoose.Schema({
     feature: {
         type: String,
-        required: true,
-        enum: ['Leads', 'Reports', 'Users', 'Staff', 'KYC', 'Payments', 'Notifications', 'Settings']
+        required: true
     },
     actions: {
         type: [String],
-        enum: ['create', 'read', 'update', 'delete'],
-        default: ['read']
+        default: []
     }
 }, { _id: false });
 

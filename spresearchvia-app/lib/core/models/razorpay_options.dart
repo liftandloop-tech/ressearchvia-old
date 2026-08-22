@@ -34,6 +34,7 @@ class RazorpayOptions {
         'name': userName.isNotEmpty ? userName : 'User'
       },
       'theme': {'color': RazorpayConfig.themeColor},
+      'retry': {'enabled': true, 'max_count': 3},
     };
 
     // hiddenMethod filtering removed as we now support full Razorpay suite or Bank Transfer

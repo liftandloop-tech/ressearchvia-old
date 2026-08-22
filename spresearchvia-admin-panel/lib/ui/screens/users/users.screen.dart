@@ -51,11 +51,7 @@ class UsersScreen extends StatelessWidget {
                         const Spacer(),
                         Row(
                           children: [
-                            if (Get.find<AuthController>()
-                                    .user
-                                    .value
-                                    ?.isDirector !=
-                                true) ...[
+                            if (Get.find<AuthController>().user.value?.has('users.create') ?? false) ...[
                               ElevatedButton.icon(
                                 onPressed: () => navController.showCreateUser(),
                                 icon: const Icon(

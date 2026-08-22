@@ -4,8 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 class ProxyService {
   constructor() {
     this.baseUrl = process.env.PROXY_API_URL || "https://partners-uat.staticip.in";
-    this.partnerUserid = process.env.PROXY_PARTNER_USERID || "partner_id_1";
-    this.partnerPassword = process.env.PROXY_PARTNER_PASSWORD || "your_password";
+    this.partnerUserid = process.env.PROXY_PARTNER_USERID || "SPResearchvia";
+    this.partnerPassword = process.env.PROXY_PARTNER_PASSWORD || "tk29yom43u725g5u";
   }
 
   async _request(endpoint, body) {

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:html' as html;
 import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
@@ -33,6 +35,13 @@ class StaffController extends GetxController {
   var isLoading = false.obs;
   var staffList = <StaffModel>[].obs;
 
+  var filterName = ''.obs;
+  var filterMobile = ''.obs;
+  var filterEmail = ''.obs;
+  var filterSelectedRoles = <String>[].obs;
+  var filterSelectedStatuses = <String>[].obs;
+  var currentPage = 1.obs;
+
   var researchersExpanded = true.obs;
   var directorsExpanded = false.obs;
   var managersExpanded = false.obs;
@@ -62,8 +71,66 @@ class StaffController extends GetxController {
         selectedDepartment.value = 'Manager';
       }
     }
+    _loadFiltersFromUrl();
     fetchStaffList();
     fetchRolesList();
+
+    // Listen to changes on filtering variables to dynamically keep the URL in sync
+    ever(filterName, (_) => updateUrlQueryParameters());
+    ever(filterMobile, (_) => updateUrlQueryParameters());
+    ever(filterEmail, (_) => updateUrlQueryParameters());
+    filterSelectedRoles.listen((_) => updateUrlQueryParameters());
+    filterSelectedStatuses.listen((_) => updateUrlQueryParameters());
+  }
+
+  void _loadFiltersFromUrl() {
+    if (!kIsWeb) return;
+    try {
+      final uri = Uri.base;
+      if (uri.queryParameters.containsKey('name')) {
+        filterName.value = uri.queryParameters['name'] ?? '';
+      }
+      if (uri.queryParameters.containsKey('mobile')) {
+        filterMobile.value = uri.queryParameters['mobile'] ?? '';
+      }
+      if (uri.queryParameters.containsKey('email')) {
+        filterEmail.value = uri.queryParameters['email'] ?? '';
+      }
+      if (uri.queryParameters.containsKey('roles')) {
+        final rolesStr = uri.queryParameters['roles'] ?? '';
+        if (rolesStr.isNotEmpty) {
+          filterSelectedRoles.assignAll(rolesStr.split(','));
+        }
+      }
+      if (uri.queryParameters.containsKey('statuses')) {
+        final statusesStr = uri.queryParameters['statuses'] ?? '';
+        if (statusesStr.isNotEmpty) {
+          filterSelectedStatuses.assignAll(statusesStr.split(','));
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading filters from URL: $e');
+    }
+  }
+
+  void updateUrlQueryParameters() {
+    if (!kIsWeb) return;
+    try {
+      final params = <String, String>{};
+      if (filterName.value.isNotEmpty) params['name'] = filterName.value;
+      if (filterMobile.value.isNotEmpty) params['mobile'] = filterMobile.value;
+      if (filterEmail.value.isNotEmpty) params['email'] = filterEmail.value;
+      if (filterSelectedRoles.isNotEmpty) params['roles'] = filterSelectedRoles.join(',');
+      if (filterSelectedStatuses.isNotEmpty) params['statuses'] = filterSelectedStatuses.join(',');
+
+      final uri = Uri.base;
+      final newUri = uri.replace(queryParameters: params);
+      
+      // Update browser URL query parameters without reloading
+      html.window.history.replaceState(null, '', newUri.toString());
+    } catch (e) {
+      debugPrint('Failed to update URL parameters: $e');
+    }
   }
 
   Future<void> fetchRolesList() async {
@@ -630,6 +697,93 @@ class StaffController extends GetxController {
   String get currentDirectorName {
     if (!Get.isRegistered<AuthController>()) return '';
     return _authController.user.value?.fullName ?? '';
+  }
+
+  List<StaffModel> get filteredStaffList {
+    return staffList.where((s) {
+      if (filterName.value.isNotEmpty) {
+        if (!s.name.toLowerCase().contains(filterName.value.toLowerCase())) {
+          return false;
+        }
+      }
+      
+      if (filterMobile.value.isNotEmpty) {
+        if (!s.mobile.toLowerCase().contains(filterMobile.value.toLowerCase())) {
+          return false;
+        }
+      }
+
+      if (filterEmail.value.isNotEmpty) {
+        if (!s.email.toLowerCase().contains(filterEmail.value.toLowerCase())) {
+          return false;
+        }
+      }
+
+      if (filterSelectedRoles.isNotEmpty) {
+        if (!filterSelectedRoles.contains(s.role.trim())) {
+          return false;
+        }
+      }
+
+      if (filterSelectedStatuses.isNotEmpty) {
+        if (!filterSelectedStatuses.contains(s.status.trim())) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  void clearAllFilters() {
+    filterName.value = '';
+    filterMobile.value = '';
+    filterEmail.value = '';
+    filterSelectedRoles.clear();
+    filterSelectedStatuses.clear();
+    currentPage.value = 1;
+  }
+
+  int get totalPages => filteredStaffList.isEmpty 
+      ? 1 
+      : (filteredStaffList.length / itemsPerPage).ceil();
+
+  List<StaffModel> get paginatedStaffList {
+    if (filteredStaffList.isEmpty) return [];
+
+    if (currentPage.value < 1) {
+      currentPage.value = 1;
+    }
+
+    final start = (currentPage.value - 1) * itemsPerPage;
+    if (start >= filteredStaffList.length && filteredStaffList.isNotEmpty) {
+      currentPage.value = totalPages;
+      final newStart = (currentPage.value - 1) * itemsPerPage;
+      final newEnd = newStart + itemsPerPage;
+      return filteredStaffList.sublist(
+        newStart,
+        newEnd > filteredStaffList.length ? filteredStaffList.length : newEnd,
+      );
+    }
+
+    final end = start + itemsPerPage;
+    return filteredStaffList.sublist(
+      start,
+      end > filteredStaffList.length ? filteredStaffList.length : end,
+    );
+  }
+
+  List<String> get availableRolesFilterOptions {
+    final roles = <String>{'All'};
+    for (var s in staffList) {
+      if (s.role.isNotEmpty) {
+        roles.add(s.role.trim());
+      }
+    }
+    for (var r in rolesList) {
+      roles.add(r.trim());
+    }
+    return roles.toList()..sort((a, b) => a == 'All' ? -1 : b == 'All' ? 1 : a.compareTo(b));
   }
 
   List<StaffModel> get availableDirectors {

@@ -43,41 +43,42 @@ class MainDashboardController extends GetxController {
       return;
     }
 
-    if (user?.isResearcher == true) {
-      if (!currentRoute.startsWith('/reports')) {
-        print('Researcher access restricted. Redirecting...');
-        Future.microtask(() => Get.offAllNamed(AppRoutes.reports));
-        return;
-      }
+    // For non-admin roles: dynamic route restrictions based on permission groups
+    if (user?.isAdmin == true) return;
+    if (currentRoute == AppRoutes.dashboard) return;
+
+    bool isAllowed = true;
+    if (currentRoute.startsWith('/users') ||
+        currentRoute.startsWith('/manage-user') ||
+        currentRoute.startsWith('/edit-user')) {
+      isAllowed = user?.hasPermission('Users', 'read') ?? false;
+    } else if (currentRoute.startsWith('/approvals/kyc') ||
+        currentRoute.startsWith('/kyc')) {
+      isAllowed = user?.hasPermission('KYC', 'read') ?? false;
+    } else if (currentRoute.startsWith('/approvals/payments')) {
+      isAllowed = user?.hasPermission('Payments', 'read') ?? false;
+    } else if (currentRoute.startsWith('/staff') ||
+        currentRoute.startsWith('/applicants') ||
+        currentRoute.startsWith('/applicant/')) {
+      isAllowed = user?.hasPermission('Staff', 'read') ?? false;
+    } else if (currentRoute.startsWith('/reports') ||
+        currentRoute.startsWith('/upload-report')) {
+      isAllowed = user?.hasPermission('Reports', 'read') ?? false;
+    } else if (currentRoute.startsWith('/notifications')) {
+      isAllowed = user?.hasPermission('Notifications', 'read') ?? false;
+    } else if (currentRoute.startsWith('/settings')) {
+      isAllowed = user?.hasPermission('Settings', 'read') ?? false;
+    } else if (currentRoute.startsWith('/leads')) {
+      isAllowed = user?.hasPermission('Leads', 'read') ?? false;
+    } else if (currentRoute.startsWith('/automated-trading') ||
+        currentRoute.startsWith('/subscriptions')) {
+      // Subscriptions and Automated Trading are admin-only features
+      isAllowed = false;
     }
 
-    if (user?.isDirector == true) {
-      final hasPaymentsPermission = user?.hasPermission('Payments', 'read') ?? false;
-      final allowedPrefixes = [
-        '/users',
-        '/staff',
-        '/reports',
-        '/manage-user',
-        '/edit-user',
-        '/approvals/kyc',
-        if (hasPaymentsPermission) '/approvals/payments',
-      ];
-      final blockedRoutes = [
-        '/users/create',
-        '/users/pending-transfers',
-        if (!hasPaymentsPermission) '/approvals/payments',
-      ];
-
-      bool isAllowed = allowedPrefixes.any(
-        (prefix) => currentRoute.startsWith(prefix),
-      );
-      bool isBlocked = blockedRoutes.any((route) => currentRoute == route);
-
-      if (!isAllowed || isBlocked) {
-        print('Director access restricted for $currentRoute. Redirecting...');
-        Future.microtask(() => Get.offAllNamed(AppRoutes.users));
-        return;
-      }
+    if (!isAllowed) {
+      print('Access restricted for $currentRoute. Redirecting to dashboard...');
+      Future.microtask(() => Get.offAllNamed(AppRoutes.dashboard));
     }
   }
 

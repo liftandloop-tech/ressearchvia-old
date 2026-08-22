@@ -27,6 +27,9 @@ const staffService = {
         body.staffId = `STF${String(count + 1).padStart(3, '0')}${randomSuffix}`;
       }
 
+      // Admin-created staff should default to 'Employee' stage, not 'Applicant'
+      body.stage = body.stage || 'Employee';
+
       if (body.mpin) {
         body.mpin = body.mpin.toString();
       }
@@ -34,13 +37,12 @@ const staffService = {
       // Seed default Admin role and group
       await roleService.seedAdminRole();
 
-      if (!body.roleId) {
-        const dept = (body.deparment || "").toLowerCase();
-        if (dept === 'admin') {
-          const adminRole = await roleModel.findOne({ name: 'Admin' });
-          if (adminRole) {
-            body.roleId = adminRole._id;
-          }
+      if (!body.roleId && body.deparment) {
+        const trimmedDept = body.deparment.trim();
+        const matchingRole = await roleModel.findOne({ name: { $regex: new RegExp(`^\\s*${trimmedDept}\\s*$`, 'i') } });
+        if (matchingRole) {
+          body.roleId = matchingRole._id;
+          console.log(`Automatically assigned roleId ${matchingRole._id} (${matchingRole.name}) for new staff with department ${trimmedDept}`);
         }
       }
 
@@ -169,11 +171,12 @@ const staffService = {
   },
   staffMpinLogin: async ({ body }) => {
     try {
+      console.log('staffMpinLogin body:', body);
       let { phone, mpin } = body;
       const cleanPhone = phone ? phone.toString().replace(/[^0-9]/g, '') : '';
       const last10 = cleanPhone.slice(-10);
 
-      const staff = await staffModel.findOne({
+      let staff = await staffModel.findOne({
         $or: [
           { mobileNumber: phone },
           { mobileNumber: cleanPhone },
@@ -252,6 +255,9 @@ const staffService = {
         return { status: 200, message: "staff not exist", data: {} }
       }
 
+      // Ensure stage is set to 'Employee' for active staff updates (prevents schema default demoting them to Applicant)
+      staff.stage = 'Employee';
+
       // Director Check: Only allow editing managers from their own team
       if (user && (user.userType === 'Director' || user.deparment === 'Director')) {
         const isOwnManager = staff.assignedDirector && staff.assignedDirector.toString() === user._id.toString();
@@ -262,7 +268,19 @@ const staffService = {
       if (fullName) staff.fullName = fullName;
       if (mobileNumber) staff.mobileNumber = mobileNumber;
       if (emailAddress) staff.emailAddress = emailAddress;
-      if (deparment) staff.deparment = deparment;
+      if (deparment) {
+        const trimmedDept = deparment.trim();
+        staff.deparment = trimmedDept;
+        
+        // Find matching role in database and update roleId
+        const matchingRole = await roleModel.findOne({ name: { $regex: new RegExp(`^\\s*${trimmedDept}\\s*$`, 'i') } });
+        if (matchingRole) {
+          staff.roleId = matchingRole._id;
+          console.log(`Automatically updated roleId to ${matchingRole._id} (${matchingRole.name}) for department ${trimmedDept}`);
+        } else {
+          console.log(`No matching role found in database for department "${trimmedDept}"`);
+        }
+      }
       if (designation) staff.designation = designation;
 
       if (body.gender) staff.gender = body.gender;

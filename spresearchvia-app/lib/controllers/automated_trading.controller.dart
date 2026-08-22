@@ -331,9 +331,7 @@ class AutomatedTradingController extends GetxController {
 
   Future<bool> unlinkBroker(String brokerCode) async {
     try {
-      final response = await _dioClient.delete('/brokers/unlink', data: {
-        'brokerCode': brokerCode,
-      });
+      final response = await _dioClient.delete('/brokers/$brokerCode/unlink');
       if (response.statusCode == 200) {
         await fetchBrokerStatus();
         consentsStatus.value = 'NOT_GRANTED';

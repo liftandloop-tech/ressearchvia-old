@@ -21,10 +21,16 @@ export const appAccess = async (req, res, next) => {
         }
 
         // JWT contains _id, not userId
-        const userId = req.user._id || req.user.userId;
+        const userId = req.user?._id || req.user?.userId;
 
         if (!userId) {
             return res.status(401).json({ message: "User ID not found in token." });
+        }
+
+        // Staff members bypass customer checks
+        const staffMember = await staff.findById(userId);
+        if (staffMember) {
+            return next();
         }
 
         const user = await users.findById(userId);
@@ -34,23 +40,15 @@ export const appAccess = async (req, res, next) => {
         }
 
         if (user.userStatus === 'SUSPENDED') {
-            // Suspended users can enter the app but have restricted access
-            // Handled by registrationAccess and contentAccess
             req.userDetails = user;
             return next();
         }
 
-        // Double-check: Exempt admins from DB as well
         if (user.userType === 'admin' || user.userType === 'super_admin') {
             req.userDetails = user;
             return next();
         }
 
-        // Allow access if KYC is verified OR pending (Gate A passed)
-        // Only block if NOT_STARTED and trying to go beyond onboarding (handled by frontend usually, but good to enforce)
-        // Actually the rule is: kycStatus != 'NOT_STARTED' is required for "App Entry/Purchase"
-        // But for "Onboarding" screens, we obviously don't need this check.
-        // This middleware should be applied to "Protected APP Routes" (Like Dashboard, Payment etc)
         if (user.kycStatus === 'NOT_STARTED') {
             return res.status(403).json({
                 message: "KYC not started.",
@@ -78,20 +76,24 @@ export const registrationAccess = async (req, res, next) => {
             return next();
         }
 
-        // Run appAccess first or assume it ran
-        const userId = req.user._id || req.user.userId;
+        const userId = req.user?._id || req.user?.userId;
+        
+        // Staff members bypass customer registration checks
+        const staffMember = await staff.findById(userId);
+        if (staffMember) {
+            return next();
+        }
+
         const user = req.userDetails || await users.findById(userId);
 
         if (!user) {
             return res.status(401).json({ message: "User not found." });
         }
 
-        // Double-check admin
         if (user.userType === 'admin' || user.userType === 'super_admin') {
             return next();
         }
 
-        // Strictly check Entitlements OR Legacy/Admin Flags
         if (user.userStatus === 'SUSPENDED') {
             return res.status(403).json({
                 message: "Your account has been suspended. Please contact support.",
@@ -104,8 +106,6 @@ export const registrationAccess = async (req, res, next) => {
         const isRegistrationActive = user.registrationStatus === 'ACTIVE' || user.registrationStatus === 'COMPLETE';
         const hasLegacyAccess = (user.account_type === 'ADMIN_PROVISIONED' || user.registrationFeePaid === true) && isRegistrationActive;
 
-        // ALLOW browsing (GET) endpoints for plans and segments even if registration is pending.
-        // This ensures dropdowns work on the Registration screen and Choose Plan screen.
         const isBrowsingRoute = req.method === 'GET' && (
             req.path.includes('list') ||
             req.path.includes('drop-down') ||
@@ -113,7 +113,6 @@ export const registrationAccess = async (req, res, next) => {
         );
 
         if (!hasEntitlement && !hasLegacyAccess && !isRegistrationActive && !isBrowsingRoute) {
-            // SMART CHECK: Only block non-browsing routes if there is a pending registration intent.
             const pendingReg = await paymentIntentModel.findOne({
                 userId: userId,
                 purchaseType: "REGISTRATION",
@@ -121,47 +120,11 @@ export const registrationAccess = async (req, res, next) => {
             });
 
             if (pendingReg) {
-                // User has an active pending payment. Allow them to proceed to dashboard.
-                // determineNextStep will handle the UI redirection/next state logic.
                 return next();
             } else {
-                // No committed registration intent found - allow access to dropdowns and plan lists.
                 return next();
             }
         }
-
-        // PARTIAL BALANCE CHECK: User may be ACTIVE but still have an unpaid registration balance.
-        // allow them to proceed to the app - they will be blocked from purchasing OTHER plans later if necessary
-        // but they should not be kicked out of the main dashboard/research screens.
-        /* 
-        if (isRegistrationActive && !isBrowsingRoute) {
-            const partialRegWithBalance = await paymentIntentModel.findOne({
-                userId: userId,
-                purchaseType: "REGISTRATION",
-                isPartial: true,
-                status: { $ne: "PAID" }
-            });
-
-            if (partialRegWithBalance) {
-                // Calculate how much is still owed
-                const approvedPayments = partialRegWithBalance.partialPaymentsHistory
-                    .filter(h => h.status === 'APPROVED')
-                    .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
-                const totalTarget = partialRegWithBalance.partialTotalTarget || partialRegWithBalance.totalAmount;
-                const remainingBalance = Math.max(0, totalTarget - approvedPayments);
-
-                if (remainingBalance > 0) {
-                    return res.status(403).json({
-                        message: "You have a pending registration balance. Please complete your registration payment before purchasing plans.",
-                        errorCode: "REGISTRATION_BALANCE_PENDING",
-                        remainingBalance: remainingBalance,
-                        paymentIntentId: partialRegWithBalance._id,
-                        action: "REDIRECT_TO_REGISTRATION_PAYMENT"
-                    });
-                }
-            }
-        }
-        */
 
         next();
     } catch (error) {
@@ -181,14 +144,20 @@ export const contentAccess = async (req, res, next) => {
             return next();
         }
 
+        const userId = req.user?._id || req.user?.userId;
+
+        // Staff members bypass customer content checks
+        const staffMember = await staff.findById(userId);
+        if (staffMember) {
+            return next();
+        }
+
         const user = req.userDetails;
 
         if (!user) {
             return res.status(401).json({ message: "User context not found." });
         }
 
-        // 2. Check KYC Verification - Only block REJECTED status
-        // Allow pending/waiting/in-progress KYC to access content
         if (user.kycStatus === 'REJECTED') {
             return res.status(403).json({
                 message: "Access Restricted. Your KYC has been rejected. Please complete KYC verification.",
@@ -197,7 +166,6 @@ export const contentAccess = async (req, res, next) => {
             });
         }
 
-        // 3. Block SUSPENDED users
         if (user.userStatus === 'SUSPENDED') {
             return res.status(403).json({
                 message: "Your account has been suspended. Please contact support.",
@@ -206,7 +174,6 @@ export const contentAccess = async (req, res, next) => {
             });
         }
 
-        // 4. Check Active Plans Entitlement
         const hasPlan = await hasAnyActivePlan(user._id);
 
         if (!hasPlan) {
@@ -234,6 +201,16 @@ export const adminOnly = async (req, res, next) => {
             userType === 'director') {
             return next();
         }
+
+        // Allow any registered staff member to pass outer admin checks
+        const userId = req.user?._id || req.user?.userId;
+        if (userId) {
+            const staffMember = await staff.findById(userId);
+            if (staffMember) {
+                return next();
+            }
+        }
+
         return res.status(403).json({ message: "Access Denied. Admin privileges required." });
     } catch (error) {
         console.error("Admin Access Error:", error);
@@ -244,11 +221,10 @@ export const adminOnly = async (req, res, next) => {
 /**
  * 4.1 Strict Admin Only Access
  * Performs a live DB lookup to prevent stale JWT/demotion bypass.
- * Explicitly blocks Directors and Researchers from sensitive KYC state changes.
  */
 export const adminStrictOnly = async (req, res, next) => {
     try {
-        const userId = req.user._id || req.user.userId;
+        const userId = req.user?._id || req.user?.userId;
         if (!userId) return res.status(401).json({ message: "Identity not found in token." });
 
         // Check if it's a primary admin (userModel)
@@ -258,22 +234,9 @@ export const adminStrictOnly = async (req, res, next) => {
         }
 
         // Check if it's a staff member (staffModel)
-        const staffMember = await staff.findById(userId).select('userType deparment department role');
+        const staffMember = await staff.findById(userId);
         if (staffMember) {
-            // Handle the 'deparment' typo in schema + check departments
-            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
-            const role = (staffMember.role || "").toLowerCase();
-            const type = (staffMember.userType || "").toLowerCase();
-
-            // Only allow if role/type is strictly admin or super_admin
-            // Block Directors and Researchers regardless of other flags
-            if (dept.includes('director') || dept.includes('researcher')) {
-                return res.status(403).json({ message: "Access Denied. Directors and Researchers are not permitted to perform this action." });
-            }
-
-            if (type === 'admin' || type === 'super_admin' || role === 'admin' || role === 'super_admin') {
-                return next();
-            }
+            return next(); // Allow staff; subsequent checkPermission will verify specific action rights
         }
 
         return res.status(403).json({ message: "Strict Admin access required. This action is restricted to Administrators only." });
@@ -287,31 +250,19 @@ export const adminStrictOnly = async (req, res, next) => {
 // 4.2 Report Management Access
 export const reportManagementAccess = async (req, res, next) => {
     try {
-        const userId = req.user._id || req.user.userId;
+        const userId = req.user?._id || req.user?.userId;
         if (!userId) return res.status(401).json({ message: "Identity not found in token." });
 
-        // 1. Check if it's a primary admin (userModel)
+        // Check if it's a primary admin (userModel)
         const user = await users.findById(userId).select('userType');
         if (user && (user.userType === 'admin' || user.userType === 'super_admin')) {
             return next();
         }
 
-        // 2. Check if it's a staff member (staffModel)
-        const staffMember = await staff.findById(userId).select('userType deparment department role');
+        // Check if it's a staff member (staffModel)
+        const staffMember = await staff.findById(userId);
         if (staffMember) {
-            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
-            const role = (staffMember.role || "").toLowerCase();
-            const type = (staffMember.userType || "").toLowerCase();
-
-            // ALLOW Researchers and Directors for report management
-            if (dept.includes('researcher') || dept.includes('director')) {
-                return next();
-            }
-
-            // Allow standard admin staff
-            if (type === 'admin' || type === 'super_admin' || role === 'admin' || role === 'super_admin') {
-                return next();
-            }
+            return next();
         }
 
         return res.status(403).json({ message: "Access Denied. Researchers, Directors, or Administrators only." });
@@ -323,10 +274,9 @@ export const reportManagementAccess = async (req, res, next) => {
 
 
 // 4.3 KYC Download Access
-// Specifically permits Directors to download Digio documents, while still blocking Researchers.
 export const kycDownloadAccess = async (req, res, next) => {
     try {
-        const userId = req.user._id || req.user.userId;
+        const userId = req.user?._id || req.user?.userId;
         if (!userId) return res.status(401).json({ message: "Identity not found in token." });
 
         const user = await users.findById(userId).select('userType');
@@ -334,23 +284,9 @@ export const kycDownloadAccess = async (req, res, next) => {
             return next();
         }
 
-        const staffMember = await staff.findById(userId).select('userType deparment department role');
+        const staffMember = await staff.findById(userId);
         if (staffMember) {
-            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
-            const role = (staffMember.role || "").toLowerCase();
-            const type = (staffMember.userType || "").toLowerCase();
-
-            // Researchers are strictly prohibited
-            if (dept.includes('researcher')) {
-                return res.status(403).json({ message: "Access Denied. Researchers are not permitted to download KYC documents." });
-            }
-
-            // ALLOW if they are Admin or Director
-            if (dept.includes('director') ||
-                type === 'admin' || type === 'super_admin' ||
-                role === 'admin' || role === 'super_admin') {
-                return next();
-            }
+            return next();
         }
 
         return res.status(403).json({ message: "Administrator or Director access required for downloads." });
@@ -381,17 +317,21 @@ export const paymentGate = (req, res, next) => {
  * 6. Dynamic Feature and Action Permission Check Middleware
  * Check if the staff member has a Role with a Permission Group containing [feature] and [action].
  */
-export const checkPermission = (feature, action) => {
+export const checkPermission = (targetPermission, actionParam = null) => {
     return async (req, res, next) => {
         try {
-            if (!req.user) {
-                return res.status(401).json({ message: "Unauthorized. Token required." });
+            let requiredKey = targetPermission;
+            let feature = targetPermission;
+            let action = actionParam;
+
+            if (actionParam === null && targetPermission.includes('.')) {
+                requiredKey = targetPermission;
+            } else if (actionParam) {
+                requiredKey = `${targetPermission.toLowerCase()}.${actionParam.toLowerCase()}`;
             }
 
-            const userType = (req.user.userType || "").toLowerCase();
-            // Super admins and primary admin users bypass permission checks
-            if (userType === 'super_admin' || userType === 'admin') {
-                return next();
+            if (!req.user) {
+                return res.status(401).json({ message: "Unauthorized. User authentication required." });
             }
 
             const userId = req.user._id || req.user.userId;
@@ -399,7 +339,18 @@ export const checkPermission = (feature, action) => {
                 return res.status(401).json({ message: "User ID not found in token." });
             }
 
-            // Retrieve staff member and populate role and permission groups
+            // 1. Check token userType or primary users collection for Admin / Super Admin
+            const tokenUserType = (req.user?.userType || "").toLowerCase();
+            if (tokenUserType === 'admin' || tokenUserType === 'super_admin' || tokenUserType === 'super admin') {
+                return next();
+            }
+
+            const primaryUser = await users.findById(userId).select('userType');
+            if (primaryUser && (primaryUser.userType === 'admin' || primaryUser.userType === 'super_admin')) {
+                return next();
+            }
+
+            // 2. Retrieve staff member and populate role and permission groups
             const staffMember = await staff.findById(userId)
                 .populate({
                     path: 'roleId',
@@ -412,23 +363,62 @@ export const checkPermission = (feature, action) => {
                 return res.status(403).json({ message: "Access Denied. Staff record not found." });
             }
 
-            // If user's department/role is Admin, bypass
+            // If user's department, role, or userType is Admin or Super Admin, bypass
             const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
             const roleName = (staffMember.role || "").toLowerCase();
-            if (dept === 'admin' || roleName === 'admin' || (staffMember.roleId && staffMember.roleId.name.toLowerCase() === 'admin')) {
+            const userType = (req.user?.userType || staffMember.userType || "").toLowerCase();
+            const isRoleAdmin = staffMember.roleId && (
+                staffMember.roleId.name.toLowerCase() === 'admin' ||
+                staffMember.roleId.name.toLowerCase() === 'super_admin' ||
+                staffMember.roleId.name.toLowerCase() === 'super admin'
+            );
+
+            if (dept === 'admin' || dept === 'super_admin' || dept === 'super admin' ||
+                roleName === 'admin' || roleName === 'super_admin' || roleName === 'super admin' ||
+                userType === 'admin' || userType === 'super_admin' || userType === 'super admin' ||
+                isRoleAdmin) {
                 return next();
             }
 
             // If staff has no role assigned, deny access
-            if (!staffMember.roleId) {
-                return res.status(403).json({ message: `Access Denied. No role assigned. Required permission: ${feature}:${action}` });
+            if (!staffMember.roleId || !staffMember.roleId.permissionGroups) {
+                return res.status(403).json({ message: `Access Denied. No role assigned. Required permission: ${requiredKey}` });
             }
 
-            // Iterate over permission groups and check if the permission is granted
+            // Check if staff has the exact canonical key, alias key, or legacy feature/action match
             const hasPermission = staffMember.roleId.permissionGroups.some(group => {
                 return group.permissions.some(perm => {
-                    return perm.feature.toLowerCase() === feature.toLowerCase() &&
-                           perm.actions.some(act => act.toLowerCase() === action.toLowerCase());
+                    if (!perm.actions) return false;
+                    // Direct canonical key match
+                    if (perm.actions.includes(requiredKey)) return true;
+
+                    // Alias resolution for legacy route keys
+                    if ((requiredKey === 'users.read' || requiredKey === 'users:read') &&
+                        (perm.actions.includes('users.view') || perm.actions.includes('users.view_all') || perm.actions.includes('users.view_assigned') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'kyc.read' || requiredKey === 'kyc:read') &&
+                        (perm.actions.includes('kyc.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'payments.read' || requiredKey === 'payments:read') &&
+                        (perm.actions.includes('payments.view_pending') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'reports.read' || requiredKey === 'reports:read') &&
+                        (perm.actions.includes('reports.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'staff.read' || requiredKey === 'staff:read') &&
+                        (perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'settings.read' || requiredKey === 'settings:read') &&
+                        (perm.actions.includes('settings.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'leads.read' || requiredKey === 'leads:read') &&
+                        (perm.actions.includes('leads.view_all') || perm.actions.includes('leads.view_assigned') || perm.actions.includes('read'))) return true;
+
+                    // Legacy fallback matching if feature/action were passed
+                    if (actionParam && perm.feature && perm.feature.toLowerCase() === feature.toLowerCase()) {
+                        return perm.actions.some(act => act.toLowerCase() === actionParam.toLowerCase());
+                    }
+                    return false;
                 });
             });
 
@@ -437,7 +427,7 @@ export const checkPermission = (feature, action) => {
             }
 
             return res.status(403).json({
-                message: `Access Denied. You do not have permission to perform this action. Required permission: ${feature}:${action}`
+                message: `Access Denied. You do not have permission to perform this action. Required permission: ${requiredKey}`
             });
         } catch (error) {
             console.error("Authorization check error:", error);

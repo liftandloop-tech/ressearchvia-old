@@ -6,6 +6,7 @@ import 'package:spresearch_web/controllers/subscription/pending_bank_transfers.c
 import 'package:spresearch_web/ui/widgets/button.widget.dart';
 import 'package:intl/intl.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/utils/invoice_pdf_generator.dart';
 
 class PendingBankTransfersScreen extends StatelessWidget {
@@ -263,15 +264,16 @@ class PendingBankTransfersScreen extends StatelessWidget {
                     columnSpacing: 20,
                     horizontalMargin: 12,
                     headingRowColor: MaterialStateProperty.all(AppTheme.gray50),
-                    columns: const [
-                      DataColumn(label: Text('Date')),
-                      DataColumn(label: Text('Customer')),
-                      DataColumn(label: Text('Registration')),
-                      DataColumn(label: Text('Plan')),
-                      DataColumn(label: Text('Paid Amount + GST')),
-                      DataColumn(label: Text('Status')),
-                      DataColumn(label: Text('Invoice')),
-                      DataColumn(label: Text('Actions')),
+                    columns: [
+                      const DataColumn(label: Text('Date')),
+                      const DataColumn(label: Text('Customer')),
+                      const DataColumn(label: Text('Registration')),
+                      const DataColumn(label: Text('Plan')),
+                      const DataColumn(label: Text('Paid Amount + GST')),
+                      const DataColumn(label: Text('Status')),
+                      const DataColumn(label: Text('Invoice')),
+                      if (Get.find<AuthController>().user.value?.has('payments.bypass') ?? false)
+                        const DataColumn(label: Text('Actions')),
                     ],
                     rows: controller.filteredPayments.map((payment) {
                       final user = payment['userId'] ?? {};
@@ -477,34 +479,34 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               onPressed: () => _showInvoiceDialog(payment),
                             ),
                           ),
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Button(
-                                  title: "Details",
-                                  buttonType: ButtonType.blue,
-                                  size: ButtonSize.small,
-                                  onTap: () =>
-                                      _showDetailsDialog(payment, controller),
-                                ),
-                                if (controller.isAdmin) ...[
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Colors.orange,
-                                      size: 20,
-                                    ),
-                                    onPressed: () =>
-                                        controller.showCorrectionDialog(payment),
-                                    tooltip: "Correct Amount / Mode",
+                          if (Get.find<AuthController>().user.value?.has('payments.bypass') ?? false)
+                            DataCell(
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Button(
+                                    title: "Details",
+                                    buttonType: ButtonType.blue,
+                                    size: ButtonSize.small,
+                                    onTap: () =>
+                                        _showDetailsDialog(payment, controller),
                                   ),
+                                  if (controller.isAdmin) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Colors.orange,
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          controller.showCorrectionDialog(payment),
+                                      tooltip: "Correct Amount / Mode",
+                                    ),
+                                  ],
                                 ],
-
-                              ],
+                              ),
                             ),
-                          ),
                         ],
                       );
                     }).toList(),
