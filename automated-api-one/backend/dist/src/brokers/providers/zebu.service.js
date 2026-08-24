@@ -22,6 +22,8 @@ const metrics_service_1 = require("../../infrastructure/metrics/metrics.service"
 const circuit_breaker_service_1 = require("../../infrastructure/circuit-breaker/circuit-breaker.service");
 const broker_rate_limiter_service_1 = require("../../infrastructure/redis/broker-rate-limiter.service");
 const crypto_1 = require("crypto");
+const prisma_service_1 = require("../../prisma.service");
+const https_proxy_agent_1 = require("https-proxy-agent");
 let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_interface_1.BrokerAdapter {
     httpService;
     configService;
@@ -29,12 +31,11 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
     metrics;
     circuitBreaker;
     rateLimiter;
+    prisma;
     logger = new common_1.Logger(ZebuService_1.name);
     isMock;
-    authUrl;
     baseUrl;
-    tokenToUidMap = new Map();
-    constructor(httpService, configService, redisService, metrics, circuitBreaker, rateLimiter) {
+    constructor(httpService, configService, redisService, metrics, circuitBreaker, rateLimiter, prisma) {
         super();
         this.httpService = httpService;
         this.configService = configService;
@@ -42,25 +43,104 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         this.metrics = metrics;
         this.circuitBreaker = circuitBreaker;
         this.rateLimiter = rateLimiter;
+        this.prisma = prisma;
         const mockVal = this.configService.get('MOCK_BROKERS', true);
         this.isMock = mockVal === true || mockVal === 'true';
-        this.authUrl =
-            this.configService.get('ZEBU_AUTH_URL') ||
-                'https://go.mynt.in/NorenWClientTP';
         this.baseUrl =
             this.configService.get('ZEBU_BASE_URL') ||
-                'https://go.mynt.in/NorenWClientTP';
+                'https://go.mynt.in/NorenWClientAPI';
     }
-    buildBody(data, susertoken) {
-        return `jData=${JSON.stringify(data)}&jKey=${susertoken}`;
-    }
-    getHeaders() {
-        return {
-            'Content-Type': 'application/x-www-form-urlencoded',
+    async executeBrokerPost(token, clientCode, endpoint, body, timeoutMs = 8000, providedHttpsAgent) {
+        const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+        let httpsAgent = providedHttpsAgent;
+        let proxyIp = 'DIRECT';
+        let networkMode = 'DIRECT';
+        if (!httpsAgent) {
+            let userBroker = null;
+            if (token) {
+                userBroker = await this.prisma.userBroker.findFirst({
+                    where: { accessToken: token },
+                    include: { proxyCredential: true },
+                });
+            }
+            else if (clientCode) {
+                userBroker = await this.prisma.userBroker.findFirst({
+                    where: { brokerClientId: clientCode },
+                    include: { proxyCredential: true },
+                });
+            }
+            if (userBroker) {
+                const userId = userBroker.userId;
+                const proxy = userBroker.proxyCredential;
+                if (proxy && proxy.ip && proxy.port && proxy.ip_userid && proxy.ip_password) {
+                    networkMode = 'DEDICATED_PROXY';
+                    const isExpired = proxy.expiresAt && new Date(proxy.expiresAt) < new Date();
+                    if (isExpired || (proxy.status !== 'ACTIVE' && proxy.status !== 'PENDING' && proxy.status !== 'RENEWING')) {
+                        this.logger.error(`[Proxy Violation] requestId=${requestId} Dedicated proxy for user ${userId} is ${proxy.status} (isExpired=${!!isExpired}). Aborting to prevent direct IP leakage.`);
+                        throw new Error(`[Proxy Error] Dedicated proxy is ${proxy.status}${isExpired ? ' (EXPIRED)' : ''}. Aborting broker request to prevent direct IP leakage.`);
+                    }
+                    proxyIp = proxy.ip;
+                    const auth = Buffer.from(`${proxy.ip_userid}:${proxy.ip_password}`).toString('base64');
+                    httpsAgent = new https_proxy_agent_1.HttpsProxyAgent(`http://${proxy.ip}:${proxy.port}`, {
+                        headers: {
+                            'Proxy-Authorization': `Basic ${auth}`,
+                        },
+                    });
+                    this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Dedicated Proxy ${proxy.ip}:${proxy.port} (user: ${proxy.ip_userid}) for user ${userId} [endpoint: ${endpoint}]`);
+                }
+            }
+        }
+        else {
+            networkMode = 'FORWARDED_PROXY';
+            proxyIp = 'FORWARDED';
+        }
+        this.logger.log(`[Broker Outbound] requestId=${requestId} networkMode=${networkMode} proxyIp=${proxyIp} endpoint=${endpoint}`);
+        const start = Date.now();
+        const headers = {
+            'Content-Type': 'text/plain',
         };
-    }
-    hashPassword(pwd) {
-        return (0, crypto_1.createHash)('sha256').update(pwd).digest('hex');
+        if (token && endpoint !== zebu_endpoints_1.ZebuEndpoints.GEN_ACCESS_TOKEN && endpoint !== zebu_endpoints_1.ZebuEndpoints.REFRESH_TOKEN) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        try {
+            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${endpoint}`, body, {
+                headers,
+                ...(httpsAgent ? { httpsAgent } : {}),
+                timeout: timeoutMs,
+            }));
+            const durationMs = Date.now() - start;
+            let data = response.data;
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch {
+                }
+            }
+            this.logger.log(`[Broker Outbound Response] requestId=${requestId} endpoint=${endpoint} httpStatus=${response.status} stat=${data?.stat || 'N/A'} duration=${durationMs}ms`);
+            if (data && data.stat === 'Not_Ok' && typeof data.emsg === 'string' && (data.emsg.includes('Session Expired') || data.emsg.includes('Invalid Session Key'))) {
+                this.logger.warn(`[Zebu Auth] Session expired on broker (${data.emsg}). Updating connection status.`);
+                if (token) {
+                    await this.prisma.userBroker.updateMany({
+                        where: { accessToken: token },
+                        data: { status: 'INACTIVE' },
+                    });
+                }
+            }
+            if (response.status === 404 && endpoint === zebu_endpoints_1.ZebuEndpoints.REFRESH_TOKEN) {
+                return { stat: 'Not_Ok', emsg: 'RefreshToken endpoint not supported by Zebu server (tokens are 90-day long lived)' };
+            }
+            if (response.status >= 400 && (!data || !data.stat)) {
+                const errMsg = data?.emsg || data?.message || (typeof data === 'string' ? data : `HTTP ${response.status}`);
+                throw new Error(`Zebu Error (${response.status}): ${errMsg}`);
+            }
+            return data;
+        }
+        catch (err) {
+            const durationMs = Date.now() - start;
+            this.logger.error(`[Broker Outbound Failed] requestId=${requestId} endpoint=${endpoint} proxyIp=${proxyIp} duration=${durationMs}ms error=${err.message}`);
+            throw err;
+        }
     }
     capabilities() {
         return {
@@ -92,65 +172,93 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         }
     }
     async generateSession(credentials) {
-        this.logger.log(`[Zebu] Generating session for UID: ${credentials.clientCode}`);
+        throw new common_1.BadRequestException('Zebu OAuth system enabled. Please use the redirection OAuth flow instead.');
+    }
+    async getAuthorizationUrl(state) {
         if (this.isMock) {
-            this.logger.log(`[SANDBOX MOCK] Generating Zebu session for ${credentials.clientCode}`);
+            return `http://localhost:3000/brokers/zebu/callback?code=mock_code&state=${state}&client_id=mock_client_id`;
+        }
+        const authState = await this.prisma.brokerAuthState.findFirst({
+            where: { state },
+        });
+        if (!authState) {
+            throw new common_1.BadRequestException('Invalid authorization state');
+        }
+        const userBroker = await this.prisma.userBroker.findFirst({
+            where: { userId: authState.userId, broker: { code: 'ZEBU' } },
+        });
+        if (!userBroker) {
+            throw new common_1.BadRequestException('Please link your Zebu broker details first');
+        }
+        let clientId = userBroker.apiKey || userBroker.brokerClientId || '';
+        if (clientId && !clientId.includes('_')) {
+            clientId = `${clientId}_U`;
+        }
+        return `https://go.mynt.in/OAuthlogin/authorize/oauth?client_id=${clientId}&state=${state}`;
+    }
+    async completeAuthorization(callbackData) {
+        this.logger.log(`Completing Zebu OAuth authorization`);
+        const authCode = callbackData.params.code;
+        const queryClientId = callbackData.params.client_id;
+        if (!authCode) {
+            throw new common_1.BadRequestException('Authorization code (code) is missing in callback data');
+        }
+        if (this.isMock) {
+            this.logger.log(`[SANDBOX MOCK] Generating session using authCode: ${authCode}`);
             return {
-                accessToken: `mock_zebu_token_${credentials.clientCode}_${Date.now()}`,
-                refreshToken: '',
-                tokenExpiry: this.midnightIst(),
+                accessToken: `mock_zebu_token_${Date.now()}`,
+                refreshToken: `mock_zebu_refresh_${Date.now()}`,
+                expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+                brokerUserId: queryClientId || 'mock_zebu_client',
             };
         }
+        let cleanClient = queryClientId || '';
+        if (cleanClient.endsWith('_U')) {
+            cleanClient = cleanClient.slice(0, -2);
+        }
+        const userBroker = await this.prisma.userBroker.findFirst({
+            where: {
+                OR: [
+                    { brokerClientId: cleanClient },
+                    { apiKey: queryClientId },
+                ],
+            },
+        });
+        if (!userBroker) {
+            throw new common_1.BadRequestException(`Linked Zebu broker config not found for client_id: ${queryClientId}`);
+        }
+        let oauthAppId = userBroker.apiKey || userBroker.brokerClientId || '';
+        if (oauthAppId && !oauthAppId.includes('_')) {
+            oauthAppId = `${oauthAppId}_U`;
+        }
+        const apiSecret = userBroker.apiSecret || '';
+        const hashString = `${oauthAppId}${apiSecret}${authCode}`;
+        const checkSum = (0, crypto_1.createHash)('sha256').update(hashString).digest('hex');
+        const payload = {
+            code: authCode,
+            checksum: checkSum,
+        };
+        const body = `jData=${JSON.stringify(payload)}`;
         try {
-            const apiKey = credentials.apiKey;
-            const vendorCode = credentials.vendorCode;
-            if (!apiKey || !vendorCode) {
-                throw new common_1.BadRequestException('Zebu API key and vendor code are required. Please re-link your Zebu account and provide your appkey and vendor code.');
+            const responseData = await this.executeBrokerPost(null, userBroker.brokerClientId, zebu_endpoints_1.ZebuEndpoints.GEN_ACCESS_TOKEN, body, 10000);
+            const accessToken = responseData?.access_token || responseData?.susertoken;
+            if (responseData?.stat !== 'Ok' || !accessToken) {
+                const errorMsg = responseData?.emsg || responseData?.message || 'Failed to get access token';
+                throw new Error(errorMsg);
             }
-            const hashedPwd = this.hashPassword(credentials.password);
-            const otpCode = credentials.totpKey;
-            const hashedAppkey = this.hashPassword(`${credentials.clientCode}|${apiKey}`);
-            const jData = {
-                apkversion: '1.0',
-                uid: credentials.clientCode,
-                pwd: hashedPwd,
-                factor2: otpCode,
-                vc: vendorCode,
-                appkey: hashedAppkey,
-                imei: 'abc1234',
-                source: 'API',
+            const refreshToken = responseData?.refresh_token || userBroker.refreshToken || '';
+            const brokerUserId = responseData.actid || responseData.uid || responseData.USERID || userBroker.brokerClientId;
+            return {
+                accessToken,
+                refreshToken,
+                expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+                brokerUserId,
             };
-            const body = `jData=${JSON.stringify(jData)}`;
-            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.authUrl}${zebu_endpoints_1.ZebuEndpoints.QUICK_AUTH}`, body, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            }));
-            const data = response.data;
-            if (data && (data.stat === 'Ok' || data.susertoken)) {
-                this.logger.log(`[Zebu] Session generated successfully for ${credentials.clientCode}`);
-                this.tokenToUidMap.set(data.susertoken, credentials.clientCode);
-                return {
-                    accessToken: data.susertoken,
-                    refreshToken: '',
-                    tokenExpiry: this.midnightIst(),
-                };
-            }
-            throw new common_1.BadRequestException(data?.emsg || 'Zebu login failed');
         }
-        catch (error) {
-            const detail = error.response?.data;
-            this.logger.error(`[Zebu] Session generation error: ${error.message}`, error.stack);
-            if (detail) {
-                this.logger.error(`[Zebu] Error details: ${JSON.stringify(detail)}`);
-            }
-            const errMessage = detail?.emsg || error.message;
-            throw new common_1.BadRequestException(`Zebu broker authentication error: ${errMessage}`);
+        catch (err) {
+            this.logger.error(`Zebu OAuth token exchange failed: ${err.message}`);
+            throw new common_1.BadRequestException(`Zebu OAuth token exchange failed: ${err.message}`);
         }
-    }
-    async getAuthorizationUrl(_state) {
-        throw new common_1.BadRequestException('Zebu Base API does not use OAuth — use generateSession() instead');
-    }
-    async completeAuthorization(_callbackData) {
-        throw new common_1.BadRequestException('Zebu Base API does not use OAuth callbacks');
     }
     async validateSession(token) {
         if (this.isMock) {
@@ -158,22 +266,48 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         }
         if (!token || token.length === 0)
             return false;
-        return Date.now() < this.midnightIst().getTime();
+        const userBroker = await this.prisma.userBroker.findFirst({
+            where: { accessToken: token },
+        });
+        if (!userBroker || !userBroker.tokenExpiry)
+            return false;
+        return new Date() < userBroker.tokenExpiry;
     }
-    async refreshSession(token, _refreshToken) {
+    async refreshSession(token, refreshToken) {
         if (this.isMock) {
             return {
                 accessToken: `mock_zebu_token_refreshed_${Date.now()}`,
-                refreshToken: '',
-                tokenExpiry: this.midnightIst(),
+                refreshToken: `mock_zebu_refresh_refreshed_${Date.now()}`,
+                tokenExpiry: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
             };
         }
-        this.logger.warn('[Zebu] refreshSession called — Zebu tokens expire at midnight IST; re-login is required');
-        return {
-            accessToken: token,
-            refreshToken: '',
-            tokenExpiry: this.midnightIst(),
-        };
+        try {
+            const userBroker = await this.prisma.userBroker.findFirst({
+                where: { accessToken: token },
+            });
+            if (!userBroker) {
+                throw new Error('UserBroker session config not found for refresh');
+            }
+            const body = `jData=${JSON.stringify({ refresh_token: refreshToken || userBroker.refreshToken })}`;
+            const responseData = await this.executeBrokerPost(token, userBroker.brokerClientId, zebu_endpoints_1.ZebuEndpoints.REFRESH_TOKEN, body, 8000);
+            const newAccessToken = responseData?.access_token || responseData?.susertoken;
+            if (responseData?.stat !== 'Ok' || !newAccessToken) {
+                throw new Error(responseData?.emsg || 'Failed to refresh token');
+            }
+            return {
+                accessToken: newAccessToken,
+                refreshToken: responseData?.refresh_token || refreshToken,
+                tokenExpiry: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+            };
+        }
+        catch (error) {
+            this.logger.error(`[Zebu] refreshSession failed: ${error.message}`);
+            return {
+                accessToken: token,
+                refreshToken,
+                tokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            };
+        }
     }
     async getProfile(token, clientCode) {
         if (this.isMock) {
@@ -182,7 +316,7 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 name: 'ZEBU USER',
                 email: 'user@example.com',
                 mobileno: '919876543210',
-                exchanges: ['NSE', 'BSE', 'NFO', 'MCX'],
+                exchanges: ['INTRADAY', 'NSE', 'BSE', 'NFO', 'MCX'],
                 products: ['CNC', 'MIS', 'NRML'],
                 lastlogintime: new Date().toISOString(),
                 brokerid: 'ZEBU',
@@ -190,12 +324,9 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             };
         }
         try {
-            const uid = clientCode || this.tokenToUidMap.get(token) || '';
-            const body = this.buildBody({ uid, actid: uid }, token);
-            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.CLIENT_DETAILS}`, body, {
-                headers: this.getHeaders(),
-            }));
-            const data = response.data;
+            const uid = clientCode || '';
+            const body = `jData=${JSON.stringify({ uid, actid: uid })}&jKey=${token}`;
+            const data = await this.executeBrokerPost(token, uid, zebu_endpoints_1.ZebuEndpoints.CLIENT_DETAILS, body);
             if (data && data.stat === 'Ok') {
                 return {
                     clientcode: data.actid || '',
@@ -225,11 +356,8 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             };
         }
         try {
-            const body = this.buildBody({ uid: clientCode, actid: clientCode }, token);
-            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.LIMITS}`, body, {
-                headers: this.getHeaders(),
-            }));
-            const data = response.data;
+            const body = `jData=${JSON.stringify({ uid: clientCode, actid: clientCode })}&jKey=${token}`;
+            const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.LIMITS, body);
             if (data && data.stat === 'Ok') {
                 const available = parseFloat(data.cash || data.net || '0');
                 const used = parseFloat(data.marginused || '0');
@@ -267,13 +395,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             await this.rateLimiter.throttle('zebu', 'market');
             const start = Date.now();
             try {
-                const body = this.buildBody({ uid: clientCode, actid: clientCode }, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.POSITION_BOOK}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify({ uid: clientCode, actid: clientCode })}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.POSITION_BOOK, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getPositions', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 const positions = Array.isArray(data) ? data : data?.stat === 'Ok' ? data.data || [] : [];
                 return positions.map((p) => ({
                     symbol: p.tsym || p.tradingsymbol || '',
@@ -307,13 +432,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             await this.rateLimiter.throttle('zebu', 'market');
             const start = Date.now();
             try {
-                const body = this.buildBody({ uid: clientCode, actid: clientCode, prd: 'C' }, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.HOLDINGS}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify({ uid: clientCode, actid: clientCode, prd: 'C' })}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.HOLDINGS, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getHoldings', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 const holdings = Array.isArray(data) ? data : data?.stat === 'Ok' ? data.data || [] : [];
                 return holdings.map((h) => ({
                     symbol: h.tsym || h.tradingsymbol || '',
@@ -375,16 +497,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 if (order.stoploss) {
                     jData['blprc'] = order.stoploss.toString();
                 }
-                this.logger.log(`[Zebu Mynt API] Sending PlaceOrder request to ${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER}:\n` +
+                this.logger.log(`[Zebu Mynt API] Sending PlaceOrder request to ${zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER}:\n` +
                     `jData Payload: ${JSON.stringify(jData, null, 2)}`);
-                const body = this.buildBody(jData, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER}`, body, {
-                    headers: this.getHeaders(),
-                    ...(httpsAgent ? { httpsAgent } : {}),
-                }));
-                const data = response.data;
-                this.logger.log(`[Zebu Mynt API] PlaceOrder response received from ${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER}:\n` +
-                    `Response: ${JSON.stringify(data, null, 2)}`);
+                const body = `jData=${JSON.stringify(jData)}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.PLACE_ORDER, body, 8000, httpsAgent);
                 this.metrics.incrementBrokerCalls('zebu', 'placeOrder', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
                 if (data && data.stat === 'Ok' && data.norenordno) {
@@ -418,13 +534,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                     prctyp: order.ordertype ? this.mapOrderType(order.ordertype) : 'LMT',
                     ret: order.duration || 'DAY',
                 };
-                const body = this.buildBody(jData, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.MODIFY_ORDER}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify(jData)}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.MODIFY_ORDER, body);
                 this.metrics.incrementBrokerCalls('zebu', 'modifyOrder', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 if (data && data.stat === 'Ok' && data.result) {
                     return { brokerOrderId: data.result, status: 'PENDING' };
                 }
@@ -448,13 +561,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             const start = Date.now();
             try {
                 const jData = { uid: clientCode, norenordno: orderId };
-                const body = this.buildBody(jData, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.CANCEL_ORDER}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify(jData)}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.CANCEL_ORDER, body);
                 this.metrics.incrementBrokerCalls('zebu', 'cancelOrder', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 if (data && data.stat === 'Ok' && data.result) {
                     return { brokerOrderId: data.result, status: 'CANCELLED' };
                 }
@@ -473,12 +583,8 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             return { brokerOrderId, status: 'EXECUTED', message: 'Mock execution successful' };
         }
         try {
-            const jData = { uid: clientCode };
-            const body = this.buildBody(jData, token);
-            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.ORDER_BOOK}`, body, {
-                headers: this.getHeaders(),
-            }));
-            const data = response.data;
+            const body = `jData=${JSON.stringify({ uid: clientCode })}&jKey=${token}`;
+            const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.ORDER_BOOK, body);
             const orders = Array.isArray(data) ? data : [];
             const found = orders.find((o) => o.norenordno === brokerOrderId);
             if (found) {
@@ -513,14 +619,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             await this.rateLimiter.throttle('zebu', 'market');
             const start = Date.now();
             try {
-                const jData = { uid: clientCode, actid: clientCode };
-                const body = this.buildBody(jData, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.ORDER_BOOK}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify({ uid: clientCode, actid: clientCode })}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.ORDER_BOOK, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getOrders', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 const orders = Array.isArray(data) ? data : [];
                 return orders.map((o) => ({
                     brokerOrderId: o.norenordno || '',
@@ -557,14 +659,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             await this.rateLimiter.throttle('zebu', 'market');
             const start = Date.now();
             try {
-                const jData = { uid: clientCode, actid: clientCode };
-                const body = this.buildBody(jData, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.TRADE_BOOK}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify({ uid: clientCode, actid: clientCode })}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.TRADE_BOOK, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getTradeBook', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 const trades = Array.isArray(data) ? data : [];
                 return trades.map((t) => ({
                     tradeId: t.flfilledtm || t.tradeid || '',
@@ -596,17 +694,8 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             };
         }
         try {
-            const uid = this.tokenToUidMap.get(token || '') || '';
-            const jData = {
-                uid,
-                exch: exchange.toUpperCase(),
-                token: _symbolToken || symbol,
-            };
-            const body = this.buildBody(jData, token || '');
-            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.GET_QUOTES}`, body, {
-                headers: this.getHeaders(),
-            }));
-            const data = response.data;
+            const body = `jData=${JSON.stringify({ uid: '', exch: exchange.toUpperCase(), token: _symbolToken || symbol })}&jKey=${token || ''}`;
+            const data = await this.executeBrokerPost(token || null, null, zebu_endpoints_1.ZebuEndpoints.GET_QUOTES, body);
             if (data && data.stat === 'Ok') {
                 return {
                     ltp: parseFloat(data.lp || '0'),
@@ -643,14 +732,10 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             await this.rateLimiter.throttle('zebu', 'market');
             const start = Date.now();
             try {
-                const jData = { uid: '', exch: exchange.toUpperCase(), token: symbolToken };
-                const body = this.buildBody(jData, token);
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${zebu_endpoints_1.ZebuEndpoints.GET_QUOTES}`, body, {
-                    headers: this.getHeaders(),
-                }));
+                const body = `jData=${JSON.stringify({ uid: '', exch: exchange.toUpperCase(), token: symbolToken })}&jKey=${token}`;
+                const data = await this.executeBrokerPost(token, null, zebu_endpoints_1.ZebuEndpoints.GET_QUOTES, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getLtpData', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const data = response.data;
                 if (data && data.stat === 'Ok') {
                     return {
                         exchange,
@@ -685,13 +770,6 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         }
         return this.getOrderStatus(token, clientCode, orderId);
     }
-    midnightIst() {
-        const now = new Date();
-        const istOffsetMs = 5.5 * 60 * 60 * 1000;
-        const istNow = new Date(now.getTime() + istOffsetMs);
-        const midnightIst = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate() + 1));
-        return new Date(midnightIst.getTime() - istOffsetMs);
-    }
     mapOrderType(orderType) {
         switch ((orderType || '').toUpperCase()) {
             case 'MARKET': return 'MKT';
@@ -720,6 +798,7 @@ exports.ZebuService = ZebuService = ZebuService_1 = __decorate([
         redis_service_1.RedisService,
         metrics_service_1.MetricsService,
         circuit_breaker_service_1.CircuitBreakerService,
-        broker_rate_limiter_service_1.BrokerRateLimiterService])
+        broker_rate_limiter_service_1.BrokerRateLimiterService,
+        prisma_service_1.PrismaService])
 ], ZebuService);
 //# sourceMappingURL=zebu.service.js.map

@@ -51,6 +51,9 @@ export declare class PrismaService implements OnModuleInit, OnModuleDestroy {
     get notificationPreference(): any;
     get notificationDelivery(): any;
     get sreAlert(): any;
+    get proxyCredential(): any;
+    get ipPool(): any;
+    get userIpAssignment(): any;
     get $transaction(): any;
     get $executeRaw(): any;
     get $queryRaw(): any;

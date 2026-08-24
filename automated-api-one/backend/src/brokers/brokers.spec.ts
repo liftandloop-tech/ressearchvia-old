@@ -4,6 +4,7 @@ import { BrokerFactory } from './factory/broker.factory';
 import { BrokerType } from './interfaces/broker-type.enum';
 import { BrokerAdapter } from './interfaces/broker-adapter.interface';
 import { AngelOneService } from './providers/angel-one.service';
+import { ZebuService } from './providers/zebu.service';
 import { BrokerSessionService } from './services/broker-session.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditEventType } from '../audit/enums/audit-event.enum';
@@ -108,6 +109,7 @@ describe('Brokers Module Tests', () => {
         BrokerFactory,
         BrokerSessionService,
         AngelOneService,
+        ZebuService,
         { provide: AuditService, useValue: mockAuditService },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ConfigService, useValue: mockConfigService },

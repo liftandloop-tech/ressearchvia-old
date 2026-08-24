@@ -408,6 +408,21 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
                 totalPages: number;
             }>;
         };
+        userIpAssignment: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
         broker: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
@@ -769,6 +784,36 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
             }>;
         };
         brokerAuthState: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        ipPool: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        proxyCredential: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
                 limit?: number;
@@ -1195,6 +1240,21 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
                 totalPages: number;
             }>;
         };
+        userIpAssignment: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
         broker: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
@@ -1556,6 +1616,36 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
             }>;
         };
         brokerAuthState: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        ipPool: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        proxyCredential: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
                 limit?: number;

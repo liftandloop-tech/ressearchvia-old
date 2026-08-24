@@ -14,5 +14,7 @@ exports.ZebuEndpoints = {
     TRADE_BOOK: '/TradeBook',
     GET_QUOTES: '/GetQuotes',
     LOGOUT: '/Logout',
+    GEN_ACCESS_TOKEN: '/GenAcsTok',
+    REFRESH_TOKEN: '/RefreshToken',
 };
 //# sourceMappingURL=zebu-endpoints.js.map

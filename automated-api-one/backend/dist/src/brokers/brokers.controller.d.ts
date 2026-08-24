@@ -7,6 +7,7 @@ export declare class LinkBrokerDto {
     brokerCode: BrokerCode;
     brokerClientId: string;
     apiKey?: string;
+    apiSecret?: string;
     vendorCode?: string;
 }
 export declare class AuthorizeBrokerDto {

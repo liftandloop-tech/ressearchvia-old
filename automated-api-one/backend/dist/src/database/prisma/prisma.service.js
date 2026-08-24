@@ -164,6 +164,15 @@ let PrismaService = PrismaService_1 = class PrismaService {
     get sreAlert() {
         return this.client.sreAlert;
     }
+    get proxyCredential() {
+        return this.client.proxyCredential;
+    }
+    get ipPool() {
+        return this.client.ipPool;
+    }
+    get userIpAssignment() {
+        return this.client.userIpAssignment;
+    }
     get $transaction() {
         return this.client.$transaction.bind(this.client);
     }

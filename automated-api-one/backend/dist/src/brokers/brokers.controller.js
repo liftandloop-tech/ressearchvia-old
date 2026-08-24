@@ -60,6 +60,7 @@ class LinkBrokerDto {
     brokerCode;
     brokerClientId;
     apiKey;
+    apiSecret;
     vendorCode;
 }
 exports.LinkBrokerDto = LinkBrokerDto;
@@ -78,6 +79,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], LinkBrokerDto.prototype, "apiKey", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], LinkBrokerDto.prototype, "apiSecret", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
@@ -142,6 +148,7 @@ let BrokersController = class BrokersController {
                 data: {
                     brokerClientId: dto.brokerClientId,
                     apiKey: dto.apiKey ?? existing.apiKey,
+                    apiSecret: dto.apiSecret ?? existing.apiSecret,
                     vendorCode: dto.vendorCode ?? existing.vendorCode,
                     status: client_1.BrokerStatus.ACTIVE,
                     deletedAt: null,
@@ -155,6 +162,7 @@ let BrokersController = class BrokersController {
                 brokerId: broker.id,
                 brokerClientId: dto.brokerClientId,
                 apiKey: dto.apiKey ?? null,
+                apiSecret: dto.apiSecret ?? null,
                 vendorCode: dto.vendorCode ?? null,
                 status: client_1.BrokerStatus.ACTIVE,
             },

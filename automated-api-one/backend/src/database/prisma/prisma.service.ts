@@ -163,6 +163,15 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get sreAlert() {
     return this.client.sreAlert;
   }
+  get proxyCredential() {
+    return this.client.proxyCredential;
+  }
+  get ipPool() {
+    return this.client.ipPool;
+  }
+  get userIpAssignment() {
+    return this.client.userIpAssignment;
+  }
 
   // Delegate transactions and raw queries
   get $transaction() {

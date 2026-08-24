@@ -11,4 +11,6 @@ export declare const ZebuEndpoints: {
     readonly TRADE_BOOK: "/TradeBook";
     readonly GET_QUOTES: "/GetQuotes";
     readonly LOGOUT: "/Logout";
+    readonly GEN_ACCESS_TOKEN: "/GenAcsTok";
+    readonly REFRESH_TOKEN: "/RefreshToken";
 };

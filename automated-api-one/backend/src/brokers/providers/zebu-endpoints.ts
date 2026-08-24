@@ -44,4 +44,10 @@ export const ZebuEndpoints = {
 
   /** Logout and invalidate the session token */
   LOGOUT: '/Logout',
+
+  /** Zebu OAuth access token generation */
+  GEN_ACCESS_TOKEN: '/GenAcsTok',
+
+  /** Zebu OAuth token refresh */
+  REFRESH_TOKEN: '/RefreshToken',
 } as const;

@@ -49,6 +49,7 @@ model User {
   kyc                     UserKyc?
   userPerformance         UserPerformance?
   segments                UserSegment[]
+  ipAssignments           UserIpAssignment[]
 
   @@index([status])
   @@index([deletedAt])
@@ -91,6 +92,7 @@ model UserBroker {
   brokerId       String          @map("broker_id") @db.Uuid
   brokerClientId String          @map("broker_client_id") @db.VarChar(100)
   apiKey         String?         @map("api_key")          // Per-user API key (e.g. Zebu appkey)
+  apiSecret      String?         @map("api_secret")
   vendorCode     String?         @map("vendor_code")      // Per-user vendor code (e.g. Zebu vc)
   accessToken    String?         @map("access_token")
   refreshToken   String?         @map("refresh_token")
@@ -108,6 +110,7 @@ model UserBroker {
   sessions       BrokerSession[]
   broker         Broker          @relation(fields: [brokerId], references: [id], onDelete: Cascade)
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proxyCredential ProxyCredential?
 
   @@unique([userId, brokerId])
   @@index([deletedAt])
@@ -1194,4 +1197,67 @@ enum EquityCurveSourceType {
   INTRADAY
   HOURLY
   DAILY
+}
+
+enum ProxyStatus {
+  PENDING
+  ACTIVE
+  RENEWING
+  EXPIRED
+  SUSPENDED
+  FAILED
+}
+
+model IpPool {
+  id               String             @id @default(uuid()) @db.Uuid
+  publicIp         String             @unique @db.VarChar(45)
+  interface        String             @default("eth0") @db.VarChar(50)
+  status           String             @default("AVAILABLE") @db.VarChar(20)
+  isHealthy        Boolean            @default(false)
+  lastVerifiedAt   DateTime?
+  observedSourceIp String?            @db.VarChar(45)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  assignments      UserIpAssignment[]
+
+  @@index([status, isHealthy])
+}
+
+model UserIpAssignment {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipPoolId         String    @db.Uuid
+  ipPool           IpPool    @relation(fields: [ipPoolId], references: [id], onDelete: Cascade)
+  status           String    @default("RESERVED") @db.VarChar(20)
+  proxyUsername    String?   @db.VarChar(150)
+  proxySecretHash  String?   @db.VarChar(255)
+  version          Int       @default(1)
+  assignedAt       DateTime  @default(now())
+  expiresAt        DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@index([userId, status])
+  @@index([ipPoolId, status])
+}
+
+model ProxyCredential {
+  id             String      @id @default(uuid()) @db.Uuid
+  ip             String?     @db.VarChar(45)
+  port           Int?
+  ip_userid      String?     @unique @db.VarChar(150)
+  ip_password    String?     @db.VarChar(100)
+  brokerName     String      @db.VarChar(50)
+  validityMonths Int
+  issuedAt       DateTime?
+  expiresAt      DateTime?
+  status         ProxyStatus
+  orderId        String      @unique @db.VarChar(100)
+  userBrokerId   String?     @unique @db.Uuid
+  userBroker     UserBroker? @relation(fields: [userBrokerId], references: [id], onDelete: SetNull)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 }

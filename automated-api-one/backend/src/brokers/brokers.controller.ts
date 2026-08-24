@@ -45,6 +45,10 @@ export class LinkBrokerDto {
 
   @IsString()
   @IsOptional()
+  apiSecret?: string; // Per-user API secret (required for Zebu OAuth)
+
+  @IsString()
+  @IsOptional()
   vendorCode?: string; // Per-user vendor code (required for brokers like Zebu)
 }
 
@@ -110,6 +114,7 @@ export class BrokersController {
         data: {
           brokerClientId: dto.brokerClientId,
           apiKey: dto.apiKey ?? existing.apiKey,
+          apiSecret: dto.apiSecret ?? existing.apiSecret,
           vendorCode: dto.vendorCode ?? existing.vendorCode,
           status: BrokerStatus.ACTIVE,
           deletedAt: null, // Undelete/Restore the record
@@ -124,6 +129,7 @@ export class BrokersController {
         brokerId: broker.id,
         brokerClientId: dto.brokerClientId,
         apiKey: dto.apiKey ?? null,
+        apiSecret: dto.apiSecret ?? null,
         vendorCode: dto.vendorCode ?? null,
         status: BrokerStatus.ACTIVE,
       },

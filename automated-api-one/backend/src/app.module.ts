@@ -33,6 +33,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './database/prisma/prisma.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { InstrumentsModule } from './instruments/instruments.module';
+import { ProxyManagerModule } from './proxy-manager/proxy-manager.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { InstrumentsModule } from './instruments/instruments.module';
     ReconciliationModule,
     AnalyticsModule,
     InstrumentsModule,
+    ProxyManagerModule,
   ],
   controllers: [AppController],
   providers: [
