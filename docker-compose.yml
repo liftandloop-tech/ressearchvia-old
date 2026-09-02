@@ -80,7 +80,7 @@ services:
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
       - TWILIO_SERVICE_SID=${TWILIO_SERVICE_SID:-}
     volumes:
-      - ll_backend_uploads:/usr/src/app/app/uploads
+      - ${UPLOADS_PATH:-/data/coolify/applications/q0oos0gsok8ogkkok8ooksgc}:/usr/src/app/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -386,8 +386,6 @@ volumes:
     name: trading_redis_data
   mongo_data:
     name: trading_mongo_data
-  ll_backend_uploads:
-    name: trading_ll_backend_uploads
   certbot_www:
     name: trading_certbot_www
   certbot_certs:
