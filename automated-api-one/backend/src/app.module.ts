@@ -54,7 +54,7 @@ import { EgressModule } from './egress/egress.module';
             password: config.get<string>('REDIS_PASSWORD'),
           };
           const username = config.get<string>('REDIS_USERNAME');
-          if (username) {
+          if (username && username !== 'default' && username !== 'sp-redis') {
             connectionOptions.username = username;
           }
           return { connection: connectionOptions };

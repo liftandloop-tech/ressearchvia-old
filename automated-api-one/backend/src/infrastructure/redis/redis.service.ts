@@ -38,7 +38,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       reconnectOnError: () => true,
     };
 
-    if (username) {
+    if (username && username !== 'default' && username !== 'sp-redis') {
       redisOptions.username = username;
     }
 
