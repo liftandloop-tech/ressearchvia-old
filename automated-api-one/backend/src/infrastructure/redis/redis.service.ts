@@ -21,9 +21,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private isConnected = false;
   private mode: PlatformMode = PlatformMode.NORMAL;
 
-  constructor(private readonly configService: ConfigService) {}
-
-  onModuleInit(): Promise<void> {
+  constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('REDIS_HOST', 'localhost');
     const port = this.configService.get<number>('REDIS_PORT', 6379);
     const username = this.configService.get<string>('REDIS_USERNAME');
@@ -34,7 +32,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const redisOptions: any = {
       host,
       port,
-      password,
+      password: password || undefined,
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: true,
       reconnectOnError: () => true,
@@ -76,7 +74,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.mode = PlatformMode.REDIS_DEGRADED;
       this.logger.warn('Redis connection ended. Platform mode: REDIS_DEGRADED');
     });
+  }
 
+  onModuleInit(): Promise<void> {
+    if (this.isConnected) {
+      return Promise.resolve();
+    }
     return new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
         this.logger.warn('Redis connection startup timeout reached (2s). Bootstrapping anyway.');
