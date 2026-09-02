@@ -14,54 +14,65 @@ class UserActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final canManageSubscription = (authController.user.value?.isAdmin == true) ||
+        (authController.user.value?.has('subscriptions.view') ?? false) ||
+        (authController.user.value?.has('subscriptions.activate') ?? false) ||
+        (authController.user.value?.has('users.update') ?? false);
+    final canEditUser = (authController.user.value?.isAdmin == true) ||
+        (authController.user.value?.has('users.update') ?? false);
+
     return Expanded(
       flex: flex,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (canManageSubscription)
+            IconButton(
+              icon: const Icon(
+                Icons.verified_user_outlined,
+                size: 18,
+              ), // Entitlement Icon
+              onPressed: () {
+                Get.dialog(
+                  AssignEntitlementsDialog(
+                    userId: user.id,
+                    currentRegStatus: user.registrationStatus,
+                  ),
+                ).then((_) => _refresh());
+              },
+              color: AppTheme.primary,
+              tooltip: 'Assign Entitlements',
+            ),
+          if (canManageSubscription)
+            IconButton(
+              icon: const Icon(Icons.card_membership_outlined, size: 18),
+              onPressed: () {
+                // Manage Users / Subscriptions
+                Get.find<UsersNavigationController>().showManageSubscription(
+                  user.id,
+                );
+              },
+              color: AppTheme.textSecondary,
+              tooltip: 'Manage Subscription',
+            ),
           IconButton(
-            icon: Icon(
-              Icons.verified_user_outlined,
-              size: 18,
-            ), // Entitlement Icon
-            onPressed: () {
-              Get.dialog(
-                AssignEntitlementsDialog(
-                  userId: user.id,
-                  currentRegStatus: user.registrationStatus,
-                ),
-              ).then((_) => _refresh());
-            },
-            color: AppTheme.primary,
-            tooltip: 'Assign Entitlements',
-          ),
-          IconButton(
-            icon: Icon(Icons.card_membership_outlined, size: 18),
-            onPressed: () {
-              // Manage Users / Subscriptions
-              Get.find<UsersNavigationController>().showManageSubscription(
-                user.id,
-              );
-            },
-            color: AppTheme.textSecondary,
-            tooltip: 'Manage Subscription',
-          ),
-          IconButton(
-            icon: Icon(Icons.visibility_outlined, size: 18),
+            icon: const Icon(Icons.visibility_outlined, size: 18),
             onPressed: () {
               Get.find<UsersNavigationController>().showUserDetails(user.id);
             },
             color: AppTheme.textSecondary,
             tooltip: 'View',
           ),
-          IconButton(
-            icon: Icon(Icons.edit_outlined, size: 18),
-            onPressed: () {
-              Get.find<UsersNavigationController>().showEditProfile(user.id);
-            },
-            color: AppTheme.textSecondary,
-            tooltip: 'Edit',
-          ),
+          if (canEditUser)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              onPressed: () {
+                Get.find<UsersNavigationController>().showEditProfile(user.id);
+              },
+              color: AppTheme.textSecondary,
+              tooltip: 'Edit',
+            ),
         ],
       ),
     );

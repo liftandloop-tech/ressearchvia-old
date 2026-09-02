@@ -28,6 +28,10 @@ class UsersTable extends StatelessWidget {
     return Obx(() {
       final authController = Get.find<AuthController>();
       final isDirector = authController.user.value?.isDirector ?? false;
+      final canManageSubscription = (authController.user.value?.isAdmin == true) ||
+          (authController.user.value?.has('subscriptions.view') ?? false) ||
+          (authController.user.value?.has('subscriptions.activate') ?? false) ||
+          (authController.user.value?.has('users.update') ?? false);
       final users = controller.filteredUsers;
       final totalCount = userManagementController.totalCount.value;
       final pageSize = userManagementController.pageSize.value;
@@ -114,7 +118,7 @@ class UsersTable extends StatelessWidget {
                       size: ColumnSize.S,
                       label: Text('KYC Status', style: _headerStyle),
                     ),
-                    if (!isDirector)
+                    if (!isDirector && canManageSubscription)
                       DataColumn2(
                         size: ColumnSize.M,
                         label: Center(
@@ -140,6 +144,7 @@ class UsersTable extends StatelessWidget {
                           user: user,
                           controller: controller,
                           isDirector: isDirector,
+                          canManageSubscription: canManageSubscription,
                         ),
                       )
                       .toList(),

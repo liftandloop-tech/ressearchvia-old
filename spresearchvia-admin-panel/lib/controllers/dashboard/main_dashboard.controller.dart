@@ -48,8 +48,11 @@ class MainDashboardController extends GetxController {
     if (currentRoute == AppRoutes.dashboard) return;
 
     bool isAllowed = true;
-    if (currentRoute.startsWith('/users') ||
-        currentRoute.startsWith('/manage-user') ||
+    if (currentRoute.startsWith('/manage-user')) {
+      isAllowed = (user?.hasPermission('Subscriptions', 'view') ?? false) ||
+          (user?.hasPermission('Subscriptions', 'activate') ?? false) ||
+          (user?.hasPermission('Users', 'update') ?? false);
+    } else if (currentRoute.startsWith('/users') ||
         currentRoute.startsWith('/edit-user')) {
       isAllowed = user?.hasPermission('Users', 'read') ?? false;
     } else if (currentRoute.startsWith('/approvals/kyc') ||
