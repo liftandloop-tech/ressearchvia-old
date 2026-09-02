@@ -28,6 +28,7 @@ COPY --from=builder /usr/src/app/package*.json ./
 COPY --from=builder /usr/src/app/prisma ./prisma
 COPY --from=builder /usr/src/app/app ./app
 COPY --from=builder /usr/src/app/server.js ./server.js
+COPY --from=builder /usr/src/app/prisma.config.* ./
 
 # Ensure standard upload directory hierarchy exists
 RUN mkdir -p app/uploads/kycimg app/uploads/kycvid app/uploads/reports app/uploads/qrcodes
