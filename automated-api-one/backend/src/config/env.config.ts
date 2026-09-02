@@ -5,7 +5,7 @@ export const envSchema = z.object({
     .enum(['development', 'production', 'test'])
     .default('development'),
   PORT: z.coerce.number().default(3000),
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.string().min(1),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().default(6379),
   REDIS_USERNAME: z.string().optional(),
@@ -38,7 +38,7 @@ export const envSchema = z.object({
   CIRCUIT_BREAKER_FAILURE_THRESHOLD: z.coerce.number().default(3),
   CIRCUIT_BREAKER_RESET_TIMEOUT_MS: z.coerce.number().default(60000),
   AUTOMATED_API_KEY: z.string().default('default_secret_key'),
-  LL_BACKEND_URL: z.string().url().default('http://localhost:8080'),
+  LL_BACKEND_URL: z.string().min(1).default('http://ll-backend:8080'),
   RISK_DEFAULT_MODE: z.enum(['BLOCK', 'ALLOW']).default('ALLOW'),
   EGRESS_MANAGER_URL: z.string().default('http://localhost:8080'),
   EGRESS_PROXY_HOST: z.string().default('localhost'),
