@@ -34,4 +34,10 @@ export const RedisKeys = {
 
   position: (userId: string, segmentId: string) =>
     `position:${userId}:${segmentId}`,
+
+  userEgress: (userId: string) =>
+    `egress:user:${userId}`,
+
+  userEgressLock: (userId: string) =>
+    `lock:egress:${userId}`,
 };

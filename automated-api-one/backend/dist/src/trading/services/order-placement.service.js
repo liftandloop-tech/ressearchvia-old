@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var OrderPlacementService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrderPlacementService = void 0;
@@ -25,6 +28,8 @@ const position_cache_service_1 = require("./position-cache.service");
 const config_1 = require("@nestjs/config");
 const client_1 = require("@prisma/client");
 const risk_service_1 = require("../../risk/risk.service");
+const egress_service_1 = require("../../egress/egress.service");
+const common_2 = require("@nestjs/common");
 const metrics_service_1 = require("../../infrastructure/metrics/metrics.service");
 let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementService {
     prisma;
@@ -38,9 +43,10 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
     configService;
     metrics;
     riskService;
+    egressService;
     logger = new common_1.Logger(OrderPlacementService_1.name);
     brokerTimeoutMs;
-    constructor(prisma, brokerFactory, circuitBreaker, rateLimiter, outbox, redisService, auditService, positionCache, configService, metrics, riskService) {
+    constructor(prisma, brokerFactory, circuitBreaker, rateLimiter, outbox, redisService, auditService, positionCache, configService, metrics, riskService, egressService) {
         this.prisma = prisma;
         this.brokerFactory = brokerFactory;
         this.circuitBreaker = circuitBreaker;
@@ -52,6 +58,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
         this.configService = configService;
         this.metrics = metrics;
         this.riskService = riskService;
+        this.egressService = egressService;
         this.brokerTimeoutMs = this.configService.get('BROKER_TIMEOUT_MS', 5000);
     }
     async placeEntryOrder(ctx) {
@@ -180,6 +187,15 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
     async resolveBrokerToken(userId, brokerId, brokerClientId) {
         this.logger.log(`[resolveBrokerToken] Resolving token & proxy for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
         const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+        let proxyAgent = undefined;
+        if (this.egressService) {
+            try {
+                proxyAgent = await this.egressService.getProxyAgentForUser(userId);
+            }
+            catch (err) {
+                this.logger.warn(`[resolveBrokerToken] EgressService proxy resolution note for user ${userId}: ${err.message}`);
+            }
+        }
         if (this.redisService.isHealthy()) {
             try {
                 const sessionKey = redis_keys_1.RedisKeys.brokerSession(userId, brokerId);
@@ -189,14 +205,17 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
                     const session = JSON.parse(cachedRaw);
                     if (session?.accessToken) {
                         this.logger.debug(`Broker session for user ${userId} resolved from Redis cache`);
-                        const agent = createProxyAgent({
-                            proxyIp: session.proxyIp || null,
-                            proxyPort: session.proxyPort || null,
-                            proxyHostname: null,
-                            proxyUsername: session.proxyUsername || null,
-                            proxyPassword: session.proxyPassword || null,
-                        });
-                        return { accessToken: session.accessToken, proxyAgent: agent };
+                        if (!proxyAgent) {
+                            const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+                            proxyAgent = createProxyAgent({
+                                proxyIp: session.proxyIp || null,
+                                proxyPort: session.proxyPort || null,
+                                proxyHostname: null,
+                                proxyUsername: session.proxyUsername || null,
+                                proxyPassword: session.proxyPassword || null,
+                            });
+                        }
+                        return { accessToken: session.accessToken, proxyAgent };
                     }
                 }
             }
@@ -212,14 +231,17 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
         });
         this.logger.log(`[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`);
         if (userBroker) {
-            const agent = createProxyAgent({
-                proxyIp: userBroker.proxyIp,
-                proxyPort: userBroker.proxyPort,
-                proxyHostname: userBroker.proxyHostname,
-                proxyUsername: userBroker.proxyUsername,
-                proxyPassword: userBroker.proxyPassword,
-            });
-            return { accessToken: userBroker.accessToken, proxyAgent: agent };
+            if (!proxyAgent) {
+                const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+                proxyAgent = createProxyAgent({
+                    proxyIp: userBroker.proxyIp,
+                    proxyPort: userBroker.proxyPort,
+                    proxyHostname: userBroker.proxyHostname,
+                    proxyUsername: userBroker.proxyUsername,
+                    proxyPassword: userBroker.proxyPassword,
+                });
+            }
+            return { accessToken: userBroker.accessToken, proxyAgent };
         }
         return { accessToken: null };
     }
@@ -227,6 +249,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
 exports.OrderPlacementService = OrderPlacementService;
 exports.OrderPlacementService = OrderPlacementService = OrderPlacementService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(11, (0, common_2.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         broker_factory_1.BrokerFactory,
         circuit_breaker_service_1.CircuitBreakerService,
@@ -237,6 +260,7 @@ exports.OrderPlacementService = OrderPlacementService = OrderPlacementService_1 
         position_cache_service_1.PositionCacheService,
         config_1.ConfigService,
         metrics_service_1.MetricsService,
-        risk_service_1.RiskService])
+        risk_service_1.RiskService,
+        egress_service_1.EgressService])
 ], OrderPlacementService);
 //# sourceMappingURL=order-placement.service.js.map

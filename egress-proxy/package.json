@@ -1,0 +1,17 @@
+{
+  "name": "s8-egress-proxy",
+  "version": "1.0.0",
+  "description": "Authenticated Host-Network Forward and CONNECT Proxy with dynamic outbound source IP binding",
+  "main": "dist/proxy.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/proxy.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

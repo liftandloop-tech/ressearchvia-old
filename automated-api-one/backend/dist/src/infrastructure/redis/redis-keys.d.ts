@@ -11,4 +11,6 @@ export declare const RedisKeys: {
     reportMonthly: (userId: string, month: string) => string;
     circuitBreaker: (broker: string) => string;
     position: (userId: string, segmentId: string) => string;
+    userEgress: (userId: string) => string;
+    userEgressLock: (userId: string) => string;
 };

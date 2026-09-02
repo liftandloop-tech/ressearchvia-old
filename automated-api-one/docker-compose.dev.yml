@@ -31,6 +31,42 @@ services:
       timeout: 5s
       retries: 5
 
+  egress-proxy:
+    build:
+      context: ../egress-proxy
+      dockerfile: Dockerfile
+    container_name: trading-egress-proxy-dev
+    environment:
+      - NODE_ENV=development
+      - PROXY_DATA_PORT=8888
+      - PROXY_CONTROL_PORT=8889
+      - PROXY_CONTROL_SECRET=s8_egress_super_secret_control_key_2026
+      - ALLOW_DEV_FALLBACK_IP=true
+    ports:
+      - "8888:8888"
+      - "8889:8889"
+
+  egress-manager:
+    build:
+      context: ../egress-manager
+      dockerfile: Dockerfile
+    container_name: trading-egress-manager-dev
+    environment:
+      - NODE_ENV=development
+      - EGRESS_MANAGER_PORT=8080
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/trading_platform?schema=public
+      - EGRESS_PROXY_CONTROL_URL=http://egress-proxy:8889
+      - EGRESS_PROXY_DATA_HOST=egress-proxy
+      - EGRESS_PROXY_DATA_PORT=8888
+      - PROXY_CONTROL_SECRET=s8_egress_super_secret_control_key_2026
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      egress-proxy:
+        condition: service_started
+
   api:
     build:
       context: ./backend
@@ -45,11 +81,17 @@ services:
       - JWT_SECRET=super_secret_jwt_key_that_is_at_least_eight_chars
       - PORT=3000
       - NODE_ENV=development
+      - EGRESS_MANAGER_URL=http://egress-manager:8080
+      - EGRESS_PROXY_HOST=egress-proxy
+      - EGRESS_PROXY_PORT=8888
+      - PROXY_CONTROL_SECRET=s8_egress_super_secret_control_key_2026
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      egress-manager:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 10s

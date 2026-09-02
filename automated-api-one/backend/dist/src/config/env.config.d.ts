@@ -34,6 +34,10 @@ export declare const envSchema: z.ZodObject<{
         BLOCK: "BLOCK";
         ALLOW: "ALLOW";
     }>>;
+    EGRESS_MANAGER_URL: z.ZodDefault<z.ZodString>;
+    EGRESS_PROXY_HOST: z.ZodDefault<z.ZodString>;
+    EGRESS_PROXY_PORT: z.ZodDefault<z.ZodCoercedNumber<unknown>>;
+    PROXY_CONTROL_SECRET: z.ZodDefault<z.ZodString>;
 }, z.core.$strip>;
 export type EnvConfig = z.infer<typeof envSchema>;
 export declare function validateEnv(config: Record<string, unknown>): EnvConfig;

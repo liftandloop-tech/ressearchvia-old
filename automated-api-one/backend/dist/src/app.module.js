@@ -41,6 +41,7 @@ const prisma_module_1 = require("./database/prisma/prisma.module");
 const infrastructure_module_1 = require("./infrastructure/infrastructure.module");
 const instruments_module_1 = require("./instruments/instruments.module");
 const proxy_manager_module_1 = require("./proxy-manager/proxy-manager.module");
+const egress_module_1 = require("./egress/egress.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -92,6 +93,7 @@ exports.AppModule = AppModule = __decorate([
             analytics_module_1.AnalyticsModule,
             instruments_module_1.InstrumentsModule,
             proxy_manager_module_1.ProxyManagerModule,
+            egress_module_1.EgressModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

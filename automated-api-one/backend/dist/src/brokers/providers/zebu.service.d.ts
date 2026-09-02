@@ -7,6 +7,7 @@ import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 import { CircuitBreakerService } from '../../infrastructure/circuit-breaker/circuit-breaker.service';
 import { BrokerRateLimiterService } from '../../infrastructure/redis/broker-rate-limiter.service';
 import { PrismaService } from '../../prisma.service';
+import { EgressService } from '../../egress/egress.service';
 export declare class ZebuService extends BrokerAdapter implements BrokerClient {
     private readonly httpService;
     private readonly configService;
@@ -15,10 +16,11 @@ export declare class ZebuService extends BrokerAdapter implements BrokerClient {
     private readonly circuitBreaker;
     private readonly rateLimiter;
     private readonly prisma;
+    private readonly egressService?;
     private readonly logger;
     private readonly isMock;
     private readonly baseUrl;
-    constructor(httpService: HttpService, configService: ConfigService, redisService: RedisService, metrics: MetricsService, circuitBreaker: CircuitBreakerService, rateLimiter: BrokerRateLimiterService, prisma: PrismaService);
+    constructor(httpService: HttpService, configService: ConfigService, redisService: RedisService, metrics: MetricsService, circuitBreaker: CircuitBreakerService, rateLimiter: BrokerRateLimiterService, prisma: PrismaService, egressService?: EgressService | undefined);
     private executeBrokerPost;
     capabilities(): BrokerCapabilities;
     healthCheck(): Promise<BrokerHealthResponse>;

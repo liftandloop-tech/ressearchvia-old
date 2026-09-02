@@ -32,6 +32,8 @@ import { BrokerRateLimiterService } from '../../infrastructure/redis/broker-rate
 import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma.service';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { EgressService } from '../../egress/egress.service';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class ZebuService extends BrokerAdapter implements BrokerClient {
@@ -47,6 +49,7 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly rateLimiter: BrokerRateLimiterService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly egressService?: EgressService,
   ) {
     super();
     const mockVal = this.configService.get<any>('MOCK_BROKERS', true);
@@ -90,24 +93,38 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
 
       if (userBroker) {
         const userId = userBroker.userId;
-        const proxy = userBroker.proxyCredential;
-
-        if (proxy && proxy.ip && proxy.port && proxy.ip_userid && proxy.ip_password) {
-          networkMode = 'DEDICATED_PROXY';
-          const isExpired = proxy.expiresAt && new Date(proxy.expiresAt) < new Date();
-          if (isExpired || (proxy.status !== 'ACTIVE' && proxy.status !== 'PENDING' && proxy.status !== 'RENEWING')) {
-            this.logger.error(`[Proxy Violation] requestId=${requestId} Dedicated proxy for user ${userId} is ${proxy.status} (isExpired=${!!isExpired}). Aborting to prevent direct IP leakage.`);
-            throw new Error(`[Proxy Error] Dedicated proxy is ${proxy.status}${isExpired ? ' (EXPIRED)' : ''}. Aborting broker request to prevent direct IP leakage.`);
+        if (this.egressService) {
+          try {
+            httpsAgent = await this.egressService.getProxyAgentForUser(userId);
+            if (httpsAgent) {
+              networkMode = 'EGRESS_PROXY';
+              proxyIp = httpsAgent.proxy?.hostname || 'EGRESS_PROXY';
+              this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Egress Proxy for user ${userId} [endpoint: ${endpoint}]`);
+            }
+          } catch (eErr: any) {
+            this.logger.warn(`[Proxy Routing] EgressService proxy notice for user ${userId}: ${eErr.message}`);
           }
+        }
 
-          proxyIp = proxy.ip;
-          const auth = Buffer.from(`${proxy.ip_userid}:${proxy.ip_password}`).toString('base64');
-          httpsAgent = new HttpsProxyAgent(`http://${proxy.ip}:${proxy.port}`, {
-            headers: {
-              'Proxy-Authorization': `Basic ${auth}`,
-            },
-          });
-          this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Dedicated Proxy ${proxy.ip}:${proxy.port} (user: ${proxy.ip_userid}) for user ${userId} [endpoint: ${endpoint}]`);
+        if (!httpsAgent) {
+          const proxy = userBroker.proxyCredential;
+          if (proxy && proxy.ip && proxy.port && proxy.ip_userid && proxy.ip_password) {
+            networkMode = 'DEDICATED_PROXY';
+            const isExpired = proxy.expiresAt && new Date(proxy.expiresAt) < new Date();
+            if (isExpired || (proxy.status !== 'ACTIVE' && proxy.status !== 'PENDING' && proxy.status !== 'RENEWING')) {
+              this.logger.error(`[Proxy Violation] requestId=${requestId} Dedicated proxy for user ${userId} is ${proxy.status} (isExpired=${!!isExpired}). Aborting to prevent direct IP leakage.`);
+              throw new Error(`[Proxy Error] Dedicated proxy is ${proxy.status}${isExpired ? ' (EXPIRED)' : ''}. Aborting broker request to prevent direct IP leakage.`);
+            }
+
+            proxyIp = proxy.ip;
+            const auth = Buffer.from(`${proxy.ip_userid}:${proxy.ip_password}`).toString('base64');
+            httpsAgent = new HttpsProxyAgent(`http://${proxy.ip}:${proxy.port}`, {
+              headers: {
+                'Proxy-Authorization': `Basic ${auth}`,
+              },
+            });
+            this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Dedicated Proxy ${proxy.ip}:${proxy.port} (user: ${proxy.ip_userid}) for user ${userId} [endpoint: ${endpoint}]`);
+          }
         }
       }
     } else {

@@ -14,5 +14,7 @@ exports.RedisKeys = {
     reportMonthly: (userId, month) => `report:monthly:${userId}:${month}`,
     circuitBreaker: (broker) => `circuit:${broker}`,
     position: (userId, segmentId) => `position:${userId}:${segmentId}`,
+    userEgress: (userId) => `egress:user:${userId}`,
+    userEgressLock: (userId) => `lock:egress:${userId}`,
 };
 //# sourceMappingURL=redis-keys.js.map

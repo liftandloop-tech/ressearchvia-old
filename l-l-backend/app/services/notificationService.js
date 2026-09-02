@@ -82,8 +82,12 @@ const notificationService = {
             data: finalData, // Common data
             tokens: tokens,
             android: androidConfig,
-            apns: apnsConfig
         };
+
+        if (!firebaseAdmin || !firebaseAdmin.messaging) {
+            console.warn("⚠️ Firebase Admin not initialized. Skipping push notification dispatch.");
+            return { success: true, count: tokens.length, skipped: true };
+        }
 
         try {
             if (tokens.length === 1) {

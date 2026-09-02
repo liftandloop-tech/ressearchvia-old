@@ -45,6 +45,10 @@ exports.envSchema = zod_1.z.object({
     AUTOMATED_API_KEY: zod_1.z.string().default('default_secret_key'),
     LL_BACKEND_URL: zod_1.z.string().url().default('http://localhost:8080'),
     RISK_DEFAULT_MODE: zod_1.z.enum(['BLOCK', 'ALLOW']).default('ALLOW'),
+    EGRESS_MANAGER_URL: zod_1.z.string().default('http://localhost:8080'),
+    EGRESS_PROXY_HOST: zod_1.z.string().default('localhost'),
+    EGRESS_PROXY_PORT: zod_1.z.coerce.number().default(8888),
+    PROXY_CONTROL_SECRET: zod_1.z.string().default('s8_egress_super_secret_control_key_2026'),
 });
 function validateEnv(config) {
     const result = exports.envSchema.safeParse(config);

@@ -14,6 +14,8 @@ import { AuditEventType } from '../../audit/enums/audit-event.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { RedisKeys } from '../../infrastructure/redis/redis-keys';
+import { Optional } from '@nestjs/common';
+import { EgressService } from '../../egress/egress.service';
 
 @Injectable()
 export class BrokerSessionService {
@@ -24,6 +26,7 @@ export class BrokerSessionService {
     private readonly brokerFactory: BrokerFactory,
     private readonly auditService: AuditService,
     private readonly redisService: RedisService,
+    @Optional() private readonly egressService?: EgressService,
   ) {}
 
   async storeSession(
@@ -43,6 +46,17 @@ export class BrokerSessionService {
       select: { brokerId: true },
     });
 
+    // Ensure Egress IP allocation is ready and cached
+    let egressCreds: any = null;
+    if (this.egressService) {
+      try {
+        egressCreds = await this.egressService.getOrCreateUserEgress(userId);
+        this.logger.log(`[BrokerSession] Egress IP ${egressCreds.publicIp} verified for user ${userId}`);
+      } catch (eErr: any) {
+        this.logger.warn(`[BrokerSession] Egress preparation notice for user ${userId}: ${eErr.message}`);
+      }
+    }
+
     // Write to Redis so resolveBrokerToken finds the token immediately
     if (this.redisService.isHealthy() && session.accessToken) {
       try {
@@ -53,10 +67,11 @@ export class BrokerSessionService {
         const sessionKey = RedisKeys.brokerSession(userId, updatedBroker.brokerId);
         const payload = JSON.stringify({
           accessToken: session.accessToken,
-          proxyIp: fullBroker?.proxyIp || null,
-          proxyPort: fullBroker?.proxyPort || null,
-          proxyUsername: fullBroker?.proxyUsername || null,
-          proxyPassword: fullBroker?.proxyPassword || null,
+          proxyIp: egressCreds?.publicIp || fullBroker?.proxyIp || null,
+          proxyPort: egressCreds?.proxyPort || fullBroker?.proxyPort || null,
+          proxyUsername: egressCreds?.proxyUsername || fullBroker?.proxyUsername || null,
+          proxyPassword: egressCreds?.token || fullBroker?.proxyPassword || null,
+          proxyHostname: egressCreds?.proxyHost || fullBroker?.proxyHostname || null,
         });
         // TTL: seconds until midnight IST (expires with session)
         const midnightIst = new Date();

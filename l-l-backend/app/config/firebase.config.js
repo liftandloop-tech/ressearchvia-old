@@ -34,7 +34,11 @@ const initializeFirebase = () => {
       console.log("Firebase Admin initialized using JSON env.");
 
     } else {
-      throw new Error("Firebase credentials not provided");
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Firebase credentials not provided");
+      }
+      console.warn("⚠️ Firebase credentials not provided. Skipping Firebase Admin initialization in development mode.");
+      return null;
     }
 
     admin.initializeApp({
@@ -44,7 +48,10 @@ const initializeFirebase = () => {
   } catch (error) {
     console.error("❌ Firebase Admin initialization failed:");
     console.error(error.message);
-    process.exit(1); // fail fast in prod
+    if (process.env.NODE_ENV === "production") {
+      process.exit(1); // fail fast in prod
+    }
+    return null;
   }
 
   return admin;
@@ -52,3 +59,4 @@ const initializeFirebase = () => {
 
 const firebaseAdmin = initializeFirebase();
 export default firebaseAdmin;
+

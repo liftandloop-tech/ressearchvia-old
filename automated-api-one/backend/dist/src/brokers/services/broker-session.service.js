@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var BrokerSessionService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BrokerSessionService = void 0;
@@ -19,17 +22,21 @@ const audit_event_enum_1 = require("../../audit/enums/audit-event.enum");
 const schedule_1 = require("@nestjs/schedule");
 const redis_service_1 = require("../../infrastructure/redis/redis.service");
 const redis_keys_1 = require("../../infrastructure/redis/redis-keys");
+const common_2 = require("@nestjs/common");
+const egress_service_1 = require("../../egress/egress.service");
 let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
     prisma;
     brokerFactory;
     auditService;
     redisService;
+    egressService;
     logger = new common_1.Logger(BrokerSessionService_1.name);
-    constructor(prisma, brokerFactory, auditService, redisService) {
+    constructor(prisma, brokerFactory, auditService, redisService, egressService) {
         this.prisma = prisma;
         this.brokerFactory = brokerFactory;
         this.auditService = auditService;
         this.redisService = redisService;
+        this.egressService = egressService;
     }
     async storeSession(userId, brokerCode, session, userBrokerId) {
         const updatedBroker = await this.prisma.userBroker.update({
@@ -41,6 +48,16 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
             },
             select: { brokerId: true },
         });
+        let egressCreds = null;
+        if (this.egressService) {
+            try {
+                egressCreds = await this.egressService.getOrCreateUserEgress(userId);
+                this.logger.log(`[BrokerSession] Egress IP ${egressCreds.publicIp} verified for user ${userId}`);
+            }
+            catch (eErr) {
+                this.logger.warn(`[BrokerSession] Egress preparation notice for user ${userId}: ${eErr.message}`);
+            }
+        }
         if (this.redisService.isHealthy() && session.accessToken) {
             try {
                 const fullBroker = await this.prisma.userBroker.findUnique({
@@ -49,10 +66,11 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
                 const sessionKey = redis_keys_1.RedisKeys.brokerSession(userId, updatedBroker.brokerId);
                 const payload = JSON.stringify({
                     accessToken: session.accessToken,
-                    proxyIp: fullBroker?.proxyIp || null,
-                    proxyPort: fullBroker?.proxyPort || null,
-                    proxyUsername: fullBroker?.proxyUsername || null,
-                    proxyPassword: fullBroker?.proxyPassword || null,
+                    proxyIp: egressCreds?.publicIp || fullBroker?.proxyIp || null,
+                    proxyPort: egressCreds?.proxyPort || fullBroker?.proxyPort || null,
+                    proxyUsername: egressCreds?.proxyUsername || fullBroker?.proxyUsername || null,
+                    proxyPassword: egressCreds?.token || fullBroker?.proxyPassword || null,
+                    proxyHostname: egressCreds?.proxyHost || fullBroker?.proxyHostname || null,
                 });
                 const midnightIst = new Date();
                 midnightIst.setUTCHours(18, 30, 0, 0);
@@ -210,9 +228,11 @@ __decorate([
 ], BrokerSessionService.prototype, "cleanupExpiredAuthStates", null);
 exports.BrokerSessionService = BrokerSessionService = BrokerSessionService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(4, (0, common_2.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         broker_factory_1.BrokerFactory,
         audit_service_1.AuditService,
-        redis_service_1.RedisService])
+        redis_service_1.RedisService,
+        egress_service_1.EgressService])
 ], BrokerSessionService);
 //# sourceMappingURL=broker-session.service.js.map

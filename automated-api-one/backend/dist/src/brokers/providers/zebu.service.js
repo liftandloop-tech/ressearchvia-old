@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var ZebuService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ZebuService = void 0;
@@ -24,6 +27,8 @@ const broker_rate_limiter_service_1 = require("../../infrastructure/redis/broker
 const crypto_1 = require("crypto");
 const prisma_service_1 = require("../../prisma.service");
 const https_proxy_agent_1 = require("https-proxy-agent");
+const egress_service_1 = require("../../egress/egress.service");
+const common_2 = require("@nestjs/common");
 let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_interface_1.BrokerAdapter {
     httpService;
     configService;
@@ -32,10 +37,11 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
     circuitBreaker;
     rateLimiter;
     prisma;
+    egressService;
     logger = new common_1.Logger(ZebuService_1.name);
     isMock;
     baseUrl;
-    constructor(httpService, configService, redisService, metrics, circuitBreaker, rateLimiter, prisma) {
+    constructor(httpService, configService, redisService, metrics, circuitBreaker, rateLimiter, prisma, egressService) {
         super();
         this.httpService = httpService;
         this.configService = configService;
@@ -44,6 +50,7 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         this.circuitBreaker = circuitBreaker;
         this.rateLimiter = rateLimiter;
         this.prisma = prisma;
+        this.egressService = egressService;
         const mockVal = this.configService.get('MOCK_BROKERS', true);
         this.isMock = mockVal === true || mockVal === 'true';
         this.baseUrl =
@@ -71,22 +78,37 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             }
             if (userBroker) {
                 const userId = userBroker.userId;
-                const proxy = userBroker.proxyCredential;
-                if (proxy && proxy.ip && proxy.port && proxy.ip_userid && proxy.ip_password) {
-                    networkMode = 'DEDICATED_PROXY';
-                    const isExpired = proxy.expiresAt && new Date(proxy.expiresAt) < new Date();
-                    if (isExpired || (proxy.status !== 'ACTIVE' && proxy.status !== 'PENDING' && proxy.status !== 'RENEWING')) {
-                        this.logger.error(`[Proxy Violation] requestId=${requestId} Dedicated proxy for user ${userId} is ${proxy.status} (isExpired=${!!isExpired}). Aborting to prevent direct IP leakage.`);
-                        throw new Error(`[Proxy Error] Dedicated proxy is ${proxy.status}${isExpired ? ' (EXPIRED)' : ''}. Aborting broker request to prevent direct IP leakage.`);
+                if (this.egressService) {
+                    try {
+                        httpsAgent = await this.egressService.getProxyAgentForUser(userId);
+                        if (httpsAgent) {
+                            networkMode = 'EGRESS_PROXY';
+                            proxyIp = httpsAgent.proxy?.hostname || 'EGRESS_PROXY';
+                            this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Egress Proxy for user ${userId} [endpoint: ${endpoint}]`);
+                        }
                     }
-                    proxyIp = proxy.ip;
-                    const auth = Buffer.from(`${proxy.ip_userid}:${proxy.ip_password}`).toString('base64');
-                    httpsAgent = new https_proxy_agent_1.HttpsProxyAgent(`http://${proxy.ip}:${proxy.port}`, {
-                        headers: {
-                            'Proxy-Authorization': `Basic ${auth}`,
-                        },
-                    });
-                    this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Dedicated Proxy ${proxy.ip}:${proxy.port} (user: ${proxy.ip_userid}) for user ${userId} [endpoint: ${endpoint}]`);
+                    catch (eErr) {
+                        this.logger.warn(`[Proxy Routing] EgressService proxy notice for user ${userId}: ${eErr.message}`);
+                    }
+                }
+                if (!httpsAgent) {
+                    const proxy = userBroker.proxyCredential;
+                    if (proxy && proxy.ip && proxy.port && proxy.ip_userid && proxy.ip_password) {
+                        networkMode = 'DEDICATED_PROXY';
+                        const isExpired = proxy.expiresAt && new Date(proxy.expiresAt) < new Date();
+                        if (isExpired || (proxy.status !== 'ACTIVE' && proxy.status !== 'PENDING' && proxy.status !== 'RENEWING')) {
+                            this.logger.error(`[Proxy Violation] requestId=${requestId} Dedicated proxy for user ${userId} is ${proxy.status} (isExpired=${!!isExpired}). Aborting to prevent direct IP leakage.`);
+                            throw new Error(`[Proxy Error] Dedicated proxy is ${proxy.status}${isExpired ? ' (EXPIRED)' : ''}. Aborting broker request to prevent direct IP leakage.`);
+                        }
+                        proxyIp = proxy.ip;
+                        const auth = Buffer.from(`${proxy.ip_userid}:${proxy.ip_password}`).toString('base64');
+                        httpsAgent = new https_proxy_agent_1.HttpsProxyAgent(`http://${proxy.ip}:${proxy.port}`, {
+                            headers: {
+                                'Proxy-Authorization': `Basic ${auth}`,
+                            },
+                        });
+                        this.logger.log(`[Proxy Routing] requestId=${requestId} Routing outbound broker call via Dedicated Proxy ${proxy.ip}:${proxy.port} (user: ${proxy.ip_userid}) for user ${userId} [endpoint: ${endpoint}]`);
+                    }
                 }
             }
         }
@@ -793,12 +815,14 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
 exports.ZebuService = ZebuService;
 exports.ZebuService = ZebuService = ZebuService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(7, (0, common_2.Optional)()),
     __metadata("design:paramtypes", [axios_1.HttpService,
         config_1.ConfigService,
         redis_service_1.RedisService,
         metrics_service_1.MetricsService,
         circuit_breaker_service_1.CircuitBreakerService,
         broker_rate_limiter_service_1.BrokerRateLimiterService,
-        prisma_service_1.PrismaService])
+        prisma_service_1.PrismaService,
+        egress_service_1.EgressService])
 ], ZebuService);
 //# sourceMappingURL=zebu.service.js.map

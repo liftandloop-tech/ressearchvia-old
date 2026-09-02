@@ -34,6 +34,7 @@ import { PrismaModule } from './database/prisma/prisma.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { InstrumentsModule } from './instruments/instruments.module';
 import { ProxyManagerModule } from './proxy-manager/proxy-manager.module';
+import { EgressModule } from './egress/egress.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { ProxyManagerModule } from './proxy-manager/proxy-manager.module';
     AnalyticsModule,
     InstrumentsModule,
     ProxyManagerModule,
+    EgressModule,
   ],
   controllers: [AppController],
   providers: [

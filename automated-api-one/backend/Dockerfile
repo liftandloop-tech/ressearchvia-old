@@ -25,8 +25,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /usr/src/app
 
-# Install native packages needed for pg healthchecks
-RUN apk add --no-cache curl postgresql-client
+# Install native packages needed for Prisma binary engines, SSL, and healthchecks
+RUN apk add --no-cache curl postgresql-client openssl libc6-compat
 
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist

@@ -4,13 +4,15 @@ import { BrokerCode } from '@prisma/client';
 import { SessionResponse } from '../interfaces/broker-client.interface';
 import { AuditService } from '../../audit/audit.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
+import { EgressService } from '../../egress/egress.service';
 export declare class BrokerSessionService {
     private readonly prisma;
     private readonly brokerFactory;
     private readonly auditService;
     private readonly redisService;
+    private readonly egressService?;
     private readonly logger;
-    constructor(prisma: PrismaService, brokerFactory: BrokerFactory, auditService: AuditService, redisService: RedisService);
+    constructor(prisma: PrismaService, brokerFactory: BrokerFactory, auditService: AuditService, redisService: RedisService, egressService?: EgressService | undefined);
     storeSession(userId: string, brokerCode: BrokerCode, session: SessionResponse, userBrokerId: string): Promise<void>;
     refreshSession(userId: string, brokerCode: BrokerCode): Promise<SessionResponse>;
     invalidateSession(userId: string, brokerCode: BrokerCode): Promise<void>;

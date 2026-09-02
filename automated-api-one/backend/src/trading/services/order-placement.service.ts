@@ -14,6 +14,8 @@ import { ExecutionContext } from '../interfaces/execution-context.interface';
 import { ConfigService } from '@nestjs/config';
 import { OrderType, OrderStatus, TradeStatus } from '@prisma/client';
 import { RiskService } from '../../risk/risk.service';
+import { EgressService } from '../../egress/egress.service';
+import { Optional } from '@nestjs/common';
 
 import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 
@@ -42,6 +44,7 @@ export class OrderPlacementService {
     private readonly configService: ConfigService,
     private readonly metrics: MetricsService,
     private readonly riskService: RiskService,
+    @Optional() private readonly egressService?: EgressService,
   ) {
     this.brokerTimeoutMs = this.configService.get<number>('BROKER_TIMEOUT_MS', 5000);
   }
@@ -262,6 +265,16 @@ export class OrderPlacementService {
     // Create HttpsProxyAgent helper inside this file or import it
     const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
 
+    // Resolve dedicated egress proxy agent
+    let proxyAgent: any = undefined;
+    if (this.egressService) {
+      try {
+        proxyAgent = await this.egressService.getProxyAgentForUser(userId);
+      } catch (err: any) {
+        this.logger.warn(`[resolveBrokerToken] EgressService proxy resolution note for user ${userId}: ${err.message}`);
+      }
+    }
+
     // 1. Try Redis cache (populated by BrokerSessionService on broker connect/refresh)
     if (this.redisService.isHealthy()) {
       try {
@@ -272,14 +285,17 @@ export class OrderPlacementService {
           const session = JSON.parse(cachedRaw) as { accessToken: string; proxyIp?: string; proxyPort?: number; proxyUsername?: string; proxyPassword?: string };
           if (session?.accessToken) {
             this.logger.debug(`Broker session for user ${userId} resolved from Redis cache`);
-            const agent = createProxyAgent({
-              proxyIp: session.proxyIp || null,
-              proxyPort: session.proxyPort || null,
-              proxyHostname: null,
-              proxyUsername: session.proxyUsername || null,
-              proxyPassword: session.proxyPassword || null,
-            });
-            return { accessToken: session.accessToken, proxyAgent: agent };
+            if (!proxyAgent) {
+              const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+              proxyAgent = createProxyAgent({
+                proxyIp: session.proxyIp || null,
+                proxyPort: session.proxyPort || null,
+                proxyHostname: null,
+                proxyUsername: session.proxyUsername || null,
+                proxyPassword: session.proxyPassword || null,
+              });
+            }
+            return { accessToken: session.accessToken, proxyAgent };
           }
         }
       } catch (err) {
@@ -296,14 +312,17 @@ export class OrderPlacementService {
     this.logger.log(`[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`);
 
     if (userBroker) {
-      const agent = createProxyAgent({
-        proxyIp: userBroker.proxyIp,
-        proxyPort: userBroker.proxyPort,
-        proxyHostname: userBroker.proxyHostname,
-        proxyUsername: userBroker.proxyUsername,
-        proxyPassword: userBroker.proxyPassword,
-      });
-      return { accessToken: userBroker.accessToken, proxyAgent: agent };
+      if (!proxyAgent) {
+        const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+        proxyAgent = createProxyAgent({
+          proxyIp: userBroker.proxyIp,
+          proxyPort: userBroker.proxyPort,
+          proxyHostname: userBroker.proxyHostname,
+          proxyUsername: userBroker.proxyUsername,
+          proxyPassword: userBroker.proxyPassword,
+        });
+      }
+      return { accessToken: userBroker.accessToken, proxyAgent };
     }
 
     return { accessToken: null };

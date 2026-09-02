@@ -9,6 +9,7 @@ import { PositionCacheService } from './position-cache.service';
 import { ExecutionContext } from '../interfaces/execution-context.interface';
 import { ConfigService } from '@nestjs/config';
 import { RiskService } from '../../risk/risk.service';
+import { EgressService } from '../../egress/egress.service';
 import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 export interface PlacementResult {
     success: boolean;
@@ -29,9 +30,10 @@ export declare class OrderPlacementService {
     private readonly configService;
     private readonly metrics;
     private readonly riskService;
+    private readonly egressService?;
     private readonly logger;
     private readonly brokerTimeoutMs;
-    constructor(prisma: PrismaService, brokerFactory: BrokerFactory, circuitBreaker: CircuitBreakerService, rateLimiter: BrokerRateLimiterService, outbox: OutboxService, redisService: RedisService, auditService: AuditService, positionCache: PositionCacheService, configService: ConfigService, metrics: MetricsService, riskService: RiskService);
+    constructor(prisma: PrismaService, brokerFactory: BrokerFactory, circuitBreaker: CircuitBreakerService, rateLimiter: BrokerRateLimiterService, outbox: OutboxService, redisService: RedisService, auditService: AuditService, positionCache: PositionCacheService, configService: ConfigService, metrics: MetricsService, riskService: RiskService, egressService?: EgressService | undefined);
     placeEntryOrder(ctx: ExecutionContext): Promise<PlacementResult>;
     private resolveBrokerToken;
 }

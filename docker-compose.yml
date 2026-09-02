@@ -1,0 +1,179 @@
+version: '3.8'
+
+networks:
+  trading_network:
+    driver: bridge
+    name: trading_network
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: trading-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-trading_platform}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-trading_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - trading_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis
+    command: >
+      sh -c '
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+        else
+          redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+        fi
+      '
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: >
+        sh -c '
+          if [ -n "$$REDIS_PASSWORD" ]; then
+            redis-cli -a "$$REDIS_PASSWORD" ping
+          else
+            redis-cli ping
+          fi
+        '
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - trading_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  egress-proxy:
+    build:
+      context: ./egress-proxy
+      dockerfile: Dockerfile
+    container_name: trading-egress-proxy
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PROXY_DATA_PORT=${PROXY_DATA_PORT:-8888}
+      - PROXY_CONTROL_PORT=${PROXY_CONTROL_PORT:-8889}
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+      - ALLOW_DEV_FALLBACK_IP=${ALLOW_DEV_FALLBACK_IP:-false}
+    ports:
+      - "${PROXY_DATA_PORT:-8888}:8888"
+      - "${PROXY_CONTROL_PORT:-8889}:8889"
+    restart: unless-stopped
+    networks:
+      - trading_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  egress-manager:
+    build:
+      context: ./egress-manager
+      dockerfile: Dockerfile
+    container_name: trading-egress-manager
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - EGRESS_MANAGER_PORT=${EGRESS_MANAGER_PORT:-8080}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
+      - EGRESS_PROXY_CONTROL_URL=http://egress-proxy:${PROXY_CONTROL_PORT:-8889}
+      - EGRESS_PROXY_DATA_HOST=egress-proxy
+      - EGRESS_PROXY_DATA_PORT=${PROXY_DATA_PORT:-8888}
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+    ports:
+      - "${EGRESS_MANAGER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      egress-proxy:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - trading_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ./automated-api-one/backend
+      dockerfile: Dockerfile
+    container_name: trading-api
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_that_is_at_least_eight_chars}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-super_secret_jwt_refresh_key_that_is_long}
+      - MOCK_BROKERS=${MOCK_BROKERS:-false}
+      - AUTOMATED_API_KEY=${AUTOMATED_API_KEY:-default_secret_key}
+      - LL_BACKEND_URL=${LL_BACKEND_URL:-http://localhost:8080}
+      - EGRESS_MANAGER_URL=http://egress-manager:8080
+      - EGRESS_PROXY_HOST=egress-proxy
+      - EGRESS_PROXY_PORT=${PROXY_DATA_PORT:-8888}
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+      - ANGEL_ONE_API_KEY=${ANGEL_ONE_API_KEY:-}
+      - ANGEL_ONE_REDIRECT_URL=${ANGEL_ONE_REDIRECT_URL:-}
+      - MSG91_API_KEY=${MSG91_API_KEY:-}
+      - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
+      - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      egress-manager:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - trading_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    name: trading_postgres_data
+  redis_data:
+    name: trading_redis_data

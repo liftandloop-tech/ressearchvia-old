@@ -40,6 +40,10 @@ export const envSchema = z.object({
   AUTOMATED_API_KEY: z.string().default('default_secret_key'),
   LL_BACKEND_URL: z.string().url().default('http://localhost:8080'),
   RISK_DEFAULT_MODE: z.enum(['BLOCK', 'ALLOW']).default('ALLOW'),
+  EGRESS_MANAGER_URL: z.string().default('http://localhost:8080'),
+  EGRESS_PROXY_HOST: z.string().default('localhost'),
+  EGRESS_PROXY_PORT: z.coerce.number().default(8888),
+  PROXY_CONTROL_SECRET: z.string().default('s8_egress_super_secret_control_key_2026'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

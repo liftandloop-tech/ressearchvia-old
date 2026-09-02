@@ -131,6 +131,29 @@ async function seed(client) {
             status: client_1.UserStatus.ACTIVE,
         },
     });
+    const defaultIps = [
+        { publicIp: '103.10.10.1', interface: 'eth0' },
+        { publicIp: '103.10.10.2', interface: 'eth0' },
+        { publicIp: '103.10.10.3', interface: 'eth0' },
+        { publicIp: '103.10.10.4', interface: 'eth0' },
+        { publicIp: '103.10.10.5', interface: 'eth0' },
+    ];
+    if (db.ipPool) {
+        for (const ipEntry of defaultIps) {
+            await db.ipPool.upsert({
+                where: { publicIp: ipEntry.publicIp },
+                update: {
+                    interface: ipEntry.interface,
+                },
+                create: {
+                    publicIp: ipEntry.publicIp,
+                    interface: ipEntry.interface,
+                    status: 'AVAILABLE',
+                    isHealthy: true,
+                },
+            });
+        }
+    }
 }
 if (require.main === module) {
     seed()
