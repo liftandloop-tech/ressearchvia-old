@@ -17,6 +17,8 @@ class App extends StatelessWidget {
       getPages: appPages,
       initialBinding: InitialBinding(),
       theme: AppTheme.lightTheme,
+      defaultTransition: Transition.noTransition,
+      transitionDuration: Duration.zero,
     );
   }
 }

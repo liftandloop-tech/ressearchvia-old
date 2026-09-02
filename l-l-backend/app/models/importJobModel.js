@@ -37,7 +37,7 @@ const importJobSchema = new mongoose.Schema({
         leadPoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'leadPool', default: null }
     },
     completedAt: { type: Date, default: null }
-}, { timestamps: true, versionKey: false });
+}, { timestamps: true, versionKey: false, suppressReservedKeysWarning: true });
 
 const importJobModel = mongoose.model("importJob", importJobSchema);
 export default importJobModel;

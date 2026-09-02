@@ -15,10 +15,9 @@ class PendingBankTransfersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (specificTab != null) {
-      Get.delete<PendingBankTransfersController>();
-    }
-    final controller = Get.put(PendingBankTransfersController());
+    final controller = Get.isRegistered<PendingBankTransfersController>()
+        ? Get.find<PendingBankTransfersController>()
+        : Get.put(PendingBankTransfersController());
 
     final content = specificTab == 1
         ? _buildKycTab(controller)

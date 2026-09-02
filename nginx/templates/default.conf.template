@@ -1,0 +1,118 @@
+# ==============================================================================
+# Domain 1: Main Backend API (l-l-backend)
+# ==============================================================================
+server {
+    listen 80;
+    server_name ${DOMAIN_BACKEND};
+
+    client_max_body_size 100M;
+
+    # Let's Encrypt ACME challenge endpoint
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Main API Routing & Static File Uploads
+    location / {
+        proxy_pass http://ll-backend:8080;
+        proxy_http_version 1.1;
+
+        # Standard Proxy Headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Timeouts for heavy reports / lead processing
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Buffer adjustments for larger uploads
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+
+# ==============================================================================
+# Domain 2: Admin Panel Web Frontend (spresearchvia-admin-panel)
+# ==============================================================================
+server {
+    listen 80;
+    server_name ${DOMAIN_ADMIN};
+
+    client_max_body_size 20M;
+
+    # Let's Encrypt ACME challenge endpoint
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Flutter Web SPA Frontend
+    location / {
+        proxy_pass http://admin-panel:80;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ==============================================================================
+# Domain 3: Automated Trading API (automated-api-one)
+# ==============================================================================
+server {
+    listen 80;
+    server_name ${DOMAIN_AUTOMATED_API};
+
+    client_max_body_size 50M;
+
+    # Let's Encrypt ACME challenge endpoint
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # API Endpoints, Swagger Docs & WebSockets
+    location / {
+        proxy_pass http://automated-api:3000;
+        proxy_http_version 1.1;
+
+        # WebSockets support
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        # Standard Proxy Headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket & long-lived streaming connections
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 86400s;
+        proxy_read_timeout 86400s;
+    }
+}
+
+# ==============================================================================
+# Catch-all Default Server Block
+# ==============================================================================
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /health {
+        access_log off;
+        return 200 "gateway-healthy\n";
+    }
+
+    location / {
+        return 404 "Error 404: No virtual host configured for this hostname on the gateway.\n";
+    }
+}

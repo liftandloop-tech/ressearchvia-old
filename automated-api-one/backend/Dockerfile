@@ -36,5 +36,9 @@ COPY --from=builder /usr/src/app/prisma ./prisma
 EXPOSE 3000
 
 ENV NODE_ENV=production
+ENV PORT=3000
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://127.0.0.1:3000/health || exit 1
 
 CMD ["node", "dist/src/main.js"]

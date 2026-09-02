@@ -1832,8 +1832,12 @@ export const expireAbandonedIntents = async (thresholdMinutes = 10) => {
             // Check if it's a network error that we should retry
             const isNetworkError = error.name === 'MongoNetworkError' ||
                 error.name === 'MongoServerSelectionError' ||
+                error.name === 'PoolClearedOnNetworkError' ||
+                error.name === 'MongoNetworkTimeoutError' ||
                 error.message.includes('ECONNRESET') ||
-                error.message.includes('ETIMEDOUT');
+                error.message.includes('ETIMEDOUT') ||
+                error.message.includes('PoolClearedOnNetworkError') ||
+                error.message.includes('monitor timeout');
 
             if (isNetworkError && attempt < maxRetries) {
                 const delay = attempt * 2000;

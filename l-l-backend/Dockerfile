@@ -29,9 +29,15 @@ COPY --from=builder /usr/src/app/prisma ./prisma
 COPY --from=builder /usr/src/app/app ./app
 COPY --from=builder /usr/src/app/server.js ./server.js
 
+# Ensure standard upload directory hierarchy exists
+RUN mkdir -p app/uploads/kycimg app/uploads/kycvid app/uploads/reports app/uploads/qrcodes
+
 EXPOSE 8080
 
 ENV NODE_ENV=production
 ENV PORT=8080
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://127.0.0.1:8080/api/health || curl -f http://127.0.0.1:8080/ || exit 1
 
 CMD ["node", "server.js"]

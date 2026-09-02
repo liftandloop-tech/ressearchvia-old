@@ -1,0 +1,114 @@
+# ==============================================================================
+# Production SSL / HTTPS Configuration Template
+# To activate SSL:
+# 1. Obtain certs using certbot or mount your SSL certs into /etc/letsencrypt/live/
+# 2. Rename this file or include it in nginx/templates/default.conf.template
+# ==============================================================================
+
+# HTTP to HTTPS Global Redirect
+server {
+    listen 80;
+    server_name ${DOMAIN_BACKEND} ${DOMAIN_ADMIN} ${DOMAIN_AUTOMATED_API};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ------------------------------------------------------------------------------
+# 1. Main Backend API (HTTPS)
+# ------------------------------------------------------------------------------
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN_BACKEND};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_BACKEND}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_BACKEND}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://ll-backend:8080;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}
+
+# ------------------------------------------------------------------------------
+# 2. Admin Panel Web Frontend (HTTPS)
+# ------------------------------------------------------------------------------
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN_ADMIN};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_ADMIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_ADMIN}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://admin-panel:80;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+
+# ------------------------------------------------------------------------------
+# 3. Automated Trading API (HTTPS + WebSockets)
+# ------------------------------------------------------------------------------
+server {
+    listen 443 ssl http2;
+    server_name ${DOMAIN_AUTOMATED_API};
+
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN_AUTOMATED_API}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN_AUTOMATED_API}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://automated-api:3000;
+        proxy_http_version 1.1;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 86400s;
+        proxy_read_timeout 86400s;
+    }
+}

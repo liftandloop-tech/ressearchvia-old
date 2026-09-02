@@ -1,0 +1,8 @@
+.git
+.gitignore
+.dart_tool
+.idea
+.vscode
+*.log
+.DS_Store
+build/

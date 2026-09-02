@@ -58,15 +58,16 @@ class ReportController extends GetxController {
 
       categories.value = result;
 
-      // Fetch all plans to populate plan dropdown
+      // Fetch all plans in parallel to populate plan dropdown
       final plansMap = <String, Map<String, dynamic>>{};
-      for (var segment in result) {
+      final planFutures = result.map((segment) async {
         final segmentId = segment['_id'];
+        if (segmentId == null) return;
         try {
           final plans = await _segmentService.getPlansBySegment(segmentId);
           for (var plan in plans) {
             final id = plan['_id'] ?? plan['id'];
-            if (!plansMap.containsKey(id)) {
+            if (id != null && !plansMap.containsKey(id)) {
               plansMap[id] = {
                 'id': id,
                 'name': plan['planName'] ?? 'Unknown Plan',
@@ -76,7 +77,8 @@ class ReportController extends GetxController {
         } catch (e) {
           debugPrint('Debug: Error fetching plans for $segmentId: $e');
         }
-      }
+      });
+      await Future.wait(planFutures);
       final sortedPlans = plansMap.values.toList();
       sortedPlans.sort(
         (a, b) => (a['name'] ?? '').toString().toLowerCase().compareTo(

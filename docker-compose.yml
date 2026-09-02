@@ -1,20 +1,295 @@
 version: '3.8'
 
 networks:
-  trading_network:
+  app_network:
     driver: bridge
-    name: trading_network
+    name: app_network
 
 services:
+  # ==============================================================================
+  # INGRESS REVERSE PROXY & GATEWAY
+  # The ONLY service exposing public host ports (80 / 443).
+  # Directs domain traffic to the 3 public services:
+  #   - DOMAIN_BACKEND       -> ll-backend:8080
+  #   - DOMAIN_ADMIN         -> admin-panel:80
+  #   - DOMAIN_AUTOMATED_API -> automated-api:3000
+  # ==============================================================================
+  gateway:
+    image: nginx:alpine
+    container_name: trading-gateway
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      - DOMAIN_BACKEND=${DOMAIN_BACKEND:-api.local}
+      - DOMAIN_ADMIN=${DOMAIN_ADMIN:-admin.local}
+      - DOMAIN_AUTOMATED_API=${DOMAIN_AUTOMATED_API:-trade.local}
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - ll-backend
+      - admin-panel
+      - automated-api
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ==============================================================================
+  # PUBLIC SERVICE 1: MAIN BACKEND (l-l-backend)
+  # Accessible from outside only via DOMAIN_BACKEND through Gateway.
+  # Uses internal Docker networking for DB, Redis, Mongo, and automated-api.
+  # ==============================================================================
+  ll-backend:
+    build:
+      context: ./l-l-backend
+      dockerfile: Dockerfile
+    container_name: trading-ll-backend
+    expose:
+      - "8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=${NODE_ENV:-production}
+      - BASE_URL=${BASE_URL:-http://${DOMAIN_BACKEND:-api.local}}
+      - ALLOW_ACCESS_ORIGIN=${ALLOW_ACCESS_ORIGIN:-*}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
+      - DB_URL=${MONGO_DB_URL:-mongodb://mongo:27017/researchvia}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_TOKEN=${JWT_TOKEN:-your_jwt_secret_must_be_long_and_secure}
+      - AUTOMATED_API_KEY=${AUTOMATED_API_KEY:-default_secret_key}
+      - CURRENCY=${CURRENCY:-INR}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - FIREBASE_SERVICE_ACCOUNT_BASE64=${FIREBASE_SERVICE_ACCOUNT_BASE64:-}
+      - FIREBASE_SERVICE_ACCOUNT_JSON=${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_SERVICE_SID=${TWILIO_SERVICE_SID:-}
+    volumes:
+      - ll_backend_uploads:/usr/src/app/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ==============================================================================
+  # PUBLIC SERVICE 2: ADMIN PANEL WEB (spresearchvia-admin-panel)
+  # Flutter Web served via high-performance Nginx static server.
+  # Accessible from outside only via DOMAIN_ADMIN through Gateway.
+  # ==============================================================================
+  admin-panel:
+    build:
+      context: ./spresearchvia-admin-panel
+      dockerfile: Dockerfile
+      args:
+        - API_BASE_URL=https://${DOMAIN_BACKEND:-api.local}/api
+        - AUTOMATED_API_BASE_URL=https://${DOMAIN_AUTOMATED_API:-trade.local}
+    container_name: trading-admin-panel
+    expose:
+      - "80"
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==============================================================================
+  # PUBLIC SERVICE 3: AUTOMATED TRADING API (automated-api-one)
+  # Accessible from outside only via DOMAIN_AUTOMATED_API through Gateway.
+  # Communicates internally with postgres, redis, egress-manager, and ll-backend.
+  # ==============================================================================
+  automated-api:
+    build:
+      context: ./automated-api-one/backend
+      dockerfile: Dockerfile
+    container_name: trading-automated-api
+    expose:
+      - "3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_that_is_at_least_eight_chars}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-super_secret_jwt_refresh_key_that_is_long}
+      - MOCK_BROKERS=${MOCK_BROKERS:-false}
+      - AUTOMATED_API_KEY=${AUTOMATED_API_KEY:-default_secret_key}
+      - LL_BACKEND_URL=http://ll-backend:8080
+      - EGRESS_MANAGER_URL=http://egress-manager:8080
+      - EGRESS_PROXY_HOST=egress-proxy
+      - EGRESS_PROXY_PORT=8888
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+      - ANGEL_ONE_API_KEY=${ANGEL_ONE_API_KEY:-}
+      - ANGEL_ONE_REDIRECT_URL=${ANGEL_ONE_REDIRECT_URL:-}
+      - MSG91_API_KEY=${MSG91_API_KEY:-}
+      - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
+      - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      egress-manager:
+        condition: service_started
+      ll-backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ==============================================================================
+  # INTERNAL SERVICE: AUTOMATED WORKER (Queue / Signal / Order Processing)
+  # Internal-only background worker for automated trading engine.
+  # ==============================================================================
+  automated-worker:
+    build:
+      context: ./automated-api-one/backend
+      dockerfile: Dockerfile
+    container_name: trading-automated-worker
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - CONTAINER_ROLE=worker
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - AUTOMATED_API_KEY=${AUTOMATED_API_KEY:-default_secret_key}
+      - LL_BACKEND_URL=http://ll-backend:8080
+      - EGRESS_MANAGER_URL=http://egress-manager:8080
+      - EGRESS_PROXY_HOST=egress-proxy
+      - EGRESS_PROXY_PORT=8888
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      egress-manager:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ==============================================================================
+  # INTERNAL SERVICE: EGRESS MANAGER
+  # Internal-only. Manages outbound broker IPs and proxy credentials.
+  # ==============================================================================
+  egress-manager:
+    build:
+      context: ./egress-manager
+      dockerfile: Dockerfile
+    container_name: trading-egress-manager
+    expose:
+      - "8080"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - EGRESS_MANAGER_PORT=8080
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
+      - EGRESS_PROXY_CONTROL_URL=http://egress-proxy:8889
+      - EGRESS_PROXY_DATA_HOST=egress-proxy
+      - EGRESS_PROXY_DATA_PORT=8888
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      egress-proxy:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==============================================================================
+  # INTERNAL SERVICE: EGRESS PROXY
+  # Internal-only. Routes broker HTTP/HTTPS traffic through verified IPs.
+  # ==============================================================================
+  egress-proxy:
+    build:
+      context: ./egress-proxy
+      dockerfile: Dockerfile
+    container_name: trading-egress-proxy
+    expose:
+      - "8888"
+      - "8889"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PROXY_DATA_PORT=8888
+      - PROXY_CONTROL_PORT=8889
+      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
+      - ALLOW_DEV_FALLBACK_IP=${ALLOW_DEV_FALLBACK_IP:-false}
+    restart: unless-stopped
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==============================================================================
+  # INTERNAL SERVICE: POSTGRESQL DATABASE
+  # Internal-only. Stores trading platform and business records. No public host port.
+  # ==============================================================================
   postgres:
     image: postgres:15-alpine
     container_name: trading-postgres
+    expose:
+      - "5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
       POSTGRES_DB: ${POSTGRES_DB:-trading_platform}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,28 +299,32 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - trading_network
+      - app_network
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
+  # ==============================================================================
+  # INTERNAL SERVICE: REDIS
+  # Internal-only. In-memory caching and BullMQ job queues. No public host port.
+  # ==============================================================================
   redis:
     image: redis:7-alpine
     container_name: trading-redis
+    expose:
+      - "6379"
     command: >
       sh -c '
         if [ -n "$$REDIS_PASSWORD" ]; then
-          redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+          redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory 1gb --maxmemory-policy noeviction
         else
-          redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+          redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy noeviction
         fi
       '
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -62,118 +341,46 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - trading_network
+      - app_network
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  egress-proxy:
-    build:
-      context: ./egress-proxy
-      dockerfile: Dockerfile
-    container_name: trading-egress-proxy
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PROXY_DATA_PORT=${PROXY_DATA_PORT:-8888}
-      - PROXY_CONTROL_PORT=${PROXY_CONTROL_PORT:-8889}
-      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
-      - ALLOW_DEV_FALLBACK_IP=${ALLOW_DEV_FALLBACK_IP:-false}
-    ports:
-      - "${PROXY_DATA_PORT:-8888}:8888"
-      - "${PROXY_CONTROL_PORT:-8889}:8889"
+  # ==============================================================================
+  # INTERNAL SERVICE: MONGODB DATABASE
+  # Internal-only. Stores document collections for legacy services. No public host port.
+  # ==============================================================================
+  mongo:
+    image: mongo:7-jammy
+    container_name: trading-mongo
+    expose:
+      - "27017"
+    volumes:
+      - mongo_data:/data/db
     restart: unless-stopped
     networks:
-      - trading_network
+      - app_network
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  egress-manager:
-    build:
-      context: ./egress-manager
-      dockerfile: Dockerfile
-    container_name: trading-egress-manager
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - EGRESS_MANAGER_PORT=${EGRESS_MANAGER_PORT:-8080}
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
-      - EGRESS_PROXY_CONTROL_URL=http://egress-proxy:${PROXY_CONTROL_PORT:-8889}
-      - EGRESS_PROXY_DATA_HOST=egress-proxy
-      - EGRESS_PROXY_DATA_PORT=${PROXY_DATA_PORT:-8888}
-      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
-    ports:
-      - "${EGRESS_MANAGER_PORT:-8080}:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      egress-proxy:
-        condition: service_started
-    restart: unless-stopped
-    networks:
-      - trading_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  api:
-    build:
-      context: ./automated-api-one/backend
-      dockerfile: Dockerfile
-    container_name: trading-api
-    ports:
-      - "${PORT:-3000}:3000"
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - JWT_SECRET=${JWT_SECRET:-super_secret_jwt_key_that_is_at_least_eight_chars}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-super_secret_jwt_refresh_key_that_is_long}
-      - MOCK_BROKERS=${MOCK_BROKERS:-false}
-      - AUTOMATED_API_KEY=${AUTOMATED_API_KEY:-default_secret_key}
-      - LL_BACKEND_URL=${LL_BACKEND_URL:-http://localhost:8080}
-      - EGRESS_MANAGER_URL=http://egress-manager:8080
-      - EGRESS_PROXY_HOST=egress-proxy
-      - EGRESS_PROXY_PORT=${PROXY_DATA_PORT:-8888}
-      - PROXY_CONTROL_SECRET=${PROXY_CONTROL_SECRET:-s8_egress_super_secret_control_key_2026}
-      - ANGEL_ONE_API_KEY=${ANGEL_ONE_API_KEY:-}
-      - ANGEL_ONE_REDIRECT_URL=${ANGEL_ONE_REDIRECT_URL:-}
-      - MSG91_API_KEY=${MSG91_API_KEY:-}
-      - FCM_PROJECT_ID=${FCM_PROJECT_ID:-}
-      - FCM_PRIVATE_KEY=${FCM_PRIVATE_KEY:-}
-      - RESEND_API_KEY=${RESEND_API_KEY:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      egress-manager:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - trading_network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
+# ==============================================================================
+# PERSISTENT VOLUMES
+# ==============================================================================
 volumes:
   postgres_data:
     name: trading_postgres_data
   redis_data:
     name: trading_redis_data
+  mongo_data:
+    name: trading_mongo_data
+  ll_backend_uploads:
+    name: trading_ll_backend_uploads
+  certbot_www:
+    name: trading_certbot_www
+  certbot_certs:
+    name: trading_certbot_certs

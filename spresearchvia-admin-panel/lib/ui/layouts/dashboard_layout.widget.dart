@@ -22,11 +22,13 @@ class DashboardLayout extends StatelessWidget {
           children: [
             DashboardHeader(controller: controller),
             Expanded(
-              child: Column(
-                children: [
-                  Expanded(child: child),
-                  const Footer(),
-                ],
+              child: ClipRect(
+                child: Column(
+                  children: [
+                    Expanded(child: child),
+                    const Footer(),
+                  ],
+                ),
               ),
             ),
           ],
