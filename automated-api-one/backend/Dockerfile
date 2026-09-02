@@ -41,4 +41,4 @@ ENV PORT=3000
 HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://127.0.0.1:3000/health || exit 1
 
-CMD ["node", "dist/src/main.js"]
+CMD ["sh", "-c", "if [ -f dist/main.js ]; then node dist/main.js; elif [ -f dist/src/main.js ]; then node dist/src/main.js; else node dist/main; fi"]
