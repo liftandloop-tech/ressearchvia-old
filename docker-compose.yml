@@ -57,10 +57,12 @@ services:
     container_name: trading-ll-backend
     expose:
       - "8080"
+    env_file:
+      - .env
     environment:
       - PORT=8080
       - NODE_ENV=${NODE_ENV:-production}
-      - BASE_URL=${BASE_URL:-http://${DOMAIN_BACKEND:-api.local}}
+      - BASE_URL=${BASE_URL:-https://${DOMAIN_BACKEND:-api.local}}
       - ALLOW_ACCESS_ORIGIN=${ALLOW_ACCESS_ORIGIN:-*}
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-trading_platform}?schema=public
       - DB_URL=${MONGO_DB_URL:-mongodb://mongo:27017/researchvia}
@@ -131,6 +133,8 @@ services:
     container_name: trading-automated-api
     expose:
       - "3000"
+    env_file:
+      - .env
     environment:
       - PORT=3000
       - NODE_ENV=${NODE_ENV:-production}
@@ -186,6 +190,8 @@ services:
       context: ./automated-api-one/backend
       dockerfile: Dockerfile
     container_name: trading-automated-worker
+    env_file:
+      - .env
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - CONTAINER_ROLE=worker
@@ -226,6 +232,8 @@ services:
     container_name: trading-egress-manager
     expose:
       - "8080"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - EGRESS_MANAGER_PORT=8080
@@ -260,6 +268,8 @@ services:
     expose:
       - "8888"
       - "8889"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PROXY_DATA_PORT=8888
