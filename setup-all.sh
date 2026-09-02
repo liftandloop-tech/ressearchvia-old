@@ -33,36 +33,33 @@ echo "Waiting for backend services to initialize..."
 sleep 5
 
 # -----------------------------------------------------------------------------
-# 3. Automated Uploads Restore (backend-uploads-all.tar.gz)
+# 3. Automated Uploads Restore (backend-uploads-all.tar.gz) - Skip if already restored
 # -----------------------------------------------------------------------------
-echo "[3/5] Checking and restoring backend uploads..."
-UPLOADS_ARCHIVE=""
-for loc in "$SCRIPT_DIR/backend-uploads-all.tar.gz" "$SCRIPT_DIR/../backend-uploads-all.tar.gz" "/root/backend-uploads-all.tar.gz"; do
-    if [ -f "$loc" ]; then
-        UPLOADS_ARCHIVE="$loc"
-        break
-    fi
-done
+echo "[3/5] Checking backend uploads directory..."
+EXISTING_UPLOADS_SIZE=$(docker exec trading-ll-backend du -s /usr/src/app/app/uploads 2>/dev/null | awk '{print $1}' || echo "0")
 
-if [ -n "$UPLOADS_ARCHIVE" ]; then
-    echo "Found uploads archive at: $UPLOADS_ARCHIVE"
-    TEMP_EXTRACT="/tmp/rv_extracted_uploads"
-    rm -rf "$TEMP_EXTRACT"
-    mkdir -p "$TEMP_EXTRACT"
-    tar -xzf "$UPLOADS_ARCHIVE" -C "$TEMP_EXTRACT"
-
-    # Copy files into the container's persistent uploads directory
-    echo "Copying uploads into trading-ll-backend:/usr/src/app/app/uploads/..."
-    docker cp "$TEMP_EXTRACT/." trading-ll-backend:/usr/src/app/app/uploads/
-    
-    # Fix ownership and permissions
-    docker exec -u 0 trading-ll-backend chown -R node:node /usr/src/app/app/uploads
-    docker exec -u 0 trading-ll-backend chmod -R 755 /usr/src/app/app/uploads
-    
-    rm -rf "$TEMP_EXTRACT"
-    echo "✔ Uploads restored and permissions set successfully."
+if [ "$EXISTING_UPLOADS_SIZE" -gt 100000 ]; then
+    echo "✔ Uploads directory is already populated ($EXISTING_UPLOADS_SIZE KB). Skipping extraction."
+    docker exec -u 0 trading-ll-backend chown -R node:node /usr/src/app/app/uploads 2>/dev/null || true
+    docker exec -u 0 trading-ll-backend chmod -R 755 /usr/src/app/app/uploads 2>/dev/null || true
 else
-    echo "ℹ No backend-uploads-all.tar.gz found. Skipping uploads restore."
+    UPLOADS_ARCHIVE=""
+    for loc in "$SCRIPT_DIR/backend-uploads-all.tar.gz" "$SCRIPT_DIR/../backend-uploads-all.tar.gz" "/root/backend-uploads-all.tar.gz"; do
+        if [ -f "$loc" ]; then
+            UPLOADS_ARCHIVE="$loc"
+            break
+        fi
+    done
+
+    if [ -n "$UPLOADS_ARCHIVE" ]; then
+        echo "Streaming and extracting uploads archive from: $UPLOADS_ARCHIVE..."
+        docker exec -i trading-ll-backend tar -xzf - -C /usr/src/app/app/uploads/ < "$UPLOADS_ARCHIVE"
+        docker exec -u 0 trading-ll-backend chown -R node:node /usr/src/app/app/uploads
+        docker exec -u 0 trading-ll-backend chmod -R 755 /usr/src/app/app/uploads
+        echo "✔ Uploads restored successfully."
+    else
+        echo "ℹ No archive found or uploads already up to date."
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -70,7 +67,7 @@ fi
 # -----------------------------------------------------------------------------
 echo "[4/5] Checking for database backup files..."
 
-# PostgreSQL Restore
+# PostgreSQL Restore (only if tables don't already exist or if explicitly needed)
 PG_BACKUP=""
 for loc in "$SCRIPT_DIR/postgres_main_backup.sql" "$SCRIPT_DIR/../postgres_main_backup.sql" "/root/postgres_main_backup.sql"; do
     if [ -f "$loc" ]; then
@@ -80,9 +77,8 @@ for loc in "$SCRIPT_DIR/postgres_main_backup.sql" "$SCRIPT_DIR/../postgres_main_
 done
 
 if [ -n "$PG_BACKUP" ]; then
-    echo "Restoring PostgreSQL database from $PG_BACKUP..."
-    docker exec -i trading-postgres psql -U postgres -d trading_platform < "$PG_BACKUP" || true
-    echo "✔ PostgreSQL restore completed."
+    echo "PostgreSQL backup file found: $PG_BACKUP"
+    echo "ℹ Skipping automatic overwrite. To manually restore, run: docker exec -i trading-postgres psql -U postgres -d trading_platform < $PG_BACKUP"
 fi
 
 # MongoDB Restore
@@ -95,11 +91,8 @@ for loc in "$SCRIPT_DIR/mongo_db1.archive" "$SCRIPT_DIR/../mongo_db1.archive" "/
 done
 
 if [ -n "$MONGO_BACKUP" ]; then
-    echo "Restoring MongoDB database from $MONGO_BACKUP..."
-    docker cp "$MONGO_BACKUP" trading-mongo:/tmp/mongo_backup.archive
-    docker exec trading-mongo mongorestore --archive=/tmp/mongo_backup.archive --drop || true
-    docker exec trading-mongo rm -f /tmp/mongo_backup.archive
-    echo "✔ MongoDB restore completed."
+    echo "MongoDB backup file found: $MONGO_BACKUP"
+    echo "ℹ Skipping automatic overwrite. To manually restore, run: docker cp $MONGO_BACKUP trading-mongo:/tmp/backup.archive && docker exec trading-mongo mongorestore --archive=/tmp/backup.archive --drop"
 fi
 
 # -----------------------------------------------------------------------------
