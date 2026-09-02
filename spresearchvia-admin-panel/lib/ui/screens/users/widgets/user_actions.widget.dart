@@ -16,9 +16,9 @@ class UserActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final authController = Get.find<AuthController>();
     final canManageSubscription = (authController.user.value?.isAdmin == true) ||
-        (authController.user.value?.has('subscriptions.view') ?? false) ||
         (authController.user.value?.has('subscriptions.activate') ?? false) ||
-        (authController.user.value?.has('users.update') ?? false);
+        (authController.user.value?.has('subscriptions.revoke') ?? false) ||
+        (authController.user.value?.has('subscriptions.view') ?? false);
     final canEditUser = (authController.user.value?.isAdmin == true) ||
         (authController.user.value?.has('users.update') ?? false);
 

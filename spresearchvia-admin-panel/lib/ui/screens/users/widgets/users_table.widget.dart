@@ -29,9 +29,9 @@ class UsersTable extends StatelessWidget {
       final authController = Get.find<AuthController>();
       final isDirector = authController.user.value?.isDirector ?? false;
       final canManageSubscription = (authController.user.value?.isAdmin == true) ||
-          (authController.user.value?.has('subscriptions.view') ?? false) ||
           (authController.user.value?.has('subscriptions.activate') ?? false) ||
-          (authController.user.value?.has('users.update') ?? false);
+          (authController.user.value?.has('subscriptions.revoke') ?? false) ||
+          (authController.user.value?.has('subscriptions.view') ?? false);
       final users = controller.filteredUsers;
       final totalCount = userManagementController.totalCount.value;
       final pageSize = userManagementController.pageSize.value;

@@ -214,6 +214,10 @@ class UserModel {
                           (actList.contains('read') || actList.contains('view') || actList.contains('settings.view'))) {
                         return true;
                       }
+                      if (requiredKey.startsWith('subscriptions') &&
+                          (actList.contains('read') || actList.contains('view') || actList.contains('subscriptions.view') || actList.contains('subscriptions.activate'))) {
+                        return true;
+                      }
                     }
 
                     // Fallback check if feature and action were provided
