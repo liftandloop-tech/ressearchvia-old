@@ -1,6 +1,6 @@
 [phases.setup]
 nixpkgsArchive = "nixos-unstable"
-nixPkgs = ["flutter"]
+nixPkgs = ["flutter", "nodejs", "nodePackages.serve"]
 
 [phases.install]
 cmds = [
@@ -14,3 +14,6 @@ cmds = [
   "mkdir -p dist",
   "cp -r build/web/* dist/"
 ]
+
+[start]
+cmd = "serve -s dist -l ${PORT:-80}"

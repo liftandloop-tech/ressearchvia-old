@@ -6,5 +6,4 @@ node_modules
 !.env.example
 .DS_Store
 *.md
-spresearchvia-admin-panel
 spresearchvia-app

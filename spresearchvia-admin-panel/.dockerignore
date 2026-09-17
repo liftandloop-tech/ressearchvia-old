@@ -1,8 +1,13 @@
 .git
 .gitignore
-.dart_tool
-.idea
-.vscode
+.dart_tool/
+.idea/
+.vscode/
 *.log
 .DS_Store
 build/
+flutter_windows_3.47.2-stable/
+flutter/
+*.bat
+.flutter-plugins
+.flutter-plugins-dependencies

@@ -14,7 +14,8 @@ server {
 
     # Main API Routing & Static File Uploads
     location / {
-        proxy_pass http://ll-backend:8080;
+        set $backend_upstream http://ll-backend:8080;
+        proxy_pass $backend_upstream;
         proxy_http_version 1.1;
 
         # Standard Proxy Headers
@@ -50,7 +51,8 @@ server {
 
     # Flutter Web SPA Frontend
     location / {
-        proxy_pass http://admin-panel:80;
+        set $admin_upstream http://admin-panel:80;
+        proxy_pass $admin_upstream;
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;
@@ -76,7 +78,8 @@ server {
 
     # API Endpoints, Swagger Docs & WebSockets
     location / {
-        proxy_pass http://automated-api:3000;
+        set $automated_upstream http://automated-api:3000;
+        proxy_pass $automated_upstream;
         proxy_http_version 1.1;
 
         # WebSockets support
