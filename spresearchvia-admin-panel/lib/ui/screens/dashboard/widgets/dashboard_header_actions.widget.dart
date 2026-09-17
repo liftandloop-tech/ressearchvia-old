@@ -48,20 +48,37 @@ class DashboardHeaderActions extends StatelessWidget {
                   horizontal: 16,
                 ),
                 decoration: BoxDecoration(
+                  color: authController.isImpersonating.value
+                      ? const Color(0xFFFEF3C7)
+                      : Colors.transparent,
                   border: Border.all(
-                    color: AppTheme.primaryBlue.withOpacity(0.2),
+                    color: authController.isImpersonating.value
+                        ? const Color(0xFFF59E0B)
+                        : AppTheme.primaryBlue.withOpacity(0.2),
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.logout, color: AppTheme.primaryBlue, size: 20),
+                    Icon(
+                      authController.isImpersonating.value
+                          ? Icons.arrow_back_rounded
+                          : Icons.logout,
+                      color: authController.isImpersonating.value
+                          ? const Color(0xFF92400E)
+                          : AppTheme.primaryBlue,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      'Logout',
+                      authController.isImpersonating.value
+                          ? 'Return to Admin'
+                          : 'Logout',
                       style: TextStyle(
-                        color: AppTheme.primaryBlue,
+                        color: authController.isImpersonating.value
+                            ? const Color(0xFF92400E)
+                            : AppTheme.primaryBlue,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),

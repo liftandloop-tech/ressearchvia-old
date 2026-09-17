@@ -18,6 +18,7 @@ import { approvePartialPayment } from "./acquisitionService.js";
 import mongoose from "mongoose";
 import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
+import Refund from "../models/refundModel.js";
 
 const segmentsService = {
   createSegments: async ({ body }) => {
@@ -946,7 +947,7 @@ const segmentsService = {
           queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] };
         }
       } else {
-        queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'REJECTED'] };
+        queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
       }
 
       // Restrict payments by staff/director assignment
@@ -1011,40 +1012,84 @@ const segmentsService = {
 
       console.log('[getPendingBankTransfers] Querying PaymentIntent with:', JSON.stringify(queryArgs, null, 2));
 
-      const intents = await PaymentIntent
-        .find(queryArgs)
-        .populate({
-          path: 'userId',
-          select: 'fullName phone email kycStatus registrationType'
-        })
-        .populate({
-          path: 'planId',
-          model: 'segmentsPlan',
-          select: 'planName price duration'
-        })
-        .sort({ updatedAt: -1 })
-        .skip(skip)
-        .limit(pageSize);
+      // Compute Global Summary Stats across ALL matching records in DB (not restricted by pagination)
+      const globalSummaryAgg = await PaymentIntent.aggregate([
+        { $match: queryArgs },
+        {
+          $facet: {
+            byUser: [
+              {
+                $group: {
+                  _id: '$userId',
+                  totalPaid: { $sum: { $ifNull: ['$amountPaid', 0] } },
+                  hasPending: {
+                    $max: {
+                      $cond: [
+                        {
+                          $or: [
+                            { $in: ['$status', ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING']] },
+                            {
+                              $gt: [
+                                {
+                                  $size: {
+                                    $filter: {
+                                      input: { $ifNull: ['$partialPaymentsHistory', []] },
+                                      as: 'h',
+                                      cond: { $eq: ['$$h.status', 'PENDING'] }
+                                    }
+                                  }
+                                },
+                                0
+                              ]
+                            }
+                          ]
+                        },
+                        1,
+                        0
+                      ]
+                    }
+                  },
+                  intentsCount: { $sum: 1 }
+                }
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalCustomers: { $sum: 1 },
+                  totalVolume: { $sum: '$totalPaid' },
+                  actionRequiredCustomers: { $sum: '$hasPending' },
+                  totalPayments: { $sum: '$intentsCount' }
+                }
+              }
+            ],
+            pendingIntents: [
+              {
+                $match: {
+                  $or: [
+                    { status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] } },
+                    { 'partialPaymentsHistory.status': 'PENDING' }
+                  ]
+                }
+              },
+              { $count: 'total' }
+            ]
+          }
+        }
+      ]);
 
-      const totalCount = await PaymentIntent.countDocuments(queryArgs);
+      const userStats = globalSummaryAgg[0]?.byUser[0] || {};
+      const pendingIntentsCount = globalSummaryAgg[0]?.pendingIntents[0]?.total || 0;
 
-      console.log('[getPendingBankTransfers] Found', intents.length, 'pending payments');
+      const summaryStats = {
+        totalCustomers: userStats.totalCustomers || 0,
+        totalVolume: userStats.totalVolume || 0,
+        actionRequiredCustomers: userStats.actionRequiredCustomers || 0,
+        totalPayments: userStats.totalPayments || 0,
+        pendingPaymentsCount: pendingIntentsCount
+      };
 
-      // Debug: Log each intent's proof status
-      intents.forEach((intent, idx) => {
-        console.log(`[DEBUG] Intent ${idx + 1}:`, {
-          id: intent._id,
-          purchaseType: intent.purchaseType,
-          hasProofImage: !!intent.proofImage,
-          proofImage: intent.proofImage,
-          hasPartialHistory: intent.partialPaymentsHistory?.length > 0,
-          historyCount: intent.partialPaymentsHistory?.length || 0,
-          status: intent.status
-        });
-      });
-
-      // Map to frontend expected format
-      const pendingPayments = await Promise.all(intents.map(async intent => {
+      // Reusable intent-to-frontend mapper
+      const mapIntentToPayment = async (intent) => {
         let planObj = intent.planId;
         let segmentName = 'N/A';
 
@@ -1094,7 +1139,6 @@ const segmentsService = {
         // Determine Frontend Status
         let displayStatus = intent.status;
         if (intent.isPartial && intent.status !== 'PAID') {
-          // Check if any installment is approved
           const hasApproved = (intent.partialPaymentsHistory || []).some(h => h.status === 'APPROVED');
           if (hasApproved) {
             displayStatus = 'PARTIAL-PAID';
@@ -1135,11 +1179,178 @@ const segmentsService = {
           serviceStartDate: intent.serviceStartDate,
           currentExpiryDate: intent.currentExpiryDate,
         };
-      }));
+      };
+
+      // --- GROUP BY USER BRANCH ---
+      if (query.groupBy === 'user') {
+        const userAgg = await PaymentIntent.aggregate([
+          { $match: queryArgs },
+          {
+            $group: {
+              _id: '$userId',
+              latestActivity: { $max: '$updatedAt' },
+              totalIntents: { $sum: 1 }
+            }
+          },
+          { $sort: { latestActivity: -1 } },
+          {
+            $facet: {
+              metadata: [{ $count: 'total' }],
+              data: [{ $skip: skip }, { $limit: pageSize }]
+            }
+          }
+        ]);
+
+        const totalUsersCount = userAgg[0]?.metadata[0]?.total || 0;
+        const pageUserIds = (userAgg[0]?.data || []).map(u => u._id).filter(Boolean);
+
+        // Fetch all customer payments so the customer dossier and cards reflect complete history
+        const intents = await PaymentIntent
+          .find({
+            userId: { $in: pageUserIds },
+            status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] },
+            $or: [
+              { proofImage: { $ne: null, $exists: true } },
+              { 'proofImages.0': { $exists: true } },
+              { 'partialPaymentsHistory.0': { $exists: true } },
+              { purchaseType: 'REGISTRATION' }
+            ]
+          })
+          .populate({
+            path: 'userId',
+            select: 'fullName phone email kycStatus registrationType'
+          })
+          .populate({
+            path: 'planId',
+            model: 'segmentsPlan',
+            select: 'planName price duration'
+          })
+          .sort({ updatedAt: -1 });
+
+        const mappedPayments = await Promise.all(intents.map(mapIntentToPayment));
+
+        // Group mapped payments by userId
+        const userMap = new Map();
+        for (const uid of pageUserIds) {
+          userMap.set(uid.toString(), {
+            user: null,
+            payments: [],
+            totalPaid: 0,
+            totalAmount: 0,
+            remainingBalance: 0,
+            pendingCount: 0,
+            hasPending: false,
+            activePlansCount: 0,
+            latestActivity: null
+          });
+        }
+
+        for (const p of mappedPayments) {
+          const uid = p.userId?._id ? p.userId._id.toString() : (p.userId ? p.userId.toString() : 'unknown');
+          let group = userMap.get(uid);
+          if (!group) {
+            group = {
+              user: p.userId,
+              payments: [],
+              totalPaid: 0,
+              totalAmount: 0,
+              remainingBalance: 0,
+              pendingCount: 0,
+              hasPending: false,
+              activePlansCount: 0,
+              latestActivity: null
+            };
+            userMap.set(uid, group);
+          }
+          if (!group.user && p.userId) {
+            group.user = p.userId;
+          }
+          group.payments.push(p);
+
+          const amtPaid = Number(p.amountPaid || 0);
+          const amtTarget = Number(p.amount || 0);
+          const disc = Number(p.discount || 0);
+          const remaining = Math.max(0, amtTarget - disc - amtPaid);
+
+          group.totalPaid += amtPaid;
+          group.totalAmount += amtTarget;
+          group.remainingBalance += remaining;
+
+          const isPending = p.status === 'PENDING_BANK_TRANSFER' || p.status === 'VERIFICATION_PENDING';
+          const hasPendingInstallment = (p.partialPaymentsHistory || []).some(h => h.status === 'PENDING');
+          if (isPending || hasPendingInstallment) {
+            group.pendingCount += 1;
+            group.hasPending = true;
+          }
+
+          if (p.status === 'PAID' || p.status === 'APPROVED' || p.status === 'PARTIAL-PAID') {
+            group.activePlansCount += 1;
+          }
+
+          const pDate = new Date(p.createdAt || Date.now());
+          if (!group.latestActivity || pDate > new Date(group.latestActivity)) {
+            group.latestActivity = p.createdAt;
+          }
+        }
+
+        const usersList = Array.from(userMap.values()).filter(g => g.user);
+
+        return {
+          status: 200,
+          message: "Pending Bank Transfers (Grouped by User)",
+          data: {
+            totalCount: totalUsersCount,
+            summaryStats,
+            users: usersList,
+            pendingPayments: mappedPayments
+          }
+        };
+      }
+
+      // --- FLAT / DEFAULT BRANCH ---
+      const intents = await PaymentIntent
+        .find(queryArgs)
+        .populate({
+          path: 'userId',
+          select: 'fullName phone email kycStatus registrationType'
+        })
+        .populate({
+          path: 'planId',
+          model: 'segmentsPlan',
+          select: 'planName price duration'
+        })
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(pageSize);
+
+      const totalCount = await PaymentIntent.countDocuments(queryArgs);
+
+      console.log('[getPendingBankTransfers] Found', intents.length, 'pending payments');
+
+      // Debug: Log each intent's proof status
+      intents.forEach((intent, idx) => {
+        console.log(`[DEBUG] Intent ${idx + 1}:`, {
+          id: intent._id,
+          purchaseType: intent.purchaseType,
+          hasProofImage: !!intent.proofImage,
+          proofImage: intent.proofImage,
+          hasPartialHistory: intent.partialPaymentsHistory?.length > 0,
+          historyCount: intent.partialPaymentsHistory?.length || 0,
+          status: intent.status
+        });
+      });
+
+      // Map to frontend expected format
+      const pendingPayments = await Promise.all(intents.map(mapIntentToPayment));
+
       return {
         status: 200,
         message: "Pending Bank Transfers",
-        data: { totalCount, pendingPayments }
+        data: {
+          totalCount,
+          summaryStats,
+          pendingPayments
+        }
       };
     } catch (error) {
       console.error('[getPendingBankTransfers] Error:', error);
@@ -1703,6 +1914,33 @@ const segmentsService = {
           startDate: payment.startDate,
           endDate: payment.endDate,
         });
+      }
+
+      // --- 3. PROCESS REFUNDS ---
+      try {
+        const refunds = await Refund.find({ userId: id }).sort({ createdAt: -1 }).lean();
+        for (const ref of refunds) {
+          allPayments.push({
+            _id: ref._id,
+            type: 'Refund',
+            planName: ref.planName || 'Refunded Plan',
+            segmentName: ref.segmentName || '-',
+            amount: ref.refundAmount,
+            originalAmount: ref.originalAmount,
+            deductionAmount: ref.deductionAmount,
+            date: ref.createdAt,
+            status: (ref.status || 'REFUNDED').toUpperCase(),
+            method: ref.refundMethod || 'BANK_TRANSFER',
+            transactionId: ref.utrNumber || ref.gatewayRefundId || `REF_${ref._id.toString().slice(-6)}`,
+            source: 'refund',
+            planId: ref.planId,
+            reason: ref.reason,
+            reasonCategory: ref.reasonCategory,
+            refundType: ref.refundType,
+          });
+        }
+      } catch (refErr) {
+        console.error('[segmentPaymentHistroy] Error fetching refunds:', refErr);
       }
 
       // Final sort & pagination

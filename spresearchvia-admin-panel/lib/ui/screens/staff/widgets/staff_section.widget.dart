@@ -17,7 +17,6 @@ class StaffSection extends StatelessWidget {
   final int itemsPerPage;
   final Function(int) onPageChange;
   final Function(StaffModel) onEdit;
-  final Function(StaffModel) onDelete;
   final Function(StaffModel, bool) onStatusToggle;
 
   const StaffSection({
@@ -34,7 +33,6 @@ class StaffSection extends StatelessWidget {
     required this.itemsPerPage,
     required this.onPageChange,
     required this.onEdit,
-    required this.onDelete,
     required this.onStatusToggle,
   });
 
@@ -88,7 +86,6 @@ class StaffSection extends StatelessWidget {
               StaffTable(
                 staffList: paginatedStaff,
                 onEdit: onEdit,
-                onDelete: onDelete,
                 onStatusToggle: onStatusToggle,
               ),
               StaffPagination(

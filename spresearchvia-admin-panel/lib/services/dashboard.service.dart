@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:spresearch_web/services/api.service.dart';
 
@@ -32,9 +31,16 @@ class DashboardService extends ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getDashboardStats() async {
+  Future<Map<String, dynamic>> getDashboardStats({
+    Map<String, dynamic>? query,
+    bool forceRefresh = false,
+  }) async {
     try {
-      final response = await get('/user/dashboard-count');
+      final response = await get(
+        '/user/dashboard-count',
+        query: query?.map((k, v) => MapEntry(k, v.toString())),
+        forceRefresh: forceRefresh,
+      );
       debugPrint('Dashboard API Response Status: ${response.statusCode}');
 
       if (response.status.hasError) {
@@ -43,6 +49,12 @@ class DashboardService extends ApiService {
           'totalUsers': '0',
           'activeSubscriptions': '0',
           'pendingKyc': '0',
+          'totalSalesAmount': 0,
+          'totalOrders': 0,
+          'activeStaffCount': 0,
+          'avgOrderValue': 0,
+          'staffPerformanceList': <Map<String, dynamic>>[],
+          'ordersList': <Map<String, dynamic>>[],
         };
       }
 
@@ -53,6 +65,15 @@ class DashboardService extends ApiService {
           'totalUsers': '0',
           'activeSubscriptions': '0',
           'pendingKyc': '0',
+          'totalSalesAmount': 0,
+          'totalOrders': 0,
+          'activeStaffCount': 0,
+          'avgOrderValue': 0,
+          'conversionRate': 0,
+          'topPerformingStaff': null,
+          'departmentSales': <Map<String, dynamic>>[],
+          'staffPerformanceList': <Map<String, dynamic>>[],
+          'ordersList': <Map<String, dynamic>>[],
         };
       }
 
@@ -61,10 +82,38 @@ class DashboardService extends ApiService {
         'totalUsers': (data['userCount'] ?? 0).toString(),
         'activeSubscriptions': (data['activeSubcription'] ?? 0).toString(),
         'pendingKyc': (data['pandingKyc'] ?? 0).toString(),
+        'totalSalesAmount': data['totalSalesAmount'] ?? 0,
+        'totalOrders': data['totalOrders'] ?? 0,
+        'activeStaffCount': data['activeStaffCount'] ?? 0,
+        'avgOrderValue': data['avgOrderValue'] ?? 0,
+        'conversionRate': data['conversionRate'] ?? 0,
+        'topPerformingStaff': data['topPerformingStaff'],
+        'departmentSales': (data['departmentSales'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+        'staffPerformanceList': (data['staffPerformanceList'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+        'ordersList': (data['ordersList'] as List? ?? [])
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
       };
     } catch (e) {
       debugPrint('Dashboard API Exception: $e');
-      return {'totalUsers': '0', 'activeSubscriptions': '0', 'pendingKyc': '0'};
+      return {
+        'totalUsers': '0',
+        'activeSubscriptions': '0',
+        'pendingKyc': '0',
+        'totalSalesAmount': 0,
+        'totalOrders': 0,
+        'activeStaffCount': 0,
+        'avgOrderValue': 0,
+        'conversionRate': 0,
+        'topPerformingStaff': null,
+        'departmentSales': <Map<String, dynamic>>[],
+        'staffPerformanceList': <Map<String, dynamic>>[],
+        'ordersList': <Map<String, dynamic>>[],
+      };
     }
   }
 
@@ -89,7 +138,6 @@ class DashboardService extends ApiService {
 
       return data.map<Map<String, dynamic>>((item) {
         final userDetails = item['userDetails'] ?? {};
-        final name = userDetails['APP_NAME'] ?? item['fullName'] ?? 'Unknown';
 
         String? endDateStr = item['packageEndDate'];
         DateTime? endDate;
@@ -170,7 +218,7 @@ class DashboardService extends ApiService {
       final response = await get('/user/purchase/recent-plan-payment-list');
 
       if (response.status.hasError) {
-        return Future.error(response.statusText ?? 'Error fetching data');
+        return await Future.error(response.statusText ?? 'Error fetching data');
       }
 
       final body = _parseBody(response.body);

@@ -246,6 +246,49 @@ export const adminStrictOnly = async (req, res, next) => {
     }
 };
 
+/**
+ * 4.1.1 Strict Admin Only (Excluding General Staff)
+ * For sensitive financial operations like Refunds that only Admin/SuperAdmin can execute.
+ */
+export const adminStrictOnlyNoStaff = async (req, res, next) => {
+    try {
+        const userId = req.user?._id || req.user?.userId;
+        if (!userId) return res.status(401).json({ message: "Identity not found in token." });
+
+        // 1. Check primary users collection
+        const user = await users.findById(userId).select('userType role');
+        if (user && (user.userType === 'admin' || user.userType === 'super_admin' || user.role === 'admin' || user.role === 'super_admin')) {
+            req.adminUser = user;
+            return next();
+        }
+
+        // 2. Check staff collection - only allow if role or department is strictly admin/super_admin
+        const staffMember = await staff.findById(userId).populate('roleId');
+        if (staffMember) {
+            const roleName = (staffMember.role || staffMember.roleId?.name || "").toLowerCase();
+            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
+            const userType = (staffMember.userType || "").toLowerCase();
+
+            if (roleName === 'admin' || roleName === 'super_admin' || roleName === 'super admin' ||
+                dept === 'admin' || dept === 'super_admin' || dept === 'super admin' ||
+                userType === 'admin' || userType === 'super_admin') {
+                req.adminUser = staffMember;
+                return next();
+            }
+        }
+
+        return res.status(403).json({
+            status: 403,
+            message: "Access Denied. Refund processing is strictly restricted to Administrators only, not general staff.",
+            errorCode: "ADMIN_ONLY_RESTRICTION"
+        });
+    } catch (error) {
+        console.error("adminStrictOnlyNoStaff Error:", error);
+        return res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+
 
 // 4.2 Report Management Access
 export const reportManagementAccess = async (req, res, next) => {
@@ -412,7 +455,7 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                         (perm.actions.includes('settings.view') || perm.actions.includes('read'))) return true;
 
                     if ((requiredKey === 'leads.read' || requiredKey === 'leads:read') &&
-                        (perm.actions.includes('leads.view_all') || perm.actions.includes('leads.view_assigned') || perm.actions.includes('read'))) return true;
+                        (perm.actions.includes('leads.view_all') || perm.actions.includes('leads.view_assigned') || perm.actions.includes('leads.pull') || perm.actions.includes('leads.view') || perm.actions.includes('read'))) return true;
 
                     // Legacy fallback matching if feature/action were passed
                     if (actionParam && perm.feature && perm.feature.toLowerCase() === feature.toLowerCase()) {

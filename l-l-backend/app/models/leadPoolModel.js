@@ -14,6 +14,20 @@ const leadPoolSchema = new mongoose.Schema({
     description: {
         type: String,
         default: null
+    },
+    pullSize: {
+        type: Number,
+        default: 20,
+        min: 1
+    },
+    maxPerStaff: {
+        type: Number,
+        default: 100,
+        min: 1
+    },
+    isActive: {
+        type: Boolean,
+        default: true
     }
 }, { timestamps: true, versionKey: false });
 

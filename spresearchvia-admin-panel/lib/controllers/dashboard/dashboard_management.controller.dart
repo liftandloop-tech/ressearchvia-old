@@ -12,6 +12,15 @@ class DashboardManagementController extends GetxController {
   var renewalsList = <Map<String, dynamic>>[].obs;
   var recentPayments = <Map<String, dynamic>>[].obs;
   var staffList = <StaffModel>[].obs;
+  var staffPerformanceList = <Map<String, dynamic>>[].obs;
+  var ordersList = <Map<String, dynamic>>[].obs;
+  var totalSalesAmount = 0.0.obs;
+  var totalOrders = 0.obs;
+  var activeStaffCount = 0.obs;
+  var avgOrderValue = 0.0.obs;
+  var conversionRate = 0.obs;
+  var topPerformingStaff = Rxn<Map<String, dynamic>>();
+  var departmentSales = <Map<String, dynamic>>[].obs;
   var isLoading = false.obs;
 
   DateTime? _lastFetchTime;
@@ -23,9 +32,13 @@ class DashboardManagementController extends GetxController {
     fetchDashboardData();
   }
 
-  Future<void> fetchDashboardData({bool force = false}) async {
+  Future<void> fetchDashboardData({
+    bool force = false,
+    Map<String, dynamic>? query,
+  }) async {
     final now = DateTime.now();
     if (!force &&
+        query == null &&
         _lastFetchTime != null &&
         now.difference(_lastFetchTime!) < _fetchThreshold &&
         dashboardStats.isNotEmpty) {
@@ -38,24 +51,41 @@ class DashboardManagementController extends GetxController {
     isLoading.value = true;
     _lastFetchTime = now;
     try {
-      final stats = await _dashboardService.getDashboardStats();
+      final stats = await _dashboardService.getDashboardStats(
+        query: query,
+        forceRefresh: force || query != null,
+      );
       debugPrint('Controller received stats: $stats');
       dashboardStats.value = stats;
-      debugPrint('Controller dashboardStats after assignment: $dashboardStats');
 
-      final renewals = await _dashboardService.getRenewalsList();
-      renewalsList.value = renewals;
+      totalSalesAmount.value = (stats['totalSalesAmount'] ?? 0).toDouble();
+      totalOrders.value = (stats['totalOrders'] ?? 0) as int;
+      activeStaffCount.value = (stats['activeStaffCount'] ?? 0) as int;
+      avgOrderValue.value = (stats['avgOrderValue'] ?? 0).toDouble();
+      conversionRate.value = (stats['conversionRate'] ?? 0) as int;
+      topPerformingStaff.value = stats['topPerformingStaff'] != null
+          ? Map<String, dynamic>.from(stats['topPerformingStaff'])
+          : null;
+      departmentSales.value = List<Map<String, dynamic>>.from(
+        stats['departmentSales'] ?? [],
+      );
+      staffPerformanceList.value = List<Map<String, dynamic>>.from(
+        stats['staffPerformanceList'] ?? [],
+      );
+      ordersList.value = List<Map<String, dynamic>>.from(
+        stats['ordersList'] ?? [],
+      );
 
-      final payments = await _dashboardService.getRecentPayments();
-      recentPayments.value = payments;
+      if (staffList.isEmpty || query == null) {
+        final renewals = await _dashboardService.getRenewalsList();
+        renewalsList.value = renewals;
 
-      final staff = await _staffService.getStaffList();
-      if (staff.isNotEmpty) {
-        debugPrint(
-          'First staff role check: ${staff.first.name} - ${staff.first.role}',
-        );
+        final payments = await _dashboardService.getRecentPayments();
+        recentPayments.value = payments;
+
+        final staff = await _staffService.getStaffList();
+        staffList.value = staff;
       }
-      staffList.value = staff;
     } catch (e) {
       debugPrint('Error fetching dashboard data: $e');
     } finally {

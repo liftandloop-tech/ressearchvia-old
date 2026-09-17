@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'dart:ui';
@@ -250,9 +249,10 @@ class AddStaffDialog extends StatelessWidget {
                       ],
                     );
                   }),
-                  // Assigned Director (Only for Manager)
+                  // Assigned Director / Supervisor (For all staff roles)
                   Obx(() {
-                    if (controller.selectedDepartment.value != 'Manager') {
+                    final role = controller.selectedDepartment.value.toLowerCase().trim();
+                    if (role == 'director') {
                       return const SizedBox.shrink();
                     }
 
@@ -260,7 +260,7 @@ class AddStaffDialog extends StatelessWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Assigned Director', required: true),
+                          _buildLabel('Assigned Director / Supervisor'),
                           const SizedBox(height: 6),
                           Container(
                             width: double.infinity,
@@ -276,7 +276,9 @@ class AddStaffDialog extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              controller.currentDirectorName,
+                              controller.currentDirectorName.isNotEmpty
+                                  ? controller.currentDirectorName
+                                  : 'Assigned to Director',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6C757D),
@@ -287,11 +289,18 @@ class AddStaffDialog extends StatelessWidget {
                         ],
                       );
                     } else {
-                      // Admin select
+                      // Admin or other role select
+                      final directors = controller.availableDirectors;
+                      final selectedValue = controller.assignedDirector.value;
+                      final safeValue = (selectedValue != null &&
+                              directors.any((d) => d.id == selectedValue.id))
+                          ? selectedValue
+                          : null;
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Assigned Director', required: true),
+                          _buildLabel('Assigned Director / Supervisor'),
                           const SizedBox(height: 6),
                           Container(
                             height: 40,
@@ -304,46 +313,53 @@ class AddStaffDialog extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: DropdownButtonHideUnderline(
-                              child: Obx(
-                                () => DropdownButton<StaffModel>(
-                                  value: controller.assignedDirector.value,
-                                  isExpanded: true,
-                                  hint: const Text(
-                                    'Select Director',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFFADB5BD),
+                              child: DropdownButton<StaffModel?>(
+                                value: safeValue,
+                                isExpanded: true,
+                                hint: const Text(
+                                  'Select Director / Supervisor (Optional)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFFADB5BD),
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 18,
+                                  color: Color(0xFF6C757D),
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF212529),
+                                ),
+                                items: [
+                                  const DropdownMenuItem<StaffModel?>(
+                                    value: null,
+                                    child: Text(
+                                      'None (Unassigned)',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF6C757D),
+                                        fontStyle: FontStyle.italic,
+                                      ),
                                     ),
                                   ),
-                                  icon: const Icon(
-                                    Icons.keyboard_arrow_down,
-                                    size: 18,
-                                    color: Color(0xFF6C757D),
-                                  ),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF212529),
-                                  ),
-                                  items: controller.availableDirectors
-                                      .map(
-                                        (e) => DropdownMenuItem<StaffModel>(
-                                          value: e,
-                                          child: Text(
-                                            e.name,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Color(0xFF212529),
-                                            ),
-                                          ),
+                                  ...directors.map(
+                                    (e) => DropdownMenuItem<StaffModel?>(
+                                      value: e,
+                                      child: Text(
+                                        "${e.name} (${e.department.isNotEmpty ? e.department : e.role})",
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF212529),
                                         ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) {
-                                    if (v != null) {
-                                      controller.assignedDirector.value = v;
-                                    }
-                                  },
-                                ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  controller.assignedDirector.value = v;
+                                },
                               ),
                             ),
                           ),
@@ -466,6 +482,66 @@ class AddStaffDialog extends StatelessWidget {
                             _buildTextField(
                               controller: controller.localAddressController,
                               hint: 'Street, City, State',
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Divider(height: 28),
+                  const Text(
+                    'Emergency Contact Details (For Digital ID Badge & Safety)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E3A5F),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('Emergency Contact Name'),
+                            const SizedBox(height: 6),
+                            _buildTextField(
+                              controller: controller.emergencyNameController,
+                              hint: 'e.g. Priya Sharma',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('Relationship'),
+                            const SizedBox(height: 6),
+                            _buildTextField(
+                              controller: controller.emergencyRelationController,
+                              hint: 'Spouse / Parent / Sibling',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('Emergency Phone'),
+                            const SizedBox(height: 6),
+                            _buildTextField(
+                              controller: controller.emergencyPhoneController,
+                              hint: '10-digit phone',
+                              keyboardType: TextInputType.phone,
                             ),
                           ],
                         ),

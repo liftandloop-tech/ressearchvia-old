@@ -5,7 +5,7 @@ import 'package:spresearch_web/controllers/staff/staff_details.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 import '../../../config/app.config.dart';
-import '../../../models/staff.model.dart';
+import 'widgets/staff_digital_id_dialog.widget.dart';
 
 class StaffDetailsScreen extends StatelessWidget {
   const StaffDetailsScreen({super.key});
@@ -67,6 +67,23 @@ class StaffDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => StaffDigitalIdDialog(staff: staff),
+                        );
+                      },
+                      icon: const Icon(Icons.badge, size: 18),
+                      label: const Text('Digital ID Card'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     ElevatedButton.icon(
                       onPressed: () => Get.toNamed('/staff/edit/${staff.id}'),
                       icon: const Icon(Icons.edit, size: 18),
@@ -209,14 +226,14 @@ class StaffDetailsScreen extends StatelessWidget {
                                   children: [
                                     _buildDetailItem('Mobile Number', staff.mobile, icon: Icons.phone),
                                     _buildDetailItem('Email Address', staff.email, icon: Icons.email),
-                                    _buildDetailItem('Department / Role', staff.department.isNotEmpty ? staff.department : staff.role, icon: Icons.work),
+                                    _buildDetailItem('Role', staff.department.isNotEmpty ? staff.department : staff.role, icon: Icons.work),
                                     _buildDetailItem('Joining Date', staff.joiningDate != null ? "${staff.joiningDate!.day}/${staff.joiningDate!.month}/${staff.joiningDate!.year}" : 'N/A', icon: Icons.calendar_today),
                                     _buildDetailItem('Gender', staff.gender ?? 'N/A', icon: Icons.person_outline),
                                     _buildDetailItem('Date of Birth', staff.dob ?? 'N/A', icon: Icons.cake),
                                     _buildDetailItem('Experience', staff.experienceYears != null ? '${staff.experienceYears} Years' : 'N/A', icon: Icons.badge),
                                     _buildDetailItem('Previous Company', staff.previousCompany ?? 'N/A', icon: Icons.business),
                                     _buildDetailItem('Last CTC', staff.lastCtc != null ? '₹${staff.lastCtc}' : 'N/A', icon: Icons.currency_rupee),
-                                    _buildDetailItem('Assigned Director', staff.assignedDirectorName ?? 'Unassigned', icon: Icons.supervisor_account),
+                                    _buildDetailItem('Assigned Director / Supervisor', staff.assignedDirectorName ?? 'Unassigned', icon: Icons.supervisor_account),
                                   ],
                                 ),
                               ],

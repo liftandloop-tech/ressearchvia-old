@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import '../../../../models/staff.model.dart';
+import 'staff_digital_id_dialog.widget.dart';
 
 class StaffCard extends StatelessWidget {
   final StaffModel staff;
@@ -36,12 +38,15 @@ class StaffCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  staff.name,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                InkWell(
+                  onTap: () => Get.toNamed('/staff/${staff.id}'),
+                  child: Text(
+                    staff.name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primaryBlue,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -85,16 +90,20 @@ class StaffCard extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                icon: Icon(Icons.edit_outlined, size: 18),
-                onPressed: () {},
-                color: AppTheme.textSecondary,
-                tooltip: 'Edit',
+                icon: const Icon(Icons.badge_outlined, size: 20),
+                onPressed: () {
+                  Get.dialog(
+                    StaffDigitalIdDialog(staff: staff),
+                  );
+                },
+                color: const Color(0xFF0F172A),
+                tooltip: 'Digital ID Card',
               ),
               IconButton(
-                icon: Icon(Icons.delete_outline, size: 18),
-                onPressed: () {},
-                color: AppTheme.statusError,
-                tooltip: 'Delete',
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                onPressed: () => Get.toNamed('/staff/${staff.id}'),
+                color: AppTheme.textSecondary,
+                tooltip: 'View Staff',
               ),
             ],
           ),

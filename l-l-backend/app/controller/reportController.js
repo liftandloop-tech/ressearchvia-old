@@ -74,6 +74,15 @@ const reportsController = {
         } catch (error) {
             res.status(400).send({ status: 400, message: error.message, data: {} });
         }
+    },
+
+    getLiveActivities: async (req, res) => {
+        try {
+            const response = await reportService.getLiveActivities();
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
     }
 
 }

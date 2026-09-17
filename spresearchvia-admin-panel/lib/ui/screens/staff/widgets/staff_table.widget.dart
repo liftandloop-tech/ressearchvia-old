@@ -8,14 +8,12 @@ import 'staff_column_filter.widget.dart';
 class StaffTable extends StatelessWidget {
   final List<StaffModel> staffList;
   final Function(StaffModel) onEdit;
-  final Function(StaffModel) onDelete;
   final Function(StaffModel, bool) onStatusToggle;
 
   const StaffTable({
     super.key,
     required this.staffList,
     required this.onEdit,
-    required this.onDelete,
     required this.onStatusToggle,
   });
 
@@ -27,12 +25,13 @@ class StaffTable extends StatelessWidget {
         top: BorderSide(color: AppTheme.gray200),
       ),
       columnWidths: const {
-        0: FlexColumnWidth(1.5),
-        1: FlexColumnWidth(1.2),
-        2: FlexColumnWidth(1.5),
-        3: FlexColumnWidth(1.2),
-        4: FlexColumnWidth(1.5), // Increased width for switch + text
-        5: FlexColumnWidth(0.6),
+        0: FlexColumnWidth(1.3), // Name
+        1: FlexColumnWidth(1.1), // Mobile No.
+        2: FlexColumnWidth(1.4), // Email
+        3: FlexColumnWidth(1.0), // Role
+        4: FlexColumnWidth(1.6), // Reporting To dropdown
+        5: FlexColumnWidth(1.1), // Status switch + text
+        6: FlexColumnWidth(1.4), // Actions (Badge, Login As, View, Edit)
       },
       children: [
         TableRow(
@@ -55,6 +54,9 @@ class StaffTable extends StatelessWidget {
               filterIcon: StaffColumnFilter(columnKey: 'role', columnName: 'Role'),
             ),
             const StaffTableHeaderCell(
+              text: 'Reporting To',
+            ),
+            const StaffTableHeaderCell(
               text: 'Status',
               filterIcon: StaffColumnFilter(columnKey: 'status', columnName: 'Status'),
             ),
@@ -65,7 +67,6 @@ class StaffTable extends StatelessWidget {
           (staff) => StaffRow(
             staff: staff,
             onEdit: () => onEdit(staff),
-            onDelete: () => onDelete(staff),
             onStatusToggle: (value) => onStatusToggle(staff, value),
           ),
         ),

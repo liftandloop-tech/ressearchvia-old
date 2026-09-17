@@ -35,12 +35,12 @@ class ReportsTable extends StatelessWidget {
                 ),
               ),
               columnWidths: const {
-                0: FlexColumnWidth(2.2), // Title
+                0: FlexColumnWidth(2.0), // Title
                 1: FlexColumnWidth(0.8), // Status
                 2: FlexColumnWidth(0.5), // File
                 3: FlexColumnWidth(1.2), // Created Date
                 4: FlexColumnWidth(1.2), // Last Updated
-                5: FlexColumnWidth(0.8), // Actions
+                5: FlexColumnWidth(1.2), // Actions
               },
               children: [
                 TableRow(

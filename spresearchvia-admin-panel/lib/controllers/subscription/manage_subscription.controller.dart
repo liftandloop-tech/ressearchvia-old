@@ -14,6 +14,7 @@ import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/segment.service.dart';
 import 'package:spresearch_web/services/auth.service.dart';
+import 'package:spresearch_web/services/refund.service.dart';
 
 class ManageSubscriptionController extends GetxController {
   late final SubscriptionService _subscriptionService;
@@ -23,6 +24,7 @@ class ManageSubscriptionController extends GetxController {
   late final AcquisitionService _acquisitionService;
   late final SegmentService _segmentService;
   late final AuthService _authService;
+  late final RefundService _refundService;
 
   var isLoading = false.obs;
   var userSubscriptions = <Map<String, dynamic>>[].obs;
@@ -66,6 +68,7 @@ class ManageSubscriptionController extends GetxController {
     _acquisitionService = Get.find<AcquisitionService>();
     _segmentService = Get.find<SegmentService>();
     _authService = Get.find<AuthService>();
+    _refundService = Get.find<RefundService>();
     super.onInit();
     _loadCurrentUser();
     fetchAvailablePlans();
@@ -2419,3 +2422,4 @@ class ManageSubscriptionController extends GetxController {
     });
   }
 }
+

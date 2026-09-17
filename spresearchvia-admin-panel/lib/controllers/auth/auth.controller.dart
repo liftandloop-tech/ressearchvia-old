@@ -2,17 +2,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // Added for Colors
 import 'package:get/get.dart';
 import 'package:spresearch_web/services/auth.service.dart';
+import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/user.model.dart';
 import 'package:spresearch_web/config/routes.config.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
+  final StaffService _staffService = Get.put(StaffService());
 
   var user = Rxn<UserModel>();
   var isAuthenticated = false.obs;
   var isInitialized = false.obs;
   var authToken = ''.obs;
+
+  var isImpersonating = false.obs;
+  var impersonatedStaffName = ''.obs;
 
   @override
   void onInit() {
@@ -30,16 +35,21 @@ class AuthController extends GetxController {
     try {
       final token = await _authService.getToken();
       final storedUser = await _authService.getUser();
+      final hasBackup = await _authService.hasAdminBackup();
 
       if (token != null && token.isNotEmpty && storedUser != null) {
         authToken.value = token;
         user.value = storedUser;
         isAuthenticated.value = true;
+        isImpersonating.value = hasBackup;
+        if (hasBackup) {
+          impersonatedStaffName.value = storedUser.fullName;
+        }
       }
     } finally {
       isInitialized.value = true;
       print(
-        'Auth Initialization Complete. Authenticated: ${isAuthenticated.value}',
+        'Auth Initialization Complete. Authenticated: ${isAuthenticated.value}, Impersonating: ${isImpersonating.value}',
       );
     }
   }
@@ -55,6 +65,7 @@ class AuthController extends GetxController {
         user.value = result.user;
         authToken.value = result.token!;
         isAuthenticated.value = true;
+        isImpersonating.value = false;
 
         if (result.user?.isResearcher == true) {
           Get.offAllNamed(AppRoutes.reports);
@@ -68,6 +79,113 @@ class AuthController extends GetxController {
       }
     } catch (e) {
       return (success: false, error: 'An error occurred: $e');
+    }
+  }
+
+  Future<void> loginAsStaff(String staffId, String staffName) async {
+    try {
+      Get.dialog(
+        const Center(
+          child: CircularProgressIndicator(),
+        ),
+        barrierDismissible: false,
+      );
+
+      // Save admin session backup first
+      if (!isImpersonating.value) {
+        final currentToken = authToken.value;
+        final currentAdminData = user.value?.rawJson ?? {
+          '_id': user.value?.id,
+          'fullName': user.value?.fullName ?? 'Admin',
+          'email': user.value?.email,
+          'deparment': 'Admin',
+          'userType': 'Admin',
+        };
+        await _authService.saveAdminBackup(currentToken, currentAdminData);
+      }
+
+      final res = await _staffService.impersonateStaff(staffId);
+
+      // Close loading dialog
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+
+      if (res.token != null && res.staffData != null) {
+        await _authService.setImpersonationSession(res.token!, res.staffData!);
+        final staffUser = UserModel.fromJson(res.staffData!);
+
+        user.value = staffUser;
+        authToken.value = res.token!;
+        isAuthenticated.value = true;
+        isImpersonating.value = true;
+        impersonatedStaffName.value = staffUser.fullName.isNotEmpty ? staffUser.fullName : staffName;
+
+        Get.snackbar(
+          'Impersonation Active',
+          'Logged in as ${impersonatedStaffName.value}',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFFFFF3CD),
+          colorText: const Color(0xFF856404),
+          duration: const Duration(seconds: 3),
+        );
+
+        if (staffUser.isResearcher) {
+          Get.offAllNamed(AppRoutes.reports);
+        } else if (staffUser.isDirector) {
+          Get.offAllNamed(AppRoutes.users);
+        } else {
+          Get.offAllNamed(AppRoutes.dashboard);
+        }
+      } else {
+        Get.snackbar(
+          'Login As Failed',
+          res.error ?? 'Could not switch to staff account',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppTheme.errorRed,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      if (Get.isDialogOpen == true) {
+        Get.back();
+      }
+      Get.snackbar(
+        'Error',
+        'Impersonation error: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppTheme.errorRed,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> exitImpersonation() async {
+    try {
+      final restored = await _authService.restoreAdminBackup();
+      if (restored != null && restored.user != null) {
+        user.value = restored.user;
+        authToken.value = restored.token ?? '';
+        isAuthenticated.value = true;
+        isImpersonating.value = false;
+        impersonatedStaffName.value = '';
+
+        Get.snackbar(
+          'Returned to Admin',
+          'You have exited staff view and returned to your Admin session.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppTheme.primaryBlue,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+
+        Get.offAllNamed(AppRoutes.staff);
+      } else {
+        await logout();
+      }
+    } catch (e) {
+      debugPrint('Error exiting impersonation: $e');
+      await logout();
     }
   }
 
@@ -92,9 +210,16 @@ class AuthController extends GetxController {
   }
 
   Future<void> logout() async {
+    if (isImpersonating.value) {
+      await exitImpersonation();
+      return;
+    }
+
     await _authService.logout();
     user.value = null;
     isAuthenticated.value = false;
+    isImpersonating.value = false;
+    impersonatedStaffName.value = '';
     Get.offAllNamed(AppRoutes.login);
   }
 

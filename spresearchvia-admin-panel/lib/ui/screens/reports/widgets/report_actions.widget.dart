@@ -17,79 +17,90 @@ class ReportActions extends StatelessWidget {
     final reportController = Get.find<ReportController>();
 
     final currentUser = Get.find<AuthController>().user.value;
-    final canUpdate = currentUser?.has('reports.update') ?? false;
-    final canDelete = currentUser?.has('reports.delete') ?? false;
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => navController.showReportDetails(report),
-          tooltip: 'View Details',
-          icon: Icon(
-            Icons.visibility_outlined,
-            size: 18,
-            color: AppTheme.primaryBlue,
-          ),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-        ),
-        if (canUpdate) ...[
-          const SizedBox(width: 12),
+    final canUpdate = currentUser == null ||
+        currentUser.isAdmin ||
+        currentUser.isResearcher ||
+        currentUser.has('reports.update');
+    final canDelete = currentUser == null ||
+        currentUser.isAdmin ||
+        currentUser.isResearcher ||
+        currentUser.has('reports.delete');
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           IconButton(
-            onPressed: () =>
-                navController.showUploadReport(reportToEdit: report),
-            tooltip: 'Edit Report',
+            onPressed: () => navController.showReportDetails(report),
+            tooltip: 'View Details',
             icon: Icon(
-              Icons.edit_outlined,
+              Icons.visibility_outlined,
               size: 18,
-              color: AppTheme.warningOrange,
+              color: AppTheme.primaryBlue,
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
           ),
-        ],
-        if (canDelete) ...[
-          const SizedBox(width: 12),
-          IconButton(
-            onPressed: () {
-              Get.dialog(
-                AlertDialog(
-                  title: const Text('Delete Report'),
-                  content: const Text(
-                    'Are you sure you want to delete this report?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Get.back(),
-                      child: const Text('Cancel'),
+          if (canUpdate) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () =>
+                  navController.showUploadReport(reportToEdit: report),
+              tooltip: 'Edit Report',
+              icon: Icon(
+                Icons.edit_outlined,
+                size: 18,
+                color: AppTheme.warningOrange,
+              ),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            ),
+          ],
+          if (canDelete) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () {
+                Get.dialog(
+                  AlertDialog(
+                    title: const Text('Delete Report'),
+                    content: const Text(
+                      'Are you sure you want to delete this report?',
                     ),
-                    TextButton(
-                      onPressed: () {
-                        if (Get.isSnackbarOpen) {
-                          Get.closeAllSnackbars();
-                        }
-                        Get.back();
-                        reportController.deleteReport(report.id);
-                      },
-                      child: const Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Get.back(),
+                        child: const Text('Cancel'),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            },
-            tooltip: 'Delete Report',
-            icon: Icon(
-              Icons.delete_outline,
-              size: 18,
-              color: AppTheme.errorRed,
+                      TextButton(
+                        onPressed: () {
+                          if (Get.isSnackbarOpen) {
+                            Get.closeAllSnackbars();
+                          }
+                          Get.back();
+                          reportController.deleteReport(report.id);
+                        },
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              tooltip: 'Delete Report',
+              icon: Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: AppTheme.errorRed,
+              ),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
             ),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

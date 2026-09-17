@@ -35,7 +35,7 @@ class DashboardNavBar extends StatelessWidget {
         {'title': 'Automated Trading', 'index': 9},
         {'title': 'Leads', 'index': 10},
         // {'title': 'Attendance & Monitoring', 'index': 11},
-        {'title': 'Job Applicants', 'index': 12},
+        // {'title': 'Job Applicants', 'index': 12},
       ];
 
       // RBAC: Roles determine visible items
@@ -84,9 +84,9 @@ class DashboardNavBar extends StatelessWidget {
               if (title == 'Leads') {
                 return (user?.has('leads.view_all') ?? user?.has('leads.view_assigned') ?? false) ? item : null;
               }
-              if (title == 'Job Applicants') {
-                return (user?.has('staff.view_applicants') ?? false) ? item : null;
-              }
+              // if (title == 'Job Applicants') {
+              //   return (user?.has('staff.view_applicants') ?? false) ? item : null;
+              // }
 
               return null;
             })

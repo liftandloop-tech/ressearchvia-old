@@ -8,6 +8,7 @@ import 'package:spresearch_web/services/segment.service.dart';
 import 'package:spresearch_web/controllers/reports/reports_navigation.controller.dart';
 import 'package:spresearch_web/models/report.model.dart';
 import 'package:spresearch_web/controllers/reports/report.controller.dart';
+import 'package:spresearch_web/controllers/notifications/research_notification.controller.dart';
 
 import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
@@ -469,6 +470,10 @@ class UploadReportController extends GetxController {
     if (success) {
       if (Get.isRegistered<ReportController>()) {
         Get.find<ReportController>().fetchReports();
+      }
+
+      if (Get.isRegistered<ResearchNotificationController>()) {
+        Get.find<ResearchNotificationController>().fetchLiveActivities();
       }
 
       if (Get.isRegistered<ReportsNavigationController>()) {

@@ -95,6 +95,8 @@ class UserHeader extends StatelessWidget {
               SizedBox(width: AppTheme.spacing12),
             ],
             if (authController.user.value?.has('users.generate_temp_pin') ?? false) ...[
+
+
               UserHeaderButton(
                 title: 'Generate Temp PIN',
                 color: Colors.amber.shade800,

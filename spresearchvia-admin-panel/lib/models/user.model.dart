@@ -156,6 +156,12 @@ class UserModel {
 
   bool hasPermission(String target, [String? optionalAction]) {
     if (isAdmin) return true; // System admins bypass permission checks
+    if (isResearcher &&
+        (target.toLowerCase().startsWith('report') ||
+            (optionalAction != null &&
+                optionalAction.toLowerCase().startsWith('report')))) {
+      return true;
+    }
     if (rawJson == null) return false;
 
     final String requiredKey = optionalAction == null
@@ -183,9 +189,21 @@ class UserModel {
                       return true;
                     }
 
-                    // 2. Feature-based alias resolution for canonical view permissions
+                    // 2. Feature-based alias resolution
                     final reqFeature = requiredKey.split('.').first;
+                    final reqAction = requiredKey.contains('.') ? requiredKey.split('.').last : '';
                     if (permFeature == reqFeature) {
+                      if (reqAction.isNotEmpty) {
+                        if (actList.contains(reqAction) ||
+                            (reqAction == 'update' && (actList.contains('edit') || actList.contains('update') || actList.contains('write'))) ||
+                            (reqAction == 'edit' && (actList.contains('update') || actList.contains('edit') || actList.contains('write'))) ||
+                            (reqAction == 'delete' && actList.contains('delete')) ||
+                            (reqAction == 'create' && (actList.contains('create') || actList.contains('add') || actList.contains('write'))) ||
+                            (reqAction == 'view' && (actList.contains('read') || actList.contains('view'))) ||
+                            (reqAction == 'read' && (actList.contains('read') || actList.contains('view')))) {
+                          return true;
+                        }
+                      }
                       if (requiredKey.startsWith('leads.view') &&
                           (actList.contains('read') || actList.contains('view') || actList.contains('leads.view_all') || actList.contains('leads.view_assigned'))) {
                         return true;

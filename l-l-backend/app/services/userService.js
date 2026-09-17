@@ -2226,6 +2226,16 @@ const userService = {
   dashboardCount: async (req) => {
     try {
       const currentUserId = req?.user?._id;
+      const {
+        search,
+        staffMember,
+        staffId,
+        department,
+        startDate,
+        endDate,
+        status,
+      } = req?.query || {};
+
       let userQuery = {};
       let kycQuery = { kycStatus: "pending" };
       let planQuery = { status: "active" };
@@ -2256,10 +2266,229 @@ const userService = {
       const userCount = await userModel.countDocuments(userQuery);
       const activeSubcription = await planPurchaseModel.countDocuments(planQuery);
       const pandingKyc = await userKycModel.countDocuments(kycQuery);
+
+      // --- STAFF SALES & ORDERS PERFORMANCE AGGREGATION ---
+      const staffList = await staffModel.find({}).select('fullName staffId deparment emailAddress mobileNumber status');
+
+      const allAssignments = await staffAssigmentModel.find({});
+      const userToStaffMap = {};
+      const staffClientCountMap = {};
+
+      allAssignments.forEach(ass => {
+        if (ass.userId && ass.staffId) {
+          const uId = ass.userId.toString();
+          const sId = ass.staffId.toString();
+          userToStaffMap[uId] = { staffId: ass.staffId, staffName: ass.staffName };
+          staffClientCountMap[sId] = (staffClientCountMap[sId] || 0) + 1;
+        }
+      });
+
+      // Filter Staff by Department or Staff Member / Staff ID if requested
+      let filteredStaffList = staffList;
+      if (department && department !== 'All Departments' && department !== 'All') {
+        const d = department.trim().toLowerCase();
+        filteredStaffList = filteredStaffList.filter(s => (s.deparment || '').toLowerCase() === d);
+      }
+      if (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') {
+        const sm = staffMember.trim().toLowerCase();
+        filteredStaffList = filteredStaffList.filter(s => (s.fullName || '').toLowerCase() === sm);
+      }
+      if (staffId) {
+        const sid = staffId.toString();
+        filteredStaffList = filteredStaffList.filter(s => s._id.toString() === sid || s.staffId === sid);
+      }
+
+      const allowedStaffIdSet = new Set(filteredStaffList.map(s => s._id.toString()));
+
+      let purchasesQuery = {};
+      if (userQuery._id && userQuery._id.$in) {
+        purchasesQuery.userId = { $in: userQuery._id.$in };
+      }
+
+      // Date filtering on planPurchaseModel
+      if (startDate || endDate) {
+        purchasesQuery.createdAt = {};
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          purchasesQuery.createdAt.$gte = start;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          purchasesQuery.createdAt.$lte = end;
+        }
+      }
+
+      // Status filtering on planPurchaseModel
+      if (status && status !== 'All' && status !== 'all') {
+        purchasesQuery.status = { $regex: new RegExp(`^${status.trim()}$`, 'i') };
+      }
+
+      const purchases = await planPurchaseModel.find(purchasesQuery)
+        .populate('userId', 'fullName phone email userObject')
+        .sort({ createdAt: -1 });
+
+      let totalSalesAmount = 0;
+      let totalPaidOrders = 0;
+      const staffSalesMap = {};
+
+      let ordersList = purchases.map(p => {
+        const uId = p.userId?._id?.toString();
+        const staffInfo = uId ? userToStaffMap[uId] : null;
+
+        const amount = p.totalPlanAmount || (p.basicAmount ? p.basicAmount + (p.cgstAmount || 0) + (p.sgstAmount || 0) : 0);
+
+        const clientName = p.userId?.fullName || (p.userId?.userObject?.firstName ? `${p.userId.userObject.firstName} ${p.userId.userObject.lastName || ''}`.trim() : 'Unknown User');
+        const clientPhone = p.userId?.phone || p.userId?.userObject?.mobileNumber || '-';
+        const clientEmail = p.userId?.email || p.userId?.userObject?.emailAddress || '-';
+        const packageName = p.packageName || 'Standard Plan';
+        const orderId = p._id ? `ORD-${p._id.toString().slice(-6).toUpperCase()}` : 'ORD-UNKNOWN';
+        const staffName = staffInfo?.staffName || 'Unassigned';
+        const sId = staffInfo?.staffId ? staffInfo.staffId.toString() : null;
+
+        const statusLower = (p.status || 'active').toLowerCase();
+        // Only count genuine paid orders - strictly exclude pending, partial, rejected, failed, suspended
+        const isPaid = (statusLower === 'active' || statusLower === 'paid') && p.isPartial !== true;
+
+        return {
+          id: p._id ? p._id.toString() : '',
+          orderId,
+          clientName,
+          clientPhone,
+          clientEmail,
+          packageName,
+          amount,
+          status: p.status || 'active',
+          isPartial: p.isPartial === true,
+          isPaid,
+          staffId: sId,
+          staffName,
+          createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
+          startDate: p.startDate ? p.startDate.toISOString() : null,
+          endDate: p.endDate ? p.endDate.toISOString() : null,
+        };
+      });
+
+      // Filter orders by allowed staff (if department or staff filter active)
+      if ((department && department !== 'All Departments' && department !== 'All') ||
+          (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') ||
+          staffId) {
+        ordersList = ordersList.filter(o => o.staffId && allowedStaffIdSet.has(o.staffId));
+      }
+
+      // Filter orders by search query
+      if (search && search.trim().length > 0) {
+        const q = search.trim().toLowerCase();
+        ordersList = ordersList.filter(o => {
+          return (
+            (o.clientName && o.clientName.toLowerCase().includes(q)) ||
+            (o.clientPhone && o.clientPhone.toLowerCase().includes(q)) ||
+            (o.clientEmail && o.clientEmail.toLowerCase().includes(q)) ||
+            (o.packageName && o.packageName.toLowerCase().includes(q)) ||
+            (o.staffName && o.staffName.toLowerCase().includes(q)) ||
+            (o.orderId && o.orderId.toLowerCase().includes(q))
+          );
+        });
+      }
+
+      // Calculate totals and populate staffSalesMap from filtered orders (PAID CLIENTS ONLY)
+      ordersList.forEach(o => {
+        const statusLower = (o.status || '').toLowerCase();
+        const isPaid = (statusLower === 'active' || statusLower === 'paid') && o.isPartial !== true;
+
+        if (isPaid) {
+          totalSalesAmount += (o.amount || 0);
+          totalPaidOrders += 1;
+        }
+
+        if (o.staffId) {
+          if (!staffSalesMap[o.staffId]) {
+            staffSalesMap[o.staffId] = { ordersCount: 0, paidOrdersCount: 0, totalAmount: 0 };
+          }
+          if (isPaid) {
+            staffSalesMap[o.staffId].paidOrdersCount += 1;
+            staffSalesMap[o.staffId].ordersCount += 1;
+            staffSalesMap[o.staffId].totalAmount += (o.amount || 0);
+          } else {
+            // Unpaid/pending/partial/failed are not counted towards sales revenue
+          }
+        }
+      });
+
+      const totalOrders = totalPaidOrders;
+
+      let staffPerformanceList = filteredStaffList.map(s => {
+        const sId = s._id.toString();
+        const salesData = staffSalesMap[sId] || { ordersCount: 0, paidOrdersCount: 0, totalAmount: 0 };
+        return {
+          id: sId,
+          staffId: s.staffId || sId.slice(-6),
+          name: s.fullName || 'Staff Member',
+          department: s.deparment || 'Sales',
+          email: s.emailAddress || '-',
+          phone: s.mobileNumber || '-',
+          assignedClients: staffClientCountMap[sId] || 0,
+          ordersCount: salesData.paidOrdersCount || salesData.ordersCount,
+          totalSalesAmount: salesData.totalAmount,
+        };
+      });
+
+      // Also filter staff performance list by search if search is active
+      if (search && search.trim().length > 0) {
+        const q = search.trim().toLowerCase();
+        staffPerformanceList = staffPerformanceList.filter(s => {
+          return (
+            (s.name && s.name.toLowerCase().includes(q)) ||
+            (s.email && s.email.toLowerCase().includes(q)) ||
+            (s.department && s.department.toLowerCase().includes(q)) ||
+            (s.staffId && s.staffId.toLowerCase().includes(q))
+          );
+        });
+      }
+
+      staffPerformanceList.sort((a, b) => b.totalSalesAmount - a.totalSalesAmount);
+
+      const activeStaffCount = staffPerformanceList.filter(s => s.totalSalesAmount > 0 || s.assignedClients > 0).length;
+      const avgOrderValue = totalOrders > 0 ? Math.round(totalSalesAmount / totalOrders) : 0;
+
+      // Department Sales Distribution (Paid sales only)
+      const departmentSalesMap = {};
+      staffPerformanceList.forEach(s => {
+        const dept = s.department || 'Sales';
+        departmentSalesMap[dept] = (departmentSalesMap[dept] || 0) + s.totalSalesAmount;
+      });
+
+      const departmentSales = Object.keys(departmentSalesMap).map(dept => ({
+        department: dept,
+        totalSalesAmount: departmentSalesMap[dept],
+      }));
+
+      // Conversion Rate: % of assigned clients who became paid clients
+      const totalAssignedClients = staffPerformanceList.reduce((acc, s) => acc + s.assignedClients, 0);
+      const conversionRate = totalAssignedClients > 0 ? Math.round((totalOrders / totalAssignedClients) * 100) : (totalOrders > 0 ? 100 : 0);
+
+      const topPerformingStaff = staffPerformanceList.length > 0 && staffPerformanceList[0].totalSalesAmount > 0
+        ? staffPerformanceList[0]
+        : (staffPerformanceList.length > 0 ? staffPerformanceList[0] : null);
+
       return {
         status: 200,
         message: "counts",
-        data: { userCount, activeSubcription, pandingKyc },
+        data: {
+          userCount,
+          activeSubcription,
+          pandingKyc,
+          totalSalesAmount,
+          totalOrders,
+          activeStaffCount,
+          avgOrderValue,
+          conversionRate,
+          topPerformingStaff,
+          departmentSales,
+          staffPerformanceList,
+          ordersList,
+        },
       };
     } catch (error) {
       return { status: 400, message: error.message, data: {} };

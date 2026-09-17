@@ -16,6 +16,7 @@ import leadRoutes from "./leadRoutes/index.js";
 import staffReportRoutes from "./staffReportRoutes/index.js";
 import roleRoutes from "./roleRoutes/index.js";
 import permissionGroupRoutes from "./permissionGroupRoutes/index.js";
+import refundRoutes from "./refundRoutes/index.js";
 
 const initRoutes = (app) => {
     app.get('/api/health', (req, res) => res.status(200).send({ status: 'OK', uptime: process.uptime() }));
@@ -37,5 +38,6 @@ const initRoutes = (app) => {
     app.use('/api/staff-reports', staffReportRoutes())
     app.use('/api/roles', roleRoutes())
     app.use('/api/permission-groups', permissionGroupRoutes())
+    app.use('/api/refund', refundRoutes())
 }
-export default initRoutes;
+export default initRoutes;

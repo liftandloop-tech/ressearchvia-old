@@ -1,28 +1,8 @@
-import pg from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from "@prisma/client";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import proxyService from "../services/proxyService.js";
 import userModel from "../models/userModel.js";
-
-// Resolve Postgres Prisma Client using driver adapter for Prisma 7
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-function toUuid(id) {
-  if (!id) return null;
-  const str = id.toString().replace(/-/g, '');
-  if (str.length === 32) {
-    return `${str.slice(0,8)}-${str.slice(8,12)}-${str.slice(12,16)}-${str.slice(16,20)}-${str.slice(20,32)}`;
-  }
-  if (str.length === 24) {
-    const padded = str + '00000000';
-    return `${padded.slice(0,8)}-${padded.slice(8,12)}-${padded.slice(12,16)}-${padded.slice(16,20)}-${padded.slice(20,32)}`;
-  }
-  return id.toString();
-}
+import { prisma, toUuid } from "../config/prismaClient.js";
 
 function normalizeBrokerEnum(code) {
   if (!code) return 'ANGEL_ONE';

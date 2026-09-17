@@ -8,6 +8,8 @@ import '../models/user.model.dart';
 class AuthService extends ApiService {
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
+  static const String _adminBackupTokenKey = 'admin_backup_token';
+  static const String _adminBackupUserKey = 'admin_backup_user';
 
   // Save token to SharedPreferences
   Future<void> _saveToken(String token) async {
@@ -39,6 +41,69 @@ class AuthService extends ApiService {
     } catch (e) {
       debugPrint('Error saving user data: $e');
     }
+  }
+
+  // Save admin backup before impersonating staff
+  Future<void> saveAdminBackup(String token, Map<String, dynamic> userData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_adminBackupTokenKey, token);
+      await prefs.setString(_adminBackupUserKey, jsonEncode(userData));
+      debugPrint('Admin backup saved');
+    } catch (e) {
+      debugPrint('Error saving admin backup: $e');
+    }
+  }
+
+  Future<bool> hasAdminBackup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.containsKey(_adminBackupTokenKey);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Restore admin session when exiting impersonation
+  Future<({String? token, UserModel? user})?> restoreAdminBackup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final backupToken = prefs.getString(_adminBackupTokenKey);
+      final backupUserStr = prefs.getString(_adminBackupUserKey);
+
+      if (backupToken != null && backupUserStr != null) {
+        // Restore to main keys
+        await prefs.setString(_tokenKey, backupToken);
+        await prefs.setString(_userKey, backupUserStr);
+
+        // Remove backup keys
+        await prefs.remove(_adminBackupTokenKey);
+        await prefs.remove(_adminBackupUserKey);
+
+        final Map<String, dynamic> userData = jsonDecode(backupUserStr);
+        final user = UserModel.fromJson(userData);
+        return (token: backupToken, user: user);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error restoring admin backup: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearAdminBackup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_adminBackupTokenKey);
+      await prefs.remove(_adminBackupUserKey);
+    } catch (e) {
+      debugPrint('Error clearing admin backup: $e');
+    }
+  }
+
+  Future<void> setImpersonationSession(String token, Map<String, dynamic> staffData) async {
+    await _saveToken(token);
+    await _saveUserData(staffData);
   }
 
   // Get user data and reconstruct UserModel
@@ -74,6 +139,8 @@ class AuthService extends ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_tokenKey);
       await prefs.remove(_userKey);
+      await prefs.remove(_adminBackupTokenKey);
+      await prefs.remove(_adminBackupUserKey);
     } catch (e) {
       debugPrint('Error clearing auth data: $e');
     }

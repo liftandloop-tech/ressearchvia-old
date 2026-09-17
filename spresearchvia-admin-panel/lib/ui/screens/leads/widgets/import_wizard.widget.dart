@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'dart:html' as html; // Used for downloading CSV file in web
 import '../../../../config/theme.config.dart';
 import '../../../../controllers/leads/leads.controller.dart';
-import '../../../../models/staff.model.dart';
 
 class ImportWizard extends StatefulWidget {
   final String importId;
@@ -52,6 +51,8 @@ class _ImportWizardState extends State<ImportWizard> {
   String? _selectedLeadPoolId;
   final _newPoolNameCtrl = TextEditingController();
   final _newPoolDescCtrl = TextEditingController();
+  final _newPoolPullSizeCtrl = TextEditingController(text: '20');
+  final _newPoolMaxStaffCtrl = TextEditingController(text: '100');
   
   // Template Save State
   bool _saveAsTemplate = false;
@@ -111,27 +112,80 @@ class _ImportWizardState extends State<ImportWizard> {
   Future<void> _createNewLeadPoolDialog() async {
     _newPoolNameCtrl.clear();
     _newPoolDescCtrl.clear();
+    _newPoolPullSizeCtrl.text = '20';
+    _newPoolMaxStaffCtrl.text = '100';
     
     await Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          width: 400,
+          width: 440,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Create New Lead Pool', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.workspaces_outlined, color: AppTheme.primaryBlue, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Create New Lead Pool', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 18),
               TextField(
                 controller: _newPoolNameCtrl,
-                decoration: const InputDecoration(labelText: 'Pool Name', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Pool Name *',
+                  hintText: 'e.g. VIP Campaigns, HNI Hedges',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               TextField(
                 controller: _newPoolDescCtrl,
-                decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                  hintText: 'Brief notes on source or target segment',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _newPoolPullSizeCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Pull Size (batch)',
+                        hintText: '20',
+                        helperText: 'Leads per staff fetch',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _newPoolMaxStaffCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Max Per Staff',
+                        hintText: '100',
+                        helperText: 'Staff capacity cap',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               Row(
@@ -140,24 +194,36 @@ class _ImportWizardState extends State<ImportWizard> {
                   TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
                   const SizedBox(width: 12),
                   ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                    ),
                     onPressed: () async {
-                      if (_newPoolNameCtrl.text.isNotEmpty) {
+                      final name = _newPoolNameCtrl.text.trim();
+                      if (name.isNotEmpty) {
+                        final pullSize = int.tryParse(_newPoolPullSizeCtrl.text.trim()) ?? 20;
+                        final maxStaff = int.tryParse(_newPoolMaxStaffCtrl.text.trim()) ?? 100;
                         final res = await _leadsController.leadService.createLeadPool(
-                          _newPoolNameCtrl.text,
-                          _newPoolDescCtrl.text.isEmpty ? null : _newPoolDescCtrl.text,
+                          name,
+                          _newPoolDescCtrl.text.trim().isEmpty ? null : _newPoolDescCtrl.text.trim(),
+                          pullSize: pullSize > 0 ? pullSize : 20,
+                          maxPerStaff: maxStaff > 0 ? maxStaff : 100,
                         );
                         if (!res.status.hasError && res.body != null) {
                           await _fetchLeadPools();
+                          _leadsController.fetchLeadPools();
+                          _leadsController.fetchPullStats();
                           setState(() {
                             _selectedLeadPoolId = res.body['data']['_id'].toString();
                           });
                           Get.back();
+                          Get.snackbar('Success', 'Lead pool "$name" created', backgroundColor: Colors.green.withOpacity(0.1));
                         } else {
                           Get.snackbar('Error', 'Failed to create pool: ${res.body?['message'] ?? ''}');
                         }
                       }
                     },
-                    child: const Text('Create'),
+                    child: const Text('Create Pool'),
                   ),
                 ],
               ),
@@ -265,7 +331,7 @@ class _ImportWizardState extends State<ImportWizard> {
     
     final blob = html.Blob([csv], 'text/csv');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute("download", "import_error_report_${widget.importId}.csv")
       ..click();
     html.Url.revokeObjectUrl(url);
@@ -462,8 +528,10 @@ class _ImportWizardState extends State<ImportWizard> {
                     onChanged: (val) {
                       if (val != null) {
                         setState(() => _selectedTemplateId = val);
-                        final tmpl = _templates.firstWhere((t) => t['_id'] == val);
-                        _applyTemplate(tmpl['mappings'] as Map<String, dynamic>);
+                        final tmpl = _templates.firstWhereOrNull((t) => t['_id']?.toString() == val);
+                        if (tmpl != null && tmpl['mappings'] != null) {
+                          _applyTemplate(tmpl['mappings'] as Map<String, dynamic>);
+                        }
                       }
                     },
                   ),
@@ -573,7 +641,7 @@ class _ImportWizardState extends State<ImportWizard> {
                           onChanged: (val) {
                             setState(() {
                               _fieldMappings[key] = val!;
-                              _numInputControllers[key]?.text = val?.toString() ?? '';
+                              _numInputControllers[key]?.text = val.toString();
                             });
                           },
                         ),
@@ -716,7 +784,7 @@ class _ImportWizardState extends State<ImportWizard> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           decoration: const InputDecoration(labelText: 'Target Lead Pool', border: OutlineInputBorder()),
-                          value: _selectedLeadPoolId,
+                          value: _leadPools.any((p) => p['_id']?.toString() == _selectedLeadPoolId) ? _selectedLeadPoolId : null,
                           hint: const Text('None'),
                           items: [
                             const DropdownMenuItem<String>(value: null, child: Text('None (Leave Unassigned)')),
@@ -725,7 +793,7 @@ class _ImportWizardState extends State<ImportWizard> {
                                 value: p['_id'].toString(),
                                 child: Text(p['name'].toString()),
                               );
-                            }).toList(),
+                            }),
                           ],
                           onChanged: (val) => setState(() => _selectedLeadPoolId = val),
                         ),

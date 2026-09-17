@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
-import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/subscription/manage_subscription.controller.dart';
-import 'package:collection/collection.dart';
 
 class CurrentSubscriptionDetails extends StatelessWidget {
   final ManageSubscriptionController controller;
@@ -42,8 +40,12 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                     );
                   }
                 },
-                icon: Icon(Icons.add, size: 16),
-                label: Text('Add Plan'),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Plan'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBlue,
+                  foregroundColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -73,7 +75,6 @@ class CurrentSubscriptionDetails extends StatelessWidget {
             return Column(
               children: subscriptions.map((sub) {
                 final planId = sub['_id'];
-                final userId = sub['userId'];
                 final status =
                     sub['status']?.toString().toLowerCase() ?? 'unknown';
 
@@ -88,233 +89,239 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                     children: [
                       // Header: Plan Name, Price, Status
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    sub['isTrial'] == true
-                                        ? 'Registration Trial'
-                                        : (sub['packageName'] ??
-                                              'Unknown Plan'),
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.textPrimary,
-                                    ),
-                                  ),
-                                  if (sub['isTrial'] == true) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber[50],
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: Colors.amber[300]!,
-                                        ),
-                                      ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
                                       child: Text(
-                                        'TRIAL',
+                                        sub['isTrial'] == true
+                                            ? 'Registration Trial'
+                                            : (sub['packageName'] ??
+                                                  'Unknown Plan'),
                                         style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.amber[900],
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textPrimary,
                                         ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (sub['isTrial'] == true) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber[50],
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.amber[300]!,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'TRIAL',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber[900],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                (() {
-                                  final segId = sub['segmentId'];
-                                  final seg = controller.segments
-                                      .firstWhereOrNull((s) => s.id == segId);
-                                  return seg?.segmentName ??
-                                      sub['segmentName'] ??
-                                      'Unknown Segment';
-                                })(),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.primary,
-                                  fontWeight: FontWeight.w500,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                        color: Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Paid: ₹${sub['basicAmount'] ?? 0}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  (() {
+                                    final segId = sub['segmentId'];
+                                    final seg = controller.segments
+                                        .firstWhereOrNull((s) => s.id == segId);
+                                    return seg?.segmentName ??
+                                        sub['segmentName'] ??
+                                        'Unknown Segment';
+                                  })(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.primary,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  const SizedBox(width: 8),
-                                  if ((sub['isPartial'] == true) ||
-                                      (sub['packageName']
-                                          .toString()
-                                          .toLowerCase()
-                                          .contains('partial')))
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 8,
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Colors.orange[50],
+                                        color: Colors.grey[100],
                                         borderRadius: BorderRadius.circular(4),
                                         border: Border.all(
-                                          color: Colors.orange[200]!,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.pie_chart,
-                                            size: 12,
-                                            color: Colors.orange[800],
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Partial',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.orange[900],
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  else
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue[50],
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: Colors.blue[200]!,
+                                          color: Colors.grey[300]!,
                                         ),
                                       ),
                                       child: Text(
-                                        'Full Access',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.blue[900],
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              if ((sub['isPartial'] == true) ||
-                                  (sub['packageName']
-                                      .toString()
-                                      .toLowerCase()
-                                      .contains('partial'))) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange[50],
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: Colors.orange[200]!,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Partial Payment Details',
-                                        style: TextStyle(
+                                        'Paid: ₹${sub['basicAmount'] ?? 0}',
+                                        style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.orange[900],
+                                          color: Colors.black87,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      if (sub['totalPlanAmount'] != null) ...[
-                                        Text(
-                                          'Standard Total Price (Plan + GST): ₹${sub['totalPlanAmount']}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.black87,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if ((sub['isPartial'] == true) ||
+                                        (sub['packageName']
+                                            .toString()
+                                            .toLowerCase()
+                                            .contains('partial')))
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange[50],
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.orange[200]!,
                                           ),
                                         ),
-                                        if (sub['gstAmount'] != null)
-                                          Text(
-                                            '(Includes GST: ₹${sub['gstAmount']})',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey[700],
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.pie_chart,
+                                              size: 12,
+                                              color: Colors.orange[800],
                                             ),
-                                          ),
-                                      ],
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Amount Paid: ₹${sub['basicAmount'] ?? 0}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.green[800],
-                                          fontWeight: FontWeight.w600,
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Partial',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.orange[900],
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                      if (sub['totalPlanAmount'] != null)
-                                        Text(
-                                          'Remaining Amount: ₹${((sub['totalPlanAmount'] is num ? sub['totalPlanAmount'] : 0) - (sub['basicAmount'] is num ? sub['basicAmount'] : 0))}',
+                                      )
+                                    else
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue[50],
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: Colors.blue[200]!,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Full Access',
                                           style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.red[800],
+                                            fontSize: 11,
+                                            color: Colors.blue[900],
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                    ],
-                                  ),
+                                      ),
+                                  ],
                                 ),
-                              ],
-                              if (sub['remarks'] != null &&
-                                  sub['remarks'].toString().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text(
-                                    'Remarks: ${sub['remarks']}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.indigo.shade700,
-                                      fontStyle: FontStyle.italic,
+                                if ((sub['isPartial'] == true) ||
+                                    (sub['packageName']
+                                        .toString()
+                                        .toLowerCase()
+                                        .contains('partial'))) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange[50],
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: Colors.orange[200]!,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Partial Payment Details',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange[900],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        if (sub['totalPlanAmount'] != null) ...[
+                                          Text(
+                                            'Standard Total Price (Plan + GST): ₹${sub['totalPlanAmount']}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          if (sub['gstAmount'] != null)
+                                            Text(
+                                              '(Includes GST: ₹${sub['gstAmount']})',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[700],
+                                              ),
+                                            ),
+                                        ],
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Amount Paid: ₹${sub['basicAmount'] ?? 0}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.green[800],
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        if (sub['totalPlanAmount'] != null)
+                                          Text(
+                                            'Remaining Amount: ₹${((sub['totalPlanAmount'] is num ? sub['totalPlanAmount'] : 0) - (sub['basicAmount'] is num ? sub['basicAmount'] : 0))}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.red[800],
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
-                                ),
-                            ],
+                                ],
+                                if (sub['remarks'] != null &&
+                                    sub['remarks'].toString().isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Text(
+                                      'Remarks: ${sub['remarks']}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.indigo.shade700,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           _buildStatusBadge(status),
                         ],
                       ),
@@ -345,91 +352,95 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                       const SizedBox(height: 16),
                       // Actions
                       if (status == 'active' || status == 'suspended')
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (status == 'active')
-                              OutlinedButton(
-                                onPressed: () => controller.suspendSubscription(
-                                  controller.currentUserId.value,
-                                  planId,
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.warningOrange,
-                                  side: BorderSide(
-                                    color: AppTheme.warningOrange,
-                                  ),
-                                ),
-                                child: const Text('Suspend'),
-                              ),
-                            if (status == 'suspended')
-                              OutlinedButton(
-                                onPressed: () =>
-                                    controller.activateSubscription(
-                                      controller.currentUserId.value,
-                                      planId,
-                                    ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.successGreen,
-                                  side: BorderSide(
-                                    color: AppTheme.successGreen,
-                                  ),
-                                ),
-                                child: const Text('Activate'),
-                              ),
-                            if (status == 'active' &&
-                                ((sub['isPartial'] == true) ||
-                                    (sub['packageName']
-                                        .toString()
-                                        .toLowerCase()
-                                        .contains('partial')))) ...[
-                              const SizedBox(width: 8),
-                              OutlinedButton(
-                                onPressed: () {
-                                  controller.triggerTopUp(
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (status == 'active')
+                                OutlinedButton(
+                                  onPressed: () => controller.suspendSubscription(
                                     controller.currentUserId.value,
-                                    sub['_id'],
-                                    sub['packageName'] ?? 'Plan',
-                                  );
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.orange,
-                                  side: BorderSide(color: Colors.orange),
+                                    planId,
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.warningOrange,
+                                    side: BorderSide(
+                                      color: AppTheme.warningOrange,
+                                    ),
+                                  ),
+                                  child: const Text('Suspend'),
                                 ),
-                                child: const Text('Add Money'),
-                              ),
+                              if (status == 'suspended')
+                                OutlinedButton(
+                                  onPressed: () =>
+                                      controller.activateSubscription(
+                                        controller.currentUserId.value,
+                                        planId,
+                                      ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.successGreen,
+                                    side: BorderSide(
+                                      color: AppTheme.successGreen,
+                                    ),
+                                  ),
+                                  child: const Text('Activate'),
+                                ),
+                              if (status == 'active' &&
+                                  ((sub['isPartial'] == true) ||
+                                      (sub['packageName']
+                                          .toString()
+                                          .toLowerCase()
+                                          .contains('partial'))))
+                                OutlinedButton(
+                                  onPressed: () {
+                                    controller.triggerTopUp(
+                                      controller.currentUserId.value,
+                                      sub['_id'],
+                                      sub['packageName'] ?? 'Plan',
+                                    );
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.orange,
+                                    side: const BorderSide(color: Colors.orange),
+                                  ),
+                                  child: const Text('Add Money'),
+                                ),
+                              if (sub['paymentIntentId'] != null &&
+                                  controller.isAdmin) ...[
+                                ElevatedButton.icon(
+                                  onPressed: () => controller
+                                      .showSubscriptionCorrectionDialog(sub),
+                                  icon: const Icon(Icons.edit, size: 16),
+                                  label: const Text('Edit Plan/Dates'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue[50],
+                                    foregroundColor: Colors.blue[900],
+                                    elevation: 0,
+                                    side: BorderSide(color: Colors.blue[100]!),
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () =>
+                                      controller.showCorrectionDialog(sub),
+                                  icon: const Icon(Icons.edit_note, size: 16),
+                                  label: const Text('Correct Amount'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.indigo[50],
+                                    foregroundColor: Colors.indigo[900],
+                                    elevation: 0,
+                                    side: BorderSide(color: Colors.indigo[100]!),
+                                  ),
+                                ),
+                              ],
                             ],
-                            if (sub['paymentIntentId'] != null &&
-                                controller.isAdmin) ...[
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => controller
-                                    .showSubscriptionCorrectionDialog(sub),
-                                icon: Icon(Icons.edit, size: 16),
-                                label: const Text('Edit Plan/Dates'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue[50],
-                                  foregroundColor: Colors.blue[900],
-                                  elevation: 0,
-                                  side: BorderSide(color: Colors.blue[100]!),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () =>
-                                    controller.showCorrectionDialog(sub),
-                                icon: Icon(Icons.edit_note, size: 16),
-                                label: const Text('Correct Amount'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo[50],
-                                  foregroundColor: Colors.indigo[900],
-                                  elevation: 0,
-                                  side: BorderSide(color: Colors.indigo[100]!),
-                                ),
-                              ),
-                            ],
-                          ],
+                          ),
                         ),
+
+
                     ],
                   ),
                 );
@@ -504,7 +515,7 @@ class CurrentSubscriptionDetails extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(100),
       ),
       child: Text(

@@ -14,6 +14,7 @@ const reportsRoutes = () => {
   Router.delete("/report-delete/:id", auth.tokenVerified, reportManagementAccess, checkPermission('Reports', 'delete'), reportsController.deleteReport)
   Router.put("/report-public-status-change", auth.tokenVerified, reportManagementAccess, checkPermission('Reports', 'update'), reportsController.publishReportStatus)
   Router.get("/report-list", auth.tokenVerified, adminOnly, checkPermission('Reports', 'read'), reportsController.reportList) // Admin list
+  Router.get("/live-activities", auth.tokenVerified, reportsController.getLiveActivities) // Live activities for staff panels
 
   // Automated Integration Route from automated-api-one (Uses Header API Key Verification instead of User session tokens)
   Router.post("/automated-trading-call", reportsController.createAutomatedTradingCall)

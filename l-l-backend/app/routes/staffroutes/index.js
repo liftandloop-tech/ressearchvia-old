@@ -20,6 +20,7 @@ const staffRoutes = () => {
     Router.post("/staff-assignment", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.StaffAssignment)
     Router.get("/assigned-users", auth.tokenVerified, checkPermission('Users', 'read'), staffController.getStaffAssignedUsers)
     Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
+    Router.post("/impersonate", auth.tokenVerified, adminOnly, staffController.staffImpersonate)
 
     // Public applicant routes
     Router.post("/applicant/register", applicantController.registerApplicant)
@@ -37,6 +38,9 @@ const staffRoutes = () => {
     // Document uploads for staff onboarding
     Router.post("/upload-doc/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), staffDocController.uploadDocument)
     Router.post("/upload-video/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = 'staff-video'; next(); }, upload.single("file"), staffDocController.uploadVideo)
+
+    // Public staff verification route (for Digital ID QR Code scans)
+    Router.get("/verify/:staffId", staffController.getPublicStaffVerification)
 
     // Attendance and face pings
     Router.post("/attendance/login", staffAttendanceController.loginSession)

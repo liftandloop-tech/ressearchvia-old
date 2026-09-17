@@ -6,7 +6,6 @@ import 'package:spresearch_web/controllers/users/user_details.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'widgets/user_header.widget.dart';
 import 'widgets/kyc_documents.widget.dart';
-import '../widgets/payment_history.widget.dart';
 import 'widgets/activity_log.widget.dart';
 import 'widgets/personal_info.widget.dart';
 import 'widgets/contact_info.widget.dart';
@@ -19,10 +18,13 @@ class UserDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(UserDetailsController());
 
-    // Initial fetch - handled by controller to avoid duplicates
+    // Initial fetch - safely scheduled after frame build
     if (userId != null && userId!.isNotEmpty) {
-      controller.fetchUserDetails(userId!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.fetchUserDetails(userId!);
+      });
     }
+
 
     return Scaffold(
       backgroundColor: AppTheme.gray50,
@@ -75,7 +77,6 @@ class UserDetailsScreen extends StatelessWidget {
 
               final currentUser = Get.find<AuthController>().user.value;
               final canViewKyc = currentUser?.has('kyc.view') ?? false;
-              final canViewPayments = currentUser?.has('payments.view_pending') ?? false;
 
               return Column(
                 children: [
@@ -94,10 +95,6 @@ class UserDetailsScreen extends StatelessWidget {
                   if (canViewKyc) ...[
                     SizedBox(height: AppTheme.spacing24),
                     KYCDocuments(controller: controller),
-                  ],
-                  if (canViewPayments) ...[
-                    SizedBox(height: AppTheme.spacing20),
-                    PaymentHistory(userId: userId, showEditColumn: false),
                   ],
                   const SizedBox(height: AppTheme.spacing20),
                   ActivityLog(userId: userId),

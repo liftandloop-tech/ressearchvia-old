@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:collection/collection.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/subscription/manage_subscription.controller.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/controllers/users/user_payment.controller.dart';
 import 'widgets/current_subscription_details.widget.dart';
-import 'widgets/subscription_actions.widget.dart';
-import 'widgets/custom_plans.widget.dart';
 import 'widgets/payment_history.widget.dart';
 import 'widgets/registration_plan_actions.widget.dart';
+import 'widgets/refund_dialog.widget.dart';
 
 class ManageSubscriptionScreen extends StatelessWidget {
   final String userId;
@@ -20,7 +19,10 @@ class ManageSubscriptionScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(ManageSubscriptionController());
 
-    controller.fetchUserSubscriptions(userId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.fetchUserSubscriptions(userId);
+    });
+
 
     final currentUser = Get.find<AuthController>().user.value;
     final canViewPayments = currentUser?.has('payments.view_pending') ?? false;
@@ -34,19 +36,85 @@ class ManageSubscriptionScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  onPressed: () =>
-                      Get.find<UsersNavigationController>().goBack(),
-                  icon: Icon(Icons.arrow_back, color: AppTheme.primaryBlue),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () =>
+                          Get.find<UsersNavigationController>().goBack(),
+                      icon: Icon(Icons.arrow_back, color: AppTheme.primaryBlue),
+                    ),
+                    SizedBox(width: AppTheme.spacing8),
+                    Text(
+                      AppStrings.manageSubscription,
+                      style: AppTheme.h2Style.copyWith(color: AppTheme.primaryBlue),
+                    ),
+                  ],
                 ),
-                SizedBox(width: AppTheme.spacing8),
-                Text(
-                  AppStrings.manageSubscription,
-                  style: AppTheme.h2Style.copyWith(color: AppTheme.primaryBlue),
-                ),
+                if (currentUser?.isAdmin ?? false)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final activeSub = controller.userSubscriptions
+                          .firstWhereOrNull((s) => s['status'] == 'active');
+                      final paymentData = activeSub != null
+                          ? {
+                              'planId': activeSub['planId'] ?? activeSub['_id'],
+                              'planName': activeSub['packageName'] ??
+                                  activeSub['planName'] ??
+                                  'Active Plan',
+                              'segmentName': activeSub['segmentName'] ?? '-',
+                              'amount': activeSub['amountPaid'] ??
+                                  activeSub['price'] ??
+                                  activeSub['totalAmount'] ??
+                                  '0',
+                              'paymentIntentId': activeSub['paymentIntentId'],
+                              'serviceStartDate': activeSub['startDate'] ??
+                                  activeSub['serviceStartDate'],
+                              'currentExpiryDate': activeSub['endDate'] ??
+                                  activeSub['currentExpiryDate'],
+                              'status': activeSub['status'] ?? 'ACTIVE',
+                            }
+                          : {
+                              'planName': 'Active / Custom Plan',
+                              'amount': '0',
+                            };
+                      Get.dialog(
+                        RefundDialog(
+                          payment: paymentData,
+                          availableSubscriptions: controller.userSubscriptions,
+                          userId: userId,
+                          userName: controller.userDetails.value?.fullName ??
+                              controller.userDetails.value?.displayName ??
+                              'User',
+                          onRefundSuccess: () {
+                            controller.fetchUserSubscriptions(userId);
+                            if (Get.isRegistered<UserPaymentController>()) {
+                              Get.find<UserPaymentController>().fetchPaymentHistory(userId, forceRefresh: true);
+                            }
+                          },
+                        ),
+                        barrierDismissible: false,
+                      );
+                    },
+                    icon: const Icon(Icons.currency_exchange, size: 16),
+                    label: const Text('Process Refund'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
               ],
             ),
+
             const SizedBox(height: 8),
             Text(
               AppStrings.manageSubscriptionDesc,
@@ -108,18 +176,17 @@ class ManageSubscriptionScreen extends StatelessWidget {
                               color: AppTheme.textSecondary,
                             ),
                           ),
-                          if (user?.userObject?.appEmail != null &&
-                              user!.userObject!.appEmail.isNotEmpty)
+                          if (user?.email != null && user!.email.isNotEmpty)
                             Text(
-                              user!.userObject!.appEmail,
+                              user.email,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,
                               ),
                             ),
-                          if (user?.formattedPhone != null)
+                          if (user?.phone != null && user!.phone.isNotEmpty)
                             Text(
-                              user!.formattedPhone,
+                              user.formattedPhone,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,

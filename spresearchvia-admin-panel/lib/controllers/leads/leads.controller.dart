@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/lead.service.dart';
 import '../../models/lead.model.dart';
+import '../../models/lead_pool.model.dart';
 import '../../services/staff.service.dart';
 import '../../models/staff.model.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,6 +25,12 @@ class LeadsController extends GetxController {
   var searchQuery = ''.obs;
   var selectedStage = ''.obs;
   var selectedRMId = ''.obs;
+  var selectedFilterPoolId = ''.obs;
+
+  // Pools state
+  var leadPoolsList = <LeadPoolModel>[].obs;
+  var isPoolsLoading = false.obs;
+  var selectedPullPoolId = ''.obs;
 
   // Pull stats
   var freshAvailable = 0.obs;
@@ -47,6 +54,7 @@ class LeadsController extends GetxController {
   final cityController = TextEditingController();
   final stateController = TextEditingController();
   final assignRMId = ''.obs;
+  final assignLeadPoolId = ''.obs;
   final leadStage = 'New'.obs;
 
   // Follow-up Form controllers
@@ -58,9 +66,36 @@ class LeadsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    fetchLeadPools();
     fetchLeads();
     fetchStaffDropdown();
     fetchPullStats();
+  }
+
+  Future<void> fetchLeadPools() async {
+    isPoolsLoading.value = true;
+    try {
+      final res = await _leadService.getLeadPools();
+      if (!res.status.hasError && res.body != null) {
+        final list = (res.body['data'] as List<dynamic>?) ?? [];
+        final parsed = list.map((item) => LeadPoolModel.fromJson(item as Map<String, dynamic>)).toList();
+        leadPoolsList.assignAll(parsed);
+        if (leadPoolsList.isNotEmpty) {
+          if (selectedPullPoolId.value.isEmpty || !leadPoolsList.any((p) => p.id == selectedPullPoolId.value)) {
+            selectedPullPoolId.value = leadPoolsList.first.id;
+          }
+        } else {
+          selectedPullPoolId.value = '';
+        }
+        if (selectedFilterPoolId.value.isNotEmpty && !leadPoolsList.any((p) => p.id == selectedFilterPoolId.value)) {
+          selectedFilterPoolId.value = '';
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading lead pools: $e');
+    } finally {
+      isPoolsLoading.value = false;
+    }
   }
 
   Future<void> fetchLeads() async {
@@ -72,6 +107,7 @@ class LeadsController extends GetxController {
         search: searchQuery.value,
         stage: selectedStage.value,
         assignedRM: selectedRMId.value,
+        leadPoolId: selectedFilterPoolId.value.isNotEmpty ? selectedFilterPoolId.value : null,
       );
       if (res.error == null) {
         leadsList.assignAll(res.leads);
@@ -93,10 +129,11 @@ class LeadsController extends GetxController {
     }
   }
 
-  void updateFilters({String? search, String? stage, String? rmId}) {
+  void updateFilters({String? search, String? stage, String? rmId, String? poolId}) {
     if (search != null) searchQuery.value = search;
     if (stage != null) selectedStage.value = stage;
     if (rmId != null) selectedRMId.value = rmId;
+    if (poolId != null) selectedFilterPoolId.value = poolId;
     currentPage.value = 1;
     fetchLeads();
   }
@@ -105,6 +142,7 @@ class LeadsController extends GetxController {
     searchQuery.value = '';
     selectedStage.value = '';
     selectedRMId.value = '';
+    selectedFilterPoolId.value = '';
     currentPage.value = 1;
     fetchLeads();
   }
@@ -116,6 +154,7 @@ class LeadsController extends GetxController {
     cityController.clear();
     stateController.clear();
     assignRMId.value = '';
+    assignLeadPoolId.value = '';
     leadStage.value = 'New';
   }
 
@@ -132,6 +171,7 @@ class LeadsController extends GetxController {
         'mobileNumber': phoneController.text.trim(),
         'emailAddress': emailController.text.trim().isEmpty ? null : emailController.text.trim(),
         'assignedRM': assignRMId.value.isEmpty ? null : assignRMId.value,
+        if (assignLeadPoolId.value.isNotEmpty) 'leadPoolId': assignLeadPoolId.value,
         'stage': leadStage.value,
         'personalDetails': {
           'city': cityController.text.trim().isEmpty ? null : cityController.text.trim(),
@@ -149,6 +189,8 @@ class LeadsController extends GetxController {
       if (success) {
         Get.back();
         fetchLeads();
+        fetchLeadPools();
+        fetchPullStats();
         Get.snackbar('Success', existingId != null ? 'Lead updated successfully' : 'Lead created successfully', backgroundColor: Colors.green.withOpacity(0.1));
       } else {
         Get.snackbar('Error', 'Failed to save lead', backgroundColor: Colors.red.withOpacity(0.1));
@@ -243,7 +285,8 @@ class LeadsController extends GetxController {
 
   Future<void> fetchPullStats() async {
     try {
-      final res = await _leadService.getPullStats();
+      final poolId = selectedPullPoolId.value.isNotEmpty ? selectedPullPoolId.value : null;
+      final res = await _leadService.getPullStats(poolId: poolId);
       if (!res.status.hasError && res.body != null) {
         final data = res.body['data'] as Map<String, dynamic>;
         freshAvailable.value = data['freshAvailable'] as int? ?? 0;
@@ -251,32 +294,200 @@ class LeadsController extends GetxController {
         freshMax.value = data['freshMax'] as int? ?? 100;
         myUnread.value = data['myUnread'] as int? ?? 0;
         unreadMax.value = data['unreadMax'] as int? ?? 50;
+
+        if (data['pools'] != null && data['pools'] is List) {
+          final poolsList = (data['pools'] as List<dynamic>)
+              .map((item) => LeadPoolModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+          leadPoolsList.assignAll(poolsList);
+          if (leadPoolsList.isNotEmpty) {
+            if (selectedPullPoolId.value.isEmpty || !leadPoolsList.any((p) => p.id == selectedPullPoolId.value)) {
+              selectedPullPoolId.value = leadPoolsList.first.id;
+            }
+          } else {
+            selectedPullPoolId.value = '';
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error fetching pull stats: $e');
     }
   }
 
-  Future<void> pullFreshLeads() async {
+  Future<void> pullLeadsFromSelectedPool({String? poolId}) async {
     if (isPulling.value) return;
     isPulling.value = true;
     pullMessage.value = '';
     try {
-      final res = await _leadService.pullLeads('fresh');
+      final targetPoolId = poolId ?? (selectedPullPoolId.value.isNotEmpty ? selectedPullPoolId.value : null);
+      final res = await _leadService.pullLeads('fresh', poolId: targetPoolId);
       if (!res.status.hasError && res.body != null) {
-        final data = res.body['data'] as Map<String, dynamic>;
+        final data = res.body['data'] as Map<String, dynamic>? ?? {};
         final pulled = data['pulled'] as int? ?? 0;
-        pullMessage.value = res.body['message']?.toString() ?? '';
-        myFresh.value = data['current'] as int? ?? myFresh.value;
-        freshAvailable.value = data['availableFresh'] as int? ?? freshAvailable.value;
-        if (pulled > 0) fetchLeads();
+        final poolName = data['poolName']?.toString() ?? 'Lead Pool';
+        final msg = res.body['message']?.toString() ?? (pulled > 0 ? '$pulled lead(s) pulled successfully from $poolName!' : 'No leads pulled.');
+        pullMessage.value = msg;
+        await fetchPullStats();
+        await fetchLeadPools();
+        if (pulled > 0) {
+          await fetchLeads();
+          Get.snackbar(
+            'Lead Pool Success',
+            msg,
+            backgroundColor: const Color(0xFFDCFCE7),
+            colorText: const Color(0xFF166534),
+            icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A)),
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.all(16),
+            borderRadius: 8,
+          );
+        } else {
+          Get.snackbar(
+            'Lead Pool Notice',
+            msg,
+            backgroundColor: const Color(0xFFFEF3C7),
+            colorText: const Color(0xFF92400E),
+            icon: const Icon(Icons.info_rounded, color: Color(0xFFD97706)),
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.all(16),
+            borderRadius: 8,
+          );
+        }
       } else {
-        pullMessage.value = res.body?['message']?.toString() ?? 'Pull failed';
+        final errMsg = res.body?['message']?.toString() ?? 'Failed to pull leads from pool';
+        pullMessage.value = errMsg;
+        Get.snackbar(
+          'Lead Pool Error',
+          errMsg,
+          backgroundColor: const Color(0xFFFEE2E2),
+          colorText: const Color(0xFF991B1B),
+          icon: const Icon(Icons.error_rounded, color: Color(0xFFDC2626)),
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 4),
+          margin: const EdgeInsets.all(16),
+          borderRadius: 8,
+        );
       }
     } catch (e) {
-      pullMessage.value = 'Error: $e';
+      final errorStr = 'Error pulling leads: $e';
+      pullMessage.value = errorStr;
+      Get.snackbar(
+        'Lead Pool Error',
+        errorStr,
+        backgroundColor: const Color(0xFFFEE2E2),
+        colorText: const Color(0xFF991B1B),
+        icon: const Icon(Icons.error_rounded, color: Color(0xFFDC2626)),
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 8,
+      );
     } finally {
       isPulling.value = false;
+    }
+  }
+
+  Future<void> pullFreshLeads() => pullLeadsFromSelectedPool();
+
+  Future<bool> createCustomLeadPool(
+    String name,
+    String? description, {
+    int pullSize = 20,
+    int maxPerStaff = 100,
+  }) async {
+    try {
+      final res = await _leadService.createLeadPool(
+        name,
+        description,
+        pullSize: pullSize,
+        maxPerStaff: maxPerStaff,
+      );
+      if (!res.status.hasError && res.body != null) {
+        await fetchLeadPools();
+        await fetchPullStats();
+        Get.snackbar(
+          'Success',
+          'Lead pool "$name" created successfully',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message'] ?? 'Failed to create lead pool',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to create lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      return false;
+    }
+  }
+
+  Future<bool> updateCustomLeadPool(String id, Map<String, dynamic> data) async {
+    try {
+      final res = await _leadService.updateLeadPool(id, data);
+      if (!res.status.hasError) {
+        await fetchLeadPools();
+        await fetchPullStats();
+        Get.snackbar(
+          'Success',
+          'Lead pool updated successfully',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message'] ?? 'Failed to update lead pool',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to update lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      return false;
+    }
+  }
+
+  Future<bool> deleteCustomLeadPool(String id) async {
+    try {
+      final res = await _leadService.deleteLeadPool(id);
+      if (!res.status.hasError) {
+        if (selectedFilterPoolId.value == id) {
+          selectedFilterPoolId.value = '';
+        }
+        if (selectedPullPoolId.value == id) {
+          selectedPullPoolId.value = '';
+        }
+        await fetchLeadPools();
+        await fetchPullStats();
+        Get.snackbar(
+          'Success',
+          'Lead pool deleted successfully',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message'] ?? 'Failed to delete lead pool',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      return false;
     }
   }
 

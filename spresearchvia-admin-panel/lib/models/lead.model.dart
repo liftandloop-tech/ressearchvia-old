@@ -11,6 +11,8 @@ class LeadModel {
   final String? education;
   final String? experience;
   final List<FollowUpModel> followUps;
+  final String? leadPoolId;
+  final String? leadPoolName;
   final DateTime createdAt;
 
   LeadModel({
@@ -26,6 +28,8 @@ class LeadModel {
     this.education,
     this.experience,
     required this.followUps,
+    this.leadPoolId,
+    this.leadPoolName,
     required this.createdAt,
   });
 
@@ -38,6 +42,17 @@ class LeadModel {
         rmName = json['assignedRM']['fullName']?.toString();
       } else {
         rmId = json['assignedRM'].toString();
+      }
+    }
+
+    String? poolId;
+    String? poolName;
+    if (json['leadPoolId'] != null) {
+      if (json['leadPoolId'] is Map) {
+        poolId = json['leadPoolId']['_id']?.toString();
+        poolName = json['leadPoolId']['name']?.toString();
+      } else {
+        poolId = json['leadPoolId'].toString();
       }
     }
 
@@ -57,6 +72,8 @@ class LeadModel {
       education: personal?['education']?.toString(),
       experience: personal?['experience']?.toString(),
       followUps: fList.map((x) => FollowUpModel.fromJson(x as Map<String, dynamic>)).toList(),
+      leadPoolId: poolId,
+      leadPoolName: poolName,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),

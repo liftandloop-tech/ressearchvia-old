@@ -244,6 +244,56 @@ const staffService = {
       return { status: 400, message: error.message, data: {} }
     }
   },
+  staffImpersonate: async ({ body, user }) => {
+    try {
+      const { staffId } = body;
+      if (!staffId) {
+        return { status: 400, message: "Staff ID is required", data: {} };
+      }
+
+      let staff = await staffModel.findOne({
+        $or: [
+          { _id: mongoose.isValidObjectId(staffId) ? staffId : null },
+          { staffId: staffId }
+        ].filter(Boolean)
+      }).populate({
+        path: 'roleId',
+        populate: {
+          path: 'permissionGroups'
+        }
+      });
+
+      if (!staff) {
+        return { status: 404, message: "Staff member not found", data: {} };
+      }
+
+      // Generate staff token for admin impersonation (valid for 2 hours)
+      const token = jwt.sign(
+        {
+          _id: staff._id.toString(),
+          fullName: staff.fullName,
+          phone: staff.mobileNumber,
+          userType: staff.deparment || 'Staff',
+          isViewOnly: staff.isViewOnly || false,
+          isImpersonated: true
+        },
+        process.env.JWT_TOKEN,
+        { expiresIn: '2h' }
+      );
+
+      return {
+        status: 200,
+        message: "Staff impersonation token generated successfully",
+        data: {
+          token,
+          staff,
+          impersonatedBy: user ? user.fullName : 'Admin'
+        }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: {} };
+    }
+  },
   staffReset: async ({ query, body, user }) => {
     try {
       console.log('staffReset query:', query);
@@ -290,12 +340,13 @@ const staffService = {
       if (body.lastCtc) staff.lastCtc = body.lastCtc;
       if (body.localAddress) staff.localAddress = body.localAddress;
       if (body.permanentAddress) staff.permanentAddress = body.permanentAddress;
+      if (body.emergencyContact) staff.emergencyContact = body.emergencyContact;
 
-      if (body.assignedDirector) {
-        staff.assignedDirector = body.assignedDirector;
+      if (body.assignedDirector !== undefined) {
+        staff.assignedDirector = (body.assignedDirector && body.assignedDirector !== 'unassigned' && body.assignedDirector !== 'admin') ? body.assignedDirector : null;
       }
-      if (body.assignedDirectorName) {
-        staff.assignedDirectorName = body.assignedDirectorName;
+      if (body.assignedDirectorName !== undefined) {
+        staff.assignedDirectorName = (body.assignedDirector && body.assignedDirector !== 'unassigned' && body.assignedDirector !== 'admin') ? body.assignedDirectorName : (body.assignedDirector === 'admin' || body.assignedDirectorName === 'Admin' ? 'Admin' : null);
       }
 
       if (body.mpin) {
@@ -663,6 +714,42 @@ const staffService = {
     } catch (error) {
       console.error('Error in getUserAssignedRM:', error);
       return { status: 400, message: error.message, data: {} };
+    }
+  },
+
+  getPublicStaffVerification: async (staffId) => {
+    try {
+      let query = {};
+      if (mongoose.Types.ObjectId.isValid(staffId)) {
+        query = { $or: [{ _id: staffId }, { staffId: staffId }] };
+      } else {
+        query = { staffId: staffId };
+      }
+
+      const staff = await staffModel.findOne(query).select('name staffId role deparment status photoUrl createdAt joiningDate onboardingStatus').lean();
+      if (!staff) {
+        return { status: 404, message: "Staff member not found or invalid ID", data: null };
+      }
+
+      return {
+        status: 200,
+        message: "Staff verification record found",
+        data: {
+          id: staff._id,
+          staffId: staff.staffId,
+          name: staff.name,
+          role: staff.role || staff.deparment,
+          department: staff.deparment || staff.role,
+          status: staff.status,
+          photoUrl: staff.photoUrl,
+          joiningDate: staff.joiningDate || staff.createdAt,
+          verified: staff.status === 'Active',
+          organization: 'SP ResearchVia Global Markets Ltd.',
+          sebiReg: 'INH000012345 (SEBI Registered Research Analyst)',
+        }
+      };
+    } catch (error) {
+      return { status: 500, message: error.message, data: null };
     }
   }
 

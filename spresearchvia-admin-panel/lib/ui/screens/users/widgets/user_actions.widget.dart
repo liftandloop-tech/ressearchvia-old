@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import '../../../../models/user.model.dart'; // Import UserModel
 import 'assign_entitlements_dialog.dart';
 
@@ -61,6 +62,7 @@ class UserActions extends StatelessWidget {
             onPressed: () {
               Get.find<UsersNavigationController>().showUserDetails(user.id);
             },
+
             color: AppTheme.textSecondary,
             tooltip: 'View',
           ),

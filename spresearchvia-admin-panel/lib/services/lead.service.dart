@@ -10,6 +10,7 @@ class LeadService extends ApiService {
     String search = '',
     String stage = '',
     String assignedRM = '',
+    String? leadPoolId,
   }) async {
     try {
       final query = {
@@ -18,6 +19,7 @@ class LeadService extends ApiService {
         'search': search,
         'stage': stage,
         'assignedRM': assignedRM,
+        if (leadPoolId != null && leadPoolId.isNotEmpty) 'leadPoolId': leadPoolId,
       };
 
       final response = await get('/leads', query: query, forceRefresh: true);
@@ -110,14 +112,33 @@ class LeadService extends ApiService {
   Future<Response> getLeadPools() =>
       get('/leads/pools');
 
-  Future<Response> createLeadPool(String name, String? description) =>
-      post('/leads/pools', {'name': name, 'description': description});
+  Future<Response> createLeadPool(
+    String name,
+    String? description, {
+    int pullSize = 20,
+    int maxPerStaff = 100,
+  }) =>
+      post('/leads/pools', {
+        'name': name,
+        if (description != null) 'description': description,
+        'pullSize': pullSize,
+        'maxPerStaff': maxPerStaff,
+      });
 
-  Future<Response> pullLeads(String type) =>
-      post('/leads/pull', {'type': type});
+  Future<Response> updateLeadPool(String id, Map<String, dynamic> data) =>
+      put('/leads/pools/$id', data);
 
-  Future<Response> getPullStats() =>
-      get('/leads/pull-stats');
+  Future<Response> deleteLeadPool(String id) =>
+      delete('/leads/pools/$id');
+
+  Future<Response> pullLeads(String type, {String? poolId}) =>
+      post('/leads/pull', {
+        'type': type,
+        if (poolId != null) 'poolId': poolId,
+      });
+
+  Future<Response> getPullStats({String? poolId}) =>
+      get(poolId != null ? '/leads/pull-stats?poolId=$poolId' : '/leads/pull-stats');
 
   Future<Response> markLeadRead(String id) =>
       patch('/leads/$id/read', {});

@@ -776,6 +776,7 @@ const reportService = {
             if (report.publishedStatus === 'published' && !report.published_at) {
                 report.published_at = Date.now();
             }
+            report.updatedAt = new Date();
             await report.save();
 
             // Also update published_at if we are explicitly publishing a draft or it was already published but we want to bump it
@@ -937,6 +938,68 @@ const reportService = {
         } catch (error) {
             console.error("Error in createOrUpdateAutomatedTradingCall:", error);
             return { status: 400, message: error.message || error, data: {} };
+        }
+    },
+
+    getLiveActivities: async () => {
+        try {
+            const reports = await reportModel.find({ publishedStatus: 'published' })
+                .sort({ updatedAt: -1, createdAt: -1 })
+                .limit(10)
+                .lean();
+
+            let latestTimestamp = 0;
+            const activities = reports.map(r => {
+                const hasUpdates = Array.isArray(r.updates) && r.updates.length > 0;
+                const lastUpdate = hasUpdates ? r.updates[r.updates.length - 1] : null;
+                const updateTime = lastUpdate?.timestamp ? new Date(lastUpdate.timestamp).getTime() : 0;
+                const updatedTime = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+                const createdTime = r.createdAt ? new Date(r.createdAt).getTime() : 0;
+                const itemTime = Math.max(updateTime, updatedTime, createdTime, 1);
+
+                if (itemTime > latestTimestamp) {
+                    latestTimestamp = itemTime;
+                }
+
+                return {
+                    id: r._id.toString(),
+                    reportId: r.reportId || '',
+                    title: r.title || 'Untitled Research',
+                    reportType: r.reportType || 'Trading calls',
+                    segmentName: Array.isArray(r.segmentName) ? r.segmentName.join(', ') : (r.segmentName || ''),
+                    description: r.description || '',
+                    publishedStatus: r.publishedStatus,
+                    latestUpdate: lastUpdate ? lastUpdate.text : null,
+                    updatesCount: hasUpdates ? r.updates.length : 0,
+                    timestamp: itemTime,
+                    isAutomated: !!r.automatedSignalId,
+                    createdAt: r.createdAt,
+                    updatedAt: r.updatedAt
+                };
+            });
+
+            // Activity is proceeding if the latest activity or update is within the last 15 minutes
+            const now = Date.now();
+            const fifteenMinutesAgo = now - (15 * 60 * 1000);
+            const isProceeding = latestTimestamp >= fifteenMinutesAgo;
+
+            return {
+                status: 200,
+                message: "Live research activities retrieved successfully",
+                data: {
+                    isProceeding,
+                    latestTimestamp,
+                    latestActivity: activities[0] || null,
+                    activities
+                }
+            };
+        } catch (error) {
+            console.error("getLiveActivities Error:", error);
+            return {
+                status: 500,
+                message: error.message || "Failed to fetch live activities",
+                data: { isProceeding: false, latestTimestamp: 0, latestActivity: null, activities: [] }
+            };
         }
     }
 

@@ -1043,9 +1043,13 @@ class PendingBankTransfersController extends GetxController {
   }
 
   // Bank Transfers
+  var viewMode = 'grouped'.obs; // 'grouped' (by user) or 'flat' (by transaction)
+  var consolidatedUsers = <Map<String, dynamic>>[].obs;
+  var filteredConsolidatedUsers = <Map<String, dynamic>>[].obs;
   var pendingPayments = <Map<String, dynamic>>[].obs;
   var filteredPayments = <Map<String, dynamic>>[].obs;
   var totalPaymentsCount = 0.obs;
+  var summaryStats = <String, dynamic>{}.obs;
 
   // KYC Approvals
   var pendingKycUsers = <UserModel>[].obs;
@@ -1072,6 +1076,70 @@ class PendingBankTransfersController extends GetxController {
 
   var hasMorePages = true.obs;
 
+  void setViewMode(String mode) {
+    if (viewMode.value == mode) return;
+    viewMode.value = mode;
+    fetchPendingTransfers();
+  }
+
+  void _buildClientSideConsolidatedUsers() {
+    final Map<String, Map<String, dynamic>> userGroups = {};
+    for (final p in pendingPayments) {
+      final user = p['userId'];
+      final uid = (user is Map)
+          ? (user['_id']?.toString() ?? 'unknown')
+          : (user?.toString() ?? 'unknown');
+      if (!userGroups.containsKey(uid)) {
+        userGroups[uid] = {
+          'user': user is Map
+              ? user
+              : {'fullName': 'Unknown', 'phone': '-', 'email': '-'},
+          'payments': <Map<String, dynamic>>[],
+          'totalPaid': 0.0,
+          'totalAmount': 0.0,
+          'remainingBalance': 0.0,
+          'pendingCount': 0,
+          'hasPending': false,
+          'activePlansCount': 0,
+          'latestActivity': p['createdAt'],
+        };
+      }
+      final group = userGroups[uid]!;
+      (group['payments'] as List<Map<String, dynamic>>).add(p);
+      final amtPaid = (p['amountPaid'] is num)
+          ? (p['amountPaid'] as num).toDouble()
+          : (double.tryParse(p['amountPaid']?.toString() ?? '0') ?? 0);
+      final amtTarget = (p['amount'] is num)
+          ? (p['amount'] as num).toDouble()
+          : (double.tryParse(p['amount']?.toString() ?? '0') ?? 0);
+      final discount = (p['discount'] is num)
+          ? (p['discount'] as num).toDouble()
+          : (double.tryParse(p['discount']?.toString() ?? '0') ?? 0);
+      final rem = (amtTarget - discount - amtPaid) > 0
+          ? (amtTarget - discount - amtPaid)
+          : 0.0;
+      group['totalPaid'] = (group['totalPaid'] as double) + amtPaid;
+      group['totalAmount'] = (group['totalAmount'] as double) + amtTarget;
+      group['remainingBalance'] = (group['remainingBalance'] as double) + rem;
+
+      final isPending = p['status'] == 'PENDING' ||
+          p['status'] == 'PENDING_BANK_TRANSFER' ||
+          p['status'] == 'VERIFICATION_PENDING';
+      final history = p['partialPaymentsHistory'] as List? ?? [];
+      final hasPendingInst = history.any((h) => h['status'] == 'PENDING');
+      if (isPending || hasPendingInst) {
+        group['pendingCount'] = (group['pendingCount'] as int) + 1;
+        group['hasPending'] = true;
+      }
+      if (p['status'] == 'PAID' ||
+          p['status'] == 'APPROVED' ||
+          p['status'] == 'PARTIAL-PAID') {
+        group['activePlansCount'] = (group['activePlansCount'] as int) + 1;
+      }
+    }
+    consolidatedUsers.assignAll(userGroups.values.toList());
+  }
+
   Future<void> fetchPendingTransfers({bool isLoadMore = false}) async {
     try {
       if (isLoadMore) {
@@ -1091,6 +1159,7 @@ class PendingBankTransfersController extends GetxController {
         pageSize: pageSize.value,
         search: searchQuery.value,
         status: statusFilter.value,
+        groupBy: viewMode.value == 'grouped' ? 'user' : null,
       );
 
       final newPayments = List<Map<String, dynamic>>.from(
@@ -1106,15 +1175,39 @@ class PendingBankTransfersController extends GetxController {
         pendingPayments.assignAll(newPayments);
       }
 
-      totalPaymentsCount.value = result['totalCount'] ?? 0;
-      hasMorePages.value = pendingPayments.length < totalPaymentsCount.value;
+      final rawUsers = result['users'];
+      if (rawUsers != null && (rawUsers as List).isNotEmpty) {
+        final newUsers = List<Map<String, dynamic>>.from(rawUsers);
+        if (isLoadMore) {
+          consolidatedUsers.addAll(newUsers);
+        } else {
+          consolidatedUsers.assignAll(newUsers);
+        }
+      } else {
+        _buildClientSideConsolidatedUsers();
+      }
 
-      // Since filtering is primarily done on backend now, we just pass the filtered list
-      // Local applyFilters can still be run for any extra UI-side sync needs
+      totalPaymentsCount.value = result['totalCount'] ?? 0;
+      if (result['summaryStats'] != null && result['summaryStats'] is Map) {
+        summaryStats.assignAll(Map<String, dynamic>.from(result['summaryStats']));
+      } else {
+        summaryStats.assignAll({
+          'totalCustomers': totalPaymentsCount.value,
+          'totalVolume': 0.0,
+          'actionRequiredCustomers': 0,
+          'totalPayments': totalPaymentsCount.value,
+          'pendingPaymentsCount': 0,
+        });
+      }
+      final currentListLength = viewMode.value == 'grouped'
+          ? consolidatedUsers.length
+          : pendingPayments.length;
+      hasMorePages.value = currentListLength < totalPaymentsCount.value;
+
       applyFilters();
 
       debugPrint(
-        '[PendingTransfers] Updated observable with ${pendingPayments.length} payments',
+        '[PendingTransfers] Updated observables with ${pendingPayments.length} payments and ${consolidatedUsers.length} users',
       );
     } catch (e) {
       debugPrint('[PendingTransfers] Error: $e');
@@ -1435,6 +1528,10 @@ class PendingBankTransfersController extends GetxController {
 
   void applyFilters() {
     filteredPayments.assignAll(pendingPayments.toList());
+    if (consolidatedUsers.isEmpty && pendingPayments.isNotEmpty) {
+      _buildClientSideConsolidatedUsers();
+    }
+    filteredConsolidatedUsers.assignAll(consolidatedUsers.toList());
   }
 
   void resetFilters() {

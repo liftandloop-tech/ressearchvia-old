@@ -106,6 +106,7 @@ class SegmentService extends ApiService {
     int pageSize = 20,
     String? search,
     String? status,
+    String? groupBy,
   }) async {
     try {
       // Add timestamp to prevent browser caching
@@ -119,12 +120,15 @@ class SegmentService extends ApiService {
       if (status != null && status != 'All') {
         url += '&status=${Uri.encodeComponent(status)}';
       }
+      if (groupBy != null && groupBy.isNotEmpty) {
+        url += '&groupBy=${Uri.encodeComponent(groupBy)}';
+      }
 
       final response = await get(url);
 
       if (response.status.hasError) {
         debugPrint('Error fetching pending transfers: ${response.statusText}');
-        return {'totalCount': 0, 'pendingPayments': []};
+        return {'totalCount': 0, 'pendingPayments': [], 'users': []};
       }
 
       if (response.body['status'] == 200 && response.body['data'] != null) {
@@ -133,10 +137,10 @@ class SegmentService extends ApiService {
         );
         return response.body['data'];
       }
-      return {'totalCount': 0, 'pendingPayments': []};
+      return {'totalCount': 0, 'pendingPayments': [], 'users': []};
     } catch (e) {
       debugPrint('Error fetching pending transfers: $e');
-      return {'totalCount': 0, 'pendingPayments': []};
+      return {'totalCount': 0, 'pendingPayments': [], 'users': []};
     }
   }
 

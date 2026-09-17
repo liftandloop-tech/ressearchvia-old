@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/services/user_payment.service.dart';
-import 'user_details.controller.dart';
-import '../subscription/manage_subscription.controller.dart'; // import just in case, but unused for now
 
 class UserPaymentController extends GetxController {
   final UserPaymentService _paymentService = Get.find<UserPaymentService>();
@@ -13,11 +11,48 @@ class UserPaymentController extends GetxController {
   var paymentHistory = <Map<String, dynamic>>[].obs;
   var totalPayments = 0.obs;
   var currentPage = 1.obs;
+  var filterType = 'ALL'.obs; // ALL, PLAN, REGISTRATION, REFUND
   final int itemsPerPage = 10;
   String? _currentUserId;
 
+  List<Map<String, dynamic>> get filteredPayments {
+    if (filterType.value == 'ALL') return paymentHistory;
+    if (filterType.value == 'REFUND') {
+      return paymentHistory.where((p) {
+        final typeStr = (p['type'] ?? '').toString().toLowerCase();
+        final statusStr = (p['status'] ?? '').toString().toUpperCase();
+        final sourceStr = (p['source'] ?? '').toString().toLowerCase();
+        return typeStr.contains('refund') ||
+            statusStr.contains('REFUND') ||
+            sourceStr == 'refund';
+      }).toList();
+    }
+    if (filterType.value == 'REGISTRATION') {
+      return paymentHistory.where((p) {
+        final typeStr = (p['type'] ?? '').toString().toLowerCase();
+        final planStr = (p['planName'] ?? '').toString().toLowerCase();
+        return typeStr.contains('registration') || planStr.contains('registration');
+      }).toList();
+    }
+    if (filterType.value == 'PLAN') {
+      return paymentHistory.where((p) {
+        final typeStr = (p['type'] ?? '').toString().toLowerCase();
+        final statusStr = (p['status'] ?? '').toString().toUpperCase();
+        final isReg = typeStr.contains('registration');
+        final isRefund = typeStr.contains('refund') || statusStr.contains('REFUND');
+        return !isReg && !isRefund;
+      }).toList();
+    }
+    return paymentHistory;
+  }
+
+  void setFilter(String filter) {
+    filterType.value = filter;
+    currentPage.value = 1;
+  }
+
   void nextPage() {
-    final totalPages = (paymentHistory.length / itemsPerPage).ceil();
+    final totalPages = (filteredPayments.length / itemsPerPage).ceil();
     if (currentPage.value < totalPages) {
       currentPage.value++;
     }
@@ -35,6 +70,8 @@ class UserPaymentController extends GetxController {
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
+      case 'refunded':
+        return const Color(0xFF9333EA);
       case 'paid':
       case 'success':
         return AppTheme.successGreen;
@@ -48,10 +85,12 @@ class UserPaymentController extends GetxController {
     }
   }
 
-  Future<void> fetchPaymentHistory(String userId) async {
-    if (_currentUserId == userId &&
-        (isLoading.value || paymentHistory.isNotEmpty))
+  Future<void> fetchPaymentHistory(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _currentUserId == userId &&
+        (isLoading.value || paymentHistory.isNotEmpty)) {
       return;
+    }
     _currentUserId = userId;
 
     isLoading.value = true;
@@ -62,60 +101,37 @@ class UserPaymentController extends GetxController {
       final response = await _paymentService.getUserPaymentHistory(trimmedId);
       debugPrint('Payment history raw response: $response');
 
-      if (response != null) {
-        if (response is Map &&
-            response['status'] != null &&
-            response['status'] != 200) {
-          error.value =
-              'API Error: ${response['message'] ?? response['status']}';
-          paymentHistory.value = [];
-          totalPayments.value = 0;
-          return;
-        }
+      if (response['status'] != null && response['status'] != 200) {
+        error.value = 'API Error: ${response['message'] ?? response['status']}';
+        paymentHistory.value = [];
+        totalPayments.value = 0;
+        return;
+      }
 
-        if (response is Map) {
-          Map? data;
-          if (response.containsKey('data') && response['data'] is Map) {
-            data = response['data'] as Map;
-          } else if (response.containsKey('segmentsPayment')) {
-            // If segmentsPayment is directly in the root, treat the root as 'data'
-            data = response;
-          }
+      Map? data;
+      if (response.containsKey('data') && response['data'] is Map) {
+        data = response['data'] as Map;
+      } else if (response.containsKey('segmentsPayment')) {
+        data = response;
+      }
 
-          if (data != null) {
-            final List? payments = data['segmentsPayment'];
-            final int count = data['segmentsPaymentCount'] ?? 0;
+      if (data != null) {
+        final List? payments = data['segmentsPayment'];
+        final int count = data['segmentsPaymentCount'] ?? 0;
 
-            if (payments != null) {
-              paymentHistory.assignAll(
-                List<Map<String, dynamic>>.from(payments),
-              );
-              totalPayments.value = count;
-              debugPrint(
-                'Successfully loaded ${paymentHistory.length} payments',
-              );
-            } else {
-              error.value = 'Payment list missing in response (Count: $count)';
-              debugPrint('Missing segmentsPayment in data: $data');
-              paymentHistory.value = [];
-              totalPayments.value = 0;
-            }
-          } else {
-            error.value =
-                'No payment data found in response (Keys: ${response.keys.join(", ")})';
-            debugPrint('Unexpected response structure: $response');
-            paymentHistory.value = [];
-            totalPayments.value = 0;
-          }
+        if (payments != null) {
+          paymentHistory.assignAll(
+            List<Map<String, dynamic>>.from(payments),
+          );
+          totalPayments.value = count;
+          debugPrint('Successfully loaded ${paymentHistory.length} payments');
         } else {
-          error.value =
-              'No payment data found in response (Response is not a Map)';
-          debugPrint('Unexpected response type: $response');
+          error.value = 'Payment list missing in response (Count: $count)';
           paymentHistory.value = [];
           totalPayments.value = 0;
         }
       } else {
-        error.value = 'Empty response from server';
+        error.value = 'No payment data found in response';
         paymentHistory.value = [];
         totalPayments.value = 0;
       }

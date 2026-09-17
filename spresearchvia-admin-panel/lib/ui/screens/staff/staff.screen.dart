@@ -5,7 +5,6 @@ import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
-import 'widgets/staff_section.widget.dart';
 import 'widgets/add_staff_dialog.widget.dart';
 import 'widgets/staff_table.widget.dart';
 import 'widgets/staff_pagination.widget.dart';
@@ -179,9 +178,6 @@ class StaffScreen extends StatelessWidget {
                                             controller: controller,
                                           ),
                                         );
-                                      },
-                                      onDelete: (staff) {
-                                        controller.deleteStaff(staff.id, staff.name);
                                       },
                                       onStatusToggle: (staff, isActive) =>
                                           controller.toggleStaffStatus(staff.id, isActive),

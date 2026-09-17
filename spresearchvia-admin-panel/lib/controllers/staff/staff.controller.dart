@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:html' as html;
@@ -31,6 +30,9 @@ class StaffController extends GetxController {
   final lastCtcController = TextEditingController();
   final localAddressController = TextEditingController();
   final permanentAddressController = TextEditingController();
+  final emergencyNameController = TextEditingController();
+  final emergencyPhoneController = TextEditingController();
+  final emergencyRelationController = TextEditingController();
 
   var isLoading = false.obs;
   var staffList = <StaffModel>[].obs;
@@ -156,6 +158,16 @@ class StaffController extends GetxController {
     mpinController.dispose();
     departmentController.dispose();
     joiningDateController.dispose();
+    genderController.dispose();
+    dobController.dispose();
+    experienceController.dispose();
+    previousCompanyController.dispose();
+    lastCtcController.dispose();
+    localAddressController.dispose();
+    permanentAddressController.dispose();
+    emergencyNameController.dispose();
+    emergencyPhoneController.dispose();
+    emergencyRelationController.dispose();
 
     super.onClose();
   }
@@ -267,15 +279,26 @@ class StaffController extends GetxController {
     lastCtcController.text = staff.lastCtc ?? '';
     localAddressController.text = staff.localAddress ?? '';
     permanentAddressController.text = staff.permanentAddress ?? '';
+    emergencyNameController.text = staff.emergencyContact?.name ?? '';
+    emergencyPhoneController.text = staff.emergencyContact?.phone ?? '';
+    emergencyRelationController.text = staff.emergencyContact?.relation ?? '';
 
     // Handle assigned director for update
-    if (staff.assignedDirector != null) {
+    assignedDirector.value = null;
+    if (staff.assignedDirector != null && staff.assignedDirector!.isNotEmpty) {
       // Find staff in list
       final director = staffList.firstWhereOrNull(
         (s) => s.id == staff.assignedDirector,
       );
       if (director != null) {
         assignedDirector.value = director;
+      } else if (staff.assignedDirectorName != null && staff.assignedDirectorName!.isNotEmpty) {
+        final dirByName = staffList.firstWhereOrNull(
+          (s) => s.name.toLowerCase().trim() == staff.assignedDirectorName!.toLowerCase().trim(),
+        );
+        if (dirByName != null) {
+          assignedDirector.value = dirByName;
+        }
       }
     }
   }
@@ -409,23 +432,10 @@ class StaffController extends GetxController {
       }
     }
 
-    // Validate Assigned Director if Manager
-    if (selectedDepartment.value.toLowerCase() == 'manager') {
-      if (isDirectorLoggedIn) {
-        // Auto-assign current director
-        // No validation needed here as we handle it in data preparation
-      } else {
-        // For Admin, ensure a director is selected
-        if (assignedDirector.value == null) {
-          Get.snackbar(
-            'Validation Error',
-            'Please assign a director to the manager',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red[100],
-            colorText: Colors.red[900],
-          );
-          return;
-        }
+    // Assigned director validation for managers when directors are available
+    if (selectedDepartment.value.toLowerCase() == 'manager' && !isDirectorLoggedIn) {
+      if (assignedDirector.value == null && availableDirectors.isNotEmpty) {
+        // Optional warning or fallback, allow proceeding if admin prefers unassigned
       }
     }
 
@@ -517,7 +527,7 @@ class StaffController extends GetxController {
     isLoading.value = true;
     try {
       // Backend expects exact field names including typo "deparment"
-      final data = {
+      final Map<String, dynamic> data = {
         "fullName": nameController.text.trim(),
         "mobileNumber": "+91$mobileStr",
         "emailAddress": emailController.text.trim(),
@@ -534,6 +544,14 @@ class StaffController extends GetxController {
         if (lastCtcController.text.trim().isNotEmpty) "lastCtc": lastCtcController.text.trim(),
         if (localAddressController.text.trim().isNotEmpty) "localAddress": localAddressController.text.trim(),
         if (permanentAddressObj != null) "permanentAddress": permanentAddressObj,
+        if (emergencyNameController.text.trim().isNotEmpty ||
+            emergencyPhoneController.text.trim().isNotEmpty ||
+            emergencyRelationController.text.trim().isNotEmpty)
+          "emergencyContact": {
+            "name": emergencyNameController.text.trim(),
+            "phone": emergencyPhoneController.text.trim(),
+            "relation": emergencyRelationController.text.trim(),
+          },
       };
 
       if (selectedDepartment.value.toLowerCase() != 'manager' &&
@@ -541,15 +559,22 @@ class StaffController extends GetxController {
         data["mpin"] = mpinController.text.trim();
       }
 
-      // Handle assigned director
-      if (selectedDepartment.value.toLowerCase() == 'manager') {
+      // Handle assigned director (Supervisor for all staff roles)
+      final deptLower = selectedDepartment.value.toLowerCase().trim();
+      if (deptLower != 'director') {
         if (isDirectorLoggedIn) {
           data["assignedDirector"] = _authController.user.value!.id;
           data["assignedDirectorName"] = _authController.user.value!.fullName;
         } else if (assignedDirector.value != null) {
           data["assignedDirector"] = assignedDirector.value!.id;
           data["assignedDirectorName"] = assignedDirector.value!.name;
+        } else {
+          data["assignedDirector"] = null;
+          data["assignedDirectorName"] = null;
         }
+      } else {
+        data["assignedDirector"] = null;
+        data["assignedDirectorName"] = null;
       }
 
       // Only include staffId for update operations
@@ -676,6 +701,9 @@ class StaffController extends GetxController {
     lastCtcController.clear();
     localAddressController.clear();
     permanentAddressController.clear();
+    emergencyNameController.clear();
+    emergencyPhoneController.clear();
+    emergencyRelationController.clear();
 
     selectedDepartment.value = isDirectorLoggedIn ? 'Manager' : '';
 
@@ -788,7 +816,17 @@ class StaffController extends GetxController {
 
   List<StaffModel> get availableDirectors {
     final directors = staffList
-        .where((s) => s.department.toLowerCase().trim().contains('director'))
+        .where((s) {
+          if (editingStaffId.value.isNotEmpty && s.id == editingStaffId.value) {
+            return false;
+          }
+          final dept = s.department.toLowerCase().trim();
+          final role = s.role.toLowerCase().trim();
+          return dept.contains('director') ||
+              role.contains('director') ||
+              dept.contains('admin') ||
+              role.contains('admin');
+        })
         .toList();
     return directors;
   }
@@ -956,6 +994,78 @@ class StaffController extends GetxController {
 
   void updateDepartment(String dept) {
     selectedDepartment.value = dept;
+  }
+
+  Future<bool> assignSupervisor(String staffId, String? supervisorId, String? supervisorName) async {
+    try {
+      final isDirectAdmin = supervisorId == null || supervisorId == 'admin' || supervisorId == 'unassigned';
+      final Map<String, dynamic> data = {
+        "assignedDirector": isDirectAdmin ? null : supervisorId,
+        "assignedDirectorName": isDirectAdmin ? 'Admin' : supervisorName,
+      };
+
+      final success = await _staffService.updateStaff(staffId, data);
+      if (success) {
+        final index = staffList.indexWhere((s) => s.id == staffId);
+        if (index != -1) {
+          final old = staffList[index];
+          staffList[index] = StaffModel(
+            id: old.id,
+            staffId: old.staffId,
+            name: old.name,
+            mobile: old.mobile,
+            email: old.email,
+            role: old.role,
+            status: old.status,
+            department: old.department,
+            joiningDate: old.joiningDate,
+            remark: old.remark,
+            assignedDirector: data["assignedDirector"],
+            assignedDirectorName: data["assignedDirectorName"],
+            mpin: old.mpin,
+            isViewOnly: old.isViewOnly,
+            panUrl: old.panUrl,
+            aadhaarUrl: old.aadhaarUrl,
+            nismUrl: old.nismUrl,
+            highestEducationUrl: old.highestEducationUrl,
+            kycVideoUrl: old.kycVideoUrl,
+            onboardingStatus: old.onboardingStatus,
+            isEmailVerified: old.isEmailVerified,
+            isMobileVerified: old.isMobileVerified,
+            photoUrl: old.photoUrl,
+            resumeUrl: old.resumeUrl,
+            stage: old.stage,
+            dob: old.dob,
+            gender: old.gender,
+            experienceYears: old.experienceYears,
+            previousCompany: old.previousCompany,
+            lastCtc: old.lastCtc,
+            localAddress: old.localAddress,
+            permanentAddress: old.permanentAddress,
+            emergencyContact: old.emergencyContact,
+          );
+          staffList.refresh();
+        }
+        Get.snackbar(
+          'Updated',
+          'Reporting authority updated to ${data["assignedDirectorName"]}',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green[100],
+          colorText: Colors.green[900],
+          duration: const Duration(seconds: 2),
+        );
+      }
+      return success;
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to update reporting authority: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
   }
 
   Future<void> deleteStaff(String staffId, String staffName) async {

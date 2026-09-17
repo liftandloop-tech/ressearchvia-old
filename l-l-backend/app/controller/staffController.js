@@ -92,5 +92,27 @@ const staffController = {
         }
     },
 
+    staffImpersonate: async (req, res) => {
+        try {
+            const response = await staffService.staffImpersonate({
+                body: req.body,
+                user: req.user
+            });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: {} });
+        }
+    },
+
+    getPublicStaffVerification: async (req, res) => {
+        try {
+            const { staffId } = req.params;
+            const response = await staffService.getPublicStaffVerification(staffId);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
 }
 export default staffController;

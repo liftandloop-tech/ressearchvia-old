@@ -190,6 +190,107 @@ class PendingBankTransfersScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    // View Mode Switcher
+                    Obx(
+                      () => Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.gray100,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.gray300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () => controller.setViewMode('grouped'),
+                              borderRadius: const BorderRadius.horizontal(
+                                left: Radius.circular(5),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: controller.viewMode.value == 'grouped'
+                                      ? AppTheme.primaryBlue
+                                      : Colors.transparent,
+                                  borderRadius: const BorderRadius.horizontal(
+                                    left: Radius.circular(5),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.group,
+                                      size: 16,
+                                      color: controller.viewMode.value == 'grouped'
+                                          ? Colors.white
+                                          : AppTheme.textSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'By Customer',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: controller.viewMode.value == 'grouped'
+                                            ? Colors.white
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => controller.setViewMode('flat'),
+                              borderRadius: const BorderRadius.horizontal(
+                                right: Radius.circular(5),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: controller.viewMode.value == 'flat'
+                                      ? AppTheme.primaryBlue
+                                      : Colors.transparent,
+                                  borderRadius: const BorderRadius.horizontal(
+                                    right: Radius.circular(5),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.receipt_long,
+                                      size: 16,
+                                      color: controller.viewMode.value == 'flat'
+                                          ? Colors.white
+                                          : AppTheme.textSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'By Transaction',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: controller.viewMode.value == 'flat'
+                                            ? Colors.white
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 16),
                     // Reset Button
                     Button(
@@ -205,10 +306,71 @@ class PendingBankTransfersScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          // KPI Summary Chips Banner
+          Obx(() {
+            final isGrouped = controller.viewMode.value == 'grouped';
+            final stats = controller.summaryStats;
+
+            final totalCustomers = stats['totalCustomers'] ?? controller.totalPaymentsCount.value;
+            final totalPayments = stats['totalPayments'] ?? controller.totalPaymentsCount.value;
+            
+            final actionRequiredCount = isGrouped
+                ? (stats['actionRequiredCustomers'] ?? controller.filteredConsolidatedUsers.where((u) => u['hasPending'] == true).length)
+                : (stats['pendingPaymentsCount'] ?? stats['actionRequiredCustomers'] ?? controller.filteredPayments.where((p) => p['status'] == 'PENDING_BANK_TRANSFER' || p['status'] == 'VERIFICATION_PENDING').length);
+
+            final num rawVolume = stats['totalVolume'] ?? 0;
+            double totalVolume = rawVolume.toDouble();
+            if (totalVolume == 0 && controller.filteredConsolidatedUsers.isNotEmpty) {
+              for (var u in controller.filteredConsolidatedUsers) {
+                totalVolume += (u['totalPaid'] is num)
+                    ? (u['totalPaid'] as num).toDouble()
+                    : (double.tryParse(u['totalPaid']?.toString() ?? '0') ?? 0);
+              }
+            }
+
+            final mainCountStr = isGrouped ? "$totalCustomers" : "$totalPayments";
+            final hasActionRequired = actionRequiredCount is num && actionRequiredCount > 0;
+
+            return Row(
+              children: [
+                _buildSummaryChip(
+                  label: isGrouped ? "Total Customers" : "Total Payments",
+                  value: mainCountStr,
+                  icon: isGrouped
+                      ? Icons.people_alt_outlined
+                      : Icons.receipt_long_outlined,
+                  color: AppTheme.primaryBlue,
+                ),
+                const SizedBox(width: 12),
+                _buildSummaryChip(
+                  label: "Action Required",
+                  value:
+                      "$actionRequiredCount ${isGrouped ? (actionRequiredCount == 1 ? 'Customer' : 'Customers') : (actionRequiredCount == 1 ? 'Payment' : 'Payments')}",
+                  icon: Icons.pending_actions_outlined,
+                  color: hasActionRequired
+                      ? Colors.orange[800]!
+                      : Colors.grey[700]!,
+                  isWarning: hasActionRequired,
+                ),
+                const SizedBox(width: 12),
+                _buildSummaryChip(
+                  label: "Total Collection Volume",
+                  value: "₹${totalVolume.toStringAsFixed(0)}",
+                  icon: Icons.payments_outlined,
+                  color: Colors.green[700]!,
+                ),
+              ],
+            );
+          }),
+          const SizedBox(height: 16),
           // Data Section
           Obx(() {
-            if (controller.isLoading.value &&
-                controller.pendingPayments.isEmpty) {
+            final isGrouped = controller.viewMode.value == 'grouped';
+            final listEmpty = isGrouped
+                ? controller.consolidatedUsers.isEmpty
+                : controller.pendingPayments.isEmpty;
+
+            if (controller.isLoading.value && listEmpty) {
               return const Center(
                 child: Padding(
                   padding: EdgeInsets.all(40.0),
@@ -217,7 +379,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
               );
             }
 
-            if (controller.pendingPayments.isEmpty) {
+            if (listEmpty) {
               return const Center(
                 child: Padding(
                   padding: EdgeInsets.all(40.0),
@@ -226,7 +388,9 @@ class PendingBankTransfersScreen extends StatelessWidget {
               );
             }
 
-            return _buildPaymentsTable(controller);
+            return isGrouped
+                ? _buildConsolidatedUsersTable(controller)
+                : _buildPaymentsTable(controller);
           }),
         ],
       ),
@@ -542,6 +706,1622 @@ class PendingBankTransfersScreen extends StatelessWidget {
         ],
       );
     });
+  }
+
+  Widget _buildSummaryChip({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    bool isWarning = false,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isWarning ? Colors.orange[300]! : AppTheme.gray200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isWarning ? Colors.orange[900] : AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConsolidatedUsersTable(
+    PendingBankTransfersController controller,
+  ) {
+    return Obx(() {
+      if (controller.filteredConsolidatedUsers.isEmpty) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(40.0),
+            child: Text("No customer payments match the selected filters."),
+          ),
+        );
+      }
+
+      final tableCard = Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: AppTheme.gray200),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scrollController = ScrollController();
+            return Scrollbar(
+              controller: scrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: scrollController,
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: DataTable(
+                    dataRowHeight: 85,
+                    columnSpacing: 24,
+                    horizontalMargin: 16,
+                    headingRowColor: MaterialStateProperty.all(AppTheme.gray50),
+                    columns: const [
+                      DataColumn(label: Text('Customer')),
+                      DataColumn(label: Text('Registration')),
+                      DataColumn(label: Text('Subscriptions / Plans')),
+                      DataColumn(label: Text('Total Paid (LTV)')),
+                      DataColumn(label: Text('Approval Status')),
+                      DataColumn(label: Text('Latest Activity')),
+                      DataColumn(label: Text('Actions')),
+                    ],
+                    rows: controller.filteredConsolidatedUsers.map((userGroup) {
+                      final user = userGroup['user'] is Map
+                          ? Map<String, dynamic>.from(userGroup['user'])
+                          : <String, dynamic>{};
+                      final List payments = userGroup['payments'] is List
+                          ? userGroup['payments'] as List
+                          : [];
+                      final double totalPaid = (userGroup['totalPaid'] is num)
+                          ? (userGroup['totalPaid'] as num).toDouble()
+                          : (double.tryParse(userGroup['totalPaid']?.toString() ?? '0') ?? 0);
+                      final double remaining = (userGroup['remainingBalance'] is num)
+                          ? (userGroup['remainingBalance'] as num).toDouble()
+                          : (double.tryParse(userGroup['remainingBalance']?.toString() ?? '0') ?? 0);
+                      final int pendingCount = userGroup['pendingCount'] is int
+                          ? userGroup['pendingCount'] as int
+                          : (int.tryParse(userGroup['pendingCount']?.toString() ?? '0') ?? 0);
+                      final bool hasPending = userGroup['hasPending'] == true || pendingCount > 0;
+                      final int activeCount = userGroup['activePlansCount'] is int
+                          ? userGroup['activePlansCount'] as int
+                          : 0;
+
+                      final regType = (user['registrationType'] ?? '').toString().toUpperCase();
+                      String regDisplay = '-';
+                      if (regType.contains('LIFETIME')) {
+                        regDisplay = 'Gold (Lifetime)';
+                      } else if (regType.contains('YEARLY')) {
+                        regDisplay = 'Silver (Yearly)';
+                      } else if (regType.isNotEmpty) {
+                        regDisplay = user['registrationType'].toString();
+                      }
+
+                      DateTime? latestDate;
+                      if (userGroup['latestActivity'] != null) {
+                        latestDate = DateTime.tryParse(userGroup['latestActivity'].toString());
+                      }
+                      final isNew = hasPending &&
+                          latestDate != null &&
+                          DateTime.now().difference(latestDate).inHours < 48;
+
+                      final double basePaid = totalPaid / 1.18;
+                      final double gstPaid = totalPaid - basePaid;
+
+                      return DataRow(
+                        color: hasPending
+                            ? MaterialStateProperty.all(Colors.amber[50])
+                            : null,
+                        cells: [
+                          // Customer
+                          DataCell(
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 220),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
+                                    child: Text(
+                                      (user['fullName']?.toString().isNotEmpty == true)
+                                          ? user['fullName'].toString().substring(0, 1).toUpperCase()
+                                          : 'U',
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryBlue,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          user['fullName'] ?? '-',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        Text(
+                                          user['email'] ?? '-',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        Text(
+                                          user['phone'] ?? '-',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Registration
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: regDisplay.startsWith('Gold')
+                                    ? Colors.amber[100]
+                                    : (regDisplay.startsWith('Silver') ? Colors.blueGrey[50] : Colors.grey[100]),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: regDisplay.startsWith('Gold')
+                                      ? Colors.amber[400]!
+                                      : Colors.grey[300]!,
+                                ),
+                              ),
+                              child: Text(
+                                regDisplay,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: regDisplay.startsWith('Gold')
+                                      ? Colors.amber[900]
+                                      : Colors.grey[800],
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Subscriptions count & plan names
+                          DataCell(
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 240),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryBlue.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          "${payments.length} ${payments.length == 1 ? 'Purchase' : 'Purchases'}",
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.primaryBlue,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    payments.map((p) {
+                                      if (p['purchaseType'] == 'REGISTRATION') return 'Registration';
+                                      final pl = p['segmentPlanId'];
+                                      if (pl is Map) return pl['planName']?.toString() ?? 'Plan';
+                                      return 'Plan';
+                                    }).toSet().join(', '),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Total Paid (LTV)
+                          DataCell(
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '₹${basePaid.toStringAsFixed(0)} + ₹${gstPaid.toStringAsFixed(0)} GST',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'Total Paid: ₹${totalPaid.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                                if (remaining > 0)
+                                  Text(
+                                    'Balance Due: ₹${remaining.toStringAsFixed(0)}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange[800],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          // Approval Status
+                          DataCell(
+                            hasPending
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.orange[300]!),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.pending_actions, size: 14, color: Colors.orange[900]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$pendingCount Pending Slip${pendingCount > 1 ? 's' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange[900],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.green[200]!),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_outline, size: 14, color: Colors.green[700]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          activeCount > 0 ? '$activeCount Active' : 'Cleared',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                          // Latest Activity
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(latestDate != null ? _getRelativeDate(latestDate) : '-'),
+                                if (isNew) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[600],
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'NEW',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          // Actions
+                          DataCell(
+                            Button(
+                              title: "Details",
+                              buttonType: hasPending ? ButtonType.blue : ButtonType.grey,
+                              size: ButtonSize.small,
+                              icon: Icons.folder_open_outlined,
+                              onTap: () => _showUserPaymentDossierDialog(userGroup, controller),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          tableCard,
+          const SizedBox(height: 16),
+          Text(
+            "Showing ${controller.filteredConsolidatedUsers.length} of ${controller.totalPaymentsCount.value} customers",
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+          if (controller.hasMorePages.value) ...[
+            const SizedBox(height: 16),
+            Center(
+              child: Button(
+                title: controller.isLoading.value ? "Loading..." : "Load More Customers",
+                buttonType: ButtonType.blue,
+                size: ButtonSize.small,
+                onTap: controller.isLoading.value
+                    ? null
+                    : () => controller.fetchPendingTransfers(isLoadMore: true),
+              ),
+            ),
+          ],
+        ],
+      );
+    });
+  }
+
+  void _showUserPaymentDossierDialog(
+    Map<String, dynamic> initialUserGroup,
+    PendingBankTransfersController controller,
+  ) {
+    final RxMap<String, dynamic> liveUserGroup =
+        Map<String, dynamic>.from(initialUserGroup).obs;
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Container(
+          width: 1150,
+          constraints: BoxConstraints(maxHeight: Get.height * 0.9),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Obx(() {
+            final user = liveUserGroup['user'] is Map
+                ? Map<String, dynamic>.from(liveUserGroup['user'])
+                : <String, dynamic>{};
+            final List payments = liveUserGroup['payments'] is List
+                ? liveUserGroup['payments'] as List
+                : [];
+            final String userId = user['_id']?.toString() ?? '';
+
+            // Compute summary stats dynamically
+            double totalPaid = 0;
+            double remainingTotal = 0;
+            int pendingCount = 0;
+            double pendingAmount = 0;
+            int activePlansCount = 0;
+
+            for (var p in payments) {
+              final double pPaid = (p['amountPaid'] is num)
+                  ? (p['amountPaid'] as num).toDouble()
+                  : (double.tryParse(p['amountPaid']?.toString() ?? '0') ?? 0);
+              final double pTarget = (p['amount'] is num)
+                  ? (p['amount'] as num).toDouble()
+                  : (double.tryParse(p['amount']?.toString() ?? '0') ?? 0);
+              final double pDiscount = (p['discount'] is num)
+                  ? (p['discount'] as num).toDouble()
+                  : (double.tryParse(p['discount']?.toString() ?? '0') ?? 0);
+              final double rem = (pTarget - pDiscount - pPaid) > 0
+                  ? (pTarget - pDiscount - pPaid)
+                  : 0;
+
+              totalPaid += pPaid;
+              remainingTotal += rem;
+
+              final isPending = p['status'] == 'PENDING' ||
+                  p['status'] == 'PENDING_BANK_TRANSFER' ||
+                  p['status'] == 'VERIFICATION_PENDING';
+              final history = p['partialPaymentsHistory'] as List? ?? [];
+              final pendingInst =
+                  history.where((h) => h['status'] == 'PENDING').toList();
+
+              if (isPending) {
+                pendingCount++;
+                pendingAmount += pPaid > 0 ? pPaid : pTarget;
+              } else if (pendingInst.isNotEmpty) {
+                pendingCount += pendingInst.length;
+                for (var inst in pendingInst) {
+                  pendingAmount += (inst['amountPaid'] is num)
+                      ? (inst['amountPaid'] as num).toDouble()
+                      : (double.tryParse(inst['amountPaid']?.toString() ?? '0') ?? 0);
+                }
+              }
+
+              if (p['status'] == 'PAID' ||
+                  p['status'] == 'APPROVED' ||
+                  p['status'] == 'PARTIAL-PAID') {
+                activePlansCount++;
+              }
+            }
+
+            final regType =
+                (user['registrationType'] ?? '').toString().toUpperCase();
+            String regBadge = 'Standard';
+            if (regType.contains('LIFETIME')) {
+              regBadge = 'Gold (Lifetime)';
+            } else if (regType.contains('YEARLY')) {
+              regBadge = 'Silver (Yearly)';
+            } else if (regType.isNotEmpty) {
+              regBadge = user['registrationType'].toString();
+            }
+
+            return Column(
+              children: [
+                // Modal Header
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  color: AppTheme.primaryBlue,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.white24,
+                        child: Text(
+                          (user['fullName']?.toString().isNotEmpty == true)
+                              ? user['fullName']
+                                  .toString()
+                                  .substring(0, 1)
+                                  .toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  user['fullName'] ??
+                                      'Customer Payments Dossier',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white24,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    regBadge,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: (user['kycStatus'] == 'VERIFIED' ||
+                                            user['kycStatus'] == 'APPROVED')
+                                        ? Colors.green.withOpacity(0.3)
+                                        : Colors.orange.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    "KYC: ${user['kycStatus'] ?? 'PENDING'}",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "Phone: ${user['phone'] ?? '-'}  •  Email: ${user['email'] ?? '-'}",
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (userId.isNotEmpty) ...[
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white12,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                          ),
+                          icon: const Icon(Icons.person, size: 16),
+                          label: const Text("User Profile",
+                              style: TextStyle(fontSize: 12)),
+                          onPressed: () {
+                            Get.toNamed('/users/$userId');
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      IconButton(
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        tooltip: "Close",
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Content Section
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top Summary KPI Cards
+                        Row(
+                          children: [
+                            _buildStatCard(
+                              "Customer Lifetime (Paid)",
+                              "₹${totalPaid.toStringAsFixed(0)}",
+                              Icons.account_balance_wallet_outlined,
+                              Colors.green[700]!,
+                            ),
+                            const SizedBox(width: 16),
+                            _buildStatCard(
+                              "Active Subscriptions",
+                              "$activePlansCount / ${payments.length} Plans",
+                              Icons.verified_outlined,
+                              AppTheme.primaryBlue,
+                            ),
+                            const SizedBox(width: 16),
+                            _buildStatCard(
+                              "Pending Reviews",
+                              pendingCount > 0
+                                  ? "$pendingCount Slips (₹${pendingAmount.toStringAsFixed(0)})"
+                                  : "None Pending",
+                              Icons.pending_actions_outlined,
+                              pendingCount > 0
+                                  ? Colors.orange[800]!
+                                  : Colors.grey[700]!,
+                            ),
+                            const SizedBox(width: 16),
+                            _buildStatCard(
+                              "Remaining Balance",
+                              "₹${remainingTotal.toStringAsFixed(0)}",
+                              Icons.timelapse_outlined,
+                              remainingTotal > 0
+                                  ? Colors.purple[700]!
+                                  : Colors.grey[700]!,
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 28),
+
+                        // Section Heading
+                        Row(
+                          children: [
+                            const Icon(Icons.receipt_long,
+                                size: 20, color: AppTheme.primaryBlue),
+                            const SizedBox(width: 8),
+                            Text(
+                              "All Purchases & Subscriptions (${payments.length})",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              "Sorted by newest activity",
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Render Plan Cards
+                        ...payments.asMap().entries.map((entry) {
+                          final int idx = entry.key;
+                          final payment = entry.value is Map
+                              ? Map<String, dynamic>.from(entry.value)
+                              : <String, dynamic>{};
+                          return _buildDossierPaymentCard(
+                            payment: payment,
+                            controller: controller,
+                            index: idx,
+                            onPaymentUpdated: (updatedPayment) {
+                              final List updatedList =
+                                  List.from(liveUserGroup['payments'] ?? []);
+                              final int pIdx = updatedList.indexWhere(
+                                (p) =>
+                                    p['_id']?.toString() ==
+                                    updatedPayment['_id']?.toString(),
+                              );
+                              if (pIdx != -1) {
+                                updatedList[pIdx] = updatedPayment;
+                              } else {
+                                updatedList.add(updatedPayment);
+                              }
+                              liveUserGroup['payments'] = updatedList;
+                              liveUserGroup.refresh();
+                              controller.fetchPendingTransfers();
+                            },
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDossierPaymentCard({
+    required Map<String, dynamic> payment,
+    required PendingBankTransfersController controller,
+    required int index,
+    required Function(Map<String, dynamic> updatedPayment) onPaymentUpdated,
+  }) {
+    final String intentId = payment['_id']?.toString() ?? '';
+    final String purchaseType = payment['purchaseType']?.toString() ?? 'PLAN';
+    final bool isRegistration = purchaseType == 'REGISTRATION';
+    final bool isPartial = payment['isPartial'] == true;
+    final String status = payment['status']?.toString() ?? 'PENDING';
+
+    final Map<String, dynamic> plan = (payment['segmentPlanId'] is Map)
+        ? Map<String, dynamic>.from(payment['segmentPlanId'])
+        : {};
+    final String planName = isRegistration
+        ? (payment['amount'] == 10000 || payment['baseAmount'] == 10000
+            ? 'Gold Registration (Lifetime)'
+            : 'Silver Registration (Yearly)')
+        : (plan['segmentsName'] != null &&
+                plan['segmentsName'].toString().isNotEmpty &&
+                plan['segmentsName'] != 'Platform'
+            ? "${plan['planName'] ?? 'Custom Plan'} (${plan['segmentsName']})"
+            : (plan['planName'] ?? 'Custom Plan'));
+
+    final double planAmount = (payment['amount'] is num)
+        ? (payment['amount'] as num).toDouble()
+        : (double.tryParse(payment['amount']?.toString() ?? '0') ?? 0);
+    final double discount = (payment['discount'] is num)
+        ? (payment['discount'] as num).toDouble()
+        : (double.tryParse(payment['discount']?.toString() ?? '0') ?? 0);
+    final double amountPaid = (payment['amountPaid'] is num)
+        ? (payment['amountPaid'] as num).toDouble()
+        : (double.tryParse(payment['amountPaid']?.toString() ?? '0') ?? 0);
+    final double target = planAmount - discount;
+    final double remaining =
+        (target - amountPaid) > 0 ? (target - amountPaid) : 0;
+
+    final double basePaid = amountPaid / 1.18;
+    final double gstPaid = amountPaid - basePaid;
+
+    final date = DateTime.tryParse(payment['createdAt'] ?? '');
+    final history = payment['partialPaymentsHistory'] as List? ?? [];
+    final proofUrl = payment['paymentProof'] ?? payment['paymentScreenshot'];
+    final List<String> paymentProofs =
+        (payment['paymentProofs'] != null &&
+                (payment['paymentProofs'] as List).isNotEmpty)
+            ? (payment['paymentProofs'] as List)
+                .map((e) => AppConfig.buildImageUrl(e.toString()))
+                .toList()
+            : (proofUrl != null
+                ? [AppConfig.buildImageUrl(proofUrl.toString())]
+                : []);
+
+    // Date Logic
+    final String? startStr = payment['serviceStartDate']?.toString();
+    DateTime? startDate = (startStr != null && startStr.isNotEmpty)
+        ? DateTime.tryParse(startStr)
+        : null;
+
+    if (startDate == null) {
+      for (var inst in history) {
+        if (inst['status'] == 'APPROVED' ||
+            inst['status'] == 'PARTIAL-PAID' ||
+            inst['status'] == 'PAID') {
+          final dtStr = inst['transactionDate']?.toString() ??
+              inst['updatedAt']?.toString() ??
+              inst['createdAt']?.toString();
+          if (dtStr != null) {
+            startDate = DateTime.tryParse(dtStr);
+            break;
+          }
+        }
+      }
+      if (status == 'PAID' || status == 'APPROVED') {
+        startDate ??= date;
+      }
+    }
+
+    final String sDateDisplay = startDate != null
+        ? _formatToIST(startDate, 'dd MMM yyyy')
+        : 'Yet to be activated';
+
+    final String? expiryStr = payment['currentExpiryDate']?.toString();
+    DateTime? expiryDate = (expiryStr != null && expiryStr.isNotEmpty)
+        ? DateTime.tryParse(expiryStr)
+        : null;
+
+    final int originalDuration = (payment['originalDuration'] is num)
+        ? (payment['originalDuration'] as num).toInt()
+        : (isRegistration ? 3650 : 365);
+
+    if (expiryDate == null && startDate != null && !isPartial) {
+      expiryDate = startDate.add(Duration(days: originalDuration));
+    }
+
+    final String eDateDisplay =
+        expiryDate != null ? _formatToIST(expiryDate, 'dd MMM yyyy') : 'N/A';
+
+    final bool hasPendingInstallment =
+        history.any((h) => h['status'] == 'PENDING');
+    final bool needsAttention = status == 'PENDING' ||
+        status == 'PENDING_BANK_TRANSFER' ||
+        status == 'VERIFICATION_PENDING' ||
+        hasPendingInstallment;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: needsAttention ? Colors.orange[300]! : AppTheme.gray200,
+          width: needsAttention ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card Top Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: needsAttention
+                  ? Colors.orange[50]?.withOpacity(0.5)
+                  : AppTheme.gray50,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
+              border: Border(bottom: BorderSide(color: AppTheme.gray200)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (isRegistration ? Colors.amber : AppTheme.primaryBlue)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    isRegistration ? Icons.badge_outlined : Icons.layers_outlined,
+                    size: 20,
+                    color:
+                        isRegistration ? Colors.amber[900] : AppTheme.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            planName,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (isRegistration)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber[100],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'REGISTRATION FEE',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber[900],
+                                ),
+                              ),
+                            )
+                          else if (isPartial)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.purple[50],
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: Colors.purple[200]!),
+                              ),
+                              child: Text(
+                                'PARTIAL PLAN',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.purple[900],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Created: ${date != null ? _formatToIST(date, 'dd MMM yyyy, hh:mm a') : '-'}  •  Order ID: ${payment['razorpayOrderId'] ?? '-'}",
+                        style: const TextStyle(
+                            fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildStatusChip(status,
+                    remaining: remaining, installmentCount: history.length),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: const Icon(Icons.receipt_long,
+                      color: AppTheme.primaryBlue),
+                  tooltip: 'View / Download Invoice',
+                  onPressed: () => _showInvoiceDialog(payment),
+                ),
+              ],
+            ),
+          ),
+
+          // Card Body
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Financial Snapshot Bar
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.gray50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.gray200),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildInfoItem(
+                          "Total Plan Target",
+                          "₹${target.toStringAsFixed(0)}",
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildInfoItem(
+                          "Amount Paid (Base + GST)",
+                          "₹${basePaid.toStringAsFixed(0)} + ₹${gstPaid.toStringAsFixed(0)}",
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildInfoItem(
+                          "Balance Due",
+                          remaining > 0
+                              ? "₹${remaining.toStringAsFixed(0)}"
+                              : "₹0 (Cleared)",
+                        ),
+                      ),
+                      if (discount > 0)
+                        Expanded(
+                          child: _buildInfoItem(
+                            "Discount Applied",
+                            "₹${discount.toStringAsFixed(0)}",
+                          ),
+                        ),
+                      Expanded(
+                        child: _buildInfoItem(
+                          "Service Validity",
+                          "$sDateDisplay ➔ $eDateDisplay",
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // If Partial Plan: Render Installment Timeline
+                if (isPartial) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.timeline, size: 18, color: Colors.purple),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Partial Installments History",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        "${history.length} Installment${history.length == 1 ? '' : 's'} recorded",
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (history.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          "No installments uploaded yet",
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(1.6),
+                        1: FlexColumnWidth(2.0),
+                        2: FlexColumnWidth(1.8),
+                        3: FlexColumnWidth(1.0),
+                        4: FlexColumnWidth(1.2),
+                        5: FlexColumnWidth(2.0),
+                      },
+                      border:
+                          TableBorder.all(color: Colors.grey[200]!, width: 0.5),
+                      children: [
+                        TableRow(
+                          decoration: BoxDecoration(color: Colors.grey[100]),
+                          children: const [
+                            Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Date',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11)),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Amount (Base+GST)',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11)),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('UTR',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11)),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Proof',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11)),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Status',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11)),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text('Actions',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                        ...history.reversed.map((inst) {
+                          final instDate = DateTime.tryParse(
+                              inst['transactionDate'] ?? '');
+                          final instProof = inst['proofImage'];
+                          final List instProofs = (inst['proofImages'] is List &&
+                                  (inst['proofImages'] as List).isNotEmpty)
+                              ? (inst['proofImages'] as List)
+                                  .map((e) =>
+                                      AppConfig.buildImageUrl(e.toString()))
+                                  .toList()
+                              : (instProof != null
+                                  ? [
+                                      AppConfig.buildImageUrl(
+                                          instProof.toString())
+                                    ]
+                                  : []);
+                          final double instAmt = (inst['amountPaid'] is num)
+                              ? (inst['amountPaid'] as num).toDouble()
+                              : (double.tryParse(
+                                      inst['amountPaid']?.toString() ?? '0') ??
+                                  0);
+                          final isInstPending = inst['status'] == 'PENDING';
+                          final isInstApproved = inst['status'] == 'APPROVED';
+                          final isInstRejected = inst['status'] == 'REJECTED';
+
+                          return TableRow(
+                            decoration: BoxDecoration(
+                              color: isInstPending ? Colors.amber[50] : null,
+                            ),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  instDate != null
+                                      ? _formatToIST(instDate, 'dd MMM yyyy')
+                                      : '-',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  '₹${(instAmt / 1.18).toStringAsFixed(0)} + ₹${(instAmt - (instAmt / 1.18)).toStringAsFixed(0)} = ₹${instAmt.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  inst['utrNumber'] ?? '-',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: instProofs.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.image_outlined,
+                                            size: 18,
+                                            color: AppTheme.primaryBlue),
+                                        onPressed: () => _showImageDialog(
+                                            instProofs.cast<String>()),
+                                        tooltip: "View Slip",
+                                      )
+                                    : const Icon(Icons.image_not_supported,
+                                        size: 16, color: Colors.grey),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: _buildStatusChip(
+                                    inst['status'] ?? 'PENDING'),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(6.0),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isInstPending) ...[
+                                      Button(
+                                        title: "Approve",
+                                        buttonType: ButtonType.green,
+                                        size: ButtonSize.small,
+                                        onTap: () {
+                                          _showRemarkPopup(
+                                            intentId: intentId,
+                                            historyId:
+                                                inst['_id']?.toString(),
+                                            isFullPayment: false,
+                                            controller: controller,
+                                            discount: discount,
+                                            payment: payment,
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Button(
+                                        title: "Reject",
+                                        buttonType: ButtonType.red,
+                                        size: ButtonSize.small,
+                                        onTap: () {
+                                          _showRevertConfirmation(
+                                            title: "Reject Installment?",
+                                            message:
+                                                "Are you sure you want to reject this installment?",
+                                            onConfirm: (remark) async {
+                                              final success = await controller
+                                                  .rejectPartialInstallment(
+                                                intentId,
+                                                inst['_id']?.toString() ?? '',
+                                              );
+                                              if (success) {
+                                                inst['status'] = 'REJECTED';
+                                                onPaymentUpdated(payment);
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ] else if (isInstApproved &&
+                                        controller.isAdmin) ...[
+                                      Button(
+                                        title: "Revert",
+                                        buttonType: ButtonType.red,
+                                        size: ButtonSize.small,
+                                        onTap: () {
+                                          _showRevertConfirmation(
+                                            title: "Revert Approval?",
+                                            message:
+                                                "This will REJECT this installment and REVERT associated data.",
+                                            onConfirm: (reason) async {
+                                              final success = await controller
+                                                  .revertApprovalAction(
+                                                intentId,
+                                                historyId:
+                                                    inst['_id']?.toString(),
+                                                reason: reason,
+                                              );
+                                              if (success) {
+                                                inst['status'] = 'REJECTED';
+                                                onPaymentUpdated(payment);
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ] else if (isInstRejected &&
+                                        controller.isAdmin) ...[
+                                      Button(
+                                        title: "Restore",
+                                        buttonType: ButtonType.green,
+                                        size: ButtonSize.small,
+                                        onTap: () {
+                                          _showRevertConfirmation(
+                                            title: "Restore Installment?",
+                                            message:
+                                                "This will restore this installment to APPROVED state.",
+                                            confirmColor: Colors.green,
+                                            onConfirm: (reason) async {
+                                              final success = await controller
+                                                  .revertRejectionAction(
+                                                intentId,
+                                                historyId:
+                                                    inst['_id']?.toString(),
+                                                reason: reason,
+                                              );
+                                              if (success) {
+                                                inst['status'] = 'APPROVED';
+                                                onPaymentUpdated(payment);
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ] else ...[
+                                      const Icon(Icons.check,
+                                          size: 16, color: Colors.green),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                ] else ...[
+                  // Full Payment Row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // UTR and Proof preview
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Payment Slip & UTR",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Row(
+                                children: [
+                                  InkWell(
+                                    onTap: paymentProofs.isNotEmpty
+                                        ? () => _showImageDialog(paymentProofs)
+                                        : null,
+                                    child: Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: Colors.grey[300]!),
+                                        color: Colors.grey[100],
+                                      ),
+                                      child: paymentProofs.isNotEmpty
+                                          ? ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: Image.network(
+                                                paymentProofs.first,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const Icon(
+                                                        Icons.broken_image,
+                                                        size: 20),
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.image_not_supported,
+                                              size: 24,
+                                              color: Colors.grey),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "UTR: ${payment['utrNumber'] ?? 'N/A'}",
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          "Method: ${payment['paymentMethod'] ?? 'BANK_TRANSFER'}",
+                                          style: const TextStyle(
+                                              fontSize: 11, color: Colors.grey),
+                                        ),
+                                        if (paymentProofs.length > 1)
+                                          Text(
+                                            "+${paymentProofs.length - 1} additional slip(s)",
+                                            style: const TextStyle(
+                                                fontSize: 10,
+                                                color: AppTheme.primaryBlue,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      // Actions
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Actions",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (status != 'PAID' &&
+                                status != 'APPROVED' &&
+                                status != 'REJECTED') ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Button(
+                                      title: "Approve & Activate",
+                                      buttonType: ButtonType.green,
+                                      size: ButtonSize.medium,
+                                      onTap: () {
+                                        _showRemarkPopup(
+                                          intentId: intentId,
+                                          controller: controller,
+                                          isFullPayment: true,
+                                          payment: payment,
+                                          discount: discount,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Button(
+                                      title: "Reject",
+                                      buttonType: ButtonType.red,
+                                      size: ButtonSize.medium,
+                                      onTap: () {
+                                        controller.rejectTransfer(payment);
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: (status == 'PAID' ||
+                                              status == 'APPROVED')
+                                          ? Colors.green[50]
+                                          : Colors.red[50],
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: (status == 'PAID' ||
+                                                status == 'APPROVED')
+                                            ? Colors.green[300]!
+                                            : Colors.red[300]!,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          (status == 'PAID' ||
+                                                  status == 'APPROVED')
+                                              ? Icons.check_circle
+                                              : Icons.cancel,
+                                          size: 16,
+                                          color: (status == 'PAID' ||
+                                                  status == 'APPROVED')
+                                              ? Colors.green[700]
+                                              : Colors.red[700],
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          (status == 'PAID' ||
+                                                  status == 'APPROVED')
+                                              ? "APPROVED"
+                                              : "REJECTED",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: (status == 'PAID' ||
+                                                    status == 'APPROVED')
+                                                ? Colors.green[800]
+                                                : Colors.red[800],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (controller.isAdmin) ...[
+                                    const SizedBox(width: 12),
+                                    if (status == 'PAID' || status == 'APPROVED')
+                                      Button(
+                                        title: "REVERT APPROVAL",
+                                        buttonType: ButtonType.red,
+                                        size: ButtonSize.small,
+                                        onTap: () {
+                                          _showRevertConfirmation(
+                                            title: "Revert Approval?",
+                                            message:
+                                                "This will REJECT the payment and DELETE all created entitlements, invoices, and plan purchases.",
+                                            onConfirm: (reason) {
+                                              controller.revertApprovalAction(
+                                                  intentId,
+                                                  reason: reason);
+                                            },
+                                          );
+                                        },
+                                      )
+                                    else if (status == 'REJECTED')
+                                      Button(
+                                        title: "RESTORE & APPROVE",
+                                        buttonType: ButtonType.green,
+                                        size: ButtonSize.small,
+                                        onTap: () {
+                                          _showRevertConfirmation(
+                                            title: "Restore & Approve?",
+                                            message:
+                                                "This will RESTORE the payment to Approved state and RECREATE all entitlements and invoices.",
+                                            confirmColor: Colors.green,
+                                            onConfirm: (reason) {
+                                              controller.revertRejectionAction(
+                                                  intentId,
+                                                  historyId: null,
+                                                  reason: reason);
+                                            },
+                                          );
+                                        },
+                                      ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Admin Correction Buttons footer for this payment
+                if (controller.isAdmin) ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (!isRegistration) ...[
+                        TextButton.icon(
+                          icon: const Icon(Icons.calendar_month,
+                              size: 14, color: AppTheme.primaryBlue),
+                          label: const Text("Edit Plan/Dates",
+                              style: TextStyle(
+                                  fontSize: 12, color: AppTheme.primaryBlue)),
+                          onPressed: () => controller
+                              .showSubscriptionCorrectionDialog(payment),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      TextButton.icon(
+                        icon: Icon(Icons.edit_note,
+                            size: 16, color: Colors.orange[800]),
+                        label: Text("Correct Financials",
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.orange[800])),
+                        onPressed: () =>
+                            controller.showCorrectionDialog(payment),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showImageDialog(List<String> urls) {

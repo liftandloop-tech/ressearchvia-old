@@ -155,6 +155,45 @@ class StaffService extends ApiService {
     }
   }
 
+  Future<({Map<String, dynamic>? staffData, String? token, String? error})> impersonateStaff(String staffId) async {
+    try {
+      if (staffId.isEmpty) {
+        return (staffData: null, token: null, error: 'Staff ID is required');
+      }
+
+      debugPrint('Requesting impersonation for staff ID: $staffId');
+      final response = await post('/staff/impersonate', {
+        'staffId': staffId,
+      });
+
+      if (response.status.hasError) {
+        final errorMsg =
+            (response.body?['message'] ?? response.statusText ?? 'Impersonation failed')
+                .toString();
+        debugPrint('Error impersonating staff: $errorMsg');
+        return (staffData: null, token: null, error: errorMsg);
+      }
+
+      if (response.body != null && response.body['status'] == 200) {
+        final data = response.body['data'];
+        final token = data?['token'] as String?;
+        final staff = data?['staff'] as Map<String, dynamic>?;
+        if (token != null && staff != null) {
+          return (staffData: staff, token: token, error: null);
+        }
+      }
+
+      return (
+        staffData: null,
+        token: null,
+        error: (response.body?['message'] ?? 'Failed to generate impersonation token').toString(),
+      );
+    } catch (e) {
+      debugPrint('Error in impersonateStaff: $e');
+      return (staffData: null, token: null, error: e.toString());
+    }
+  }
+
   Future<bool> deleteStaff(String staffId) async {
     try {
       if (staffId.isEmpty) {

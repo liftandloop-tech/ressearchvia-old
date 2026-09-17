@@ -340,10 +340,10 @@ class ApplicantProfileScreen extends StatelessWidget {
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
               ),
               const SizedBox(height: 20),
-              // Department Selector
+              // Role Selector
               Obx(() => DropdownButtonFormField<String>(
                     value: controller.selectedDepartment.value.isEmpty ? null : controller.selectedDepartment.value,
-                    decoration: const InputDecoration(labelText: 'Select Department *', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Select Role *', border: OutlineInputBorder()),
                     items: ['Manager', 'Research Analyst', 'Advisory', 'Compliance', 'Sales', 'Support', 'Admin']
                         .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                         .toList(),

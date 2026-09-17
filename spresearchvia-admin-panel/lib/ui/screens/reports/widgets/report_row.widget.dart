@@ -153,7 +153,7 @@ class ReportRow extends TableRow {
           ReportCell(text: report.createdDate, color: AppTheme.textSecondary),
           ReportCell(text: report.lastUpdated, color: AppTheme.textSecondary),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
             child: ReportActions(report: report),
           ),
         ],

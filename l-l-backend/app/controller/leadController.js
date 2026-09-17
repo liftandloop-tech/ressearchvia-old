@@ -5,11 +5,22 @@ import fs from "fs";
 import csvParser from "csv-parser";
 import importService from "../services/importService.js";
 import importJobModel from "../models/importJobModel.js";
+import { ensureDefaultFreshPool } from "./leadPoolController.js";
 
 const leadController = {
     createLead: async (req, res) => {
         try {
-            const lead = await leadModel.create(req.body);
+            const companyId = req.user.companyId || req.user.company || "default_company";
+            let { leadPoolId } = req.body;
+            if (!leadPoolId) {
+                const defaultPool = await ensureDefaultFreshPool(companyId);
+                leadPoolId = defaultPool._id;
+            }
+            const lead = await leadModel.create({
+                ...req.body,
+                companyId,
+                leadPoolId
+            });
             res.status(200).send({ status: 200, message: "Lead created successfully", data: { lead } });
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: {} });
@@ -31,7 +42,7 @@ const leadController = {
 
     listLeads: async (req, res) => {
         try {
-            const { page = 1, limit = 10, search = "", stage = "", assignedRM = "" } = req.query;
+            const { page = 1, limit = 10, search = "", stage = "", assignedRM = "", leadPoolId = "" } = req.query;
             const query = {};
 
             // Data-Scope Enforcement: If user has leads.view_assigned but not leads.view_all, restrict query to assignedRM
@@ -71,10 +82,12 @@ const leadController = {
             }
             if (stage) query.stage = stage;
             if (assignedRM && !query.assignedRM) query.assignedRM = assignedRM;
+            if (leadPoolId) query.leadPoolId = leadPoolId;
 
             const total = await leadModel.countDocuments(query);
             const leads = await leadModel.find(query)
                 .populate('assignedRM', 'fullName emailAddress mobileNumber')
+                .populate('leadPoolId', 'name description pullSize maxPerStaff isActive')
                 .skip((page - 1) * limit)
                 .limit(parseInt(limit))
                 .sort({ createdAt: -1 });
