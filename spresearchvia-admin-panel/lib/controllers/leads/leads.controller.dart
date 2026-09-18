@@ -9,6 +9,7 @@ import '../../models/staff.model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app.config.dart';
 import '../../ui/screens/leads/widgets/import_wizard.widget.dart';
+import '../../controllers/auth/auth.controller.dart';
 
 class LeadsController extends GetxController {
   final LeadService _leadService = Get.find<LeadService>();
@@ -123,6 +124,34 @@ class LeadsController extends GetxController {
   Future<void> fetchStaffDropdown() async {
     try {
       final list = await _staffService.getStaffList();
+      if (Get.isRegistered<AuthController>()) {
+        final auth = Get.find<AuthController>();
+        final currentUser = auth.user.value;
+        if (currentUser != null && !currentUser.isAdmin) {
+          if (currentUser.isDirector || currentUser.isManager || list.length > 1) {
+            staffList.assignAll(list);
+            return;
+          }
+          final myStaff = list
+              .where((s) => s.id == currentUser.id || s.name == currentUser.fullName)
+              .toList();
+          staffList.assignAll(myStaff.isNotEmpty
+              ? myStaff
+              : [
+                  StaffModel(
+                    id: currentUser.id,
+                    staffId: currentUser.userId ?? currentUser.id,
+                    name: currentUser.fullName,
+                    email: currentUser.email,
+                    mobile: currentUser.mobile,
+                    role: currentUser.subscriptionPlan,
+                    status: 'Active',
+                    department: currentUser.subscriptionPlan,
+                  ),
+                ]);
+          return;
+        }
+      }
       staffList.assignAll(list);
     } catch (e) {
       debugPrint('Error loading staff dropdown: $e');

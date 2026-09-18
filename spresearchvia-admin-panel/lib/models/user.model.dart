@@ -77,7 +77,35 @@ class UserModel {
 
   bool get isResearcher => subscriptionPlan.toLowerCase() == 'researcher';
 
-  bool get isDirector => subscriptionPlan.toLowerCase() == 'director';
+  bool get isDirector {
+    final dept = subscriptionPlan.toLowerCase();
+    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
+    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
+    String roleIdName = '';
+    if (rawJson?['roleId'] is Map) {
+      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
+    }
+    return dept.contains('director') ||
+        roleStr.contains('director') ||
+        userTypeStr.contains('director') ||
+        roleIdName.contains('director');
+  }
+
+  bool get isManager {
+    final dept = subscriptionPlan.toLowerCase();
+    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
+    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
+    String roleIdName = '';
+    if (rawJson?['roleId'] is Map) {
+      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
+    }
+    return dept.contains('manager') ||
+        roleStr.contains('manager') ||
+        userTypeStr.contains('manager') ||
+        roleIdName.contains('manager');
+  }
+
+  bool get isSupervisor => isDirector || isManager;
 
   static String _parseMongoId(dynamic id) {
     if (id is Map && id.containsKey('\$oid'))

@@ -6,6 +6,7 @@ import csvParser from "csv-parser";
 import importService from "../services/importService.js";
 import importJobModel from "../models/importJobModel.js";
 import { ensureDefaultFreshPool } from "./leadPoolController.js";
+import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 
 const leadController = {
     createLead: async (req, res) => {
@@ -67,7 +68,12 @@ const leadController = {
                         );
 
                         if (hasViewAssigned && !hasViewAll) {
-                            query.assignedRM = staffMember._id;
+                            const hierarchy = await getSupervisedStaffIds(callerId);
+                            if (hierarchy.staffIds && hierarchy.staffIds.length > 1) {
+                                query.assignedRM = { $in: hierarchy.staffIds };
+                            } else {
+                                query.assignedRM = staffMember._id;
+                            }
                         }
                     }
                 }
@@ -81,7 +87,16 @@ const leadController = {
                 ];
             }
             if (stage) query.stage = stage;
-            if (assignedRM && !query.assignedRM) query.assignedRM = assignedRM;
+            if (assignedRM) {
+                if (query.assignedRM && query.assignedRM.$in) {
+                    const allowed = query.assignedRM.$in.map(id => id.toString());
+                    if (allowed.includes(assignedRM.toString())) {
+                        query.assignedRM = assignedRM;
+                    }
+                } else if (!query.assignedRM) {
+                    query.assignedRM = assignedRM;
+                }
+            }
             if (leadPoolId) query.leadPoolId = leadPoolId;
 
             const total = await leadModel.countDocuments(query);

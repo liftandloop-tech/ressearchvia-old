@@ -54,21 +54,33 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Overall Sales & Staff Performance',
-              style: AppTheme.h1Style.copyWith(
-                color: AppTheme.primaryBlue,
-                fontWeight: FontWeight.w700,
-                fontSize: 26,
+            Obx(
+              () => Text(
+                controller.isAdmin
+                    ? 'Overall Sales & Staff Performance'
+                    : (controller.hasTeamMembers
+                        ? 'Team Sales & Performance Dashboard'
+                        : 'My Sales & Performance'),
+                style: AppTheme.h1Style.copyWith(
+                  color: AppTheme.primaryBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 26,
+                ),
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Live performance analytics, sales metric cards, staff leaderboard & orders monitoring for Admin.',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-                letterSpacing: 0.2,
+            Obx(
+              () => Text(
+                controller.isAdmin
+                    ? 'Live performance analytics, sales metric cards, staff leaderboard & orders monitoring.'
+                    : (controller.hasTeamMembers
+                        ? 'Live team performance analytics, sales metric cards, team leaderboard & orders monitoring.'
+                        : 'Live personal performance analytics, sales metric cards, your leaderboard & orders monitoring.'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.textSecondary,
+                  letterSpacing: 0.2,
+                ),
               ),
             ),
           ],

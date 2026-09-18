@@ -3,9 +3,12 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   static const String appName = 'SPResearchVia Admin Panel';
   static const String version = '1.0.0';
+  static const String adminUrl = 'https://spadmin.researchvia.in';
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080/api',
+    defaultValue: kReleaseMode
+        ? 'https://api.researchvia.in/api'
+        : 'http://localhost:8080/api',
   );
 
   static String get automatedApiBaseUrl {

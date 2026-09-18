@@ -1,10 +1,33 @@
 import 'package:get/get.dart';
-// Force refresh
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/models/user.model.dart';
 import 'dashboard_management.controller.dart';
 
 class DashboardController extends GetxController {
   final DashboardManagementController _dashboardManagementController =
       Get.find<DashboardManagementController>();
+
+  AuthController? get _authController =>
+      Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+  UserModel? get currentUser => _authController?.user.value;
+  bool get isAdmin => currentUser?.isAdmin ?? false;
+  bool get isDirector => currentUser?.isDirector ?? false;
+  bool get isManager => currentUser?.isManager ?? false;
+  bool get isSupervisor => currentUser?.isSupervisor ?? false;
+
+  /// True if user manages a team (Admin, Director, Manager, or user with subordinates)
+  bool get hasTeamMembers {
+    if (isAdmin || isDirector || isManager) return true;
+    final staffList = _dashboardManagementController.staffList;
+    if (staffList.length > 1) return true;
+    final dept = (currentUser?.subscriptionPlan ?? '').toLowerCase();
+    if (dept.contains('director') || dept.contains('manager')) return true;
+    return false;
+  }
+
+  /// True ONLY for individual regular staff with no subordinates
+  bool get isSingleStaff => currentUser != null && !isAdmin && !hasTeamMembers;
+  bool get isRegularStaff => isSingleStaff; // backwards-compatible alias
 
   var selectedRenewalStatus = 'All'.obs; // Order Status filter
   var selectedDateFilter = 'All Time'.obs;
@@ -19,6 +42,19 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _syncFilterDefaults();
+
+    if (_authController != null) {
+      ever(_authController!.user, (_) {
+        _syncFilterDefaults();
+        fetchFilteredData();
+      });
+    }
+
+    ever(_dashboardManagementController.staffList, (_) {
+      _syncFilterDefaults();
+    });
+
     debounce(
       searchQuery,
       (_) => fetchFilteredData(),
@@ -31,18 +67,50 @@ class DashboardController extends GetxController {
     ever(selectedRenewalStatus, (_) => fetchFilteredData());
   }
 
+  void _syncFilterDefaults() {
+    if (isSingleStaff) {
+      final myName = currentUser?.fullName.trim();
+      selectedManagerFilter.value =
+          (myName != null && myName.isNotEmpty) ? myName : 'My Profile';
+      final myDept = (currentUser?.subscriptionPlan ?? '').trim();
+      selectedDepartmentFilter.value =
+          (myDept.isNotEmpty && myDept != 'N/A') ? myDept : 'Sales';
+    } else {
+      if (!managerFilterItems.contains(selectedManagerFilter.value)) {
+        selectedManagerFilter.value = 'All Staff';
+      }
+      if (!departmentFilterItems.contains(selectedDepartmentFilter.value)) {
+        selectedDepartmentFilter.value = 'All Departments';
+      }
+    }
+  }
+
   void fetchFilteredData() {
     final query = <String, dynamic>{};
     if (searchQuery.value.trim().isNotEmpty) {
       query['search'] = searchQuery.value.trim();
     }
-    if (selectedManagerFilter.value != 'All Staff' &&
-        selectedManagerFilter.value != 'All Managers') {
-      query['staffMember'] = selectedManagerFilter.value;
+
+    if (isSingleStaff) {
+      query['staffId'] = currentUser?.id;
+      final name = currentUser?.fullName.trim();
+      if (name != null && name.isNotEmpty) {
+        query['staffMember'] = name;
+      }
+      final dept = (currentUser?.subscriptionPlan ?? '').trim();
+      if (dept.isNotEmpty && dept != 'N/A') {
+        query['department'] = dept;
+      }
+    } else {
+      if (selectedManagerFilter.value != 'All Staff' &&
+          selectedManagerFilter.value != 'All Managers') {
+        query['staffMember'] = selectedManagerFilter.value;
+      }
+      if (selectedDepartmentFilter.value != 'All Departments') {
+        query['department'] = selectedDepartmentFilter.value;
+      }
     }
-    if (selectedDepartmentFilter.value != 'All Departments') {
-      query['department'] = selectedDepartmentFilter.value;
-    }
+
     if (startDate.value != null) {
       query['startDate'] = startDate.value!.toIso8601String();
     }
@@ -66,18 +134,35 @@ class DashboardController extends GetxController {
       renewalsList;
 
   List<String> get managerFilterItems {
+    if (isSingleStaff) {
+      final name = currentUser?.fullName.trim();
+      if (name != null && name.isNotEmpty) {
+        return [name];
+      }
+      return ['My Profile'];
+    }
+
+    final myName = currentUser?.fullName.trim() ?? '';
     final staff = _dashboardManagementController.staffList
-        .map((e) => e.name)
+        .map((e) => e.name.trim())
         .where((name) => name.isNotEmpty)
         .toSet()
         .toList();
     staff.sort();
-    return ['All Staff', ...staff];
+
+    return {'All Staff', if (myName.isNotEmpty) myName, ...staff}.toList();
   }
 
   List<String> get departmentFilterItems {
+    if (isSingleStaff) {
+      final dept = (currentUser?.subscriptionPlan ?? '').trim();
+      if (dept.isNotEmpty && dept != 'N/A') {
+        return [dept];
+      }
+      return ['Sales'];
+    }
     final depts = _dashboardManagementController.staffList
-        .map((e) => e.department)
+        .map((e) => e.department.trim())
         .where((d) => d.isNotEmpty)
         .toSet()
         .toList();
@@ -108,6 +193,22 @@ class DashboardController extends GetxController {
   List<Map<String, dynamic>> get filteredStaffPerformance {
     var list = List<Map<String, dynamic>>.from(staffPerformanceList);
 
+    if (isSingleStaff) {
+      final myId = (currentUser?.id ?? '').toLowerCase();
+      final myName = (currentUser?.fullName ?? '').trim().toLowerCase();
+      final myEmail = (currentUser?.email ?? '').trim().toLowerCase();
+
+      list = list.where((item) {
+        final id = (item['id'] ?? item['staffId'] ?? '').toString().toLowerCase();
+        final name = (item['name'] ?? '').toString().trim().toLowerCase();
+        final email = (item['email'] ?? '').toString().trim().toLowerCase();
+
+        return (myId.isNotEmpty && id == myId) ||
+            (myName.isNotEmpty && name == myName) ||
+            (myEmail.isNotEmpty && email == myEmail);
+      }).toList();
+    }
+
     if (searchQuery.value.isNotEmpty) {
       final q = searchQuery.value.toLowerCase();
       list = list.where((item) {
@@ -122,19 +223,21 @@ class DashboardController extends GetxController {
       }).toList();
     }
 
-    if (selectedManagerFilter.value != 'All Staff' &&
-        selectedManagerFilter.value != 'All Managers') {
-      list = list
-          .where((item) => item['name'] == selectedManagerFilter.value)
-          .toList();
-    }
+    if (!isSingleStaff) {
+      if (selectedManagerFilter.value != 'All Staff' &&
+          selectedManagerFilter.value != 'All Managers') {
+        list = list
+            .where((item) => (item['name'] ?? '').toString().trim().toLowerCase() == selectedManagerFilter.value.trim().toLowerCase())
+            .toList();
+      }
 
-    if (selectedDepartmentFilter.value != 'All Departments') {
-      list = list
-          .where((item) =>
-              (item['department'] ?? '').toString().toLowerCase() ==
-              selectedDepartmentFilter.value.toLowerCase())
-          .toList();
+      if (selectedDepartmentFilter.value != 'All Departments') {
+        list = list
+            .where((item) =>
+                (item['department'] ?? '').toString().toLowerCase() ==
+                selectedDepartmentFilter.value.toLowerCase())
+            .toList();
+      }
     }
 
     return list;
@@ -142,6 +245,19 @@ class DashboardController extends GetxController {
 
   List<Map<String, dynamic>> get filteredStaffOrders {
     var list = List<Map<String, dynamic>>.from(ordersList);
+
+    if (isSingleStaff) {
+      final myId = (currentUser?.id ?? '').toLowerCase();
+      final myName = (currentUser?.fullName ?? '').trim().toLowerCase();
+
+      list = list.where((item) {
+        final sId = (item['staffId'] ?? '').toString().toLowerCase();
+        final staffName = (item['staffName'] ?? '').toString().trim().toLowerCase();
+
+        return (myId.isNotEmpty && sId == myId) ||
+            (myName.isNotEmpty && staffName == myName);
+      }).toList();
+    }
 
     if (searchQuery.value.isNotEmpty) {
       final q = searchQuery.value.toLowerCase();
@@ -159,11 +275,21 @@ class DashboardController extends GetxController {
       }).toList();
     }
 
-    if (selectedManagerFilter.value != 'All Staff' &&
-        selectedManagerFilter.value != 'All Managers') {
-      list = list
-          .where((item) => item['staffName'] == selectedManagerFilter.value)
-          .toList();
+    if (!isSingleStaff) {
+      if (selectedManagerFilter.value != 'All Staff' &&
+          selectedManagerFilter.value != 'All Managers') {
+        list = list
+            .where((item) => (item['staffName'] ?? '').toString().trim().toLowerCase() == selectedManagerFilter.value.trim().toLowerCase())
+            .toList();
+      }
+
+      if (selectedDepartmentFilter.value != 'All Departments') {
+        list = list
+            .where((item) =>
+                (item['department'] ?? '').toString().toLowerCase() ==
+                selectedDepartmentFilter.value.toLowerCase())
+            .toList();
+      }
     }
 
     if (selectedRenewalStatus.value != 'All') {
@@ -274,10 +400,9 @@ class DashboardController extends GetxController {
     selectedCustomDate.value = null;
     startDate.value = null;
     endDate.value = null;
-    selectedManagerFilter.value = 'All Staff';
-    selectedDepartmentFilter.value = 'All Departments';
     searchQuery.value = '';
-    _dashboardManagementController.fetchDashboardData(force: true);
+    _syncFilterDefaults();
+    fetchFilteredData();
   }
 
   void refreshData() {

@@ -18,6 +18,7 @@ import { approvePartialPayment } from "./acquisitionService.js";
 import mongoose from "mongoose";
 import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
+import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 import Refund from "../models/refundModel.js";
 
 const segmentsService = {
@@ -950,28 +951,15 @@ const segmentsService = {
         queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
       }
 
-      // Restrict payments by staff/director assignment
+      // Restrict payments by staff/director/manager assignment hierarchy
       const callerId = user?._id || user?.userId;
       if (callerId) {
-        const staffMember = await staffModel.findById(callerId).populate('roleId');
-        if (staffMember) {
-          const roleName = (staffMember.roleId?.roleName || "").toLowerCase();
-          const dept = (staffMember.deparment || "").toLowerCase();
-          const isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
-          if (!isSystemAdmin) {
-            let targetStaffIds = [staffMember._id];
-            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
-            if (dept.includes('director')) {
-              // Find all managers assigned to this director
-              const managers = await staffModel.find({ assignedDirector: staffMember._id }).select('_id');
-              const managerIds = managers.map(m => m._id);
-              targetStaffIds = [...targetStaffIds, ...managerIds];
-            }
-            const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-            const assignedUserIds = assignments.map(a => a.userId);
-            
-            queryArgs.userId = { $in: assignedUserIds };
-          }
+        const hierarchy = await getSupervisedStaffIds(callerId);
+        if (!hierarchy.isSystemAdmin) {
+          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
+          const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
+          const assignedUserIds = assignments.map(a => a.userId);
+          queryArgs.userId = { $in: assignedUserIds };
         }
       }
 

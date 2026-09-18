@@ -34,6 +34,7 @@ const staffRoutes = () => {
     // Admin applicant review & approval
     Router.get("/applicants", auth.tokenVerified, applicantController.listApplicants)
     Router.post("/applicant/approve/:id", auth.tokenVerified, applicantController.approveApplicant)
+    Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, applicantController.saveEvaluationRemarks)
 
     // Document uploads for staff onboarding
     Router.post("/upload-doc/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), staffDocController.uploadDocument)

@@ -19,6 +19,11 @@ import permissionGroupRoutes from "./permissionGroupRoutes/index.js";
 import refundRoutes from "./refundRoutes/index.js";
 
 const initRoutes = (app) => {
+    app.get('/', (req, res) => res.status(200).send({
+        status: 'OK',
+        message: 'SPResearchVia Backend API is running',
+        health: '/api/health'
+    }));
     app.get('/api/health', (req, res) => res.status(200).send({ status: 'OK', uptime: process.uptime() }));
     app.use('/api/user', userRoutes())
     app.use('/api/user/proxy', proxyRoutes())

@@ -16,17 +16,17 @@ ENV AUTOMATED_API_BASE_URL=${AUTOMATED_API_BASE_URL}
 COPY pubspec.yaml pubspec.lock ./
 
 RUN flutter config --no-analytics \
-    && flutter config --enable-web \
-    && flutter pub get
+  && flutter config --enable-web \
+  && flutter pub get
 
 # Copy all source code
 COPY . .
 
 # Build web distribution with baked-in environment parameters
 RUN flutter build web --release \
-    --no-tree-shake-icons \
-    --dart-define=API_BASE_URL=${API_BASE_URL} \
-    --dart-define=AUTOMATED_API_BASE_URL=${AUTOMATED_API_BASE_URL}
+  --no-tree-shake-icons \
+  --dart-define=API_BASE_URL=${API_BASE_URL} \
+  --dart-define=AUTOMATED_API_BASE_URL=${AUTOMATED_API_BASE_URL}
 
 # ==========================================
 # Stage 2: High Performance Nginx Web Server

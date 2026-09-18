@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/services/dashboard.service.dart';
 import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/staff.model.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 
 class DashboardManagementController extends GetxController {
   final DashboardService _dashboardService = Get.find<DashboardService>();
@@ -84,7 +85,32 @@ class DashboardManagementController extends GetxController {
         recentPayments.value = payments;
 
         final staff = await _staffService.getStaffList();
-        staffList.value = staff;
+        if (Get.isRegistered<AuthController>()) {
+          final auth = Get.find<AuthController>();
+          final user = auth.user.value;
+          if (user != null && !user.isAdmin) {
+            if (staff.isNotEmpty) {
+              staffList.value = staff;
+            } else {
+              staffList.value = [
+                StaffModel(
+                  id: user.id,
+                  staffId: user.userId ?? user.id,
+                  name: user.fullName,
+                  email: user.email,
+                  mobile: user.mobile,
+                  role: user.subscriptionPlan,
+                  status: 'Active',
+                  department: user.subscriptionPlan,
+                )
+              ];
+            }
+          } else {
+            staffList.value = staff;
+          }
+        } else {
+          staffList.value = staff;
+        }
       }
     } catch (e) {
       debugPrint('Error fetching dashboard data: $e');

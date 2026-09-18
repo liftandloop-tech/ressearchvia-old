@@ -36,22 +36,39 @@ class UserManagementController extends GetxController {
     try {
       final list = await _staffService.getStaffList();
 
-      // If a Director is logged in, show their managers or unassigned managers/staff
+      // If non-admin is logged in:
       if (Get.isRegistered<AuthController>()) {
         final authController = Get.find<AuthController>();
         final currentUser = authController.user.value;
-        if (currentUser != null && currentUser.isDirector) {
-          managers.value = list
-              .where(
-                (s) =>
-                    s.department.trim().toLowerCase().contains('manager') &&
-                    (s.assignedDirector == currentUser.id || s.assignedDirector == null || s.assignedDirector!.isEmpty),
-              )
-              .toList();
-          if (managers.isEmpty) {
+        if (currentUser != null && !currentUser.isAdmin) {
+          if (currentUser.isDirector || currentUser.isManager || list.length > 1) {
             managers.value = list;
+            return;
+          } else {
+            // Regular staff: only themselves in the manager dropdown
+            final myStaff = list
+                .where(
+                  (s) =>
+                      s.id == currentUser.id || s.name == currentUser.fullName,
+                )
+                .toList();
+            managers.value = myStaff.isNotEmpty
+                ? myStaff
+                : [
+                    StaffModel(
+                      id: currentUser.id,
+                      staffId: currentUser.userId ?? currentUser.id,
+                      name: currentUser.fullName,
+                      email: currentUser.email,
+                      mobile: currentUser.mobile,
+                      role: currentUser.subscriptionPlan,
+                      status: 'Active',
+                      department: currentUser.subscriptionPlan,
+                    ),
+                  ];
+            managerFilter.value = currentUser.fullName;
+            return;
           }
-          return;
         }
       }
 

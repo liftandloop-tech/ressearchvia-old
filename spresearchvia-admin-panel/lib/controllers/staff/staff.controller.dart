@@ -69,9 +69,6 @@ class StaffController extends GetxController {
     _staffService = Get.find<StaffService>();
     if (Get.isRegistered<AuthController>()) {
       _authController = Get.find<AuthController>();
-      if (isDirectorLoggedIn) {
-        selectedDepartment.value = 'Manager';
-      }
     }
     _loadFiltersFromUrl();
     fetchStaffList();
@@ -182,22 +179,8 @@ class StaffController extends GetxController {
         debugPrint('Staff: ${s.name}, Department: "${s.department}"');
       }
 
-      // If a Director is logged in, filter the list to show themselves, their managers, and all researchers/analysts
-      if (isDirectorLoggedIn) {
-        final directorId = _authController.user.value?.id;
-        staffList.value = list.where((s) {
-          final isMe = s.id == directorId;
-          final deptLower = s.department.toLowerCase();
-          final isMyManager =
-              deptLower.contains('manager') &&
-              (s.assignedDirector == directorId || s.assignedDirector == null);
-          final isResearcherOrAnalyst =
-              deptLower.contains('research') || deptLower.contains('analyst');
-          return isMe || isMyManager || isResearcherOrAnalyst;
-        }).toList();
-      } else {
-        staffList.value = list;
-      }
+      // Use backend-scoped staff list directly (backend strictly enforces hierarchy: Admin -> all, Director/Manager -> self + supervised team, Staff -> self)
+      staffList.value = list;
 
       if (list.isEmpty) {
         debugPrint('No staff members found');

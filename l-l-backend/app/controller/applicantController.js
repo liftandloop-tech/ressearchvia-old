@@ -410,6 +410,40 @@ const applicantController = {
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
+    },
+
+    saveEvaluationRemarks: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { recruiterRemarks, interviewerRemarks } = req.body;
+
+            const applicant = await staffModel.findById(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            if (!applicant.walkInForm) {
+                applicant.walkInForm = {};
+            }
+
+            if (recruiterRemarks !== undefined) {
+                applicant.walkInForm.recruiterRemarks = recruiterRemarks;
+            }
+            if (interviewerRemarks !== undefined) {
+                applicant.walkInForm.interviewerRemarks = interviewerRemarks;
+            }
+
+            applicant.markModified('walkInForm');
+            await applicant.save();
+
+            res.status(200).send({
+                status: 200,
+                message: "Evaluation remarks saved successfully",
+                data: { walkInForm: applicant.walkInForm }
+            });
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
     }
 };
 

@@ -101,8 +101,8 @@ fi
 echo "[5/5] Setting up SSL certificates and HTTPS gateway..."
 
 # Read domain names from .env
-DOMAIN_BACKEND=$(grep '^DOMAIN_BACKEND=' .env | cut -d '=' -f2 | tr -d ' "\r\n' || echo "apitest.researchvia.in")
-DOMAIN_ADMIN=$(grep '^DOMAIN_ADMIN=' .env | cut -d '=' -f2 | tr -d ' "\r\n' || echo "admintest.researchvia.in")
+DOMAIN_BACKEND=$(grep '^DOMAIN_BACKEND=' .env | cut -d '=' -f2 | tr -d ' "\r\n' || echo "api.researchvia.in")
+DOMAIN_ADMIN=$(grep '^DOMAIN_ADMIN=' .env | cut -d '=' -f2 | tr -d ' "\r\n' || echo "spadmin.researchvia.in")
 DOMAIN_AUTOMATED_API=$(grep '^DOMAIN_AUTOMATED_API=' .env | cut -d '=' -f2 | tr -d ' "\r\n' || echo "tradetest.researchvia.in")
 
 echo "Target domains for SSL:"

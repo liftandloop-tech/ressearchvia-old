@@ -135,6 +135,30 @@ const staffSchema = new mongoose.Schema({
     otpExpires: {
         type: Number
     },
+    mobileOtp: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+    mobileOtpExpires: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+    emailOtp: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+    emailOtpExpires: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+    isMobileVerified: {
+        type: Boolean,
+        default: false
+    },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
     mpin: {
         type: String,
         default: null
@@ -156,6 +180,10 @@ const staffSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Role',
         default: null
+    },
+    walkInForm: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
     },
 }, { timestamps: true, versionKey: false });
 const staffModel = mongoose.model("staff", staffSchema);

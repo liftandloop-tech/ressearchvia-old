@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import { logManagerAssigned } from "./activityLogService.js";
 import roleModel from "../models/roleModel.js";
 import roleService from "./roleService.js";
+import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 
 
 
@@ -402,27 +403,38 @@ const staffService = {
       console.log('=== staffList called ===');
       console.log('User:', user ? { userType: user.userType, deparment: user.deparment, _id: user._id } : 'No user');
 
-      // If user is a Director, they can only see managers assigned to them (and themselves)
-      if (user && (user.userType === 'Director' || user.deparment === 'Director')) {
-        query = {
-          stage: { $ne: 'Applicant' },
-          $or: [
-            { assignedDirector: user._id },
-            { _id: user._id }
-          ]
-        };
-        console.log('Director query:', JSON.stringify(query));
-      } else {
-        console.log('Admin/Other query (all staff):', JSON.stringify(query));
+      const callerId = user?._id || user?.userId;
+      let isSystemAdmin = false;
+      let hasStaffViewAll = false;
+
+      if (callerId) {
+        const hierarchy = await getSupervisedStaffIds(callerId);
+        isSystemAdmin = hierarchy.isSystemAdmin;
+
+        if (hierarchy.staffMember?.roleId?.permissionGroups) {
+          hasStaffViewAll = hierarchy.staffMember.roleId.permissionGroups.some(g =>
+            g.permissions?.some(p => p.actions?.includes('staff.view'))
+          );
+        }
+
+        if (!isSystemAdmin && !hasStaffViewAll) {
+          query = {
+            stage: { $ne: 'Applicant' },
+            _id: { $in: hierarchy.staffIds }
+          };
+          console.log(`Staff list scoped for ${hierarchy.staffMember?.fullName} (${hierarchy.staffIds.length} staff):`, JSON.stringify(query));
+        } else {
+          console.log('Admin / staff.view query (all staff):', JSON.stringify(query));
+        }
       }
 
-      const staffList = await staffModel.find(query).lean()
+      const staffList = await staffModel.find(query).lean();
       console.log(`Found ${staffList.length} staff members`);
       console.log('Staff departments:', staffList.map(s => ({ name: s.fullName, dept: s.deparment })));
 
-      return { status: 200, message: "staff list", data: { staffList } }
+      return { status: 200, message: "staff list", data: { staffList } };
     } catch (error) {
-      return { status: 400, message: error.message, data: {} }
+      return { status: 400, message: error.message, data: {} };
     }
   },
 
@@ -489,15 +501,9 @@ const staffService = {
       pageSize = pageSize ? parseInt(pageSize) : 10;
 
       let targetStaffIds = [staffId];
-
-      // Check if the staff member is a Director
-      const staffMember = await staffModel.findById(staffId);
-
-      if (staffMember && staffMember.deparment === 'Director') {
-        // Find all managers assigned to this director
-        const managers = await staffModel.find({ assignedDirector: staffId }).select('_id');
-        const managerIds = managers.map(m => m._id.toString());
-        targetStaffIds = [...targetStaffIds, ...managerIds];
+      const hierarchy = await getSupervisedStaffIds(staffId);
+      if (!hierarchy.isSystemAdmin && hierarchy.staffIds) {
+        targetStaffIds = hierarchy.staffIds;
       }
 
       // Get all user IDs assigned to this staff (or team)

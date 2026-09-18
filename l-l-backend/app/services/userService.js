@@ -24,6 +24,7 @@ import { grantEntitlement } from "./entitlementService.js";
 import staffService from "./staffService.js";
 import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
+import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 
 /* ==========================================================================
    HELPER FUNCTIONS (Refactored to reduce redundancy)
@@ -1593,24 +1594,14 @@ const userService = {
       page = page ? parseInt(page) : "";
       pageSize = pageSize ? parseInt(pageSize) : "";
 
-      // Restrict users list by staff/director assignment
+      // Restrict users list by staff/director/manager assignment hierarchy
       let assignedUserIds = null;
       if (currentUserId) {
-        const isStaff = await staffModel.findById(currentUserId).populate('roleId');
-        if (isStaff) {
-          const roleName = (isStaff.roleId?.roleName || "").toLowerCase();
-          const dept = (isStaff.deparment || "").toLowerCase();
-          const isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
-          if (!isSystemAdmin) {
-            let targetStaffIds = [isStaff._id];
-            if (dept.includes('director')) {
-              const managers = await staffModel.find({ assignedDirector: isStaff._id }).select('_id');
-              const managerIds = managers.map(m => m._id);
-              targetStaffIds = [...targetStaffIds, ...managerIds];
-            }
-            const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-            assignedUserIds = assignments.map(a => a.userId);
-          }
+        const hierarchy = await getSupervisedStaffIds(currentUserId);
+        if (!hierarchy.isSystemAdmin) {
+          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];
+          const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
+          assignedUserIds = assignments.map(a => a.userId);
         }
       }
 
@@ -2240,26 +2231,21 @@ const userService = {
       let kycQuery = { kycStatus: "pending" };
       let planQuery = { status: "active" };
 
+      let isSystemAdmin = false;
+      let targetStaffIds = [];
+
       if (currentUserId) {
-        const isStaff = await staffModel.findById(currentUserId).populate('roleId');
-        if (isStaff) {
-          const roleName = (isStaff.roleId?.roleName || "").toLowerCase();
-          const dept = (isStaff.deparment || "").toLowerCase();
-          const isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
-          if (!isSystemAdmin) {
-            let targetStaffIds = [isStaff._id];
-            if (dept.includes('director')) {
-              const managers = await staffModel.find({ assignedDirector: isStaff._id }).select('_id');
-              const managerIds = managers.map(m => m._id);
-              targetStaffIds = [...targetStaffIds, ...managerIds];
-            }
-            const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-            const assignedUserIds = assignments.map(a => a.userId);
-            
-            userQuery = { _id: { $in: assignedUserIds } };
-            kycQuery = { userId: { $in: assignedUserIds }, kycStatus: "pending" };
-            planQuery = { userId: { $in: assignedUserIds }, status: "active" };
-          }
+        const hierarchy = await getSupervisedStaffIds(currentUserId);
+        isSystemAdmin = hierarchy.isSystemAdmin;
+
+        if (!isSystemAdmin) {
+          targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];
+          const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
+          const assignedUserIds = assignments.map(a => a.userId);
+
+          userQuery = { _id: { $in: assignedUserIds } };
+          kycQuery = { userId: { $in: assignedUserIds }, kycStatus: "pending" };
+          planQuery = { userId: { $in: assignedUserIds }, status: "active" };
         }
       }
 
@@ -2268,17 +2254,29 @@ const userService = {
       const pandingKyc = await userKycModel.countDocuments(kycQuery);
 
       // --- STAFF SALES & ORDERS PERFORMANCE AGGREGATION ---
-      const staffList = await staffModel.find({}).select('fullName staffId deparment emailAddress mobileNumber status');
+      const staffListQuery = (!isSystemAdmin && targetStaffIds.length > 0)
+        ? { _id: { $in: targetStaffIds } }
+        : {};
+      const staffList = await staffModel.find(staffListQuery).select('fullName staffId deparment emailAddress mobileNumber status');
 
-      const allAssignments = await staffAssigmentModel.find({});
+      const assignmentQuery = (!isSystemAdmin && targetStaffIds.length > 0)
+        ? { staffId: { $in: targetStaffIds } }
+        : {};
+      const allAssignments = await staffAssigmentModel.find(assignmentQuery);
       const userToStaffMap = {};
       const staffClientCountMap = {};
+
+      const staffDeptMap = {};
+      staffList.forEach(s => {
+        staffDeptMap[s._id.toString()] = s.deparment || 'Sales';
+      });
 
       allAssignments.forEach(ass => {
         if (ass.userId && ass.staffId) {
           const uId = ass.userId.toString();
           const sId = ass.staffId.toString();
-          userToStaffMap[uId] = { staffId: ass.staffId, staffName: ass.staffName };
+          const dept = staffDeptMap[sId] || 'Sales';
+          userToStaffMap[uId] = { staffId: ass.staffId, staffName: ass.staffName, department: dept };
           staffClientCountMap[sId] = (staffClientCountMap[sId] || 0) + 1;
         }
       });
@@ -2303,6 +2301,8 @@ const userService = {
       let purchasesQuery = {};
       if (userQuery._id && userQuery._id.$in) {
         purchasesQuery.userId = { $in: userQuery._id.$in };
+      } else if (!isSystemAdmin) {
+        purchasesQuery.userId = { $in: [] };
       }
 
       // Date filtering on planPurchaseModel
@@ -2346,6 +2346,7 @@ const userService = {
         const orderId = p._id ? `ORD-${p._id.toString().slice(-6).toUpperCase()}` : 'ORD-UNKNOWN';
         const staffName = staffInfo?.staffName || 'Unassigned';
         const sId = staffInfo?.staffId ? staffInfo.staffId.toString() : null;
+        const staffDept = staffInfo?.department || (sId && staffDeptMap[sId] ? staffDeptMap[sId] : 'Sales');
 
         const statusLower = (p.status || 'active').toLowerCase();
         // Only count genuine paid orders - strictly exclude pending, partial, rejected, failed, suspended
@@ -2364,11 +2365,18 @@ const userService = {
           isPaid,
           staffId: sId,
           staffName,
+          department: staffDept,
           createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
           startDate: p.startDate ? p.startDate.toISOString() : null,
           endDate: p.endDate ? p.endDate.toISOString() : null,
         };
       });
+
+      // Strictly restrict orders for non-admin to their target staff only
+      if (!isSystemAdmin && targetStaffIds.length > 0) {
+        const allowedTargetSet = new Set(targetStaffIds.map(id => id.toString()));
+        ordersList = ordersList.filter(o => o.staffId && allowedTargetSet.has(o.staffId.toString()));
+      }
 
       // Filter orders by allowed staff (if department or staff filter active)
       if ((department && department !== 'All Departments' && department !== 'All') ||
