@@ -15,14 +15,15 @@ const userKycRoutes = () => {
   Router.patch("/document/kyc-status-change", auth.tokenVerified, adminStrictOnly, checkPermission('KYC', 'update'), usersKycController.kycStatusChange)
   Router.put("/gate-status/:id", auth.tokenVerified, adminStrictOnly, checkPermission('KYC', 'update'), usersKycController.updateGateStatus)  // NEW: Per-gate approval/rejection
   Router.get("/document/kyc-list", auth.tokenVerified, adminOnly, checkPermission('KYC', 'read'), usersKycController.kycDocList)
-  Router.post("/kyc-video-upload/:id", auth.tokenVerified, (req, res, next) => { req.query.type = 'kyc-video'; next(); }, upload.single("file"), usersKycController.uploadKycVideo)
+  Router.post("/kyc-video-upload/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = 'kyc-video'; next(); }, upload.single("file"), usersKycController.uploadKycVideo)
   Router.post("/admin/document/update-file/:id", auth.tokenVerified, adminStrictOnly, checkPermission('KYC', 'update'), (req, res, next) => {
-    if (req.query.docType === 'video') {
-      req.query.type = 'kyc-video';
-    } else if (req.query.docType === 'serviceAgreement' || req.query.docType === 'agreement' || req.query.docType === 'signedDocument') {
-      req.query.type = 'serviceAgreement';
+    const docType = req.query?.docType;
+    if (docType === 'video') {
+      req.uploadType = 'kyc-video';
+    } else if (docType === 'serviceAgreement' || docType === 'agreement' || docType === 'signedDocument') {
+      req.uploadType = 'serviceAgreement';
     } else {
-      req.query.type = 'pancard';
+      req.uploadType = 'pancard';
     }
     next();
   }, upload.single("file"), usersKycController.updateAdminKycDocument)

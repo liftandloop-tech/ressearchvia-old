@@ -4,7 +4,7 @@ import fs from "fs";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    let type = req.uploadType || req.query.type;
+    let type = req.uploadType || req.query?.type || req.query?.docType;
     if (!type) {
       if (req.originalUrl.includes("pancard-upload")) type = "pancard";
       else if (req.originalUrl.includes("aadhaar-upload")) type = "aadhaar";
@@ -13,6 +13,15 @@ const storage = multer.diskStorage({
       else if (req.originalUrl.includes("kyc-video-upload")) type = "kyc-video";
       else if (req.originalUrl.includes("upload-proof")) type = "payment-proof";
       else if (req.originalUrl.includes("update-payment")) type = "payment-proof";
+      else if (req.originalUrl.includes("update-file")) {
+        if (req.originalUrl.includes("serviceAgreement") || req.originalUrl.includes("agreement") || req.originalUrl.includes("signedDocument")) {
+          type = "serviceAgreement";
+        } else if (req.originalUrl.includes("docType=video")) {
+          type = "kyc-video";
+        } else {
+          type = "pancard";
+        }
+      }
     }
 
     let uploadPath = "app/uploads/";
@@ -51,8 +60,8 @@ const fileFilter = (req, file, cb) => {
   console.log("DEBUG: req.query BEFORE logic:", req.query);
   console.log("DEBUG: File:", file.originalname, file.mimetype);
 
-  // Use req.uploadType (set by route middleware) first, then fall back
-  let uploadType = req.uploadType || req.query.type;
+  // Use req.uploadType (set by route middleware) first, then req.query.type / req.query.docType, then URL fallback
+  let uploadType = req.uploadType || req.query?.type || req.query?.docType;
 
   if (!uploadType) {
     if (req.originalUrl && req.originalUrl.includes("pancard-upload")) {
@@ -75,6 +84,15 @@ const fileFilter = (req, file, cb) => {
     }
     else if (req.originalUrl && req.originalUrl.includes("update-payment")) {
       uploadType = "payment-proof";
+    }
+    else if (req.originalUrl && req.originalUrl.includes("update-file")) {
+      if (req.originalUrl.includes("serviceAgreement") || req.originalUrl.includes("agreement") || req.originalUrl.includes("signedDocument")) {
+        uploadType = "serviceAgreement";
+      } else if (req.originalUrl.includes("docType=video")) {
+        uploadType = "kyc-video";
+      } else {
+        uploadType = "pancard";
+      }
     }
   }
   console.log("DEBUG: uploadType resolved to:", uploadType);
@@ -103,6 +121,9 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.test(ext)) {
     cb(null, true);
   } else if (uploadType === "image" && file.mimetype && (file.mimetype.startsWith("image/") || file.mimetype === "application/octet-stream")) {
+    cb(null, true);
+  } else if ((uploadType === "serviceAgreement" || uploadType === "agreement" || uploadType === "signedDocument") &&
+             (file.mimetype === "application/pdf" || file.mimetype === "application/octet-stream" || file.mimetype.startsWith("image/"))) {
     cb(null, true);
   } else {
     return cb(new Error("Invalid upload type: " + file.originalname + " (" + file.mimetype + ")"));
