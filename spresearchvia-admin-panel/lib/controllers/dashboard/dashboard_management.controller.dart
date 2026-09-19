@@ -49,6 +49,13 @@ class DashboardManagementController extends GetxController {
       return;
     }
 
+    if (isLoading.value && !force) {
+      debugPrint(
+        'DashboardManagementController: Fetch already in progress, skipping duplicate.',
+      );
+      return;
+    }
+
     isLoading.value = true;
     _lastFetchTime = now;
     try {

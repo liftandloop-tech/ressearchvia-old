@@ -45,6 +45,8 @@ class TableReportingToDropdown extends StatelessWidget {
           child: DropdownButton<String>(
             value: selectedValue,
             isExpanded: true,
+            isDense: true,
+            itemHeight: 52.0,
             icon: const Icon(
               Icons.keyboard_arrow_down,
               size: 18,
@@ -153,33 +155,30 @@ class TableReportingToDropdown extends StatelessWidget {
                 final roleName = s.department.isNotEmpty ? s.department : s.role;
                 return DropdownMenuItem<String>(
                   value: s.id,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          s.name,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        s.name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textPrimary,
+                          fontWeight: FontWeight.w500,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          roleName,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.gray500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        roleName,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.gray500,
                         ),
-                      ],
-                    ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 );
               }),

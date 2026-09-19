@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/config/routes.config.dart';
@@ -29,10 +28,10 @@ class MainDashboardController extends GetxController {
     final user = authController.user.value;
     final currentRoute = Get.currentRoute;
 
-    if (!authController.isInitialized.value) return;
+    if (!authController.isInitialized.value || user == null) return;
 
     print(
-      'Controller Redirect Check. Route: $currentRoute, Auth: ${authController.isAuthenticated.value}, Role: ${user?.subscriptionPlan}',
+      'Controller Redirect Check. Route: $currentRoute, Auth: ${authController.isAuthenticated.value}, Role: ${user.subscriptionPlan}',
     );
 
     if (!authController.isAuthenticated.value) {
@@ -43,36 +42,45 @@ class MainDashboardController extends GetxController {
       return;
     }
 
-    // For non-admin roles: dynamic route restrictions based on permission groups
-    if (user?.isAdmin == true) return;
+    // Admins and Directors have top-level access across all operational modules
+    if (user.isAdmin) return;
     if (currentRoute == AppRoutes.dashboard) return;
+
+    if (user.isDirector) {
+      if (currentRoute.startsWith('/automated-trading') ||
+          currentRoute.startsWith('/subscriptions/plans/create')) {
+        print('Access restricted for $currentRoute. Redirecting to dashboard...');
+        Future.microtask(() => Get.offNamed(AppRoutes.dashboard));
+      }
+      return;
+    }
 
     bool isAllowed = true;
     if (currentRoute.startsWith('/manage-user')) {
-      isAllowed = (user?.hasPermission('Subscriptions', 'view') ?? false) ||
-          (user?.hasPermission('Subscriptions', 'activate') ?? false) ||
-          (user?.hasPermission('Users', 'update') ?? false);
+      isAllowed = (user.hasPermission('Subscriptions', 'view')) ||
+          (user.hasPermission('Subscriptions', 'activate')) ||
+          (user.hasPermission('Users', 'update'));
     } else if (currentRoute.startsWith('/users') ||
         currentRoute.startsWith('/edit-user')) {
-      isAllowed = user?.hasPermission('Users', 'read') ?? false;
+      isAllowed = user.hasPermission('Users', 'read');
     } else if (currentRoute.startsWith('/approvals/kyc') ||
         currentRoute.startsWith('/kyc')) {
-      isAllowed = user?.hasPermission('KYC', 'read') ?? false;
+      isAllowed = user.hasPermission('KYC', 'read');
     } else if (currentRoute.startsWith('/approvals/payments')) {
-      isAllowed = user?.hasPermission('Payments', 'read') ?? false;
+      isAllowed = user.hasPermission('Payments', 'read');
     } else if (currentRoute.startsWith('/staff') ||
         currentRoute.startsWith('/applicants') ||
         currentRoute.startsWith('/applicant/')) {
-      isAllowed = user?.hasPermission('Staff', 'read') ?? false;
+      isAllowed = user.hasPermission('Staff', 'read');
     } else if (currentRoute.startsWith('/reports') ||
         currentRoute.startsWith('/upload-report')) {
-      isAllowed = user?.hasPermission('Reports', 'read') ?? false;
+      isAllowed = user.hasPermission('Reports', 'read');
     } else if (currentRoute.startsWith('/notifications')) {
-      isAllowed = user?.hasPermission('Notifications', 'read') ?? false;
+      isAllowed = user.hasPermission('Notifications', 'read');
     } else if (currentRoute.startsWith('/settings')) {
-      isAllowed = user?.hasPermission('Settings', 'read') ?? false;
+      isAllowed = user.hasPermission('Settings', 'read');
     } else if (currentRoute.startsWith('/leads')) {
-      isAllowed = user?.hasPermission('Leads', 'read') ?? false;
+      isAllowed = user.hasPermission('Leads', 'read');
     } else if (currentRoute.startsWith('/automated-trading') ||
         currentRoute.startsWith('/subscriptions')) {
       // Subscriptions and Automated Trading are admin-only features
@@ -81,7 +89,7 @@ class MainDashboardController extends GetxController {
 
     if (!isAllowed) {
       print('Access restricted for $currentRoute. Redirecting to dashboard...');
-      Future.microtask(() => Get.offAllNamed(AppRoutes.dashboard));
+      Future.microtask(() => Get.offNamed(AppRoutes.dashboard));
     }
   }
 

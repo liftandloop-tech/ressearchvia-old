@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'; // Added for Colors
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/services/auth.service.dart';
 import 'package:spresearch_web/services/staff.service.dart';
@@ -132,8 +131,6 @@ class AuthController extends GetxController {
 
         if (staffUser.isResearcher) {
           Get.offAllNamed(AppRoutes.reports);
-        } else if (staffUser.isDirector) {
-          Get.offAllNamed(AppRoutes.users);
         } else {
           Get.offAllNamed(AppRoutes.dashboard);
         }
@@ -249,9 +246,6 @@ class AuthController extends GetxController {
     if (staffUser.isResearcher) {
       print('Redirecting Researcher to Reports...');
       Get.offAllNamed(AppRoutes.reports);
-    } else if (staffUser.isDirector) {
-      print('Redirecting Director to Users...');
-      Get.offAllNamed(AppRoutes.users);
     } else {
       print('Redirecting Staff to Dashboard...');
       Get.offAllNamed(AppRoutes.dashboard);

@@ -184,19 +184,43 @@ class UserModel {
 
   bool hasPermission(String target, [String? optionalAction]) {
     if (isAdmin) return true; // System admins bypass permission checks
-    if (isResearcher &&
-        (target.toLowerCase().startsWith('report') ||
-            (optionalAction != null &&
-                optionalAction.toLowerCase().startsWith('report')))) {
+
+    final t = target.toLowerCase();
+    final action = optionalAction?.toLowerCase() ?? '';
+
+    // 1. Director role: full operational authority across users, staff, leads, reports, kyc, payments, notifications, settings
+    if (isDirector) {
+      if (t.startsWith('automated') || t.startsWith('trading') || t.contains('plans.create')) {
+        return false;
+      }
       return true;
     }
+
+    // 2. Manager role: supervisor access over team operations (Users, Leads, Reports, KYC, Payments, Notifications, Attendance)
+    if (isManager) {
+      if (t.startsWith('automated') || t.startsWith('trading') || t.startsWith('subscription') || t.startsWith('settings')) {
+        return false;
+      }
+      if (t.startsWith('staff') && (action == 'delete' || action == 'create')) {
+        return false;
+      }
+      return true;
+    }
+
+    // 3. Researcher role: reports and notifications access
+    if (isResearcher) {
+      if (t.startsWith('report') || t.startsWith('notification')) {
+        return true;
+      }
+    }
+
     if (rawJson == null) return false;
 
     final String requiredKey = optionalAction == null
         ? target.toLowerCase()
         : '${target.toLowerCase()}.${optionalAction.toLowerCase()}';
 
-    // Check roleId
+    // 4. Granular database-configured Role and Permission Groups check
     final roleId = rawJson!['roleId'];
     if (roleId is Map) {
       final groups = roleId['permissionGroups'];
@@ -279,7 +303,19 @@ class UserModel {
           }
         }
       }
-      return false; // Has roleId but permission not found in groups
+    }
+
+    // 5. Department-based fallback if permission groups are empty or unassigned
+    final dept = subscriptionPlan.toLowerCase();
+    if (dept.contains('sales') || dept.contains('executive') || dept.contains('advisory') || dept.contains('support')) {
+      if (t.startsWith('lead') || t.startsWith('user') || t.startsWith('notification') || t.startsWith('kyc') || t.startsWith('attendance')) {
+        return true;
+      }
+    }
+    if (dept.contains('compliance')) {
+      if (t.startsWith('kyc') || t.startsWith('report') || t.startsWith('user') || t.startsWith('notification')) {
+        return true;
+      }
     }
 
     return false;

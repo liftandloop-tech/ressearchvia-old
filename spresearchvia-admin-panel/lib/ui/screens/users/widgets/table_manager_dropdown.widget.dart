@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
-import 'package:spresearch_web/controllers/users/user.controller.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import '../../../../models/user.model.dart';
-import '../../../../models/staff.model.dart';
 
 class TableManagerDropdown extends StatelessWidget {
   final UserModel user;
@@ -43,7 +41,8 @@ class TableManagerDropdown extends StatelessWidget {
           child: DropdownButton<String>(
             value: selectedValue,
             isExpanded: true,
-            itemHeight: null,
+            isDense: true,
+            itemHeight: 52.0,
             icon: const Icon(
               Icons.keyboard_arrow_down,
               size: 18,
@@ -109,7 +108,7 @@ class TableManagerDropdown extends StatelessWidget {
                 (m) => DropdownMenuItem<String>(
                   value: m.id,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -118,13 +117,13 @@ class TableManagerDropdown extends StatelessWidget {
                         Text(
                           m.name,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: AppTheme.textPrimary,
                             fontWeight: FontWeight.w500,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
                           m.department.isNotEmpty ? m.department : 'Unassigned',
                           style: const TextStyle(

@@ -39,6 +39,8 @@ class FilterTextField extends StatelessWidget {
           child: TextField(
             decoration: InputDecoration(
               hintText: hint,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
               hintStyle: const TextStyle(
                 fontSize: 14,
                 color: Color(0xffADAEBC),

@@ -57,6 +57,7 @@ class FilterDropdownField extends StatelessWidget {
                           child: DropdownButton<String>(
                             value: value,
                             isExpanded: true,
+                            isDense: true,
                             icon: const SizedBox.shrink(),
                             style: const TextStyle(
                               fontSize: 14,

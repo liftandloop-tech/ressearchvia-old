@@ -38,6 +38,7 @@ class DashboardController extends GetxController {
   var selectedDepartmentFilter = 'All Departments'.obs;
   var searchQuery = ''.obs;
   var activeTab = 0.obs; // 0: Staff Performance Leaderboard, 1: Staff Orders
+  bool _isFilterSyncing = false;
 
   @override
   void onInit() {
@@ -47,7 +48,6 @@ class DashboardController extends GetxController {
     if (_authController != null) {
       ever(_authController!.user, (_) {
         _syncFilterDefaults();
-        fetchFilteredData();
       });
     }
 
@@ -57,31 +57,52 @@ class DashboardController extends GetxController {
 
     debounce(
       searchQuery,
-      (_) => fetchFilteredData(),
+      (_) {
+        if (!_isFilterSyncing) fetchFilteredData();
+      },
       time: const Duration(milliseconds: 350),
     );
-    ever(selectedManagerFilter, (_) => fetchFilteredData());
-    ever(selectedDepartmentFilter, (_) => fetchFilteredData());
-    ever(startDate, (_) => fetchFilteredData());
-    ever(endDate, (_) => fetchFilteredData());
-    ever(selectedRenewalStatus, (_) => fetchFilteredData());
+    ever(selectedManagerFilter, (_) {
+      if (!_isFilterSyncing) fetchFilteredData();
+    });
+    ever(selectedDepartmentFilter, (_) {
+      if (!_isFilterSyncing) fetchFilteredData();
+    });
+    ever(startDate, (_) {
+      if (!_isFilterSyncing) fetchFilteredData();
+    });
+    ever(endDate, (_) {
+      if (!_isFilterSyncing) fetchFilteredData();
+    });
+    ever(selectedRenewalStatus, (_) {
+      if (!_isFilterSyncing) fetchFilteredData();
+    });
   }
 
   void _syncFilterDefaults() {
-    if (isSingleStaff) {
-      final myName = currentUser?.fullName.trim();
-      selectedManagerFilter.value =
-          (myName != null && myName.isNotEmpty) ? myName : 'My Profile';
-      final myDept = (currentUser?.subscriptionPlan ?? '').trim();
-      selectedDepartmentFilter.value =
-          (myDept.isNotEmpty && myDept != 'N/A') ? myDept : 'Sales';
-    } else {
-      if (!managerFilterItems.contains(selectedManagerFilter.value)) {
-        selectedManagerFilter.value = 'All Staff';
+    _isFilterSyncing = true;
+    try {
+      if (isSingleStaff) {
+        final myName = currentUser?.fullName.trim();
+        final targetManager = (myName != null && myName.isNotEmpty) ? myName : 'My Profile';
+        if (selectedManagerFilter.value != targetManager) {
+          selectedManagerFilter.value = targetManager;
+        }
+        final myDept = (currentUser?.subscriptionPlan ?? '').trim();
+        final targetDept = (myDept.isNotEmpty && myDept != 'N/A') ? myDept : 'Sales';
+        if (selectedDepartmentFilter.value != targetDept) {
+          selectedDepartmentFilter.value = targetDept;
+        }
+      } else {
+        if (!managerFilterItems.contains(selectedManagerFilter.value)) {
+          selectedManagerFilter.value = 'All Staff';
+        }
+        if (!departmentFilterItems.contains(selectedDepartmentFilter.value)) {
+          selectedDepartmentFilter.value = 'All Departments';
+        }
       }
-      if (!departmentFilterItems.contains(selectedDepartmentFilter.value)) {
-        selectedDepartmentFilter.value = 'All Departments';
-      }
+    } finally {
+      Future.microtask(() => _isFilterSyncing = false);
     }
   }
 
@@ -122,7 +143,7 @@ class DashboardController extends GetxController {
     }
 
     _dashboardManagementController.fetchDashboardData(
-      force: true,
+      force: query.isNotEmpty,
       query: query.isNotEmpty ? query : null,
     );
   }
