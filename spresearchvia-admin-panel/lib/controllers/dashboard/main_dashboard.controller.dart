@@ -48,9 +48,11 @@ class MainDashboardController extends GetxController {
 
     if (user.isDirector) {
       if (currentRoute.startsWith('/automated-trading') ||
-          currentRoute.startsWith('/subscriptions/plans/create')) {
+          currentRoute.startsWith('/subscriptions/plans/create') ||
+          currentRoute.startsWith('/settings')) {
         print('Access restricted for $currentRoute. Redirecting to dashboard...');
         Future.microtask(() => Get.offNamed(AppRoutes.dashboard));
+        return;
       }
       return;
     }
@@ -78,7 +80,11 @@ class MainDashboardController extends GetxController {
     } else if (currentRoute.startsWith('/notifications')) {
       isAllowed = user.hasPermission('Notifications', 'read');
     } else if (currentRoute.startsWith('/settings')) {
-      isAllowed = user.hasPermission('Settings', 'read');
+      if (user.isDirector) {
+        isAllowed = false;
+      } else {
+        isAllowed = user.hasPermission('Settings', 'read');
+      }
     } else if (currentRoute.startsWith('/leads')) {
       isAllowed = user.hasPermission('Leads', 'read');
     } else if (currentRoute.startsWith('/automated-trading') ||
@@ -127,6 +133,7 @@ class MainDashboardController extends GetxController {
 
   void changeTab(int index) {
     selectedTab.value = index;
+    final currentUser = Get.find<AuthController>().user.value;
     switch (index) {
       case 0:
         Get.offNamed('/dashboard');
@@ -147,7 +154,11 @@ class MainDashboardController extends GetxController {
         Get.offNamed('/notifications');
         break;
       case 6:
-        Get.offNamed('/settings');
+        if (currentUser?.isDirector ?? false) {
+          Get.offNamed('/dashboard');
+        } else {
+          Get.offNamed('/settings');
+        }
         break;
       case 7:
         Get.offNamed(AppRoutes.userKyc);

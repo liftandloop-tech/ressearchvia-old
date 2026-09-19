@@ -808,13 +808,23 @@ const userkycService = {
             } else if (docType === 'video') {
                 user.kycDocs.video = file.filename;
                 user.kycVideo = file.filename;
+            } else if (docType === 'serviceAgreement' || docType === 'agreement' || docType === 'signedDocument') {
+                user.kycDocs.serviceAgreement = file.filename;
+                if (!userDoc.serviceAgreement) userDoc.serviceAgreement = {};
+                userDoc.serviceAgreement.fileName = file.filename;
+                userDoc.serviceAgreement.filePath = file.path;
+                userDoc.serviceAgreement.fileOriginalName = file.originalname;
             } else {
                 return { status: 400, message: "Invalid docType", data: {} };
             }
 
             // Reset the relevant gate to PENDING so the admin can re-review the updated doc
             if (!user.kycGates) user.kycGates = {};
-            const gateKey = (docType === 'pan' || docType === 'aadhaarFront' || docType === 'aadhaarBack') ? 'documents' : 'video';
+            const gateKey = (docType === 'pan' || docType === 'aadhaarFront' || docType === 'aadhaarBack')
+                ? 'documents'
+                : (docType === 'serviceAgreement' || docType === 'agreement' || docType === 'signedDocument')
+                    ? 'esign'
+                    : 'video';
             if (!user.kycGates[gateKey]) user.kycGates[gateKey] = {};
             user.kycGates[gateKey].status = 'PENDING';
             user.kycGates[gateKey].rejectionReason = null;

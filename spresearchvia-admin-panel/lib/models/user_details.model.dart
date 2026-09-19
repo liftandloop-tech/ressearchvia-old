@@ -183,12 +183,18 @@ class UserDetailsModel {
           (kycDocs?.aadhaarBack != null && kycDocs!.aadhaarBack!.isNotEmpty) ||
           (kycDocs?.video != null && kycDocs!.video!.isNotEmpty) ||
           (kycVideo != null && kycVideo!.isNotEmpty) ||
-          (digioDocumentId != null && digioDocumentId!.isNotEmpty);
+          (digioDocumentId != null && digioDocumentId!.isNotEmpty) ||
+          (manualServiceAgreement != null && manualServiceAgreement!.isNotEmpty);
 
       if (!hasDocs) return 'PENDING';
     }
     return status;
   }
+
+  String? get manualServiceAgreement => kycDocs?.serviceAgreement;
+  bool get hasSignedDocument =>
+      (manualServiceAgreement != null && manualServiceAgreement!.isNotEmpty) ||
+      (digioDocumentId != null && digioDocumentId!.isNotEmpty);
 }
 
 class UserObject {
@@ -264,8 +270,15 @@ class KycDocs {
   final String? aadhaarFront;
   final String? aadhaarBack;
   final String? video;
+  final String? serviceAgreement;
 
-  KycDocs({this.panImage, this.aadhaarFront, this.aadhaarBack, this.video});
+  KycDocs({
+    this.panImage,
+    this.aadhaarFront,
+    this.aadhaarBack,
+    this.video,
+    this.serviceAgreement,
+  });
 
   factory KycDocs.fromJson(Map<String, dynamic> json) {
     return KycDocs(
@@ -273,6 +286,7 @@ class KycDocs {
       aadhaarFront: json['aadhaarFront'],
       aadhaarBack: json['aadhaarBack'],
       video: json['video'],
+      serviceAgreement: json['serviceAgreement'],
     );
   }
 }

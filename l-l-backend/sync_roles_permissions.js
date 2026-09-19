@@ -10,19 +10,17 @@ async function run() {
     const pgCollection = mongoose.connection.db.collection('permissiongroups');
     const roleCollection = mongoose.connection.db.collection('roles');
 
-    // 1. Update Director PG to include Notifications and Settings
+    // 1. Update Director PG to include Notifications and ensure Settings is removed
     const dirPg = await pgCollection.findOne({ name: 'Director' });
     if (dirPg) {
-      const existingFeatures = (dirPg.permissions || []).map(p => (p.feature || '').toLowerCase());
-      const newPerms = [...(dirPg.permissions || [])];
+      // Filter out any Settings permissions for Director
+      let newPerms = (dirPg.permissions || []).filter(p => (p.feature || '').toLowerCase() !== 'settings');
+      const existingFeatures = newPerms.map(p => (p.feature || '').toLowerCase());
       if (!existingFeatures.includes('notifications')) {
         newPerms.push({ feature: 'Notifications', actions: ['read', 'view'] });
       }
-      if (!existingFeatures.includes('settings')) {
-        newPerms.push({ feature: 'Settings', actions: ['read', 'view'] });
-      }
       await pgCollection.updateOne({ _id: dirPg._id }, { $set: { permissions: newPerms } });
-      console.log('✓ Updated Director permission group with Notifications and Settings.');
+      console.log('✓ Updated Director permission group (Notifications included, Settings removed).');
     }
 
     // 2. Create or find Manager PG

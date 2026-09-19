@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/services/subscription.service.dart';
@@ -2420,6 +2421,377 @@ class ManageSubscriptionController extends GetxController {
         ),
       );
     });
+  }
+  Future<bool> updateDiscount(String intentId, double discount) async {
+    try {
+      isLoading.value = true;
+      final success = await _acquisitionService.updatePaymentDiscount(
+        paymentIntentId: intentId,
+        discount: discount,
+      );
+      if (success) {
+        Get.snackbar(
+          "Success",
+          "Discount updated",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+        if (currentUserId.value.isNotEmpty) {
+          await fetchUserSubscriptions(currentUserId.value);
+        }
+        return true;
+      } else {
+        Get.snackbar(
+          "Error",
+          "Failed to update discount",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return false;
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void showDiscountDialog(Map<String, dynamic> sub) {
+    final String paymentIntentId =
+        (sub['paymentIntentId'] ?? sub['_id'] ?? '').toString();
+    if (paymentIntentId.isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Invalid payment intent ID",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final double planAmount = (sub['totalPlanAmount'] is num)
+        ? (sub['totalPlanAmount'] as num).toDouble()
+        : (sub['amount'] is num)
+            ? (sub['amount'] as num).toDouble()
+            : (double.tryParse(
+                    sub['totalPlanAmount']?.toString() ??
+                        sub['amount']?.toString() ??
+                        '0') ??
+                0);
+
+    final double currentDiscount = (sub['discount'] is num)
+        ? (sub['discount'] as num).toDouble()
+        : (double.tryParse(sub['discount']?.toString() ?? '0') ?? 0);
+
+    final double amountPaid = (sub['paidAmount'] is num)
+        ? (sub['paidAmount'] as num).toDouble()
+        : (sub['amountPaid'] is num)
+            ? (sub['amountPaid'] as num).toDouble()
+            : (double.tryParse(
+                    sub['paidAmount']?.toString() ??
+                        sub['amountPaid']?.toString() ??
+                        '0') ??
+                0);
+
+    final TextEditingController discountInputController =
+        TextEditingController(
+      text: currentDiscount > 0 ? currentDiscount.toStringAsFixed(0) : '',
+    );
+    discountInputController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: discountInputController.text.length,
+    );
+
+    final isSubmitting = false.obs;
+    final previewDiscount = RxDouble(currentDiscount);
+    final errorText = RxString('');
+
+    void calculatePreview(String val) {
+      errorText.value = '';
+      final clean = val.trim();
+      if (clean.isEmpty) {
+        previewDiscount.value = 0;
+        return;
+      }
+      final parsed = double.tryParse(clean);
+      if (parsed == null) {
+        errorText.value = 'Please enter a valid numeric value';
+        return;
+      }
+      if (planAmount > 0 && parsed > planAmount) {
+        errorText.value =
+            'Discount cannot exceed original plan price (₹${planAmount.toStringAsFixed(0)})';
+      }
+      previewDiscount.value = parsed;
+    }
+
+    Future<void> submitDiscount() async {
+      final clean = discountInputController.text.trim();
+      final double newDiscount =
+          clean.isEmpty ? 0 : (double.tryParse(clean) ?? -1);
+      if (newDiscount < 0) {
+        errorText.value = 'Please enter a valid positive discount';
+        return;
+      }
+      if (planAmount > 0 && newDiscount > planAmount) {
+        errorText.value =
+            'Discount cannot exceed original plan price (₹${planAmount.toStringAsFixed(0)})';
+        return;
+      }
+
+      isSubmitting.value = true;
+      try {
+        final success = await updateDiscount(paymentIntentId, newDiscount);
+        if (success) {
+          Get.back(); // close dialog
+        }
+      } finally {
+        isSubmitting.value = false;
+      }
+    }
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        child: Container(
+          width: 440,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.discount_outlined,
+                            color: Colors.teal, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        "Plan Discount",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3A5F),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                    onPressed: () => Get.back(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Original Plan Price",
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B))),
+                        Text(
+                          "₹${planAmount.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Amount Paid",
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B))),
+                        Text(
+                          "₹${amountPaid.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green),
+                        ),
+                      ],
+                    ),
+                    if (currentDiscount > 0) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Current Discount",
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF64748B))),
+                          Text(
+                            "₹${currentDiscount.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.teal),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Discount Amount (₹)",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: discountInputController,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  prefixText: "₹ ",
+                  hintText: "Enter total discount (e.g. 5000)",
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+                onChanged: calculatePreview,
+                onSubmitted: (_) => submitDiscount(),
+              ),
+              Obx(() {
+                if (errorText.value.isNotEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      errorText.value,
+                      style: const TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+              const SizedBox(height: 16),
+              Obx(() {
+                final d = previewDiscount.value;
+                final newTarget = planAmount > 0
+                    ? ((planAmount - d) > 0 ? (planAmount - d) : 0)
+                    : 0;
+                final newBal =
+                    (newTarget - amountPaid) > 0 ? (newTarget - amountPaid) : 0;
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.teal.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          const Text("New Target",
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
+                          const SizedBox(height: 3),
+                          Text(
+                            "₹${newTarget.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        height: 28,
+                        width: 1,
+                        color: Colors.teal.withOpacity(0.2),
+                      ),
+                      Column(
+                        children: [
+                          const Text("Remaining Due",
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
+                          const SizedBox(height: 3),
+                          Text(
+                            newBal > 0
+                                ? "₹${newBal.toStringAsFixed(0)}"
+                                : "₹0 (Cleared)",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color:
+                                  newBal > 0 ? Colors.orange[800] : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text("Cancel"),
+                  ),
+                  const SizedBox(width: 12),
+                  Obx(
+                    () => ElevatedButton.icon(
+                      icon: isSubmitting.value
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check, size: 18),
+                      label: Text(
+                        isSubmitting.value ? "Applying..." : "Apply Discount",
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                      onPressed: isSubmitting.value ? null : submitDiscount,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

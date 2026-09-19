@@ -269,6 +269,15 @@ export const adminStrictOnlyNoStaff = async (req, res, next) => {
             const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
             const userType = (staffMember.userType || "").toLowerCase();
 
+            const isDirector = dept.includes('director') || roleName.includes('director') || userType.includes('director');
+            if (isDirector) {
+                return res.status(403).json({
+                    status: 403,
+                    message: "Access Denied. Financial operations (approvals, rejections, reverts, refunds) are strictly restricted to Administrators only, not Directors.",
+                    errorCode: "ADMIN_ONLY_RESTRICTION"
+                });
+            }
+
             if (roleName === 'admin' || roleName === 'super_admin' || roleName === 'super admin' ||
                 dept === 'admin' || dept === 'super_admin' || dept === 'super admin' ||
                 userType === 'admin' || userType === 'super_admin') {
@@ -415,6 +424,15 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 staffMember.roleId.name.toLowerCase() === 'super_admin' ||
                 staffMember.roleId.name.toLowerCase() === 'super admin'
             );
+
+            const isDirector = dept.includes('director') || roleName.includes('director') || userType.includes('director');
+
+            // Director is strictly barred from Settings operations
+            if (isDirector && (requiredKey.toLowerCase().startsWith('settings') || (feature && feature.toLowerCase() === 'settings'))) {
+                return res.status(403).json({
+                    message: "Access Denied. Settings management is restricted to Administrators only, not Directors."
+                });
+            }
 
             if (dept === 'admin' || dept === 'super_admin' || dept === 'super admin' ||
                 roleName === 'admin' || roleName === 'super_admin' || roleName === 'super admin' ||

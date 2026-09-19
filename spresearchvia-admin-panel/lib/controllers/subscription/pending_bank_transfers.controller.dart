@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:spresearch_web/services/user.service.dart';
 import 'package:spresearch_web/services/segment.service.dart';
@@ -8,6 +9,7 @@ import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/auth.service.dart';
 import 'package:spresearch_web/services/subscription.service.dart';
 import '../../models/user.model.dart';
+import '../auth/auth.controller.dart';
 import 'package:file_picker/file_picker.dart';
 
 class PendingBankTransfersController extends GetxController {
@@ -33,7 +35,17 @@ class PendingBankTransfersController extends GetxController {
     fetchPendingKyc();
   }
 
-  bool get isAdmin => currentUser.value?.isAdmin ?? false;
+  UserModel? get effectiveUser {
+    if (Get.isRegistered<AuthController>()) {
+      final authUser = Get.find<AuthController>().user.value;
+      if (authUser != null) return authUser;
+    }
+    return currentUser.value;
+  }
+
+  bool get isDirector => effectiveUser?.isDirector ?? false;
+  bool get isAdmin => !isDirector && (effectiveUser?.isAdmin ?? false);
+  bool get canTakePaymentActions => isAdmin && !isDirector;
 
   // Correction Engine Observables
   var segments = <Map<String, dynamic>>[].obs;
@@ -56,6 +68,16 @@ class PendingBankTransfersController extends GetxController {
   }
 
   void showSubscriptionCorrectionDialog(Map<String, dynamic> payment) {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can edit subscription dates or plans.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return;
+    }
+
     // 0. Preliminary Checks
     if (payment['purchaseType'] == 'REGISTRATION') {
       Get.snackbar(
@@ -422,6 +444,16 @@ class PendingBankTransfersController extends GetxController {
   Timer? _searchDebounce;
 
   void showCorrectionDialog(Map<String, dynamic> payment) {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can perform financial corrections.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return;
+    }
+
     final paymentIntentId = payment['_id'] ?? '';
     final currentAmount = (payment['amountPaid'] ?? payment['amount'] ?? 0)
         .toDouble();
@@ -1238,6 +1270,16 @@ class PendingBankTransfersController extends GetxController {
     String? remark,
     double? discount,
   }) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can approve payments.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return;
+    }
+
     final userId = payment['userId']['_id'];
     final segmentPlanIdData = payment['segmentPlanId'];
 
@@ -1292,6 +1334,16 @@ class PendingBankTransfersController extends GetxController {
   }
 
   Future<void> rejectTransfer(Map<String, dynamic> payment) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can reject payments.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return;
+    }
+
     final paymentId = payment['_id'];
     final success = await _segmentService.rejectBankTransfer(paymentId);
     if (success) {
@@ -1318,6 +1370,16 @@ class PendingBankTransfersController extends GetxController {
     String? remark,
     double? discount,
   }) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can approve installments.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
+
     try {
       isLoading.value = true;
       final success = await _acquisitionService.approvePartialPayment(
@@ -1350,6 +1412,16 @@ class PendingBankTransfersController extends GetxController {
   }
 
   Future<bool> updateDiscount(String intentId, double discount) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can modify discounts.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
+
     try {
       isLoading.value = true;
       final success = await _acquisitionService.updatePaymentDiscount(
@@ -1379,14 +1451,384 @@ class PendingBankTransfersController extends GetxController {
     }
   }
 
+  void showDiscountDialog(
+    Map<String, dynamic> payment, {
+    Function(Map<String, dynamic> updatedPayment)? onUpdated,
+  }) {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can apply discounts.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return;
+    }
+
+    final String paymentIntentId =
+        (payment['_id'] ?? payment['paymentIntentId'] ?? '').toString();
+    if (paymentIntentId.isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Invalid payment intent ID",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final double planAmount = (payment['amount'] is num)
+        ? (payment['amount'] as num).toDouble()
+        : (payment['totalPlanAmount'] is num)
+            ? (payment['totalPlanAmount'] as num).toDouble()
+            : (double.tryParse(
+                    payment['amount']?.toString() ??
+                        payment['totalPlanAmount']?.toString() ??
+                        '0') ??
+                0);
+
+    final double currentDiscount = (payment['discount'] is num)
+        ? (payment['discount'] as num).toDouble()
+        : (double.tryParse(payment['discount']?.toString() ?? '0') ?? 0);
+
+    final double amountPaid = (payment['amountPaid'] is num)
+        ? (payment['amountPaid'] as num).toDouble()
+        : (double.tryParse(payment['amountPaid']?.toString() ?? '0') ?? 0);
+
+    final TextEditingController discountInputController =
+        TextEditingController(
+      text: currentDiscount > 0 ? currentDiscount.toStringAsFixed(0) : '',
+    );
+    discountInputController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: discountInputController.text.length,
+    );
+
+    final isSubmitting = false.obs;
+    final previewDiscount = RxDouble(currentDiscount);
+    final errorText = RxString('');
+
+    void calculatePreview(String val) {
+      errorText.value = '';
+      final clean = val.trim();
+      if (clean.isEmpty) {
+        previewDiscount.value = 0;
+        return;
+      }
+      final parsed = double.tryParse(clean);
+      if (parsed == null) {
+        errorText.value = 'Please enter a valid numeric value';
+        return;
+      }
+      if (planAmount > 0 && parsed > planAmount) {
+        errorText.value =
+            'Discount cannot exceed original plan price (₹${planAmount.toStringAsFixed(0)})';
+      }
+      previewDiscount.value = parsed;
+    }
+
+    Future<void> submitDiscount() async {
+      final clean = discountInputController.text.trim();
+      final double newDiscount =
+          clean.isEmpty ? 0 : (double.tryParse(clean) ?? -1);
+      if (newDiscount < 0) {
+        errorText.value = 'Please enter a valid positive discount';
+        return;
+      }
+      if (planAmount > 0 && newDiscount > planAmount) {
+        errorText.value =
+            'Discount cannot exceed original plan price (₹${planAmount.toStringAsFixed(0)})';
+        return;
+      }
+
+      isSubmitting.value = true;
+      try {
+        final success = await updateDiscount(paymentIntentId, newDiscount);
+        if (success) {
+          final updatedPayment = Map<String, dynamic>.from(payment);
+          updatedPayment['discount'] = newDiscount;
+          final double newTarget =
+              planAmount > 0 ? (planAmount - newDiscount) : 0;
+          updatedPayment['remainingAmount'] =
+              (newTarget - amountPaid) > 0 ? (newTarget - amountPaid) : 0;
+          if (amountPaid >= (newTarget - 1) && newTarget > 0) {
+            updatedPayment['status'] = 'PAID';
+          }
+          if (onUpdated != null) {
+            onUpdated(updatedPayment);
+          }
+          Get.back(); // close dialog
+        }
+      } finally {
+        isSubmitting.value = false;
+      }
+    }
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        child: Container(
+          width: 440,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.discount_outlined,
+                            color: Colors.teal, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        "Plan Discount",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3A5F),
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                    onPressed: () => Get.back(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Original Plan Price",
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B))),
+                        Text(
+                          "₹${planAmount.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Amount Paid",
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF64748B))),
+                        Text(
+                          "₹${amountPaid.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green),
+                        ),
+                      ],
+                    ),
+                    if (currentDiscount > 0) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("Current Discount",
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF64748B))),
+                          Text(
+                            "₹${currentDiscount.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.teal),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Discount Amount (₹)",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: discountInputController,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  prefixText: "₹ ",
+                  hintText: "Enter total discount (e.g. 5000)",
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+                onChanged: calculatePreview,
+                onSubmitted: (_) => submitDiscount(),
+              ),
+              Obx(() {
+                if (errorText.value.isNotEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      errorText.value,
+                      style: const TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+              const SizedBox(height: 16),
+              // Live calculation preview
+              Obx(() {
+                final d = previewDiscount.value;
+                final newTarget = planAmount > 0
+                    ? ((planAmount - d) > 0 ? (planAmount - d) : 0)
+                    : 0;
+                final newBal =
+                    (newTarget - amountPaid) > 0 ? (newTarget - amountPaid) : 0;
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.teal.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Column(
+                        children: [
+                          const Text("New Target",
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
+                          const SizedBox(height: 3),
+                          Text(
+                            "₹${newTarget.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        height: 28,
+                        width: 1,
+                        color: Colors.teal.withOpacity(0.2),
+                      ),
+                      Column(
+                        children: [
+                          const Text("Remaining Due",
+                              style: TextStyle(
+                                  fontSize: 11, color: Color(0xFF64748B))),
+                          const SizedBox(height: 3),
+                          Text(
+                            newBal > 0
+                                ? "₹${newBal.toStringAsFixed(0)}"
+                                : "₹0 (Cleared)",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color:
+                                  newBal > 0 ? Colors.orange[800] : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text("Cancel"),
+                  ),
+                  const SizedBox(width: 12),
+                  Obx(
+                    () => ElevatedButton.icon(
+                      icon: isSubmitting.value
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check, size: 18),
+                      label: Text(
+                        isSubmitting.value ? "Applying..." : "Apply Discount",
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                      onPressed: isSubmitting.value ? null : submitDiscount,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<bool> rejectPartialInstallment(
-    String intentId,
+    String paymentId,
     String historyId,
   ) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can reject installments.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
+
     try {
       isLoading.value = true;
       final success = await _acquisitionService.rejectPartialPayment(
-        paymentIntentId: intentId,
+        paymentIntentId: paymentId,
         historyId: historyId,
       );
       if (success) {
@@ -1417,6 +1859,16 @@ class PendingBankTransfersController extends GetxController {
     String? reason,
     String? historyId,
   }) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can revert approvals.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
+
     try {
       isLoading.value = true;
       final success = await _segmentService.revertToRejected(
@@ -1452,6 +1904,16 @@ class PendingBankTransfersController extends GetxController {
     String? historyId,
     String? reason,
   }) async {
+    if (!canTakePaymentActions) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can restore rejections.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
+
     try {
       isLoading.value = true;
       final success = await _segmentService.revertToApproved(

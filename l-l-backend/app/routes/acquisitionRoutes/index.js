@@ -4,7 +4,7 @@ import * as acquisitionController from "../../controller/acquisitionController.j
 
 import upload from "../../config/upload.js";
 
-import { adminOnly, registrationAccess, adminStrictOnly } from "../../middleware/accessMiddleware.js";
+import { adminOnly, registrationAccess, adminStrictOnly, adminStrictOnlyNoStaff } from "../../middleware/accessMiddleware.js";
 
 const Router = express.Router();
 
@@ -21,10 +21,10 @@ const acquisitionRoutes = () => {
 
     // Offline Flow (Admin)
     Router.post("/admin-onboard", auth.tokenVerified, adminOnly, acquisitionController.adminOnboardUser);
-    Router.post("/approve-partial-payment", auth.tokenVerified, adminOnly, acquisitionController.approvePartialPayment);
-    Router.post("/reject-partial-payment", auth.tokenVerified, adminOnly, acquisitionController.rejectPartialPayment);
-    Router.post("/update-payment-discount", auth.tokenVerified, adminOnly, acquisitionController.updatePaymentDiscount);
-    Router.post("/update-subscription-metadata", auth.tokenVerified, adminStrictOnly, acquisitionController.updateSubscriptionMetadata);
+    Router.post("/approve-partial-payment", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.approvePartialPayment);
+    Router.post("/reject-partial-payment", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.rejectPartialPayment);
+    Router.post("/update-payment-discount", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.updatePaymentDiscount);
+    Router.post("/update-subscription-metadata", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.updateSubscriptionMetadata);
 
     return Router;
 };

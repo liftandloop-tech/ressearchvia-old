@@ -79,6 +79,7 @@ class DashboardNavBar extends StatelessWidget {
                 return (user?.has('notifications.view') ?? false) ? item : null;
               }
               if (title == 'Settings') {
+                if (user?.isDirector ?? false) return null;
                 return (user?.has('settings.view') ?? false) ? item : null;
               }
               if (title == 'Leads') {

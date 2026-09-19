@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.config.dart';
@@ -435,7 +436,10 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       const DataColumn(label: Text('Paid Amount + GST')),
                       const DataColumn(label: Text('Status')),
                       const DataColumn(label: Text('Invoice')),
-                      if (Get.find<AuthController>().user.value?.has('payments.bypass') ?? false)
+                      if ((Get.find<AuthController>().user.value?.has('payments.bypass') ?? false) ||
+                          (Get.find<AuthController>().user.value?.has('payments.view_pending') ?? false) ||
+                          controller.isDirector ||
+                          controller.canTakePaymentActions)
                         const DataColumn(label: Text('Actions')),
                     ],
                     rows: controller.filteredPayments.map((payment) {
@@ -642,7 +646,10 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               onPressed: () => _showInvoiceDialog(payment),
                             ),
                           ),
-                          if (Get.find<AuthController>().user.value?.has('payments.bypass') ?? false)
+                          if ((Get.find<AuthController>().user.value?.has('payments.bypass') ?? false) ||
+                              (Get.find<AuthController>().user.value?.has('payments.view_pending') ?? false) ||
+                              controller.isDirector ||
+                              controller.canTakePaymentActions)
                             DataCell(
                               Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -654,7 +661,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                     onTap: () =>
                                         _showDetailsDialog(payment, controller),
                                   ),
-                                  if (controller.isAdmin) ...[
+                                  if (controller.canTakePaymentActions) ...[
                                     const SizedBox(width: 8),
                                     IconButton(
                                       icon: const Icon(
@@ -1482,6 +1489,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
     final bool isRegistration = purchaseType == 'REGISTRATION';
     final bool isPartial = payment['isPartial'] == true;
     final String status = payment['status']?.toString() ?? 'PENDING';
+    final bool canAct = controller.canTakePaymentActions;
 
     final Map<String, dynamic> plan = (payment['segmentPlanId'] is Map)
         ? Map<String, dynamic>.from(payment['segmentPlanId'])
@@ -1737,9 +1745,18 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       ),
                       if (discount > 0)
                         Expanded(
-                          child: _buildInfoItem(
-                            "Discount Applied",
-                            "₹${discount.toStringAsFixed(0)}",
+                          child: InkWell(
+                            onTap: canAct
+                                ? () => controller.showDiscountDialog(
+                                      payment,
+                                      onUpdated: onPaymentUpdated,
+                                    )
+                                : null,
+                            borderRadius: BorderRadius.circular(4),
+                            child: _buildInfoItem(
+                              "Discount Applied",
+                              "₹${discount.toStringAsFixed(0)}",
+                            ),
                           ),
                         ),
                       Expanded(
@@ -1793,62 +1810,71 @@ class PendingBankTransfersScreen extends StatelessWidget {
                     )
                   else
                     Table(
-                      columnWidths: const {
-                        0: FlexColumnWidth(1.6),
-                        1: FlexColumnWidth(2.0),
-                        2: FlexColumnWidth(1.8),
-                        3: FlexColumnWidth(1.0),
-                        4: FlexColumnWidth(1.2),
-                        5: FlexColumnWidth(2.0),
-                      },
+                      columnWidths: canAct
+                          ? const {
+                              0: FlexColumnWidth(1.6),
+                              1: FlexColumnWidth(2.0),
+                              2: FlexColumnWidth(1.8),
+                              3: FlexColumnWidth(1.0),
+                              4: FlexColumnWidth(1.2),
+                              5: FlexColumnWidth(2.0),
+                            }
+                          : const {
+                              0: FlexColumnWidth(1.6),
+                              1: FlexColumnWidth(2.2),
+                              2: FlexColumnWidth(2.0),
+                              3: FlexColumnWidth(1.0),
+                              4: FlexColumnWidth(1.2),
+                            },
                       border:
                           TableBorder.all(color: Colors.grey[200]!, width: 0.5),
                       children: [
                         TableRow(
                           decoration: BoxDecoration(color: Colors.grey[100]),
-                          children: const [
-                            Padding(
+                          children: [
+                            const Padding(
                               padding: EdgeInsets.all(8.0),
                               child: Text('Date',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11)),
                             ),
-                            Padding(
+                            const Padding(
                               padding: EdgeInsets.all(8.0),
                               child: Text('Amount (Base+GST)',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11)),
                             ),
-                            Padding(
+                            const Padding(
                               padding: EdgeInsets.all(8.0),
                               child: Text('UTR',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11)),
                             ),
-                            Padding(
+                            const Padding(
                               padding: EdgeInsets.all(8.0),
                               child: Text('Proof',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11)),
                             ),
-                            Padding(
+                            const Padding(
                               padding: EdgeInsets.all(8.0),
                               child: Text('Status',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11)),
                             ),
-                            Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Text('Actions',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 11)),
-                            ),
+                            if (canAct)
+                              const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Text('Actions',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11)),
+                              ),
                           ],
                         ),
                         ...history.reversed.map((inst) {
@@ -1925,114 +1951,113 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                 child: _buildStatusChip(
                                     inst['status'] ?? 'PENDING'),
                               ),
-                              Padding(
-                                padding: const EdgeInsets.all(6.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isInstPending) ...[
-                                      Button(
-                                        title: "Approve",
-                                        buttonType: ButtonType.green,
-                                        size: ButtonSize.small,
-                                        onTap: () {
-                                          _showRemarkPopup(
-                                            intentId: intentId,
-                                            historyId:
-                                                inst['_id']?.toString(),
-                                            isFullPayment: false,
-                                            controller: controller,
-                                            discount: discount,
-                                            payment: payment,
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Button(
-                                        title: "Reject",
-                                        buttonType: ButtonType.red,
-                                        size: ButtonSize.small,
-                                        onTap: () {
-                                          _showRevertConfirmation(
-                                            title: "Reject Installment?",
-                                            message:
-                                                "Are you sure you want to reject this installment?",
-                                            onConfirm: (remark) async {
-                                              final success = await controller
-                                                  .rejectPartialInstallment(
-                                                intentId,
-                                                inst['_id']?.toString() ?? '',
-                                              );
-                                              if (success) {
-                                                inst['status'] = 'REJECTED';
-                                                onPaymentUpdated(payment);
-                                              }
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ] else if (isInstApproved &&
-                                        controller.isAdmin) ...[
-                                      Button(
-                                        title: "Revert",
-                                        buttonType: ButtonType.red,
-                                        size: ButtonSize.small,
-                                        onTap: () {
-                                          _showRevertConfirmation(
-                                            title: "Revert Approval?",
-                                            message:
-                                                "This will REJECT this installment and REVERT associated data.",
-                                            onConfirm: (reason) async {
-                                              final success = await controller
-                                                  .revertApprovalAction(
-                                                intentId,
-                                                historyId:
-                                                    inst['_id']?.toString(),
-                                                reason: reason,
-                                              );
-                                              if (success) {
-                                                inst['status'] = 'REJECTED';
-                                                onPaymentUpdated(payment);
-                                              }
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ] else if (isInstRejected &&
-                                        controller.isAdmin) ...[
-                                      Button(
-                                        title: "Restore",
-                                        buttonType: ButtonType.green,
-                                        size: ButtonSize.small,
-                                        onTap: () {
-                                          _showRevertConfirmation(
-                                            title: "Restore Installment?",
-                                            message:
-                                                "This will restore this installment to APPROVED state.",
-                                            confirmColor: Colors.green,
-                                            onConfirm: (reason) async {
-                                              final success = await controller
-                                                  .revertRejectionAction(
-                                                intentId,
-                                                historyId:
-                                                    inst['_id']?.toString(),
-                                                reason: reason,
-                                              );
-                                              if (success) {
-                                                inst['status'] = 'APPROVED';
-                                                onPaymentUpdated(payment);
-                                              }
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ] else ...[
-                                      const Icon(Icons.check,
-                                          size: 16, color: Colors.green),
+                              if (canAct)
+                                Padding(
+                                  padding: const EdgeInsets.all(6.0),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (isInstPending) ...[
+                                        Button(
+                                          title: "Approve",
+                                          buttonType: ButtonType.green,
+                                          size: ButtonSize.small,
+                                          onTap: () {
+                                            _showRemarkPopup(
+                                              intentId: intentId,
+                                              historyId:
+                                                  inst['_id']?.toString(),
+                                              isFullPayment: false,
+                                              controller: controller,
+                                              discount: discount,
+                                              payment: payment,
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Button(
+                                          title: "Reject",
+                                          buttonType: ButtonType.red,
+                                          size: ButtonSize.small,
+                                          onTap: () {
+                                            _showRevertConfirmation(
+                                              title: "Reject Installment?",
+                                              message:
+                                                  "Are you sure you want to reject this installment?",
+                                              onConfirm: (remark) async {
+                                                final success = await controller
+                                                    .rejectPartialInstallment(
+                                                  intentId,
+                                                  inst['_id']?.toString() ?? '',
+                                                );
+                                                if (success) {
+                                                  inst['status'] = 'REJECTED';
+                                                  onPaymentUpdated(payment);
+                                                }
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ] else if (isInstApproved) ...[
+                                        Button(
+                                          title: "Revert",
+                                          buttonType: ButtonType.red,
+                                          size: ButtonSize.small,
+                                          onTap: () {
+                                            _showRevertConfirmation(
+                                              title: "Revert Approval?",
+                                              message:
+                                                  "This will REJECT this installment and REVERT associated data.",
+                                              onConfirm: (reason) async {
+                                                final success = await controller
+                                                    .revertApprovalAction(
+                                                  intentId,
+                                                  historyId:
+                                                      inst['_id']?.toString(),
+                                                  reason: reason,
+                                                );
+                                                if (success) {
+                                                  inst['status'] = 'REJECTED';
+                                                  onPaymentUpdated(payment);
+                                                }
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ] else if (isInstRejected) ...[
+                                        Button(
+                                          title: "Restore",
+                                          buttonType: ButtonType.green,
+                                          size: ButtonSize.small,
+                                          onTap: () {
+                                            _showRevertConfirmation(
+                                              title: "Restore Installment?",
+                                              message:
+                                                  "This will restore this installment to APPROVED state.",
+                                              confirmColor: Colors.green,
+                                              onConfirm: (reason) async {
+                                                final success = await controller
+                                                    .revertRejectionAction(
+                                                  intentId,
+                                                  historyId:
+                                                      inst['_id']?.toString(),
+                                                  reason: reason,
+                                                );
+                                                if (success) {
+                                                  inst['status'] = 'APPROVED';
+                                                  onPaymentUpdated(payment);
+                                                }
+                                              },
+                                            );
+                                          },
+                                        ),
+                                      ] else ...[
+                                        const Icon(Icons.check,
+                                            size: 16, color: Colors.green),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
                             ],
                           );
                         }).toList(),
@@ -2151,37 +2176,65 @@ class PendingBankTransfersScreen extends StatelessWidget {
                             if (status != 'PAID' &&
                                 status != 'APPROVED' &&
                                 status != 'REJECTED') ...[
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Button(
-                                      title: "Approve & Activate",
-                                      buttonType: ButtonType.green,
-                                      size: ButtonSize.medium,
-                                      onTap: () {
-                                        _showRemarkPopup(
-                                          intentId: intentId,
-                                          controller: controller,
-                                          isFullPayment: true,
-                                          payment: payment,
-                                          discount: discount,
-                                        );
-                                      },
+                              if (canAct)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Button(
+                                        title: "Approve & Activate",
+                                        buttonType: ButtonType.green,
+                                        size: ButtonSize.medium,
+                                        onTap: () {
+                                          _showRemarkPopup(
+                                            intentId: intentId,
+                                            controller: controller,
+                                            isFullPayment: true,
+                                            payment: payment,
+                                            discount: discount,
+                                          );
+                                        },
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Button(
-                                      title: "Reject",
-                                      buttonType: ButtonType.red,
-                                      size: ButtonSize.medium,
-                                      onTap: () {
-                                        controller.rejectTransfer(payment);
-                                      },
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Button(
+                                        title: "Reject",
+                                        buttonType: ButtonType.red,
+                                        size: ButtonSize.medium,
+                                        onTap: () {
+                                          controller.rejectTransfer(payment);
+                                        },
+                                      ),
                                     ),
+                                  ],
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber[50],
+                                    borderRadius: BorderRadius.circular(6),
+                                    border:
+                                        Border.all(color: Colors.amber[300]!),
                                   ),
-                                ],
-                              ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.hourglass_empty,
+                                          size: 16,
+                                          color: Colors.amber[800]),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        "PENDING APPROVAL",
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber[900]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                             ] else ...[
                               Row(
                                 children: [
@@ -2233,9 +2286,10 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  if (controller.isAdmin) ...[
+                                  if (canAct) ...[
                                     const SizedBox(width: 12),
-                                    if (status == 'PAID' || status == 'APPROVED')
+                                    if (status == 'PAID' ||
+                                        status == 'APPROVED')
                                       Button(
                                         title: "REVERT APPROVAL",
                                         buttonType: ButtonType.red,
@@ -2285,7 +2339,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                 ],
 
                 // Admin Correction Buttons footer for this payment
-                if (controller.isAdmin) ...[
+                if (canAct) ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
                   const SizedBox(height: 12),
@@ -2304,6 +2358,22 @@ class PendingBankTransfersScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                       ],
+                      TextButton.icon(
+                        icon: const Icon(Icons.discount_outlined,
+                            size: 15, color: Colors.teal),
+                        label: const Text(
+                          "Discount",
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.teal),
+                        ),
+                        onPressed: () => controller.showDiscountDialog(
+                          payment,
+                          onUpdated: onPaymentUpdated,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       TextButton.icon(
                         icon: Icon(Icons.edit_note,
                             size: 16, color: Colors.orange[800]),
@@ -2740,7 +2810,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                   color: Colors.grey,
                                 ),
                               ),
-                              if (payment['purchaseType'] != 'REGISTRATION' && controller.isAdmin)
+                              if (payment['purchaseType'] != 'REGISTRATION' && controller.canTakePaymentActions)
                                 TextButton.icon(
                                   icon: Icon(Icons.edit, size: 14, color: Colors.blue),
                                   label: Text("Edit Plan/Dates", style: TextStyle(fontSize: 12, color: Colors.blue)),
@@ -2934,12 +3004,32 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                             controller: discountController,
                                             decoration: const InputDecoration(
                                               labelText:
-                                                  "Additional Discount (₹)",
+                                                  "Discount (₹)",
                                               hintText: "Amount in Rs",
                                               border: OutlineInputBorder(),
                                               isDense: true,
                                             ),
                                             keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter.digitsOnly,
+                                            ],
+                                            onFieldSubmitted: (val) async {
+                                              final double disc =
+                                                  double.tryParse(val) ?? 0;
+                                              final success = await controller
+                                                  .updateDiscount(
+                                                    payment['_id']
+                                                            ?.toString() ??
+                                                        '',
+                                                    disc,
+                                                  );
+                                              if (success) {
+                                                isDiscountApplied.value =
+                                                    disc > 0;
+                                                livePayment['discount'] = disc;
+                                                livePayment.refresh();
+                                              }
+                                            },
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -3034,7 +3124,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                               Colors.grey[100],
                                             ),
                                         columnSpacing: 12,
-                                        columns: const [
+                                        columns: [
                                           DataColumn(
                                             label: Text(
                                               'Date',
@@ -3083,14 +3173,15 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                               ),
                                             ),
                                           ),
-                                          DataColumn(
-                                            label: Text(
-                                              'Action',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
+                                          if (controller.canTakePaymentActions)
+                                            DataColumn(
+                                              label: Text(
+                                                'Action',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                         rows: installments.reversed.toList().map((inst) {
                                           final isPending =
@@ -3241,163 +3332,164 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                               DataCell(
                                                 _buildStatusChip(inst['status']),
                                               ),
-                                              DataCell(
-                                                isPending
-                                                    ? Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Button(
-                                                            title: "Approve",
-                                                            buttonType:
-                                                                ButtonType.green,
-                                                            size:
-                                                                ButtonSize.small,
-                                                            onTap: () {
-                                                              _showRemarkPopup(
-                                                                intentId:
-                                                                    intentId,
-                                                                historyId:
-                                                                    inst['_id']
-                                                                        ?.toString(),
-                                                                controller:
-                                                                    controller,
-                                                                payment: livePayment,
-                                                              );
-                                                            },
-                                                          ),
-                                                          const SizedBox(
-                                                            width: 8,
-                                                          ),
-                                                          Button(
-                                                            title: controller.isLoading.value ? "..." : "Reject",
-                                                            buttonType:
-                                                                ButtonType.red,
-                                                            size:
-                                                                ButtonSize.small,
-                                                            onTap: controller.isLoading.value ? () {} : () {
-                                                              _showRevertConfirmation(
-                                                                title: "Reject Installment?",
-                                                                message: "Are you sure you want to reject this installment?",
-                                                                onConfirm: (remark) async {
-                                                                  final success = await controller.rejectPartialInstallment(
-                                                                    intentId,
-                                                                    inst['_id']?.toString() ?? '',
-                                                                  );
-                                                                  if (success) {
-                                                                    final List history = List.from(livePayment['partialPaymentsHistory'] ?? []);
-                                                                    final int idx = history.indexWhere((h) => h['_id']?.toString() == inst['_id']?.toString());
-                                                                    if (idx != -1) {
-                                                                      history[idx]['status'] = 'REJECTED';
-                                                                      livePayment['partialPaymentsHistory'] = history;
-                                                                      livePayment.refresh();
-                                                                    }
-                                                                  }
-                                                                },
-                                                              );
-                                                            },
-                                                          ),
-                                                        ],
-                                                      )
-                                                    : Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            inst['status'] ==
-                                                                    'APPROVED'
-                                                                ? Icons
-                                                                    .check_circle
-                                                                : Icons.cancel,
-                                                            color: inst['status'] ==
-                                                                    'APPROVED'
-                                                                ? Colors.green
-                                                                : Colors.red,
-                                                            size: 20,
-                                                          ),
-                                                          if (controller.isAdmin) ...[
+                                              if (controller.canTakePaymentActions)
+                                                DataCell(
+                                                  isPending
+                                                      ? Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Button(
+                                                              title: "Approve",
+                                                              buttonType:
+                                                                  ButtonType.green,
+                                                              size:
+                                                                  ButtonSize.small,
+                                                              onTap: () {
+                                                                _showRemarkPopup(
+                                                                  intentId:
+                                                                      intentId,
+                                                                  historyId:
+                                                                      inst['_id']
+                                                                          ?.toString(),
+                                                                  controller:
+                                                                      controller,
+                                                                  payment: livePayment,
+                                                                );
+                                                              },
+                                                            ),
                                                             const SizedBox(
-                                                                width: 8),
-                                                            if (inst['status'] ==
-                                                                'APPROVED')
-                                                              Button(
-                                                                title: controller.isLoading.value ? "..." : "REVERT",
-                                                                buttonType:
-                                                                    ButtonType
-                                                                        .red,
-                                                                size: ButtonSize
-                                                                    .small,
-                                                                onTap: controller.isLoading.value ? () {} : () {
-                                                                  _showRevertConfirmation(
-                                                                    title:
-                                                                        "Revert Approval?",
-                                                                    message:
-                                                                        "This will REJECT this installment and REVERT associated data.",
-                                                                    onConfirm:
-                                                                        (reason) async {
-                                                                      Get.back();
-                                                                      final success = await controller
-                                                                          .revertApprovalAction(
-                                                                              intentId,
-                                                                              historyId: inst['_id']?.toString(),
-                                                                              reason: reason);
-                                                                      if (success) {
-                                                                        final List history = List.from(livePayment['partialPaymentsHistory'] ?? []);
-                                                                        final int idx = history.indexWhere((h) => h['_id']?.toString() == inst['_id']?.toString());
-                                                                        if (idx != -1) {
-                                                                          history[idx]['status'] = 'REJECTED';
-                                                                          livePayment['partialPaymentsHistory'] = history;
-                                                                          livePayment.refresh();
-                                                                        }
+                                                              width: 8,
+                                                            ),
+                                                            Button(
+                                                              title: controller.isLoading.value ? "..." : "Reject",
+                                                              buttonType:
+                                                                  ButtonType.red,
+                                                              size:
+                                                                  ButtonSize.small,
+                                                              onTap: controller.isLoading.value ? () {} : () {
+                                                                _showRevertConfirmation(
+                                                                  title: "Reject Installment?",
+                                                                  message: "Are you sure you want to reject this installment?",
+                                                                  onConfirm: (remark) async {
+                                                                    final success = await controller.rejectPartialInstallment(
+                                                                      intentId,
+                                                                      inst['_id']?.toString() ?? '',
+                                                                    );
+                                                                    if (success) {
+                                                                      final List history = List.from(livePayment['partialPaymentsHistory'] ?? []);
+                                                                      final int idx = history.indexWhere((h) => h['_id']?.toString() == inst['_id']?.toString());
+                                                                      if (idx != -1) {
+                                                                        history[idx]['status'] = 'REJECTED';
+                                                                        livePayment['partialPaymentsHistory'] = history;
+                                                                        livePayment.refresh();
                                                                       }
-                                                                    },
-                                                                  );
-                                                                },
-                                                              ),
-                                                            if (inst['status'] ==
-                                                                'REJECTED')
-                                                              Button(
-                                                                title: controller.isLoading.value ? "..." : "RESTORE",
-                                                                buttonType:
-                                                                    ButtonType
-                                                                        .green,
-                                                                size: ButtonSize
-                                                                    .small,
-                                                                onTap: controller.isLoading.value ? () {} : () {
-                                                                  _showRevertConfirmation(
-                                                                    title:
-                                                                        "Restore Installment?",
-                                                                    message:
-                                                                        "This will restore this installment to APPROVED state.",
-                                                                    onConfirm:
-                                                                        (reason) async {
-                                                                      Get.back();
-                                                                      final success = await controller
-                                                                          .revertRejectionAction(
-                                                                              intentId,
-                                                                              historyId: inst['_id']
-                                                                                  ?.toString(),
-                                                                              reason: reason);
-                                                                      if (success) {
-                                                                        final List history = List.from(livePayment['partialPaymentsHistory'] ?? []);
-                                                                        final int idx = history.indexWhere((h) => h['_id']?.toString() == inst['_id']?.toString());
-                                                                        if (idx != -1) {
-                                                                          history[idx]['status'] = 'APPROVED';
-                                                                          livePayment['partialPaymentsHistory'] = history;
-                                                                          livePayment.refresh();
-                                                                        }
-                                                                      }
-                                                                    },
-                                                                    confirmColor:
-                                                                        Colors
-                                                                            .green,
-                                                                  );
-                                                                },
-                                                              ),
+                                                                    }
+                                                                  },
+                                                                );
+                                                              },
+                                                            ),
                                                           ],
-                                                        ],
-                                                      ),
-                                              ),
+                                                        )
+                                                      : Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              inst['status'] ==
+                                                                      'APPROVED'
+                                                                  ? Icons
+                                                                      .check_circle
+                                                                  : Icons.cancel,
+                                                              color: inst['status'] ==
+                                                                      'APPROVED'
+                                                                  ? Colors.green
+                                                                  : Colors.red,
+                                                              size: 20,
+                                                            ),
+                                                            if (controller.canTakePaymentActions) ...[
+                                                              const SizedBox(
+                                                                  width: 8),
+                                                              if (inst['status'] ==
+                                                                  'APPROVED')
+                                                                Button(
+                                                                  title: controller.isLoading.value ? "..." : "REVERT",
+                                                                  buttonType:
+                                                                      ButtonType
+                                                                          .red,
+                                                                  size: ButtonSize
+                                                                      .small,
+                                                                  onTap: controller.isLoading.value ? () {} : () {
+                                                                    _showRevertConfirmation(
+                                                                      title:
+                                                                          "Revert Approval?",
+                                                                      message:
+                                                                          "This will REJECT this installment and REVERT associated data.",
+                                                                      onConfirm:
+                                                                          (reason) async {
+                                                                        Get.back();
+                                                                        final success = await controller
+                                                                            .revertApprovalAction(
+                                                                                intentId,
+                                                                                historyId: inst['_id']?.toString(),
+                                                                                reason: reason);
+                                                                        if (success) {
+                                                                          final List history = List.from(livePayment['partialPaymentsHistory'] ?? []);
+                                                                          final int idx = history.indexWhere((h) => h['_id']?.toString() == inst['_id']?.toString());
+                                                                          if (idx != -1) {
+                                                                            history[idx]['status'] = 'REJECTED';
+                                                                            livePayment['partialPaymentsHistory'] = history;
+                                                                            livePayment.refresh();
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                    );
+                                                                  },
+                                                                ),
+                                                              if (inst['status'] ==
+                                                                  'REJECTED')
+                                                                Button(
+                                                                  title: controller.isLoading.value ? "..." : "RESTORE",
+                                                                  buttonType:
+                                                                      ButtonType
+                                                                          .green,
+                                                                  size: ButtonSize
+                                                                      .small,
+                                                                  onTap: controller.isLoading.value ? () {} : () {
+                                                                    _showRevertConfirmation(
+                                                                      title:
+                                                                          "Restore Installment?",
+                                                                      message:
+                                                                          "This will restore this installment to APPROVED state.",
+                                                                      onConfirm:
+                                                                          (reason) async {
+                                                                        Get.back();
+                                                                        final success = await controller
+                                                                            .revertRejectionAction(
+                                                                                intentId,
+                                                                                historyId: inst['_id']
+                                                                                    ?.toString(),
+                                                                                reason: reason);
+                                                                        if (success) {
+                                                                          final List history = List.from(livePayment['partialPaymentsHistory'] ?? []);
+                                                                          final int idx = history.indexWhere((h) => h['_id']?.toString() == inst['_id']?.toString());
+                                                                          if (idx != -1) {
+                                                                            history[idx]['status'] = 'APPROVED';
+                                                                            livePayment['partialPaymentsHistory'] = history;
+                                                                            livePayment.refresh();
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      confirmColor:
+                                                                          Colors
+                                                                              .green,
+                                                                    );
+                                                                  },
+                                                                ),
+                                                            ],
+                                                          ],
+                                                        ),
+                                                ),
                                             ],
                                           );
                                         }).toList(),
@@ -3422,23 +3514,44 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               ),
                             ),
 
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.edit, size: 18),
-                              label: const Text("CORRECT FINANCIALS"),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.orange[800],
-                                side: BorderSide(color: Colors.orange[800]!),
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                              ),
-                              onPressed: () {
-                                Get.back();
-                                controller.showCorrectionDialog(payment);
-                              },
+                          if (controller.canTakePaymentActions) ...[
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.discount_outlined, size: 18),
+                                    label: const Text("DISCOUNT"),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.teal,
+                                      side: const BorderSide(color: Colors.teal),
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                    ),
+                                    onPressed: () {
+                                      Get.back();
+                                      controller.showDiscountDialog(payment);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.edit, size: 18),
+                                    label: const Text("CORRECT FINANCIALS"),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.orange[800],
+                                      side: BorderSide(color: Colors.orange[800]!),
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                    ),
+                                    onPressed: () {
+                                      Get.back();
+                                      controller.showCorrectionDialog(payment);
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -3982,7 +4095,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                 color: Colors.grey,
                               ),
                             ),
-                            if (payment['purchaseType'] != 'REGISTRATION' && controller.isAdmin)
+                            if (payment['purchaseType'] != 'REGISTRATION' && controller.canTakePaymentActions)
                               TextButton.icon(
                                 icon: Icon(Icons.edit, size: 14, color: Colors.blue),
                                 label: Text("Edit Plan/Dates", style: TextStyle(fontSize: 12, color: Colors.blue)),
@@ -4122,97 +4235,111 @@ class PendingBankTransfersScreen extends StatelessWidget {
                           ),
                         ),
 
-                        const SizedBox(height: 32),
+                        if (status != 'PAID' && status != 'REJECTED' && controller.canTakePaymentActions) ...[
+                          const SizedBox(height: 32),
 
-                        // Verification / Discount Settings
-                        const Text(
-                          "Verification Settings",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
+                          // Verification / Discount Settings
+                          const Text(
+                            "Verification Settings",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.orange[50]?.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange[100]!),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.info_outline,
-                                color: Colors.orange,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  "Manage discounts if any. Remarks will be required during final approval.",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.black87,
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50]?.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange[100]!),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  color: Colors.orange,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    "Manage discounts if any. Remarks will be required during final approval.",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black87,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              SizedBox(
-                                width: 250,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: discountController,
-                                        decoration: const InputDecoration(
-                                          labelText: "Discount (₹)",
-                                          border: OutlineInputBorder(),
-                                          isDense: true,
-                                        ),
-                                        keyboardType: TextInputType.number,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Obx(
-                                      () => SizedBox(
-                                        height: 40,
-                                        child: ElevatedButton(
-                                          onPressed: () async {
+                                const SizedBox(width: 16),
+                                SizedBox(
+                                  width: 250,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: discountController,
+                                          decoration: const InputDecoration(
+                                            labelText: "Discount (₹)",
+                                            border: OutlineInputBorder(),
+                                            isDense: true,
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.digitsOnly,
+                                          ],
+                                          onFieldSubmitted: (val) async {
                                             final double disc =
-                                                double.tryParse(
-                                                  discountController.text,
-                                                ) ??
-                                                0;
+                                                double.tryParse(val) ?? 0;
                                             final success = await controller
                                                 .updateDiscount(intentId, disc);
                                             if (success) {
-                                              isDiscountApplied.value =
-                                                  disc > 0;
+                                              isDiscountApplied.value = disc > 0;
                                             }
                                           },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                isDiscountApplied.value
-                                                ? Colors.blue
-                                                : Colors.green,
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          child: Text(
-                                            isDiscountApplied.value
-                                                ? "EDIT"
-                                                : "ADD",
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Obx(
+                                        () => SizedBox(
+                                          height: 40,
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              final double disc =
+                                                  double.tryParse(
+                                                    discountController.text,
+                                                  ) ??
+                                                  0;
+                                              final success = await controller
+                                                  .updateDiscount(intentId, disc);
+                                              if (success) {
+                                                isDiscountApplied.value =
+                                                    disc > 0;
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  isDiscountApplied.value
+                                                  ? Colors.blue
+                                                  : Colors.green,
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            child: Text(
+                                              isDiscountApplied.value
+                                                  ? "EDIT"
+                                                  : "ADD",
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
 
                         const SizedBox(height: 32),
 
@@ -4380,40 +4507,67 @@ class PendingBankTransfersScreen extends StatelessWidget {
 
                         // Actions
                         if (status != 'PAID' && status != 'REJECTED') ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Obx(() => Button(
-                                    title: controller.isLoading.value ? "Processing..." : "Approve & Activate",
-                                    buttonType: ButtonType.green,
-                                    onTap: controller.isLoading.value ? () {} : () {
-                                      _showRemarkPopup(
-                                        intentId: intentId,
-                                        controller: controller,
-                                        isFullPayment: true,
-                                        payment: payment,
-                                        discount:
-                                            double.tryParse(
-                                              discountController.text,
-                                            ) ??
-                                            0,
-                                      );
-                                    },
-                                  )),
+                          if (controller.canTakePaymentActions) ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Obx(() => Button(
+                                      title: controller.isLoading.value ? "Processing..." : "Approve & Activate",
+                                      buttonType: ButtonType.green,
+                                      onTap: controller.isLoading.value ? () {} : () {
+                                        _showRemarkPopup(
+                                          intentId: intentId,
+                                          controller: controller,
+                                          isFullPayment: true,
+                                          payment: payment,
+                                          discount:
+                                              double.tryParse(
+                                                discountController.text,
+                                              ) ??
+                                              0,
+                                        );
+                                      },
+                                    )),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Obx(() => Button(
+                                      title: controller.isLoading.value ? "Processing..." : "Reject Transaction",
+                                      buttonType: ButtonType.red,
+                                      onTap: controller.isLoading.value ? () {} : () {
+                                        Get.back();
+                                        controller.rejectTransfer(payment);
+                                      },
+                                    )),
+                                ),
+                              ],
+                            ),
+                          ] else ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 20,
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Obx(() => Button(
-                                    title: controller.isLoading.value ? "Processing..." : "Reject Transaction",
-                                    buttonType: ButtonType.red,
-                                    onTap: controller.isLoading.value ? () {} : () {
-                                      Get.back();
-                                      controller.rejectTransfer(payment);
-                                    },
-                                  )),
+                              decoration: BoxDecoration(
+                                color: Colors.amber[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.amber.shade300,
+                                ),
                               ),
-                            ],
-                          ),
+                              child: Center(
+                                child: Text(
+                                  "PENDING APPROVAL (VIEW ONLY)",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber[900],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ] else ...[
                           Container(
                             width: double.infinity,
@@ -4477,7 +4631,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                     textAlign: TextAlign.center,
                                   ),
                                 ],
-                                if (controller.isAdmin) ...[
+                                if (controller.canTakePaymentActions) ...[
                                   const SizedBox(height: 20),
                                   const Divider(),
                                   const SizedBox(height: 12),
@@ -4531,24 +4685,45 @@ class PendingBankTransfersScreen extends StatelessWidget {
                           ),
                         ],
 
-                        const SizedBox(height: 16),
+                        if (controller.canTakePaymentActions) ...[
+                          const SizedBox(height: 16),
 
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.edit, size: 18),
-                            label: const Text("CORRECT FINANCIALS"),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.orange[800],
-                              side: BorderSide(color: Colors.orange[800]!),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            onPressed: () {
-                              Get.back();
-                              controller.showCorrectionDialog(payment);
-                            },
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.discount_outlined, size: 18),
+                                  label: const Text("DISCOUNT"),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.teal,
+                                    side: const BorderSide(color: Colors.teal),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                  onPressed: () {
+                                    Get.back();
+                                    controller.showDiscountDialog(payment);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.edit, size: 18),
+                                  label: const Text("CORRECT FINANCIALS"),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.orange[800],
+                                    side: BorderSide(color: Colors.orange[800]!),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                  onPressed: () {
+                                    Get.back();
+                                    controller.showCorrectionDialog(payment);
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

@@ -425,6 +425,22 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                 ),
                                 ElevatedButton.icon(
                                   onPressed: () =>
+                                      controller.showDiscountDialog(sub),
+                                  icon: const Icon(Icons.discount_outlined, size: 16),
+                                  label: Text(
+                                    ((sub['discount'] is num) && (sub['discount'] as num) > 0)
+                                        ? 'Discount (₹${(sub['discount'] as num).toInt()})'
+                                        : 'Discount',
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal[50],
+                                    foregroundColor: Colors.teal[900],
+                                    elevation: 0,
+                                    side: BorderSide(color: Colors.teal[100]!),
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () =>
                                       controller.showCorrectionDialog(sub),
                                   icon: const Icon(Icons.edit_note, size: 16),
                                   label: const Text('Correct Amount'),

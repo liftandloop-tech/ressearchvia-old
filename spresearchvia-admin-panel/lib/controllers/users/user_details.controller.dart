@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:spresearch_web/models/user_details.model.dart';
@@ -6,6 +5,9 @@ import 'package:spresearch_web/services/user_details.service.dart';
 import 'package:spresearch_web/services/user.service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'package:spresearch_web/config/app.config.dart';
 
 class UserDetailsController extends GetxController {
   late final UserDetailsService _service;
@@ -313,8 +315,20 @@ class UserDetailsController extends GetxController {
   Future<void> updateDocument(String docType) async {
     if (userDetails.value == null) return;
     try {
+      FileType pickerType = FileType.image;
+      List<String>? allowedExtensions;
+      if (docType == 'video') {
+        pickerType = FileType.video;
+      } else if (docType == 'serviceAgreement' ||
+          docType == 'agreement' ||
+          docType == 'signedDocument') {
+        pickerType = FileType.custom;
+        allowedExtensions = ['pdf', 'png', 'jpg', 'jpeg'];
+      }
+
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: docType == 'video' ? FileType.video : FileType.image,
+        type: pickerType,
+        allowedExtensions: allowedExtensions,
         allowMultiple: false,
       );
 
@@ -371,6 +385,122 @@ class UserDetailsController extends GetxController {
       Get.snackbar('Error', 'Error: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  String? get signedDocumentUrl {
+    final manual = userDetails.value?.manualServiceAgreement;
+    if (manual != null && manual.isNotEmpty) {
+      if (manual.startsWith('http')) return manual;
+      if (manual.startsWith('app/uploads/')) {
+        final baseUrl = AppConfig.apiBaseUrl.replaceAll('/api', '');
+        return '$baseUrl/${manual.substring(4)}';
+      }
+      return '${AppConfig.apiBaseUrl}/user/kyc/image/$manual';
+    }
+    return null;
+  }
+
+  Future<void> viewSignedDocument() async {
+    final manual = userDetails.value?.manualServiceAgreement;
+    if (manual != null && manual.isNotEmpty) {
+      final url = signedDocumentUrl;
+      if (url != null) {
+        try {
+          final uri = Uri.parse(url);
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          Get.snackbar('Error', 'Could not open document: $e');
+        }
+      }
+    } else if (userDetails.value?.digioDocumentId != null) {
+      await viewServiceAgreement();
+    } else {
+      Get.snackbar('Notice', 'No signed document uploaded yet');
+    }
+  }
+
+  Future<void> previewSignedDocument() async {
+    final manual = userDetails.value?.manualServiceAgreement;
+    if (manual != null && manual.isNotEmpty) {
+      final url = signedDocumentUrl!;
+      final isPdf = manual.toLowerCase().endsWith('.pdf');
+
+      if (isPdf) {
+        try {
+          isLoading.value = true;
+          final response = await http.get(Uri.parse(url));
+          if (response.statusCode == 200) {
+            await Printing.layoutPdf(
+              onLayout: (format) async => response.bodyBytes,
+              name: 'Signed_Document_$manual',
+            );
+          } else {
+            Get.snackbar(
+              'Error',
+              'Failed to load PDF for preview (HTTP ${response.statusCode})',
+            );
+          }
+        } catch (e) {
+          Get.snackbar('Error', 'Preview failed: $e');
+        } finally {
+          isLoading.value = false;
+        }
+      } else {
+        // Image preview in interactive modal dialog
+        Get.dialog(
+          Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(16),
+            child: Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Container(
+                  constraints: BoxConstraints(
+                    maxWidth: Get.width * 0.85,
+                    maxHeight: Get.height * 0.85,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) => const Center(
+                      child: Text(
+                        "Failed to load image preview",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.black),
+                      onPressed: () => Get.back(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } else if (userDetails.value?.digioDocumentId != null) {
+      await viewServiceAgreement();
+    } else {
+      Get.snackbar('Notice', 'No signed document uploaded yet');
     }
   }
 

@@ -18,7 +18,7 @@ const storage = multer.diskStorage({
     let uploadPath = "app/uploads/";
     if (type === "image") {
       uploadPath = "app/uploads/image"
-    } else if (type === "pancard" || type === "pan" || type === "nism" || type === "education" || type === "photo" || type === "resume") {
+    } else if (type === "pancard" || type === "pan" || type === "nism" || type === "education" || type === "photo" || type === "resume" || type === "serviceAgreement" || type === "agreement" || type === "signedDocument") {
       uploadPath = "app/uploads/kycimg"
     } else if (type === 'aadhaar') {
       uploadPath = "app/uploads/kycimg"
@@ -82,7 +82,7 @@ const fileFilter = (req, file, cb) => {
   let allowedTypes = ''
   if (uploadType === "image") {
     allowedTypes = /jpeg|jpg|png|gif|bmp|webp/;
-  } else if (uploadType === "pancard" || uploadType === "pan" || uploadType === "nism" || uploadType === "education" || uploadType === "aadhaar" || uploadType === "photo" || uploadType === "resume") {
+  } else if (uploadType === "pancard" || uploadType === "pan" || uploadType === "nism" || uploadType === "education" || uploadType === "aadhaar" || uploadType === "photo" || uploadType === "resume" || uploadType === "serviceAgreement" || uploadType === "agreement" || uploadType === "signedDocument") {
     allowedTypes = /jpeg|jpg|png|gif|bmp|webp|pdf/;
   } else if (uploadType === "report") {
     allowedTypes = /pdf|png|jpg|jpeg|gif|webp/;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/controllers/users/user_details.controller.dart';
-import 'package:spresearch_web/ui/widgets/button.widget.dart';
 import 'package:spresearch_web/ui/widgets/video_player.widget.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'kyc_doc_placeholder.widget.dart';
@@ -159,7 +158,6 @@ class KYCDocuments extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final authController = Get.find<AuthController>();
-      final isDirector = authController.user.value?.isDirector == true;
       final userDetails = controller.userDetails.value;
       if (userDetails == null || userDetails.id.isEmpty) {
         return const Center(child: CircularProgressIndicator());
@@ -224,15 +222,15 @@ class KYCDocuments extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    (userDetails.effectiveKycStatus ?? 'PENDING').toUpperCase(),
+                    userDetails.effectiveKycStatus.toUpperCase(),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color:
-                          (userDetails.effectiveKycStatus ?? '').toLowerCase() ==
-                              'verified'
-                          ? Colors.green.shade700
-                          : Colors.orange.shade700,
+                          userDetails.effectiveKycStatus.toLowerCase() ==
+                                  'verified'
+                              ? Colors.green.shade700
+                              : Colors.orange.shade700,
                     ),
                   ),
                 ),
@@ -522,6 +520,189 @@ class KYCDocuments extends StatelessWidget {
                   ],
                 ),
               ),
+
+            const SizedBox(height: 16),
+            // Signed Document Management (Upload, View & Preview)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.description_outlined,
+                            size: 18,
+                            color: Colors.blueGrey.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            "Signed Document",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (userDetails.hasSignedDocument)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                size: 14,
+                                color: Colors.green.shade700,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                userDetails.manualServiceAgreement != null
+                                    ? "Manual Document Uploaded"
+                                    : "Digio E-Signed",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Text(
+                          "No document captured/uploaded",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade800,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (userDetails.manualServiceAgreement != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.attach_file,
+                          size: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            "File: ${userDetails.manualServiceAgreement}",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      // 1. Upload Button
+                      if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
+                        ElevatedButton.icon(
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : () => controller.updateDocument('serviceAgreement'),
+                          icon: const Icon(Icons.upload_file_rounded, size: 16),
+                          label: Text(
+                            userDetails.manualServiceAgreement != null
+                                ? "Update / Replace Document"
+                                : "Upload Signed Document",
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF163174),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      // 2. Preview Button
+                      OutlinedButton.icon(
+                        onPressed: userDetails.hasSignedDocument
+                            ? () => controller.previewSignedDocument()
+                            : null,
+                        icon: const Icon(Icons.visibility_rounded, size: 16),
+                        label: const Text("Preview"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF163174),
+                          side: BorderSide(
+                            color: userDetails.hasSignedDocument
+                                ? const Color(0xFF163174)
+                                : Colors.grey.shade300,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                      // 3. View Button
+                      OutlinedButton.icon(
+                        onPressed: userDetails.hasSignedDocument
+                            ? () => controller.viewSignedDocument()
+                            : null,
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: const Text("View Document"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0284C7),
+                          side: BorderSide(
+                            color: userDetails.hasSignedDocument
+                                ? const Color(0xFF0284C7)
+                                : Colors.grey.shade300,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
             const SizedBox(height: 24),
             _buildGateDropdown(

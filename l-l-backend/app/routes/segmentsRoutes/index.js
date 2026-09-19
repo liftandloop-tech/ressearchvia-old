@@ -1,7 +1,7 @@
 import express from "express";
 import segmentsController from "../../controller/segmentsController.js";
 import auth from "../../config/auth.js"
-import { appAccess, registrationAccess, contentAccess, paymentGate, checkPermission } from "../../middleware/accessMiddleware.js";
+import { appAccess, registrationAccess, contentAccess, paymentGate, checkPermission, adminStrictOnlyNoStaff } from "../../middleware/accessMiddleware.js";
 
 const Router = express.Router();
 
@@ -11,10 +11,10 @@ const SegmentsRoutes = () => {
     Router.post("/segment-plan-create", auth.tokenVerified, segmentsController.segmentsPlanCreate)
     Router.put("/segment-plan-update", auth.tokenVerified, segmentsController.segmentsPlanUpdate)
     Router.put("/update-segments", auth.tokenVerified, segmentsController.updateSegments)
-    Router.post("/admin-grant-segment", auth.tokenVerified, segmentsController.adminGrantSegment)
-    Router.post("/reject-bank-transfer", auth.tokenVerified, segmentsController.rejectBankTransfer)
-    Router.post("/revert-to-rejected", auth.tokenVerified, segmentsController.revertApproval)
-    Router.post("/revert-to-approved", auth.tokenVerified, segmentsController.revertRejection)
+    Router.post("/admin-grant-segment", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.adminGrantSegment)
+    Router.post("/reject-bank-transfer", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.rejectBankTransfer)
+    Router.post("/revert-to-rejected", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.revertApproval)
+    Router.post("/revert-to-approved", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.revertRejection)
     Router.get("/pending-bank-transfers", auth.tokenVerified, checkPermission('Payments', 'read'), segmentsController.getPendingBankTransfers)
     Router.get("/hni-requests", auth.tokenVerified, segmentsController.getHniRequests)
     Router.post("/admin-grant-hni-plan", auth.tokenVerified, segmentsController.adminGrantHniPlan)

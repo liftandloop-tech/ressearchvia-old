@@ -58,6 +58,7 @@ class UserModel {
   String get formattedPhone => mobile;
 
   bool get isAdmin {
+    if (isDirector || isManager || isResearcher) return false;
     final dept = subscriptionPlan.toLowerCase();
     final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
     final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
@@ -188,9 +189,21 @@ class UserModel {
     final t = target.toLowerCase();
     final action = optionalAction?.toLowerCase() ?? '';
 
-    // 1. Director role: full operational authority across users, staff, leads, reports, kyc, payments, notifications, settings
+    // 1. Director role: operational authority across users, staff, leads, reports, kyc, notifications
+    // Settings, Automated Trading, and Plan Creation are strictly ADMIN-ONLY.
+    // Payment approval, rejection, revert, and subscription modification actions are strictly ADMIN-ONLY.
+    // Directors are permitted to VIEW payments and subscriptions only.
     if (isDirector) {
-      if (t.startsWith('automated') || t.startsWith('trading') || t.contains('plans.create')) {
+      if (t.startsWith('automated') ||
+          t.startsWith('trading') ||
+          t.contains('plans.create') ||
+          t.startsWith('setting')) {
+        return false;
+      }
+      if (t.startsWith('payment') || t.startsWith('subscription')) {
+        if (action == 'view' || action == 'read' || (action.isEmpty && (t.contains('view') || t.contains('read')))) {
+          return true;
+        }
         return false;
       }
       return true;

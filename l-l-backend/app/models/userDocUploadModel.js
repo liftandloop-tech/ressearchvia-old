@@ -25,6 +25,11 @@ const userDocUploadSchema = new mongoose.Schema(
                 filePath: { type: String },
             }
         },
+        serviceAgreement: {
+            fileOriginalName: { type: String },
+            fileName: { type: String },
+            filePath: { type: String },
+        },
     },
     { timestamps: true, versionKey: false }
 );

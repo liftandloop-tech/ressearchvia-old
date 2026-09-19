@@ -157,7 +157,8 @@ const userSchema = new mongoose.Schema({
         panImage: { type: String, default: null },
         aadhaarFront: { type: String, default: null },
         aadhaarBack: { type: String, default: null },
-        video: { type: String, default: null }
+        video: { type: String, default: null },
+        serviceAgreement: { type: String, default: null }
     },
     // --- KYC 3-GATE SYSTEM ---
     // Each gate tracks its own status independently.

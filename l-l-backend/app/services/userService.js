@@ -2164,6 +2164,9 @@ const userService = {
           if (userDoc.aadhaar?.back?.filePath) {
             user.kycDocs.aadhaarBack = userDoc.aadhaar.back.filePath;
           }
+          if (userDoc.serviceAgreement?.filePath || userDoc.serviceAgreement?.fileName) {
+            user.kycDocs.serviceAgreement = userDoc.serviceAgreement.fileName || userDoc.serviceAgreement.filePath;
+          }
 
           console.log('[UserDetails] Populated kycDocs from userDocUploadModel:', user.kycDocs);
         }
