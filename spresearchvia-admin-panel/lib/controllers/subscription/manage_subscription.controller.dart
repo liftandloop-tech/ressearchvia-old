@@ -1567,8 +1567,11 @@ class ManageSubscriptionController extends GetxController {
     );
   }
 
-  void showCorrectionDialog(Map<String, dynamic> payment) {
-    final paymentIntentId = payment['paymentIntentId'] ?? '';
+  void showCorrectionDialog(
+    Map<String, dynamic> payment, {
+    Map<String, dynamic>? installment,
+  }) {
+    final paymentIntentId = payment['paymentIntentId'] ?? payment['_id'] ?? '';
     if (paymentIntentId.isEmpty) {
       Get.snackbar(
         'Feature Unavailable',
@@ -1579,14 +1582,23 @@ class ManageSubscriptionController extends GetxController {
       return;
     }
 
-    final currentAmount = (payment['amountPaid'] ?? payment['amount'] ?? 0)
-        .toDouble();
-    final bool currentIsPartial = payment['isPartial'] == true;
-    final String piStatus = payment['paymentIntentStatus'] ?? '';
+    final String? historyId = installment?['_id']?.toString();
+    final currentAmount = installment != null
+        ? ((installment['amountPaid'] ?? installment['amount'] ?? 0) as num).toDouble()
+        : ((payment['amountPaid'] ?? payment['amount'] ?? 0) as num).toDouble();
+    final bool currentIsPartial = installment != null ? true : (payment['isPartial'] == true);
+    final String piStatus = installment != null
+        ? (installment['status']?.toString() ?? '')
+        : (payment['paymentIntentStatus'] ?? payment['status'] ?? '').toString();
     final bool isApproved = piStatus == 'PAID' || piStatus == 'APPROVED';
 
     final amountController = TextEditingController(
       text: currentAmount.toString(),
+    );
+    final utrController = TextEditingController(
+      text: installment != null
+          ? (installment['utrNumber'] ?? '').toString()
+          : (payment['utrNumber'] ?? '').toString(),
     );
     final reasonController = TextEditingController();
 
@@ -1605,6 +1617,7 @@ class ManageSubscriptionController extends GetxController {
         paymentIntentId: paymentIntentId,
         newAmount: amt,
         targetIsPartial: isPartialMode.value,
+        historyId: historyId,
       );
       previewResult.value = result;
       isPreviewLoading.value = false;
@@ -1618,7 +1631,13 @@ class ManageSubscriptionController extends GetxController {
     Get.dialog(
       AlertDialog(
         title: Text(
-          isApproved ? 'Financial Ledger Correction' : 'Edit Payment Draft',
+          installment != null
+              ? (isApproved
+                  ? 'Correct Installment Ledger'
+                  : 'Edit Installment Draft')
+              : (isApproved
+                  ? 'Financial Ledger Correction'
+                  : 'Edit Payment Draft'),
         ),
         content: SizedBox(
           width: 450,
@@ -1708,43 +1727,63 @@ class ManageSubscriptionController extends GetxController {
                   ),
                 ),
                 SizedBox(height: 16),
-
-                Obx(
-                  () => Row(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Partial Payment Mode',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            isPartialMode.value
-                                ? 'Granting reduced validity'
-                                : 'Granting full duration',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Spacer(),
-                      Switch(
-                        value: isPartialMode.value,
-                        activeColor: AppTheme.primary,
-                        onChanged: (v) {
-                          isPartialMode.value = v;
-                          if (isApproved) fetchPreview();
-                        },
-                      ),
-                    ],
+                Text(
+                  'UTR / Transaction Reference',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: utrController,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter UTR number',
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
+                SizedBox(height: 16),
+
+                if (installment == null) ...[
+                  Obx(
+                    () => Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Partial Payment Mode',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              isPartialMode.value
+                                  ? 'Granting reduced validity'
+                                  : 'Granting full duration',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                        Spacer(),
+                        Switch(
+                          value: isPartialMode.value,
+                          activeColor: AppTheme.primary,
+                          onChanged: (v) {
+                            isPartialMode.value = v;
+                            if (isApproved) fetchPreview();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                ],
 
                 if (isApproved) ...[
                   SizedBox(height: 20),
@@ -1917,6 +1956,10 @@ class ManageSubscriptionController extends GetxController {
                     newAmount: amt,
                     targetIsPartial: isPartialMode.value,
                     reason: reasonController.text,
+                    historyId: historyId,
+                    utrNumber: utrController.text.trim().isNotEmpty
+                        ? utrController.text.trim()
+                        : null,
                     previewTimestamp:
                         lastPreviewTimestamp ??
                         DateTime.now().toIso8601String(),
@@ -2084,16 +2127,6 @@ class ManageSubscriptionController extends GetxController {
   }
 
   void showSubscriptionCorrectionDialog(Map<String, dynamic> payment) {
-    if (payment['purchaseType'] == 'REGISTRATION') {
-      Get.snackbar(
-        "Restricted",
-        "Registration details cannot be edited.",
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-
     String parseId(dynamic id) {
       if (id is Map && id.containsKey('\$oid'))
         return id['\$oid']?.toString() ?? '';
@@ -2130,6 +2163,19 @@ class ManageSubscriptionController extends GetxController {
     );
     final currentCorrectionVersion = payment['correctionVersion'] ?? 0;
 
+    final bool isRegistration = payment['purchaseType'] == 'REGISTRATION';
+    final isRegMode = RxBool(isRegistration);
+    final regPlanChoice = RxString(
+      (payment['amount'] == 10000 ||
+              payment['baseAmount'] == 10000 ||
+              (payment['packageName'] ?? '')
+                  .toString()
+                  .toLowerCase()
+                  .contains('gold'))
+          ? 'REG_GOLD'
+          : 'REG_SILVER',
+    );
+
     final selectedSegmentId = RxString(currentSegmentId);
     final selectedPlanId = RxString(currentPlanId);
     final startDate = Rxn<DateTime>(currentStartDate);
@@ -2144,7 +2190,7 @@ class ManageSubscriptionController extends GetxController {
         AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.edit_note, color: Colors.blue),
+              Icon(Icons.change_circle_outlined, color: Colors.blue),
               SizedBox(width: 8),
               Text('Correct Subscription Details'),
             ],
@@ -2184,83 +2230,164 @@ class ManageSubscriptionController extends GetxController {
                       ],
                     ),
                   ),
-                  SizedBox(height: 20),
+                  SizedBox(height: 16),
 
-                  Text(
-                    'Segment',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Obx(
-                    () => DropdownButtonFormField<String>(
-                      value:
-                          correctionSegments.any(
-                            (s) =>
-                                parseId(s['_id'] ?? s['id']) ==
-                                selectedSegmentId.value,
-                          )
-                          ? selectedSegmentId.value
-                          : null,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  // Mode Toggle (Registration vs Segment Plan)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Plan Category',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
-                      items: correctionSegments
-                          .map(
-                            (s) => DropdownMenuItem(
-                              value: parseId(s['_id'] ?? s['id']),
-                              child: Text(s['segmentName'] ?? ''),
+                      Obx(
+                        () => Row(
+                          children: [
+                            ChoiceChip(
+                              label: Text('Segment Plan', style: TextStyle(fontSize: 11)),
+                              selected: !isRegMode.value,
+                              onSelected: (val) {
+                                if (val) isRegMode.value = false;
+                              },
                             ),
-                          )
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          selectedSegmentId.value = val;
-                          selectedPlanId.value = '';
-                          loadCorrectionPlansForSegment(val);
-                        }
-                      },
-                    ),
+                            SizedBox(width: 8),
+                            ChoiceChip(
+                              label: Text('Registration', style: TextStyle(fontSize: 11)),
+                              selected: isRegMode.value,
+                              onSelected: (val) {
+                                if (val) isRegMode.value = true;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: 16),
 
-                  Text(
-                    'Plan',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Obx(
-                    () => isFetchingPlans.value
-                        ? LinearProgressIndicator()
-                        : DropdownButtonFormField<String>(
+                  Obx(() {
+                    if (isRegMode.value) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Registration Plan Tier',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: regPlanChoice.value,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'REG_SILVER',
+                                child: Text('Silver Registration (Yearly - 365 Days)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'REG_GOLD',
+                                child: Text('Gold Registration (Lifetime - 10 Years)'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                regPlanChoice.value = val;
+                                if (startDate.value != null) {
+                                  expiryDate.value = startDate.value!.add(
+                                    Duration(days: val == 'REG_GOLD' ? 3652 : 365),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          SizedBox(height: 16),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Segment',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 8),
+                        Obx(
+                          () => DropdownButtonFormField<String>(
                             value:
-                                plansForSelectedSegment.any(
-                                  (p) =>
-                                      parseId(p['_id'] ?? p['id']) ==
-                                      selectedPlanId.value,
+                                correctionSegments.any(
+                                  (s) =>
+                                      parseId(s['_id'] ?? s['id']) ==
+                                      selectedSegmentId.value,
                                 )
-                                ? selectedPlanId.value
+                                ? selectedSegmentId.value
                                 : null,
                             decoration: InputDecoration(
                               border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
                             ),
-                            items: plansForSelectedSegment
+                            items: correctionSegments
                                 .map(
-                                  (p) => DropdownMenuItem(
-                                    value: parseId(p['_id'] ?? p['id']),
-                                    child: Text(p['planName'] ?? ''),
+                                  (s) => DropdownMenuItem(
+                                    value: parseId(s['_id'] ?? s['id']),
+                                    child: Text(s['segmentName'] ?? ''),
                                   ),
                                 )
                                 .toList(),
                             onChanged: (val) {
-                              if (val != null) selectedPlanId.value = val;
+                              if (val != null) {
+                                selectedSegmentId.value = val;
+                                selectedPlanId.value = '';
+                                loadCorrectionPlansForSegment(val);
+                              }
                             },
                           ),
-                  ),
-                  SizedBox(height: 16),
+                        ),
+                        SizedBox(height: 16),
+
+                        Text(
+                          'Plan',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 8),
+                        Obx(
+                          () => isFetchingPlans.value
+                              ? LinearProgressIndicator()
+                              : DropdownButtonFormField<String>(
+                                  value:
+                                      plansForSelectedSegment.any(
+                                        (p) =>
+                                            parseId(p['_id'] ?? p['id']) ==
+                                            selectedPlanId.value,
+                                      )
+                                      ? selectedPlanId.value
+                                      : null,
+                                  decoration: InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                  ),
+                                  items: plansForSelectedSegment
+                                      .map(
+                                        (p) => DropdownMenuItem(
+                                          value: parseId(p['_id'] ?? p['id']),
+                                          child: Text(p['planName'] ?? ''),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) selectedPlanId.value = val;
+                                  },
+                                ),
+                        ),
+                        SizedBox(height: 16),
+                      ],
+                    );
+                  }),
 
                   Row(
                     children: [
@@ -2298,7 +2425,18 @@ class ManageSubscriptionController extends GetxController {
                                     firstDate: DateTime(2020),
                                     lastDate: DateTime(2100),
                                   );
-                                  if (picked != null) startDate.value = picked;
+                                  if (picked != null) {
+                                    startDate.value = picked;
+                                    if (isRegMode.value) {
+                                      expiryDate.value = picked.add(
+                                        Duration(
+                                          days: regPlanChoice.value == 'REG_GOLD'
+                                              ? 3652
+                                              : 365,
+                                        ),
+                                      );
+                                    }
+                                  }
                                 },
                               ),
                             ),
@@ -2362,10 +2500,24 @@ class ManageSubscriptionController extends GetxController {
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
-                if (selectedSegmentId.value.isEmpty ||
-                    selectedPlanId.value.isEmpty ||
-                    startDate.value == null ||
-                    expiryDate.value == null) {
+                final String targetSegId =
+                    isRegMode.value ? 'REGISTRATION' : selectedSegmentId.value;
+                final String targetPlanId =
+                    isRegMode.value ? regPlanChoice.value : selectedPlanId.value;
+
+                if (!isRegMode.value &&
+                    (selectedSegmentId.value.isEmpty ||
+                        selectedPlanId.value.isEmpty)) {
+                  Get.snackbar(
+                    "Required",
+                    "Please select both Segment and Plan.",
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+
+                if (startDate.value == null || expiryDate.value == null) {
                   Get.snackbar(
                     "Required",
                     "All fields must be filled.",
@@ -2381,8 +2533,8 @@ class ManageSubscriptionController extends GetxController {
                   final success = await _acquisitionService
                       .updateSubscriptionMetadata(
                         paymentIntentId: paymentIntentId,
-                        newSegmentId: selectedSegmentId.value,
-                        newPlanId: selectedPlanId.value,
+                        newSegmentId: targetSegId,
+                        newPlanId: targetPlanId,
                         newStartDate: startDate.value?.toIso8601String(),
                         newExpiryDate: expiryDate.value?.toIso8601String(),
                         clientVersion: currentCorrectionVersion,
@@ -2415,13 +2567,14 @@ class ManageSubscriptionController extends GetxController {
                   isLoading.value = false;
                 }
               },
-              child: Text('Apply Changes'),
+              child: Text('Save'),
             ),
           ],
         ),
       );
     });
   }
+
   Future<bool> updateDiscount(String intentId, double discount) async {
     try {
       isLoading.value = true;

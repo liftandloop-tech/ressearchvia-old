@@ -953,12 +953,21 @@ const planPurchaseService = {
 
   adminPreviewCorrection: async ({ body }) => {
     try {
-      const { paymentIntentId, newAmount, targetIsPartial } = body;
+      const { paymentIntentId, newAmount, targetIsPartial, historyId } = body;
 
       const payment = await PaymentIntent.findById(paymentIntentId).populate('planId');
       if (!payment) throw new Error("Payment record not found");
 
-      const effect = planPurchaseService._calculateCorrectionEffect({ payment, newAmount, targetIsPartial });
+      let effectiveTotalAmount = newAmount;
+      if (historyId && payment.isPartial && payment.partialPaymentsHistory && payment.partialPaymentsHistory.length > 0) {
+        const targetIndex = payment.partialPaymentsHistory.findIndex(h => h._id && h._id.toString() === historyId.toString());
+        const otherInstallmentsSum = payment.partialPaymentsHistory
+          .filter((h, idx) => idx !== targetIndex)
+          .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
+        effectiveTotalAmount = otherInstallmentsSum + newAmount;
+      }
+
+      const effect = planPurchaseService._calculateCorrectionEffect({ payment, newAmount: effectiveTotalAmount, targetIsPartial });
 
       return {
         status: 200,
@@ -979,7 +988,7 @@ const planPurchaseService = {
 
   adminUpdatePayment: async ({ body, user, req }) => {
     try {
-      let { paymentIntentId, newAmount, targetIsPartial, reason, previewTimestamp, utrNumber } = body;
+      let { paymentIntentId, newAmount, targetIsPartial, reason, previewTimestamp, utrNumber, historyId } = body;
       const adminId = user?._id;
 
       // Ensure proper parsing from FormData
@@ -1007,11 +1016,16 @@ const planPurchaseService = {
         const oldAmount = payment.amountPaid;
         const oldMode = payment.isPartial;
 
-        // For partial payments: update the LATEST installment (by index) and recalculate total
+        // For partial payments: update the target installment and recalculate total
         if (payment.isPartial && payment.partialPaymentsHistory && payment.partialPaymentsHistory.length > 0) {
-          // Always target the LAST installment entry (most recent by position)
-          const lastIdx = payment.partialPaymentsHistory.length - 1;
-          const targetInstallment = payment.partialPaymentsHistory[lastIdx];
+          let targetIndex = -1;
+          if (historyId) {
+            targetIndex = payment.partialPaymentsHistory.findIndex(h => h._id && h._id.toString() === historyId.toString());
+          }
+          if (targetIndex === -1) {
+            targetIndex = payment.partialPaymentsHistory.length - 1;
+          }
+          const targetInstallment = payment.partialPaymentsHistory[targetIndex];
 
           // Save old amount for the delta recalculation
           const oldInstallmentAmount = targetInstallment.amountPaid || 0;
@@ -1035,15 +1049,16 @@ const planPurchaseService = {
           }
 
           // Recalculate total amountPaid:
-          // Sum ALL installments except the last one + the new corrected amount
+          // Sum ALL installments except the target one + the new corrected amount
           const otherInstallmentsSum = payment.partialPaymentsHistory
-            .slice(0, lastIdx)
+            .filter((h, idx) => idx !== targetIndex)
             .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
 
           payment.amountPaid = otherInstallmentsSum + newAmount;
-          payment.remainingAmount = Math.max(0, payment.totalAmount - payment.amountPaid - (payment.discount || 0));
+          const targetAmount = (payment.isPartial ? payment.partialTotalTarget : payment.totalAmount) || payment.totalAmount;
+          payment.remainingAmount = Math.max(0, targetAmount - payment.amountPaid - (payment.discount || 0));
 
-          console.log(`[PARTIAL_CORRECTION] Intent: ${payment._id}. Installment[${lastIdx}] updated: ₹${oldInstallmentAmount} → ₹${newAmount}. New total: ₹${payment.amountPaid}`);
+          console.log(`[PARTIAL_CORRECTION] Intent: ${payment._id}. Installment[${targetIndex}] (id: ${targetInstallment._id}) updated: ₹${oldInstallmentAmount} → ₹${newAmount}. New total: ₹${payment.amountPaid}`);
         } else {
           // Non-partial payment: update amounts directly
           payment.amountPaid = newAmount;
@@ -1123,7 +1138,7 @@ const planPurchaseService = {
             action: 'PAYMENT_PRE_APPROVAL_EDIT',
             targetUserId: payment.userId,
             reason: reason || 'Draft correction',
-            meta: { paymentIntentId, oldAmount, newAmount: payment.amountPaid, oldMode, newMode: payment.isPartial, newExpiry, newValidityDays }
+            meta: { paymentIntentId, historyId, oldAmount, newAmount: payment.amountPaid, oldMode, newMode: payment.isPartial, newExpiry, newValidityDays }
           }]);
 
           return { status: 200, message: "Payment draft updated and expiry recalculated successfully", data: { payment, newExpiry, newValidityDays } };
@@ -1138,7 +1153,7 @@ const planPurchaseService = {
             action: 'PAYMENT_PRE_APPROVAL_EDIT',
             targetUserId: payment.userId,
             reason: reason || 'Draft correction',
-            meta: { paymentIntentId, oldAmount, newAmount: payment.amountPaid, oldMode, newMode: payment.isPartial }
+            meta: { paymentIntentId, historyId, oldAmount, newAmount: payment.amountPaid, oldMode, newMode: payment.isPartial }
           }]);
 
           return { status: 200, message: "Payment draft updated successfully (expiry sync skipped)", data: payment };
@@ -1146,9 +1161,36 @@ const planPurchaseService = {
       }
 
       // PHASE 2: Post-Approval Correction (Ledger Revaluation)
+      let effectiveTotalAmount = newAmount;
+      if (payment.isPartial && payment.partialPaymentsHistory && payment.partialPaymentsHistory.length > 0) {
+        let targetIndex = -1;
+        if (historyId) {
+          targetIndex = payment.partialPaymentsHistory.findIndex(h => h._id && h._id.toString() === historyId.toString());
+        }
+        if (targetIndex === -1) {
+          targetIndex = payment.partialPaymentsHistory.length - 1;
+        }
+        const targetInstallment = payment.partialPaymentsHistory[targetIndex];
+
+        targetInstallment.amountPaid = newAmount;
+        if (utrNumber !== undefined && utrNumber !== '') targetInstallment.utrNumber = utrNumber;
+        if (req.files && req.files.length > 0) {
+          const imageUrls = req.files.map(file => file.location || `uploads/receipts/${file.filename}`);
+          targetInstallment.proofImage = imageUrls[0];
+          targetInstallment.proofImages = imageUrls;
+          payment.proofImage = imageUrls[0];
+          payment.proofImages = imageUrls;
+        }
+        if (reason) targetInstallment.note = reason;
+
+        const otherInstallmentsSum = payment.partialPaymentsHistory
+          .filter((h, idx) => idx !== targetIndex)
+          .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
+        effectiveTotalAmount = otherInstallmentsSum + newAmount;
+      }
       
       // If the admin is ONLY updating files/UTR and NOT changing the amount, save and exit early!
-      if (payment.amountPaid === newAmount && payment.isPartial === targetIsPartial) {
+      if (payment.amountPaid === effectiveTotalAmount && payment.isPartial === targetIsPartial) {
           // Just save the payment record with the updated URL/UTR and skip tracking as a financial correction
           await payment.save();
           return { status: 200, message: "Payment info updated successfully without ledger revaluation.", data: { payment } };
@@ -1168,7 +1210,7 @@ const planPurchaseService = {
       await payment.populate('planId');
 
       // 2. Run Mathematical Engine (Frozen Rate Logic)
-      const effect = planPurchaseService._calculateCorrectionEffect({ payment, newAmount, targetIsPartial });
+      const effect = planPurchaseService._calculateCorrectionEffect({ payment, newAmount: effectiveTotalAmount, targetIsPartial });
 
       const newExpiry = effect.newExpiry;
       const newValidityDays = effect.newValidityDays;
@@ -1184,16 +1226,17 @@ const planPurchaseService = {
       };
 
       // 3. Update PaymentIntent
-      payment.amountPaid = newAmount;
+      payment.amountPaid = effectiveTotalAmount;
       payment.isPartial = targetIsPartial;
       payment.isCorrected = true;
       payment.correctionVersion = (payment.correctionVersion || 0) + 1;
       payment.currentExpiryDate = newExpiry;
-      payment.remainingAmount = Math.max(0, payment.totalAmount - newAmount);
+      const targetAmount = (payment.isPartial ? payment.partialTotalTarget : payment.totalAmount) || payment.totalAmount;
+      payment.remainingAmount = Math.max(0, targetAmount - effectiveTotalAmount - (payment.discount || 0));
 
       payment.correctionHistory.push({
         oldAmount,
-        newAmount,
+        newAmount: effectiveTotalAmount,
         oldMode,
         newMode: targetIsPartial,
         oldExpiry,
@@ -1203,14 +1246,14 @@ const planPurchaseService = {
         correctedAt: new Date(),
         snapShotBefore,
         snapShotAfter: {
-          amountPaid: newAmount,
+          amountPaid: effectiveTotalAmount,
           isPartial: targetIsPartial,
           expiry: newExpiry
         }
       });
 
       // Sensitivity Check (Fraud/Audit Protection)
-      const amountDelta = Math.abs(newAmount - oldAmount) / (oldAmount || 1);
+      const amountDelta = Math.abs(effectiveTotalAmount - oldAmount) / (oldAmount || 1);
       const isHighSensitivity = (payment.correctionVersion > 3) || (amountDelta > 0.4);
 
       if (isHighSensitivity) {

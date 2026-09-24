@@ -44,7 +44,7 @@ class PendingBankTransfersController extends GetxController {
   }
 
   bool get isDirector => effectiveUser?.isDirector ?? false;
-  bool get isAdmin => !isDirector && (effectiveUser?.isAdmin ?? false);
+  bool get isAdmin => !isDirector && (effectiveUser?.isAdmin ?? true);
   bool get canTakePaymentActions => isAdmin && !isDirector;
 
   // Correction Engine Observables
@@ -67,24 +67,16 @@ class PendingBankTransfersController extends GetxController {
     isFetchingPlans.value = false;
   }
 
-  void showSubscriptionCorrectionDialog(Map<String, dynamic> payment) {
+  void showSubscriptionCorrectionDialog(
+    Map<String, dynamic> payment, {
+    Function(Map<String, dynamic> updatedPayment)? onUpdated,
+  }) {
     if (!canTakePaymentActions) {
       Get.snackbar(
         "Permission Denied",
         "Only administrators can edit subscription dates or plans.",
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
-      );
-      return;
-    }
-
-    // 0. Preliminary Checks
-    if (payment['purchaseType'] == 'REGISTRATION') {
-      Get.snackbar(
-        "Restricted",
-        "Registration details cannot be edited.",
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
       );
       return;
     }
@@ -125,6 +117,19 @@ class PendingBankTransfersController extends GetxController {
     );
     final currentCorrectionVersion = payment['correctionVersion'] ?? 0;
 
+    final bool isRegistration = payment['purchaseType'] == 'REGISTRATION';
+    final isRegMode = RxBool(isRegistration);
+    final regPlanChoice = RxString(
+      (payment['amount'] == 10000 ||
+              payment['baseAmount'] == 10000 ||
+              (payment['packageName'] ?? '')
+                  .toString()
+                  .toLowerCase()
+                  .contains('gold'))
+          ? 'REG_GOLD'
+          : 'REG_SILVER',
+    );
+
     final selectedSegmentId = RxString(currentSegmentId);
     final selectedPlanId = RxString(currentPlanId);
     final startDate = Rxn<DateTime>(currentStartDate);
@@ -134,14 +139,14 @@ class PendingBankTransfersController extends GetxController {
     loadSegments();
     if (currentSegmentId.isNotEmpty) loadPlansForSegment(currentSegmentId);
 
-    Future.delayed(Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       Get.dialog(
         AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.edit_note, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Correct Subscription Details'),
+              const Icon(Icons.change_circle_outlined, color: Colors.blue),
+              const SizedBox(width: 8),
+              const Text('Change Plan / Correct Subscription'),
             ],
           ),
           content: SizedBox(
@@ -153,7 +158,7 @@ class PendingBankTransfersController extends GetxController {
                 children: [
                   // Info Box
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.amber[50],
                       borderRadius: BorderRadius.circular(8),
@@ -166,10 +171,10 @@ class PendingBankTransfersController extends GetxController {
                           size: 18,
                           color: Colors.amber[900],
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            "Changing the plan will reset any existing discounts to ₹0 and recalculate all financial ledgers.",
+                            "Changing the plan will recalibrate the price, GST, validity, and update user entitlements.",
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.amber[900],
@@ -180,85 +185,154 @@ class PendingBankTransfersController extends GetxController {
                       ],
                     ),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                  // Segment Selection
-                  Text(
-                    'Segment',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Obx(
-                    () => DropdownButtonFormField<String>(
-                      value:
-                          segments.any(
-                            (s) =>
-                                parseId(s['_id'] ?? s['id']) ==
-                                selectedSegmentId.value,
-                          )
-                          ? selectedSegmentId.value
-                          : null,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  // Mode Toggle (Registration vs Segment Plan)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Plan Category',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                       ),
-                      items: segments
-                          .map(
-                            (s) => DropdownMenuItem(
-                              value: parseId(s['_id'] ?? s['id']),
-                              child: Text(s['segmentName'] ?? ''),
+                      Obx(
+                        () => Row(
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Segment Plan', style: TextStyle(fontSize: 11)),
+                              selected: !isRegMode.value,
+                              onSelected: (val) {
+                                if (val) isRegMode.value = false;
+                              },
                             ),
-                          )
-                          .toList(),
-                      onChanged: (val) {
-                        if (val != null) {
-                          selectedSegmentId.value = val;
-                          selectedPlanId.value = '';
-                          loadPlansForSegment(val);
-                        }
-                      },
-                    ),
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: const Text('Registration', style: TextStyle(fontSize: 11)),
+                              selected: isRegMode.value,
+                              onSelected: (val) {
+                                if (val) isRegMode.value = true;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                  // Plan Selection
-                  Text(
-                    'Plan',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 8),
-                  Obx(
-                    () => isFetchingPlans.value
-                        ? LinearProgressIndicator()
-                        : DropdownButtonFormField<String>(
-                            value:
-                                plansForSelectedSegment.any(
-                                  (p) =>
-                                      parseId(p['_id'] ?? p['id']) ==
-                                      selectedPlanId.value,
-                                )
-                                ? selectedPlanId.value
-                                : null,
-                            decoration: InputDecoration(
+                  Obx(() {
+                    if (isRegMode.value) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Registration Plan Tier',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          DropdownButtonFormField<String>(
+                            value: regPlanChoice.value,
+                            decoration: const InputDecoration(
                               border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
                             ),
-                            items: plansForSelectedSegment
-                                .map(
-                                  (p) => DropdownMenuItem(
-                                    value: parseId(p['_id'] ?? p['id']),
-                                    child: Text(p['planName'] ?? ''),
-                                  ),
-                                )
-                                .toList(),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'REG_SILVER',
+                                child: Text('Silver Registration (Yearly - 365 Days)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'REG_GOLD',
+                                child: Text('Gold Registration (Lifetime - 10 Years)'),
+                              ),
+                            ],
                             onChanged: (val) {
-                              if (val != null) selectedPlanId.value = val;
+                              if (val != null) {
+                                regPlanChoice.value = val;
+                                if (startDate.value != null) {
+                                  expiryDate.value = startDate.value!.add(
+                                    Duration(days: val == 'REG_GOLD' ? 3652 : 365),
+                                  );
+                                }
+                              }
                             },
                           ),
-                  ),
-                  SizedBox(height: 16),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Segment Selection
+                        const Text(
+                          'Segment',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: segments.any(
+                            (s) => parseId(s['_id'] ?? s['id']) == selectedSegmentId.value,
+                          )
+                              ? selectedSegmentId.value
+                              : null,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                          ),
+                          items: segments
+                              .map(
+                                (s) => DropdownMenuItem(
+                                  value: parseId(s['_id'] ?? s['id']),
+                                  child: Text(s['segmentName'] ?? ''),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              selectedSegmentId.value = val;
+                              selectedPlanId.value = '';
+                              loadPlansForSegment(val);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Plan Selection
+                        const Text(
+                          'Plan',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        isFetchingPlans.value
+                            ? const LinearProgressIndicator()
+                            : DropdownButtonFormField<String>(
+                                value: plansForSelectedSegment.any(
+                                  (p) => parseId(p['_id'] ?? p['id']) == selectedPlanId.value,
+                                )
+                                    ? selectedPlanId.value
+                                    : null,
+                                decoration: const InputDecoration(
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                                ),
+                                items: plansForSelectedSegment
+                                    .map(
+                                      (p) => DropdownMenuItem(
+                                        value: parseId(p['_id'] ?? p['id']),
+                                        child: Text(p['planName'] ?? ''),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (val) {
+                                  if (val != null) selectedPlanId.value = val;
+                                },
+                              ),
+                        const SizedBox(height: 16),
+                      ],
+                    );
+                  }),
 
                   // Date Selectors
                   Row(
@@ -267,21 +341,21 @@ class PendingBankTransfersController extends GetxController {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Service Start Date',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Obx(
                               () => OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  minimumSize: Size(double.infinity, 50),
+                                  minimumSize: const Size(double.infinity, 50),
                                   alignment: Alignment.centerLeft,
                                 ),
-                                icon: Icon(Icons.calendar_today, size: 16),
+                                icon: const Icon(Icons.calendar_today, size: 16),
                                 label: Text(
                                   startDate.value != null
                                       ? _formatDate(
@@ -297,33 +371,44 @@ class PendingBankTransfersController extends GetxController {
                                     firstDate: DateTime(2020),
                                     lastDate: DateTime(2100),
                                   );
-                                  if (picked != null) startDate.value = picked;
+                                  if (picked != null) {
+                                    startDate.value = picked;
+                                    if (isRegMode.value) {
+                                      expiryDate.value = picked.add(
+                                        Duration(
+                                          days: regPlanChoice.value == 'REG_GOLD'
+                                              ? 3652
+                                              : 365,
+                                        ),
+                                      );
+                                    }
+                                  }
                                 },
                               ),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Expiry Date',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Obx(
                               () => OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  minimumSize: Size(double.infinity, 50),
+                                  minimumSize: const Size(double.infinity, 50),
                                   alignment: Alignment.centerLeft,
                                 ),
-                                icon: Icon(Icons.event_busy, size: 16),
+                                icon: const Icon(Icons.event_busy, size: 16),
                                 label: Text(
                                   expiryDate.value != null
                                       ? _formatDate(
@@ -352,11 +437,11 @@ class PendingBankTransfersController extends GetxController {
                   // Correction History Timeline
                   if (payment['correctionHistory'] != null &&
                       (payment['correctionHistory'] as List).isNotEmpty) ...[
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     Row(
                       children: [
                         Icon(Icons.history, size: 16, color: Colors.grey[700]),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
                           'Recent Correction History',
                           style: TextStyle(
@@ -367,7 +452,7 @@ class PendingBankTransfersController extends GetxController {
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildCorrectionTimeline(
                       payment['correctionHistory'] as List,
                     ),
@@ -377,12 +462,18 @@ class PendingBankTransfersController extends GetxController {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Get.back(), child: Text('CANCEL')),
+            TextButton(onPressed: () => Get.back(), child: const Text('CANCEL')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               onPressed: () async {
-                if (selectedSegmentId.value.isEmpty ||
-                    selectedPlanId.value.isEmpty) {
+                final String targetSegId =
+                    isRegMode.value ? 'REGISTRATION' : selectedSegmentId.value;
+                final String targetPlanId =
+                    isRegMode.value ? regPlanChoice.value : selectedPlanId.value;
+
+                if (!isRegMode.value &&
+                    (selectedSegmentId.value.isEmpty ||
+                        selectedPlanId.value.isEmpty)) {
                   Get.snackbar(
                     "Required",
                     "Please select both Segment and Plan.",
@@ -395,8 +486,8 @@ class PendingBankTransfersController extends GetxController {
                     final success = await _acquisitionService
                         .updateSubscriptionMetadata(
                           paymentIntentId: paymentIntentId,
-                          newSegmentId: selectedSegmentId.value,
-                          newPlanId: selectedPlanId.value,
+                          newSegmentId: targetSegId,
+                          newPlanId: targetPlanId,
                           newStartDate: startDate.value?.toIso8601String(),
                           newExpiryDate: expiryDate.value?.toIso8601String(),
                           clientVersion: currentCorrectionVersion,
@@ -406,11 +497,22 @@ class PendingBankTransfersController extends GetxController {
                       Get.back(); // Close dialog
                       Get.snackbar(
                         "Success",
-                        "Subscription metadata corrected successfully.",
+                        "Subscription plan corrected successfully.",
                         backgroundColor: Colors.green,
                         colorText: Colors.white,
                       );
                       fetchPendingTransfers();
+                      if (onUpdated != null) {
+                        payment['purchaseType'] = isRegMode.value ? 'REGISTRATION' : 'PLAN';
+                        if (isRegMode.value) {
+                          payment['packageName'] = regPlanChoice.value == 'REG_GOLD'
+                              ? 'Gold Registration (Lifetime)'
+                              : 'Silver Registration (Yearly)';
+                        }
+                        payment['serviceStartDate'] = startDate.value?.toIso8601String();
+                        payment['currentExpiryDate'] = expiryDate.value?.toIso8601String();
+                        onUpdated(payment);
+                      }
                     } else {
                       Get.snackbar(
                         "Update Failed",
@@ -420,10 +522,10 @@ class PendingBankTransfersController extends GetxController {
                       );
                     }
                   },
-                  loadingWidget: Center(child: CircularProgressIndicator()),
+                  loadingWidget: const Center(child: CircularProgressIndicator()),
                 );
               },
-              child: Text(
+              child: const Text(
                 'SAVE CORRECTIONS',
                 style: TextStyle(
                   color: Colors.white,
@@ -443,7 +545,11 @@ class PendingBankTransfersController extends GetxController {
   String? lastPreviewTimestamp;
   Timer? _searchDebounce;
 
-  void showCorrectionDialog(Map<String, dynamic> payment) {
+  void showCorrectionDialog(
+    Map<String, dynamic> payment, {
+    Map<String, dynamic>? installment,
+    Function(Map<String, dynamic>)? onPaymentUpdated,
+  }) {
     if (!canTakePaymentActions) {
       Get.snackbar(
         "Permission Denied",
@@ -455,26 +561,39 @@ class PendingBankTransfersController extends GetxController {
     }
 
     final paymentIntentId = payment['_id'] ?? '';
-    final currentAmount = (payment['amountPaid'] ?? payment['amount'] ?? 0)
-        .toDouble();
-    final isApproved =
-        payment['status'] == 'PAID' ||
-        payment['status'] == 'APPROVED' ||
-        payment['status'] == 'PARTIAL-PAID';
+    final String? historyId = installment?['_id']?.toString();
+    final double currentAmount = installment != null
+        ? ((installment['amountPaid'] is num)
+            ? (installment['amountPaid'] as num).toDouble()
+            : (double.tryParse(installment['amountPaid']?.toString() ?? '0') ?? 0))
+        : (payment['amountPaid'] ?? payment['amount'] ?? 0).toDouble();
+
+    final bool isApproved = installment != null
+        ? (installment['status'] == 'APPROVED')
+        : (payment['status'] == 'PAID' ||
+            payment['status'] == 'APPROVED' ||
+            payment['status'] == 'PARTIAL-PAID');
 
     // Always reset preview state when opening a new dialog
     correctionPreview.value = {};
     isCalculating.value = false;
 
     final TextEditingController amountController = TextEditingController(
-      text: currentAmount.toString(),
+      text: currentAmount > 0
+          ? (currentAmount % 1 == 0
+              ? currentAmount.toInt().toString()
+              : currentAmount.toString())
+          : '',
     );
     final TextEditingController reasonController = TextEditingController();
     final TextEditingController utrController = TextEditingController(
-      text: payment['utrNumber']?.toString() ?? '',
+      text: (installment != null
+              ? installment['utrNumber']?.toString()
+              : payment['utrNumber']?.toString()) ??
+          '',
     );
     final originallyPartial = payment['isPartial'] == true;
-    final isPartialMode = originallyPartial.obs;
+    final isPartialMode = (installment != null ? true : originallyPartial).obs;
     final selectedFileNames = <String>[].obs;
     List<PlatformFile> selectedFiles = [];
 
@@ -498,6 +617,7 @@ class PendingBankTransfersController extends GetxController {
         paymentIntentId: paymentIntentId,
         newAmount: amt,
         targetIsPartial: isPartialMode.value,
+        historyId: historyId,
       );
       if (result != null) {
         correctionPreview.value = Map<String, dynamic>.from(result);
@@ -513,7 +633,13 @@ class PendingBankTransfersController extends GetxController {
     Get.dialog(
       AlertDialog(
         title: Text(
-          isApproved ? 'Financial Ledger Correction' : 'Edit Payment Draft',
+          isApproved
+              ? (installment != null
+                  ? 'Correct Installment Ledger'
+                  : 'Financial Ledger Correction')
+              : (installment != null
+                  ? 'Edit Installment Draft'
+                  : 'Edit Payment Draft'),
         ),
         content: SizedBox(
           width: 450,
@@ -541,7 +667,9 @@ class PendingBankTransfersController extends GetxController {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            "This payment is already APPROVED. Changing the amount will re-value the user's entitlements.",
+                            installment != null
+                                ? "This installment is already APPROVED. Correcting its amount will re-value the user's entitlements."
+                                : "This payment is already APPROVED. Changing the amount will re-value the user's entitlements.",
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.amber[900],
@@ -553,7 +681,9 @@ class PendingBankTransfersController extends GetxController {
                   ),
 
                 Text(
-                  'Correct Payment Amount',
+                  installment != null
+                      ? 'Correct Installment Amount'
+                      : 'Correct Payment Amount',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -575,7 +705,7 @@ class PendingBankTransfersController extends GetxController {
                 ),
                 SizedBox(height: 16),
 
-                if (originallyPartial) ...[
+                if (originallyPartial && installment == null) ...[
                   Row(
                     children: [
                       Text(
@@ -607,7 +737,9 @@ class PendingBankTransfersController extends GetxController {
                 ],
 
                 Text(
-                  'Update UTR / Ref ID (Optional)',
+                  installment != null
+                      ? 'Update Installment UTR / Ref ID (Optional)'
+                      : 'Update UTR / Ref ID (Optional)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -625,7 +757,9 @@ class PendingBankTransfersController extends GetxController {
                 SizedBox(height: 16),
 
                 Text(
-                  'Update Payment Screenshots (Optional)',
+                  installment != null
+                      ? 'Update Installment Screenshots (Optional)'
+                      : 'Update Payment Screenshots (Optional)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -813,6 +947,7 @@ class PendingBankTransfersController extends GetxController {
                     utrNumber: utrController.text.isNotEmpty
                         ? utrController.text
                         : null,
+                    historyId: historyId,
                     files: selectedFiles.isNotEmpty ? selectedFiles : null,
                   );
                   if (success) {
@@ -825,6 +960,15 @@ class PendingBankTransfersController extends GetxController {
                       backgroundColor: Colors.green,
                       colorText: Colors.white,
                     );
+                    if (installment != null) {
+                      installment['amountPaid'] = amt;
+                      if (utrController.text.isNotEmpty) {
+                        installment['utrNumber'] = utrController.text;
+                      }
+                      if (onPaymentUpdated != null) {
+                        onPaymentUpdated(payment);
+                      }
+                    }
                     fetchPendingTransfers();
                   } else {
                     Get.snackbar(

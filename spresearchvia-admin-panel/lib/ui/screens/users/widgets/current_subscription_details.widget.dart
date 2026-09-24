@@ -111,6 +111,40 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (controller.isAdmin &&
+                                        (sub['paymentIntentId'] != null ||
+                                            sub['_id'] != null)) ...[
+                                      const SizedBox(width: 8),
+                                      Tooltip(
+                                        message: "Change Plan",
+                                        child: InkWell(
+                                          onTap: () => controller
+                                              .showSubscriptionCorrectionDialog(sub),
+                                          customBorder: const CircleBorder(),
+                                          child: Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryBlue
+                                                  .withOpacity(0.08),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: AppTheme.primaryBlue
+                                                    .withOpacity(0.3),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: const Center(
+                                              child: Icon(
+                                                Icons.change_circle_outlined,
+                                                size: 15,
+                                                color: AppTheme.primaryBlue,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     if (sub['isTrial'] == true) ...[
                                       const SizedBox(width: 8),
                                       Container(

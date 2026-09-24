@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import PaymentIntent from "../models/paymentIntentModel.js";
@@ -1877,46 +1878,77 @@ export const updateSubscriptionMetadata = async ({
             throw error;
         }
 
-        // Gap 5: Registration Lock
-        if (paymentIntent.purchaseType === 'REGISTRATION') {
-            throw new Error("REGISTRATION_LOCKED: Registration details cannot be altered via this tool.");
-        }
-
         const snapshotBefore = JSON.parse(JSON.stringify(paymentIntent));
 
-        // 2. Fetch new Segment and Plan (Gap 32: Separate lookups for virtual fields)
-        const newSegment = await segmentsModel.findById(newSegmentId);
-        const newPlan = await SegmentsPlan.findById(newPlanId);
+        const isRegTarget = newSegmentId === 'REGISTRATION' || 
+            ['REG_SILVER', 'YEARLY', 'SILVER', 'REG_GOLD', 'LIFETIME', 'GOLD'].includes(newPlanId);
 
-        if (!newSegment || !newPlan) throw new Error("INVALID_SELECTION: New segment or plan not found.");
+        let newSegment = null;
+        let newPlan = null;
+        let newSegmentName = '';
+        let newPlanName = '';
+        let newPackageName = '';
+        let newBasePrice = 0;
+        let newDuration = 30;
 
         // Fetch old names for history
         const oldSegmentId = paymentIntent.preferredSegmentId || snapshotBefore.preferredSegmentId;
         const oldPlanId = paymentIntent.planId || snapshotBefore.planId;
         
-        const oldSegment = await segmentsModel.findById(oldSegmentId);
-        const oldPlan = await SegmentsPlan.findById(oldPlanId);
-        const oldSegmentName = oldSegment ? oldSegment.segmentName : (paymentIntent.packageName?.split(' - ')[0] || 'Unknown Segment');
-        const oldPlanName = oldPlan ? oldPlan.planName : (paymentIntent.packageName?.split(' - ')[1] || 'Unknown Plan');
+        const oldSegment = oldSegmentId ? await segmentsModel.findById(oldSegmentId).catch(() => null) : null;
+        const oldPlan = oldPlanId ? await SegmentsPlan.findById(oldPlanId).catch(() => null) : null;
+        const oldSegmentName = oldSegment ? oldSegment.segmentName : (paymentIntent.purchaseType === 'REGISTRATION' ? 'Registration' : (paymentIntent.packageName?.split(' - ')[0] || 'Unknown Segment'));
+        const oldPlanName = oldPlan ? oldPlan.planName : (paymentIntent.purchaseType === 'REGISTRATION' ? paymentIntent.packageName || 'Registration' : (paymentIntent.packageName?.split(' - ')[1] || 'Unknown Plan'));
 
-        console.log(`[CorrectionHistory] Old: ${oldSegmentName} / ${oldPlanName}, New: ${newSegment.segmentName} / ${newPlan.planName}`);
+        if (isRegTarget || (paymentIntent.purchaseType === 'REGISTRATION' && (!newSegmentId || newSegmentId === 'REGISTRATION'))) {
+            const isGold = (newPlanId === 'REG_GOLD' || newPlanId === 'LIFETIME' || newPlanId === 'GOLD');
+            const regType = isGold ? 'LIFETIME' : 'YEARLY';
+            newSegmentName = 'Registration';
+            newPlanName = isGold ? 'Gold Registration (Lifetime)' : 'Silver Registration (Yearly)';
+            newPackageName = newPlanName;
+            newBasePrice = isGold ? 10000 : (paymentIntent.baseAmount && paymentIntent.baseAmount <= 1000 ? 1000 : 5000);
+            newDuration = isGold ? 3652 : 365;
+            paymentIntent.purchaseType = 'REGISTRATION';
+            
+            // Sync user registrationType
+            await User.findByIdAndUpdate(paymentIntent.userId, {
+                registrationType: regType,
+                registrationExpiry: paymentIntent.currentExpiryDate
+            }).catch(e => console.error('Error syncing user registrationType:', e));
+        } else {
+            // 2. Fetch new Segment and Plan (Gap 32: Separate lookups for virtual fields)
+            newSegment = await segmentsModel.findById(newSegmentId);
+            newPlan = await SegmentsPlan.findById(newPlanId);
 
-        // Gap 9: Active Plan Validation
-        if (newPlan.planStatus !== 'active') throw new Error("INACTIVE_PLAN: Selected plan is currently deactivated.");
+            if (!newSegment || !newPlan) throw new Error("INVALID_SELECTION: New segment or plan not found.");
 
-        // Gap 17: Custom Plan Blocker
-        if ((oldPlan && oldPlan.isHni) || newPlan.isHni) {
-            throw new Error("CUSTOM_PLAN_RESTRICTED: Standard plans cannot be converted to Custom/HNI plans and vice-versa.");
+            // Gap 9: Active Plan Validation
+            if (newPlan.planStatus !== 'active') throw new Error("INACTIVE_PLAN: Selected plan is currently deactivated.");
+
+            // Gap 17: Custom Plan Blocker
+            if ((oldPlan && oldPlan.isHni) || newPlan.isHni) {
+                throw new Error("CUSTOM_PLAN_RESTRICTED: Standard plans cannot be converted to Custom/HNI plans and vice-versa.");
+            }
+
+            // Gap 27 Sanitization: Ensure package name doesn't contain reserved keywords
+            const sanitizedPlanName = newPlan.planName.replace(/registration/gi, "Package");
+            newSegmentName = newSegment.segmentName || 'Unknown Segment';
+            newPlanName = newPlan.planName || 'Unknown Plan';
+            newPackageName = `${newSegmentName} - ${sanitizedPlanName}`;
+            newBasePrice = newPlan.price;
+            paymentIntent.purchaseType = 'PLAN';
+
+            // Gap 25: Duration Reset
+            const d1 = parseInt(newPlan.duration);
+            const d2 = parseInt(newPlan.day);
+            if (newPlan.planName.toLowerCase().includes('lifetime')) newDuration = 3652;
+            else if (!isNaN(d1) && d1 > 0) newDuration = d1;
+            else if (!isNaN(d2) && d2 > 0) newDuration = d2;
         }
 
-        // Gap 27 Sanitization: Ensure package name doesn't contain reserved keywords
-        const sanitizedPlanName = newPlan.planName.replace(/registration/gi, "Package");
-        const newSegmentName = newSegment.segmentName || 'Unknown Segment';
-        const newPlanName = newPlan.planName || 'Unknown Plan';
-        const newPackageName = `${newSegmentName} - ${sanitizedPlanName}`;
+        console.log(`[CorrectionHistory] Old: ${oldSegmentName} / ${oldPlanName}, New: ${newSegmentName} / ${newPlanName}`);
 
         // 3. Mathematical Recalculation (Gap 2, 11, 28)
-        const newBasePrice = newPlan.price;
         const gstRate = paymentIntent.gstRateUsed || 18;
         const newGstAmount = Math.round((newBasePrice * gstRate) / 100);
         const newTotalAmount = newBasePrice + newGstAmount;
@@ -1929,14 +1961,6 @@ export const updateSubscriptionMetadata = async ({
         if (approvedPayments > newTotalAmount) {
             throw new Error(`OVERPAID_DOWNGRADE: User has already paid ₹${approvedPayments}, which exceeds the new plan price of ₹${newTotalAmount}.`);
         }
-
-        // Gap 25: Duration Reset
-        let newDuration = 30;
-        const d1 = parseInt(newPlan.duration);
-        const d2 = parseInt(newPlan.day);
-        if (newPlan.planName.toLowerCase().includes('lifetime')) newDuration = 3652;
-        else if (!isNaN(d1) && d1 > 0) newDuration = d1;
-        else if (!isNaN(d2) && d2 > 0) newDuration = d2;
 
         // Gap 2 & 13: Discount Reset & Partial Math
         const previousDiscount = paymentIntent.discount || 0;
@@ -1967,9 +1991,9 @@ export const updateSubscriptionMetadata = async ({
         }
 
         // 4. Update Intent Fields (Sync 1)
-        paymentIntent.planId = newPlanId;
-        paymentIntent.preferredPlanId = newPlanId.toString();
-        paymentIntent.preferredSegmentId = newSegmentId.toString();
+        paymentIntent.planId = (newPlanId && mongoose.Types.ObjectId.isValid(newPlanId)) ? newPlanId : null;
+        paymentIntent.preferredPlanId = newPlanId ? newPlanId.toString() : null;
+        paymentIntent.preferredSegmentId = newSegmentId ? newSegmentId.toString() : null;
         paymentIntent.packageName = newPackageName;
         paymentIntent.baseAmount = newBasePrice / (1 + (gstRate/100)); // Precise base
         paymentIntent.gstAmount = newTotalAmount - (newTotalAmount / (1 + (gstRate/100)));
@@ -2017,12 +2041,16 @@ export const updateSubscriptionMetadata = async ({
         await paymentIntent.save();
 
         // 5. Quad-Sync (Legacy & App state)
+        const validPlanObjectId = (newPlanId && mongoose.Types.ObjectId.isValid(newPlanId)) ? newPlanId : null;
+        const validSegmentObjectId = (newSegmentId && mongoose.Types.ObjectId.isValid(newSegmentId)) ? newSegmentId : null;
+
         // Sync 2: Entitlement (Gap 8)
         await Entitlement.updateMany(
             { userId: paymentIntent.userId, sourceRefId: paymentIntentId.toString() },
             { 
-                resourceId: newPlanId, 
-                segmentId: newSegmentId,
+                type: paymentIntent.purchaseType,
+                resourceId: validPlanObjectId, 
+                segmentId: validSegmentObjectId,
                 startDate: paymentIntent.serviceStartDate || undefined,
                 endDate: paymentIntent.currentExpiryDate || undefined
             }
@@ -2040,7 +2068,7 @@ export const updateSubscriptionMetadata = async ({
             },
             {
                 packageName: newPackageName,
-            totalPlanAmount: newTotalAmount,
+                totalPlanAmount: newTotalAmount,
                 basicAmount: paymentIntent.baseAmount,
                 cgstAmount: paymentIntent.gstAmount / 2,
                 sgstAmount: paymentIntent.gstAmount / 2,
@@ -2051,10 +2079,12 @@ export const updateSubscriptionMetadata = async ({
         );
 
         // Sync 4: userActiveSegment (Gap 34)
-        await userActiveSegmentModel.findOneAndUpdate(
-            { userId: paymentIntent.userId, isActive: true },
-            { segmentId: newSegmentId, expiryDate: paymentIntent.currentExpiryDate || undefined }
-        );
+        if (validSegmentObjectId) {
+            await userActiveSegmentModel.findOneAndUpdate(
+                { userId: paymentIntent.userId, isActive: true },
+                { segmentId: validSegmentObjectId, expiryDate: paymentIntent.currentExpiryDate || undefined }
+            );
+        }
 
         // 6. Finalize (Audit & Legal)
         // Gap 20 & 10: Audit Log

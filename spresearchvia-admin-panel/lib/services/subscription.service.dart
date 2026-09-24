@@ -431,12 +431,14 @@ class SubscriptionService extends ApiService {
     required String paymentIntentId,
     required double newAmount,
     required bool targetIsPartial,
+    String? historyId,
   }) async {
     try {
       final body = {
         "paymentIntentId": paymentIntentId,
         "newAmount": newAmount,
         "targetIsPartial": targetIsPartial,
+        if (historyId != null) "historyId": historyId,
       };
       final response = await post(
         '/user/purchase/admin/preview-correction',
@@ -459,6 +461,7 @@ class SubscriptionService extends ApiService {
     required String reason,
     required String previewTimestamp,
     String? utrNumber,
+    String? historyId,
     List<dynamic>? files, // Pass PlatformFile list
   }) async {
     try {
@@ -476,6 +479,7 @@ class SubscriptionService extends ApiService {
           "reason": reason,
           "previewTimestamp": previewTimestamp,
           if (utrNumber != null) "utrNumber": utrNumber,
+          if (historyId != null) "historyId": historyId,
           "file": multipartList,
         });
         final response = await post(
@@ -491,6 +495,7 @@ class SubscriptionService extends ApiService {
           "reason": reason,
           "previewTimestamp": previewTimestamp,
           if (utrNumber != null) "utrNumber": utrNumber,
+          if (historyId != null) "historyId": historyId,
         };
         final response = await post(
           '/user/purchase/admin/update-payment',

@@ -1478,6 +1478,46 @@ class PendingBankTransfersScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildCorrectFinancialsButton({
+    required VoidCallback onTap,
+    bool isSmall = true,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          height: isSmall
+              ? AppTheme.buttonHeightSmall
+              : AppTheme.buttonHeightDefault,
+          padding: EdgeInsets.symmetric(horizontal: isSmall ? 10 : 14),
+          decoration: BoxDecoration(
+            color: Colors.orange[50],
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.orange[300]!, width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.edit_note,
+                  size: isSmall ? 16 : 18, color: Colors.orange[900]),
+              const SizedBox(width: 4),
+              Text(
+                "Correct Financials",
+                style: TextStyle(
+                  fontSize: isSmall ? 11 : 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange[900],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDossierPaymentCard({
     required Map<String, dynamic> payment,
     required PendingBankTransfersController controller,
@@ -1648,6 +1688,36 @@ class PendingBankTransfersScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          Tooltip(
+                            message: "Change Plan",
+                            child: InkWell(
+                              onTap: () => controller.showSubscriptionCorrectionDialog(
+                                payment,
+                                onUpdated: onPaymentUpdated,
+                              ),
+                              customBorder: const CircleBorder(),
+                              child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryBlue.withOpacity(0.08),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppTheme.primaryBlue.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.change_circle_outlined,
+                                    size: 16,
+                                    color: AppTheme.primaryBlue,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           if (isRegistration)
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -1812,12 +1882,12 @@ class PendingBankTransfersScreen extends StatelessWidget {
                     Table(
                       columnWidths: canAct
                           ? const {
-                              0: FlexColumnWidth(1.6),
-                              1: FlexColumnWidth(2.0),
+                              0: FlexColumnWidth(1.5),
+                              1: FlexColumnWidth(2.2),
                               2: FlexColumnWidth(1.8),
-                              3: FlexColumnWidth(1.0),
+                              3: FlexColumnWidth(0.8),
                               4: FlexColumnWidth(1.2),
-                              5: FlexColumnWidth(2.0),
+                              5: FlexColumnWidth(3.4),
                             }
                           : const {
                               0: FlexColumnWidth(1.6),
@@ -1954,9 +2024,19 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               if (canAct)
                                 Padding(
                                   padding: const EdgeInsets.all(6.0),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                  child: Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
                                     children: [
+                                      _buildCorrectFinancialsButton(
+                                        onTap: () => controller.showCorrectionDialog(
+                                          payment,
+                                          installment: inst,
+                                          onPaymentUpdated: onPaymentUpdated,
+                                        ),
+                                      ),
                                       if (isInstPending) ...[
                                         Button(
                                           title: "Approve",
@@ -1974,7 +2054,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                             );
                                           },
                                         ),
-                                        const SizedBox(width: 6),
                                         Button(
                                           title: "Reject",
                                           buttonType: ButtonType.red,
@@ -2179,6 +2258,14 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               if (canAct)
                                 Row(
                                   children: [
+                                    _buildCorrectFinancialsButton(
+                                      isSmall: false,
+                                      onTap: () => controller.showCorrectionDialog(
+                                        payment,
+                                        onPaymentUpdated: onPaymentUpdated,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: Button(
                                         title: "Approve & Activate",
@@ -2195,7 +2282,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                         },
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: Button(
                                         title: "Reject",
@@ -2238,6 +2325,16 @@ class PendingBankTransfersScreen extends StatelessWidget {
                             ] else ...[
                               Row(
                                 children: [
+                                  if (canAct) ...[
+                                    _buildCorrectFinancialsButton(
+                                      isSmall: true,
+                                      onTap: () => controller.showCorrectionDialog(
+                                        payment,
+                                        onPaymentUpdated: onPaymentUpdated,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                  ],
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 8),
@@ -2346,18 +2443,18 @@ class PendingBankTransfersScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      if (!isRegistration) ...[
-                        TextButton.icon(
-                          icon: const Icon(Icons.calendar_month,
-                              size: 14, color: AppTheme.primaryBlue),
-                          label: const Text("Edit Plan/Dates",
-                              style: TextStyle(
-                                  fontSize: 12, color: AppTheme.primaryBlue)),
-                          onPressed: () => controller
-                              .showSubscriptionCorrectionDialog(payment),
+                      TextButton.icon(
+                        icon: const Icon(Icons.calendar_month,
+                            size: 14, color: AppTheme.primaryBlue),
+                        label: const Text("Edit Plan/Dates",
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.primaryBlue)),
+                        onPressed: () => controller.showSubscriptionCorrectionDialog(
+                          payment,
+                          onUpdated: onPaymentUpdated,
                         ),
-                        const SizedBox(width: 12),
-                      ],
+                      ),
+                      const SizedBox(width: 12),
                       TextButton.icon(
                         icon: const Icon(Icons.discount_outlined,
                             size: 15, color: Colors.teal),
@@ -2372,16 +2469,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
                           payment,
                           onUpdated: onPaymentUpdated,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      TextButton.icon(
-                        icon: Icon(Icons.edit_note,
-                            size: 16, color: Colors.orange[800]),
-                        label: Text("Correct Financials",
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.orange[800])),
-                        onPressed: () =>
-                            controller.showCorrectionDialog(payment),
                       ),
                     ],
                   ),
@@ -2810,10 +2897,10 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                   color: Colors.grey,
                                 ),
                               ),
-                              if (payment['purchaseType'] != 'REGISTRATION' && controller.canTakePaymentActions)
+                              if (controller.canTakePaymentActions)
                                 TextButton.icon(
-                                  icon: Icon(Icons.edit, size: 14, color: Colors.blue),
-                                  label: Text("Edit Plan/Dates", style: TextStyle(fontSize: 12, color: Colors.blue)),
+                                  icon: const Icon(Icons.edit, size: 14, color: Colors.blue),
+                                  label: const Text("Edit Plan/Dates", style: TextStyle(fontSize: 12, color: Colors.blue)),
                                   onPressed: () {
                                     Get.back();
                                     controller.showSubscriptionCorrectionDialog(payment);
@@ -2836,7 +2923,39 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                 Row(
                                   children: [
                                     Expanded(
-                                      child: _buildInfoItem("Plan Name", pName),
+                                      child: _buildInfoItem(
+                                        "Plan Name",
+                                        pName,
+                                        trailing: Tooltip(
+                                          message: "Change Plan",
+                                          child: InkWell(
+                                            onTap: () {
+                                              Get.back();
+                                              controller.showSubscriptionCorrectionDialog(payment);
+                                            },
+                                            customBorder: const CircleBorder(),
+                                            child: Container(
+                                              width: 22,
+                                              height: 22,
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primaryBlue.withOpacity(0.1),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: AppTheme.primaryBlue.withOpacity(0.3),
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.change_circle_outlined,
+                                                  size: 14,
+                                                  color: AppTheme.primaryBlue,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                     Expanded(
                                       child: _buildInfoItem("Segment", sName),
@@ -3339,6 +3458,20 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                                           mainAxisSize:
                                                               MainAxisSize.min,
                                                           children: [
+                                                            _buildCorrectFinancialsButton(
+                                                              isSmall: true,
+                                                              onTap: () {
+                                                                controller.showCorrectionDialog(
+                                                                  payment,
+                                                                  installment: inst,
+                                                                  onPaymentUpdated: (up) {
+                                                                    livePayment.value = Map<String, dynamic>.from(up);
+                                                                    livePayment.refresh();
+                                                                  },
+                                                                );
+                                                              },
+                                                            ),
+                                                            const SizedBox(width: 8),
                                                             Button(
                                                               title: "Approve",
                                                               buttonType:
@@ -3395,6 +3528,20 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                                           mainAxisSize:
                                                               MainAxisSize.min,
                                                           children: [
+                                                            _buildCorrectFinancialsButton(
+                                                              isSmall: true,
+                                                              onTap: () {
+                                                                controller.showCorrectionDialog(
+                                                                  payment,
+                                                                  installment: inst,
+                                                                  onPaymentUpdated: (up) {
+                                                                    livePayment.value = Map<String, dynamic>.from(up);
+                                                                    livePayment.refresh();
+                                                                  },
+                                                                );
+                                                              },
+                                                            ),
+                                                            const SizedBox(width: 8),
                                                             Icon(
                                                               inst['status'] ==
                                                                       'APPROVED'
@@ -3530,22 +3677,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                     onPressed: () {
                                       Get.back();
                                       controller.showDiscountDialog(payment);
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.edit, size: 18),
-                                    label: const Text("CORRECT FINANCIALS"),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.orange[800],
-                                      side: BorderSide(color: Colors.orange[800]!),
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                    ),
-                                    onPressed: () {
-                                      Get.back();
-                                      controller.showCorrectionDialog(payment);
                                     },
                                   ),
                                 ),
@@ -3750,15 +3881,24 @@ class PendingBankTransfersScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoItem(String label, String value, {Widget? trailing}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 6),
+              trailing,
+            ],
+          ],
         ),
       ],
     );
@@ -4095,10 +4235,10 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                 color: Colors.grey,
                               ),
                             ),
-                            if (payment['purchaseType'] != 'REGISTRATION' && controller.canTakePaymentActions)
+                            if (controller.canTakePaymentActions)
                               TextButton.icon(
-                                icon: Icon(Icons.edit, size: 14, color: Colors.blue),
-                                label: Text("Edit Plan/Dates", style: TextStyle(fontSize: 12, color: Colors.blue)),
+                                icon: const Icon(Icons.edit, size: 14, color: Colors.blue),
+                                label: const Text("Edit Plan/Dates", style: TextStyle(fontSize: 12, color: Colors.blue)),
                                 onPressed: () {
                                   Get.back();
                                   controller.showSubscriptionCorrectionDialog(payment);
@@ -4121,7 +4261,39 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               Row(
                                 children: [
                                   Expanded(
-                                    child: _buildInfoItem("Plan Name", pName),
+                                    child: _buildInfoItem(
+                                      "Plan Name",
+                                      pName,
+                                      trailing: Tooltip(
+                                        message: "Change Plan",
+                                        child: InkWell(
+                                          onTap: () {
+                                            Get.back();
+                                            controller.showSubscriptionCorrectionDialog(payment);
+                                          },
+                                          customBorder: const CircleBorder(),
+                                          child: Container(
+                                            width: 22,
+                                            height: 22,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryBlue.withOpacity(0.1),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: AppTheme.primaryBlue.withOpacity(0.3),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: const Center(
+                                              child: Icon(
+                                                Icons.change_circle_outlined,
+                                                size: 14,
+                                                color: AppTheme.primaryBlue,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                   Expanded(
                                     child: _buildInfoItem("Segment", sName),
