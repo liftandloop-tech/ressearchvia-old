@@ -3512,6 +3512,293 @@ class PendingBankTransfersScreen extends StatelessWidget {
         .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
         .join(' ');
   }
+
+  Widget _buildKycTab(PendingBankTransfersController controller) {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Filters Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.gray200),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // Search Bar
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: controller.kycSearchController,
+                        onChanged: (value) {
+                          controller.kycSearchQuery.value = value;
+                          controller.applyKycFilters();
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search by name or phone',
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            size: 20,
+                            color: AppTheme.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppTheme.gray300),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppTheme.gray300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppTheme.primaryBlue),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Status Filter
+                    Expanded(
+                      child: Obx(
+                        () => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppTheme.gray300),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: controller.kycStatusFilter.value,
+                              isExpanded: true,
+                              items:
+                                  [
+                                    'All',
+                                    'Verified',
+                                    'Rejected',
+                                    'Waiting_for_review',
+                                    'In_progress',
+                                    'Not_started',
+                                  ].map((String value) {
+                                    return DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    );
+                                  }).toList(),
+                              onChanged: (String? newValue) {
+                                if (newValue != null) {
+                                  controller.kycStatusFilter.value = newValue;
+                                  controller.applyKycFilters();
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Reset Button
+                    Button(
+                      title: 'Reset',
+                      buttonType: ButtonType.grey,
+                      icon: Icons.refresh,
+                      size: ButtonSize.small,
+                      onTap: controller.resetKycFilters,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Data Section
+          Obx(() {
+            if (controller.isLoading.value &&
+                controller.pendingKycUsers.isEmpty) {
+              return const SizedBox(
+                height: 450,
+                child: TableSkeleton(rowCount: 7, columnCount: 6),
+              );
+            }
+
+            if (controller.pendingKycUsers.isEmpty) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: Text("No pending KYC approvals found."),
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                // Table
+                _buildKycTable(controller),
+                const SizedBox(height: 16),
+                Text(
+                  "Showing ${controller.filteredKycUsers.length} of ${controller.totalKycCount.value} records",
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKycTable(PendingBankTransfersController controller) {
+    return Obx(() {
+      if (controller.filteredKycUsers.isEmpty) {
+        return const Center(
+          child: Text("No users match the selected filters."),
+        );
+      }
+
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: AppTheme.gray200),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scrollController = ScrollController();
+            return Scrollbar(
+              controller: scrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: scrollController,
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: DataTable(
+                    dataRowHeight: 80,
+                    columnSpacing: 20,
+                    horizontalMargin: 12,
+                    headingRowColor: MaterialStateProperty.all(AppTheme.gray50),
+                    columns: const [
+                      DataColumn(label: Text('Date Joined')),
+                      DataColumn(label: Text('User ID')),
+                      DataColumn(label: Text('User')),
+                      DataColumn(label: Text('Phone')),
+                      DataColumn(label: Text('PAN Card')),
+                      DataColumn(label: Text('KYC Status')),
+                      DataColumn(label: Text('Actions')),
+                    ],
+                    rows: controller.filteredKycUsers.map((user) {
+                      final date = DateTime.tryParse(user.createdAt);
+                      final status = user.kycStatus ?? 'PENDING';
+
+                      Color statusColor;
+                      Color statusBgColor;
+
+                      switch (status.toUpperCase()) {
+                        case 'VERIFIED':
+                        case 'APPROVED':
+                          statusColor = Colors.green[800]!;
+                          statusBgColor = Colors.green[100]!;
+                          break;
+                        case 'REJECTED':
+                          statusColor = Colors.red[800]!;
+                          statusBgColor = Colors.red[100]!;
+                          break;
+                        case 'WAITING_FOR_REVIEW':
+                          statusColor = Colors.blue[800]!;
+                          statusBgColor = Colors.blue[100]!;
+                          break;
+                        default:
+                          statusColor = Colors.orange[800]!;
+                          statusBgColor = Colors.orange[100]!;
+                      }
+
+                      return DataRow(
+                        cells: [
+                          DataCell(
+                            Text(
+                              date != null
+                                  ? _formatToIST(date, 'yyyy-MM-dd')
+                                  : '-',
+                            ),
+                          ),
+                          DataCell(Text(user.userId ?? '-')),
+                          DataCell(
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  user.fullName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  user.email,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          DataCell(Text(user.formattedPhone)),
+                          DataCell(Text(user.panCard ?? '-')),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusBgColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                status,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Button(
+                                  title: "View Details",
+                                  buttonType: ButtonType.blue,
+                                  size: ButtonSize.small,
+                                  onTap: () => Get.toNamed('/users/${user.id}'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    });
+  }
 }
 
 extension StringExtension on String {

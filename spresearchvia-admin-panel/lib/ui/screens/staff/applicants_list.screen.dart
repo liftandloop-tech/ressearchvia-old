@@ -5,6 +5,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/recruitment/applicants_list.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
+import '../../../config/app.config.dart';
 
 class ApplicantsListScreen extends StatelessWidget {
   const ApplicantsListScreen({super.key});
