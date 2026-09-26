@@ -50,15 +50,19 @@ class DashboardNavBar extends StatelessWidget {
               if (title == 'Dashboard') return item;
 
               if (title == 'Clients' || title == 'Users') {
+                final canAccessUsers = user?.canAccessDepartmentPage('Users') ?? false;
+                final canAccessKyc = user?.canAccessDepartmentPage('KYC') ?? false;
+                final canAccessPayments = user?.canAccessDepartmentPage('Payments') ?? false;
+
                 final children = ((item['children'] as List<Map<String, dynamic>>?) ?? [])
                     .where((child) {
                       final childTitle = child['title'] as String;
                       if (childTitle == 'All Clients' || childTitle == 'All Users') {
-                        return (user?.has('users.view') ?? user?.hasPermission('Users', 'read') ?? false);
+                        return canAccessUsers && (user?.has('users.view') ?? user?.hasPermission('Users', 'read') ?? false);
                       } else if (childTitle == 'Registered Clients' || childTitle == 'User KYC') {
-                        return (user?.has('kyc.view') ?? false) || (user?.has('users.view') ?? false) || (user?.hasPermission('KYC', 'read') ?? false) || (user?.hasPermission('Users', 'read') ?? false);
+                        return (canAccessKyc || canAccessUsers) && ((user?.has('kyc.view') ?? false) || (user?.has('users.view') ?? false) || (user?.hasPermission('KYC', 'read') ?? false) || (user?.hasPermission('Users', 'read') ?? false));
                       } else if (childTitle == 'Payments') {
-                        return (user?.has('payments.view_pending') ?? user?.hasPermission('Payments', 'read') ?? false);
+                        return canAccessPayments && (user?.has('payments.view_pending') ?? user?.hasPermission('Payments', 'read') ?? false);
                       }
                       return false;
                     })
@@ -70,22 +74,32 @@ class DashboardNavBar extends StatelessWidget {
               }
 
               if (title == 'Staff') {
+                if (user?.canAccessDepartmentPage('Staff') != true) return null;
                 return (user?.has('staff.view') ?? user?.hasPermission('Staff', 'read') ?? false) ? item : null;
               }
+              if (title == 'Subscriptions') {
+                if (user?.canAccessDepartmentPage('Subscriptions') != true) return null;
+                return (user?.has('subscriptions.view') ?? user?.hasPermission('Subscriptions', 'read') ?? false) ? item : null;
+              }
               if (title == 'Reports') {
+                if (user?.canAccessDepartmentPage('Reports') != true) return null;
                 return (user?.has('reports.view') ?? user?.hasPermission('Reports', 'read') ?? false) ? item : null;
               }
               if (title == 'Notifications') {
+                if (user?.canAccessDepartmentPage('Notifications') != true) return null;
                 return (user?.has('notifications.view') ?? user?.hasPermission('Notifications', 'read') ?? false) ? item : null;
               }
               if (title == 'Settings') {
                 if (user?.isDirector ?? false) return null;
+                if (user?.canAccessDepartmentPage('Settings') != true) return null;
                 return (user?.has('settings.view') ?? user?.hasPermission('Settings', 'read') ?? false) ? item : null;
               }
               if (title == 'Leads') {
+                if (user?.canAccessDepartmentPage('Leads') != true) return null;
                 return (user?.has('leads.view') ?? user?.has('leads.view_all') ?? user?.has('leads.view_assigned') ?? user?.hasPermission('Leads', 'read') ?? false) ? item : null;
               }
               if (title == 'Attendance') {
+                if (user?.canAccessDepartmentPage('Attendance') != true) return null;
                 return (user?.has('attendance.view') ?? user?.hasPermission('Attendance', 'read') ?? false) ? item : null;
               }
 

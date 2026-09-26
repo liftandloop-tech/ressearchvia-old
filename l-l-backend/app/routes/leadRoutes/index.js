@@ -11,9 +11,9 @@ const Router = express.Router();
 
 const leadRoutes = () => {
     Router.get("/pools", auth.tokenVerified, checkPermission('Leads', 'read'), leadPoolController.listLeadPools);
-    Router.post("/pools", auth.tokenVerified, checkPermission('Leads', 'create'), leadPoolController.createLeadPool);
-    Router.put("/pools/:id", auth.tokenVerified, checkPermission('Leads', 'update'), leadPoolController.updateLeadPool);
-    Router.delete("/pools/:id", auth.tokenVerified, checkPermission('Leads', 'delete'), leadPoolController.deleteLeadPool);
+    Router.post("/pools", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.createLeadPool);
+    Router.put("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.updateLeadPool);
+    Router.delete("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.deleteLeadPool);
 
     // Pull system
     Router.post("/pull", auth.tokenVerified, leadPullController.pullLeads);

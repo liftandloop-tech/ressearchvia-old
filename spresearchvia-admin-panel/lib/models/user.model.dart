@@ -124,14 +124,16 @@ class UserModel {
   bool get isSupervisor => isDirector || isManager;
 
   static String _parseMongoId(dynamic id) {
-    if (id is Map && id.containsKey('\$oid'))
+    if (id is Map && id.containsKey('\$oid')) {
       return id['\$oid']?.toString() ?? '';
+    }
     return id?.toString() ?? '';
   }
 
   static String _parseMongoDate(dynamic date) {
-    if (date is Map && date.containsKey('\$date'))
+    if (date is Map && date.containsKey('\$date')) {
       return date['\$date']?.toString() ?? '';
+    }
     return date?.toString() ?? '';
   }
 
@@ -198,6 +200,91 @@ class UserModel {
     );
   }
 
+  Map? get departmentData {
+    if (rawJson?['departmentId'] is Map) return rawJson!['departmentId'] as Map;
+    if (rawJson?['department'] is Map) return rawJson!['department'] as Map;
+    if (rawJson?['roleId'] is Map && rawJson!['roleId']['departmentId'] is Map) {
+      return rawJson!['roleId']['departmentId'] as Map;
+    }
+    return null;
+  }
+
+  /// Checks whether the user's assigned department has access to the specified page.
+  /// If the department is global or user is admin, returns true.
+  /// If the department specifies assignedPages, only pages in that list return true.
+  bool canAccessDepartmentPage(String pageKey) {
+    if (isAdmin) return true;
+
+    final dept = departmentData;
+    if (dept != null) {
+      if (dept['isGlobal'] == true) return true;
+
+      final dynamic rawPages = dept['assignedPages'];
+      if (rawPages is List) {
+        final Set<String> assigned = rawPages
+            .map((p) => p.toString().toLowerCase().trim())
+            .toSet();
+
+        final key = pageKey.toLowerCase().trim();
+
+        // Direct match
+        if (assigned.contains(key)) return true;
+
+        // Alias matching for page names
+        if ((key == 'users' || key == 'clients' || key == 'all clients') && assigned.contains('users')) {
+          return true;
+        }
+        if ((key == 'kyc' || key == 'registered clients' || key == 'user kyc') && (assigned.contains('kyc') || assigned.contains('users'))) {
+          return true;
+        }
+        if ((key == 'payments') && (assigned.contains('payments') || assigned.contains('subscriptions'))) {
+          return true;
+        }
+        if ((key == 'subscriptions' || key == 'plans' || key == 'segments') && assigned.contains('subscriptions')) {
+          return true;
+        }
+        if ((key == 'leads' || key == 'lead') && assigned.contains('leads')) {
+          return true;
+        }
+        if ((key == 'reports' || key == 'report') && assigned.contains('reports')) {
+          return true;
+        }
+        if ((key == 'notifications' || key == 'notification') && assigned.contains('notifications')) {
+          return true;
+        }
+        if ((key == 'staff' || key == 'applicants') && assigned.contains('staff')) {
+          return true;
+        }
+        if ((key == 'settings') && assigned.contains('settings')) {
+          return true;
+        }
+        if ((key == 'attendance') && (assigned.contains('attendance') || assigned.contains('staff'))) {
+          return true;
+        }
+
+        // The department explicitly configured assignedPages and this page is not in them
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  String? _getDepartmentPageForFeature(String feature) {
+    final f = feature.toLowerCase().trim();
+    if (f == 'leads' || f == 'lead') return 'Leads';
+    if (f == 'users' || f == 'user' || f == 'client' || f == 'clients') return 'Users';
+    if (f == 'kyc') return 'KYC';
+    if (f == 'payments' || f == 'payment') return 'Payments';
+    if (f == 'subscriptions' || f == 'subscription' || f == 'plans' || f == 'segments') return 'Subscriptions';
+    if (f == 'reports' || f == 'report') return 'Reports';
+    if (f == 'notifications' || f == 'notification') return 'Notifications';
+    if (f == 'staff' || f == 'applicant' || f == 'applicants') return 'Staff';
+    if (f == 'settings' || f == 'roles' || f == 'permissiongroups') return 'Settings';
+    if (f == 'attendance') return 'Attendance';
+    return null;
+  }
+
   bool hasPermission(String target, [String? optionalAction]) {
     if (isAdmin) return true; // System admins bypass permission checks
 
@@ -249,6 +336,12 @@ class UserModel {
       targetFeature = 'users';
     }
 
+    // Department page gate: If department specifies assignedPages, ensure the feature belongs to an assigned page
+    final String? deptPage = _getDepartmentPageForFeature(targetFeature);
+    if (deptPage != null && !canAccessDepartmentPage(deptPage)) {
+      return false;
+    }
+
     final String requiredKey = targetAction.isNotEmpty 
         ? '$targetFeature.$targetAction' 
         : targetFeature;
@@ -271,6 +364,7 @@ class UserModel {
     }
 
     // Granular database-configured Role and Permission Groups check
+    bool hasConfiguredRole = false;
     if (rawJson != null) {
       Map? roleMap;
       if (rawJson!['roleId'] is Map) {
@@ -280,6 +374,10 @@ class UserModel {
       }
 
       final dynamic groups = roleMap?['permissionGroups'] ?? rawJson!['permissionGroups'];
+      if (roleMap != null || groups != null || rawJson!['roleId'] != null) {
+        hasConfiguredRole = true;
+      }
+
       if (groups is List && groups.isNotEmpty) {
         for (var group in groups) {
           if (group is! Map) continue;
@@ -457,9 +555,15 @@ class UserModel {
       }
     }
 
+    // If the user has an assigned Role with permission groups, permissions MUST come from
+    // the assigned permission groups. Do NOT fall back to legacy substring heuristics!
+    if (hasConfiguredRole) {
+      return false;
+    }
+
     // 4. Fallback for legacy role assignments if permissionGroups are empty
     if (isResearcher && (targetFeature == 'reports' || targetFeature == 'notifications')) {
-      return true;
+      return isReadIntent || targetAction == 'create' || targetAction == 'update' || targetAction == 'publish';
     }
 
     if (isManager) {
@@ -469,33 +573,40 @@ class UserModel {
       if (t.startsWith('staff') && (action == 'delete' || action == 'create')) {
         return false;
       }
-      return true;
+      return isReadIntent || targetAction == 'update';
     }
 
     // 5. Department-based fallback if permission groups are empty or unassigned
+    // Strictly basic read/standard permissions ONLY - NO elevated permissions like view_pools or bulk operations
     final dept = subscriptionPlan.toLowerCase();
     if (dept.contains('sales') || dept.contains('executive') || dept.contains('advisory') || dept.contains('support')) {
-      if (t.startsWith('lead') || t.startsWith('user') || t.startsWith('notification') || t.startsWith('kyc') || t.startsWith('attendance') || t.startsWith('report')) {
+      if (t == 'leads' || t == 'leads.view' || t == 'leads.pull' || t == 'leads.follow_up' || t == 'leads.view_assigned') {
+        return true;
+      }
+      if (t == 'users' || t == 'users.view' || t == 'users.view_assigned') {
+        return true;
+      }
+      if (isReadIntent && (targetFeature == 'leads' || targetFeature == 'users')) {
         return true;
       }
     }
     if (dept.contains('research')) {
-      if (t.startsWith('report') || t.startsWith('notification')) {
+      if (isReadIntent && targetFeature == 'reports') {
         return true;
       }
     }
     if (dept.contains('compliance') || dept.contains('operations')) {
-      if (t.startsWith('kyc') || t.startsWith('report') || t.startsWith('user') || t.startsWith('notification') || t.startsWith('payment')) {
+      if (isReadIntent && (targetFeature == 'kyc' || targetFeature == 'users' || targetFeature == 'payments')) {
         return true;
       }
     }
     if (dept.contains('hr') || dept.contains('human')) {
-      if (t.startsWith('staff') || t.startsWith('attendance') || t.startsWith('notification')) {
+      if (isReadIntent && (targetFeature == 'staff' || targetFeature == 'attendance')) {
         return true;
       }
     }
     if (dept.contains('back office') || dept.contains('office')) {
-      if (t.startsWith('user') || t.startsWith('payment') || t.startsWith('kyc') || t.startsWith('subscription')) {
+      if (isReadIntent && (targetFeature == 'users' || targetFeature == 'payments' || targetFeature == 'kyc' || targetFeature == 'subscriptions')) {
         return true;
       }
     }

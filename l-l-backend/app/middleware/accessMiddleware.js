@@ -1,5 +1,6 @@
 import users from "../models/userModel.js";
 import staff from "../models/staffModel.js";
+import departmentModel from "../models/departmentModel.js";
 
 import { hasActiveRegistration, hasAnyActivePlan } from "../services/entitlementService.js";
 import paymentIntentModel from "../models/paymentIntentModel.js";
@@ -402,8 +403,9 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 return next();
             }
 
-            // 2. Retrieve staff member and populate role and permission groups
+            // 2. Retrieve staff member and populate role, permission groups, and department
             const staffMember = await staff.findById(userId)
+                .populate('departmentId')
                 .populate({
                     path: 'roleId',
                     populate: {
@@ -439,6 +441,37 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 userType === 'admin' || userType === 'super_admin' || userType === 'super admin' ||
                 isRoleAdmin) {
                 return next();
+            }
+
+            // Department page gating: If department specifies assignedPages, ensure requested module is allowed
+            if (staffMember.departmentId && !staffMember.departmentId.isGlobal && Array.isArray(staffMember.departmentId.assignedPages) && staffMember.departmentId.assignedPages.length > 0) {
+                const assigned = new Set(staffMember.departmentId.assignedPages.map(p => p.toLowerCase()));
+                const targetMod = (feature || targetPermission.split('.')[0] || '').toLowerCase();
+                const modPageMap = {
+                    'leads': 'leads',
+                    'users': 'users',
+                    'client': 'users',
+                    'clients': 'users',
+                    'kyc': 'kyc',
+                    'payments': 'payments',
+                    'subscriptions': 'subscriptions',
+                    'plans': 'subscriptions',
+                    'segments': 'subscriptions',
+                    'reports': 'reports',
+                    'notifications': 'notifications',
+                    'staff': 'staff',
+                    'settings': 'settings'
+                };
+                const expectedPage = modPageMap[targetMod];
+                if (expectedPage && !assigned.has(expectedPage)) {
+                    const hasFallback = (expectedPage === 'kyc' && assigned.has('users')) ||
+                                        (expectedPage === 'payments' && (assigned.has('subscriptions') || assigned.has('users')));
+                    if (!hasFallback) {
+                        return res.status(403).json({
+                            message: `Access Denied. Department "${staffMember.departmentId.name}" does not have access to the ${expectedPage} module.`
+                        });
+                    }
+                }
             }
 
             // If staff has no role assigned, deny access
