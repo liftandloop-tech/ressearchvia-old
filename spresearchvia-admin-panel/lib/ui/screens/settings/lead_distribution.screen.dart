@@ -103,27 +103,29 @@ class _LeadDistributionScreenState extends State<LeadDistributionScreen> {
                           color: AppTheme.primaryBlue,
                         ),
                         const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Lead Distribution',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                                letterSpacing: -0.3,
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Lead Distribution',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Control capacity limits and pull quotas for default fresh leads distribution',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: AppTheme.textSecondary,
+                              SizedBox(height: 2),
+                              Text(
+                                'Control capacity limits and pull quotas for default fresh leads distribution',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppTheme.textSecondary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -131,8 +133,8 @@ class _LeadDistributionScreenState extends State<LeadDistributionScreen> {
 
                     // Lead Pools Navigation Banner
                     Container(
-                      width: 580,
-                      constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+                      width: MediaQuery.of(context).size.width > 640 ? 580 : double.infinity,
+                      constraints: const BoxConstraints(maxWidth: 580),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryBlue.withValues(alpha: 0.04),
@@ -167,8 +169,8 @@ class _LeadDistributionScreenState extends State<LeadDistributionScreen> {
 
                     // Config Card
                     Container(
-                      width: 580,
-                      constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+                      width: MediaQuery.of(context).size.width > 640 ? 580 : double.infinity,
+                      constraints: const BoxConstraints(maxWidth: 580),
                       padding: const EdgeInsets.all(22),
                       decoration: BoxDecoration(
                         color: Colors.white,

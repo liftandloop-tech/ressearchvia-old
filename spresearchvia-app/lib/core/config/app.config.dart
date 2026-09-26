@@ -35,6 +35,8 @@ class AppConfig {
   }
 
   static String get baseUrl {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) return envUrl;
     switch (_mode) {
       case AppMode.development:
         if (Platform.isAndroid) {
@@ -56,6 +58,8 @@ class AppConfig {
   }
 
   static String get automatedApiBaseUrl {
+    const envUrl = String.fromEnvironment('AUTOMATED_API_BASE_URL');
+    if (envUrl.isNotEmpty) return envUrl;
     switch (_mode) {
       case AppMode.development:
         if (Platform.isAndroid) {
@@ -63,7 +67,7 @@ class AppConfig {
         }
         return 'http://192.168.29.35:3000';
       case AppMode.production:
-        return 'https://api.researchvia.in/automated';
+        return 'https://tradetest.researchvia.in';
     }
   }
 

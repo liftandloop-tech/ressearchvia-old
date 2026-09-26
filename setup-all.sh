@@ -110,8 +110,16 @@ echo "  - Backend:   $DOMAIN_BACKEND"
 echo "  - Admin:     $DOMAIN_ADMIN"
 echo "  - Auto API:  $DOMAIN_AUTOMATED_API"
 
+# Build deduplicated list of domains for Certbot
+DOMAINS_ARGS=""
+for d in "$DOMAIN_ADMIN" "$DOMAIN_BACKEND" "$DOMAIN_AUTOMATED_API"; do
+    if [ -n "$d" ] && [[ ! " $DOMAINS_ARGS " =~ " -d $d " ]]; then
+        DOMAINS_ARGS="$DOMAINS_ARGS -d $d"
+    fi
+done
+
 # Request certificates using certbot container via ACME challenge webroot
-echo "Requesting Let's Encrypt SSL certificates..."
+echo "Requesting Let's Encrypt SSL certificates for: $DOMAINS_ARGS..."
 docker run --rm \
   -v trading_certbot_www:/var/www/certbot \
   -v trading_certbot_certs:/etc/letsencrypt \
@@ -121,12 +129,11 @@ docker run --rm \
   --non-interactive \
   --agree-tos \
   --register-unsafely-without-email \
-  -d "$DOMAIN_BACKEND" \
-  -d "$DOMAIN_ADMIN" \
-  -d "$DOMAIN_AUTOMATED_API" || echo "Certbot attempt completed."
+  $DOMAINS_ARGS || echo "Certbot attempt completed."
 
-# Check if certificates exist
-if docker run --rm -v trading_certbot_certs:/etc/letsencrypt alpine test -f "/etc/letsencrypt/live/$DOMAIN_BACKEND/fullchain.pem" 2>/dev/null; then
+# Check if certificates exist (check DOMAIN_ADMIN or DOMAIN_BACKEND)
+CERT_DOMAIN="${DOMAIN_ADMIN:-$DOMAIN_BACKEND}"
+if docker run --rm -v trading_certbot_certs:/etc/letsencrypt alpine test -f "/etc/letsencrypt/live/$CERT_DOMAIN/fullchain.pem" 2>/dev/null; then
     echo "✔ Valid SSL certificates found! Activating HTTPS in Nginx Gateway..."
     cp nginx/templates/default-ssl.conf.template.example nginx/templates/default.conf.template
     docker compose restart gateway

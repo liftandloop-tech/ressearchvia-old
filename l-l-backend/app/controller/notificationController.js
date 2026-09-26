@@ -85,7 +85,7 @@ const notificationController = {
 
             let imageUrl = null;
             if (req.file) {
-                const baseUrl = process.env.API_BASE_URL || 'https://api.researchvia.in';
+                const baseUrl = process.env.API_BASE_URL || process.env.BASE_URL || 'https://api.researchvia.in';
                 imageUrl = `${baseUrl}/${req.file.path.replace(/\\/g, '/')}`;
             }
 

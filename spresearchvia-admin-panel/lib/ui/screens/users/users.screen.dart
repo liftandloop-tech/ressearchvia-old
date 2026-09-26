@@ -54,17 +54,18 @@ class UsersScreen extends StatelessWidget {
                           color: AppTheme.primaryBlue,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isRegistered ? 'Registered Clients' : 'All Clients',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primaryBlue,
+                      Expanded(
+                        child: Text(
+                          isRegistered ? 'Registered Clients' : 'All Clients',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryBlue,
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           if (!isRegistered &&
                               (Get.find<AuthController>()

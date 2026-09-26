@@ -34,27 +34,29 @@ class RolesPermissionsScreen extends StatelessWidget {
                           color: AppTheme.primaryBlue,
                         ),
                         const SizedBox(width: 8),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Departmental Hierarchy & Access Control',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.textPrimary,
-                                letterSpacing: -0.3,
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Departmental Hierarchy & Access Control',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              'Manage organizational departments, scoped permission presets, and functional roles',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: AppTheme.textSecondary,
+                              SizedBox(height: 2),
+                              Text(
+                                'Manage organizational departments, scoped permission presets, and functional roles',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppTheme.textSecondary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -83,12 +85,15 @@ class RolesPermissionsScreen extends StatelessWidget {
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: AppTheme.gray200, width: 1)),
       ),
-      child: Row(
-        children: [
-          _buildTabItem(controller, index: 0, label: '1. Departments (Top Hierarchy)'),
-          _buildTabItem(controller, index: 1, label: '2. Permission Groups'),
-          _buildTabItem(controller, index: 2, label: '3. Roles'),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildTabItem(controller, index: 0, label: '1. Departments (Top Hierarchy)'),
+            _buildTabItem(controller, index: 1, label: '2. Permission Groups'),
+            _buildTabItem(controller, index: 2, label: '3. Roles'),
+          ],
+        ),
       ),
     );
   }
@@ -129,20 +134,23 @@ class RolesPermissionsScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Organizational Departments',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Define top-level organizational divisions and assign accessible pages to restrict scoped permissions.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.gray500),
-                ),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Organizational Departments',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Define top-level organizational divisions and assign accessible pages to restrict scoped permissions.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.gray500),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 16),
             ElevatedButton.icon(
               onPressed: () => _showDepartmentDialog(context, controller),
               icon: const Icon(Icons.add, size: 18),
@@ -310,20 +318,23 @@ class RolesPermissionsScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Permission Groups Presets',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Permission groups are scoped to a Department and strictly restricted to the pages assigned to that department.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.gray500),
-                ),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Permission Groups Presets',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Permission groups are scoped to a Department and strictly restricted to the pages assigned to that department.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.gray500),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 16),
             ElevatedButton.icon(
               onPressed: () => _showGroupDialog(context, controller),
               icon: const Icon(Icons.add, size: 18),
@@ -492,20 +503,23 @@ class RolesPermissionsScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'User Roles Configuration',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Bundle permission groups into functional roles assigned directly to staff members.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.gray500),
-                ),
-              ],
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'User Roles Configuration',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Bundle permission groups into functional roles assigned directly to staff members.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.gray500),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 16),
             ElevatedButton.icon(
               onPressed: () => _showRoleDialog(context, controller),
               icon: const Icon(Icons.add, size: 18),
@@ -682,7 +696,7 @@ class RolesPermissionsScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: Text(department == null ? 'Create Department' : 'Edit Department'),
         content: SizedBox(
-          width: 700,
+          width: MediaQuery.of(context).size.width > 750 ? 700 : MediaQuery.of(context).size.width * 0.92,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -888,9 +902,9 @@ class RolesPermissionsScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: Text(group == null ? 'Create Permission Group' : 'Edit Permission Group'),
         content: SizedBox(
-          width: 780,
+          width: MediaQuery.of(context).size.width > 820 ? 780 : MediaQuery.of(context).size.width * 0.92,
+          height: MediaQuery.of(context).size.height * 0.75,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -1257,9 +1271,9 @@ class RolesPermissionsScreen extends StatelessWidget {
         return AlertDialog(
           title: Text(role == null ? 'Create Role' : 'Edit Role'),
           content: SizedBox(
-            width: 550,
+            width: MediaQuery.of(context).size.width > 600 ? 550 : MediaQuery.of(context).size.width * 0.92,
+            height: MediaQuery.of(context).size.height * 0.75,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(

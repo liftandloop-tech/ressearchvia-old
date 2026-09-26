@@ -32,27 +32,13 @@ class StaffScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          IconButton(
-                            onPressed: () => Get.back(),
-                            icon: Icon(
-                              Icons.arrow_back,
-                              color: AppTheme.primaryBlue,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            AppStrings.staffManagement,
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const Spacer(),
-                          Row(
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isNarrow = constraints.maxWidth < 700;
+                          final actions = Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
                               Obx(() {
                                 final hasActiveFilters = controller.filterName.value.isNotEmpty ||
@@ -70,7 +56,6 @@ class StaffScreen extends StatelessWidget {
                                   ),
                                 );
                               }),
-                              const SizedBox(width: 8),
                               IconButton(
                                 onPressed: () => controller.fetchStaffList(),
                                 icon: Icon(
@@ -79,7 +64,6 @@ class StaffScreen extends StatelessWidget {
                                 ),
                                 tooltip: 'Refresh Staff List',
                               ),
-                              const SizedBox(width: 8),
                               Button(
                                 title: AppStrings.addNewStaff,
                                 buttonType: ButtonType.green,
@@ -90,8 +74,64 @@ class StaffScreen extends StatelessWidget {
                                 },
                               ),
                             ],
-                          ),
-                        ],
+                          );
+
+                          if (isNarrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      onPressed: () => Get.back(),
+                                      icon: Icon(
+                                        Icons.arrow_back,
+                                        color: AppTheme.primaryBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        AppStrings.staffManagement,
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                actions,
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              IconButton(
+                                onPressed: () => Get.back(),
+                                icon: Icon(
+                                  Icons.arrow_back,
+                                  color: AppTheme.primaryBlue,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  AppStrings.staffManagement,
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              actions,
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                       // Active Filter Chips

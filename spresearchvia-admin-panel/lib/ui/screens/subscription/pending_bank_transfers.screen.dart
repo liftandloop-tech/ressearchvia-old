@@ -73,19 +73,20 @@ class PendingBankTransfersScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text(
-                  specificTab == 1
-                      ? "Registered Clients"
-                      : specificTab == 0
-                      ? "Pending Payments Approvals"
-                      : "Pending Approvals",
-                  style: TextStyle(
-                    fontSize: context.width < 600 ? 20 : 24,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                Expanded(
+                  child: Text(
+                    specificTab == 1
+                        ? "Registered Clients"
+                        : specificTab == 0
+                        ? "Pending Payments Approvals"
+                        : "Pending Approvals",
+                    style: TextStyle(
+                      fontSize: context.width < 600 ? 20 : 24,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 IconButton(
                   onPressed: () {
                     controller.fetchPendingTransfers();
@@ -213,8 +214,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
           bgColor: const Color(0xFFFAF5FF),
         ),
       ];
-
-      final isSmallScreen = context.width < 850;
 
       final periodSelector = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -374,91 +373,102 @@ class PendingBankTransfersScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Compact Header & Toolbar
-            if (isSmallScreen) ...[
-              Row(
-                children: [
-                  const Icon(Icons.receipt_long_outlined, size: 15, color: AppTheme.primaryBlue),
-                  const SizedBox(width: 6),
-                  const Text(
-                    "GST & Revenue",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text("SAC 998371", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue[800])),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text("MP (23)", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green[800])),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  periodSelector,
-                  if (customDateBtn != null) customDateBtn,
-                  if (exportBtn != null) exportBtn,
-                ],
-              ),
-            ] else ...[
-              Row(
-                children: [
-                  const Icon(Icons.receipt_long_outlined, size: 15, color: AppTheme.primaryBlue),
-                  const SizedBox(width: 6),
-                  const Text(
-                    "GST & Revenue",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text("SAC 998371", style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.blue[800])),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text("MP (23)", style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.green[800])),
-                  ),
-                  const SizedBox(width: 6),
-                  Tooltip(
-                    message: "SAC 998371 (Market Research Services - 18% GST). Intra-state MP clients: 9% CGST + 9% SGST. Inter-state clients: 18% IGST. Export file matches GSTR-1.",
-                    child: Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
-                  ),
-                  const Spacer(),
-                  periodSelector,
-                  if (customDateBtn != null) ...[
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 880;
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.receipt_long_outlined, size: 15, color: AppTheme.primaryBlue),
+                          const SizedBox(width: 6),
+                          const Text(
+                            "GST & Revenue",
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text("SAC 998371", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.green[50],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text("MP (23)", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green[800])),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          periodSelector,
+                          if (customDateBtn != null) customDateBtn,
+                          if (exportBtn != null) exportBtn,
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    const Icon(Icons.receipt_long_outlined, size: 15, color: AppTheme.primaryBlue),
                     const SizedBox(width: 6),
-                    customDateBtn,
-                  ],
-                  if (exportBtn != null) ...[
+                    const Text(
+                      "GST & Revenue",
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
                     const SizedBox(width: 8),
-                    exportBtn,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text("SAC 998371", style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.green[50],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text("MP (23)", style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.green[800])),
+                    ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: "SAC 998371 (Market Research Services - 18% GST). Intra-state MP clients: 9% CGST + 9% SGST. Inter-state clients: 18% IGST. Export file matches GSTR-1.",
+                      child: Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
+                    ),
+                    const Spacer(),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        periodSelector,
+                        if (customDateBtn != null) customDateBtn,
+                        if (exportBtn != null) exportBtn,
+                      ],
+                    ),
                   ],
-                ],
-              ),
-            ],
+                );
+              },
+            ),
             const SizedBox(height: 8),
             // Cards Grid
             LayoutBuilder(

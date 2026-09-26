@@ -112,6 +112,7 @@ services:
       args:
         - API_BASE_URL=https://${DOMAIN_BACKEND:-api.researchvia.in}/api
         - AUTOMATED_API_BASE_URL=https://${DOMAIN_AUTOMATED_API:-tradetest.researchvia.in}
+        - ADMIN_URL=https://${DOMAIN_ADMIN:-spadmin.researchvia.in}
     container_name: trading-admin-panel
     expose:
       - "80"

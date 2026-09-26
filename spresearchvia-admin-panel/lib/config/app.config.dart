@@ -3,19 +3,47 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   static const String appName = 'SPResearchVia Admin Panel';
   static const String version = '1.0.0';
-  static const String adminUrl = 'https://spadmin.researchvia.in';
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: kReleaseMode
-        ? 'https://api.researchvia.in/api'
-        : 'http://localhost:8080/api',
-  );
+  static String get adminUrl {
+    const fromEnv = String.fromEnvironment('ADMIN_URL');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    if (kIsWeb) {
+      try {
+        final origin = Uri.base.origin;
+        if (origin.isNotEmpty &&
+            !origin.contains('localhost') &&
+            !origin.contains('127.0.0.1')) {
+          return origin;
+        }
+      } catch (_) {}
+    }
+    return kReleaseMode
+        ? 'https://admintest.researchvia.in'
+        : 'http://localhost:8080';
+  }
+
+  static String get apiBaseUrl {
+    const fromEnv = String.fromEnvironment('API_BASE_URL');
+    if (fromEnv.isNotEmpty) return fromEnv;
+    if (kIsWeb) {
+      try {
+        final origin = Uri.base.origin;
+        if (origin.isNotEmpty &&
+            !origin.contains('localhost') &&
+            !origin.contains('127.0.0.1')) {
+          return '$origin/api';
+        }
+      } catch (_) {}
+    }
+    return kReleaseMode
+        ? 'https://test.researchvia.in/api'
+        : 'http://localhost:8080/api';
+  }
 
   static String get automatedApiBaseUrl {
     const fromEnv = String.fromEnvironment('AUTOMATED_API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
     if (kReleaseMode) {
-      return 'https://api.researchvia.in/automated';
+      return 'https://tradetest.researchvia.in';
     }
     return 'http://localhost:3000';
   }

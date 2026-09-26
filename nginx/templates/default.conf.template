@@ -1,5 +1,72 @@
 # ==============================================================================
-# Domain 1: Main Backend API (l-l-backend)
+# Domain 1: Admin Panel Web Frontend & Unified Gateway (spresearchvia-admin-panel)
+# Handles Admin Web SPA and routes /api/ and /uploads/ to ll-backend.
+# If DOMAIN_ADMIN == DOMAIN_BACKEND (single domain setup), this block cleanly handles both.
+# ==============================================================================
+server {
+    listen 80;
+    server_name ${DOMAIN_ADMIN};
+
+    client_max_body_size 100M;
+
+    # Let's Encrypt ACME challenge endpoint
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Proxy /api/ requests to Main Backend
+    location /api/ {
+        set $backend_upstream http://ll-backend:8080;
+        proxy_pass $backend_upstream;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # Proxy /uploads/ requests to Main Backend
+    location /uploads/ {
+        set $backend_upstream http://ll-backend:8080;
+        proxy_pass $backend_upstream;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 90s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # Flutter Web SPA Frontend
+    location / {
+        set $admin_upstream http://admin-panel:80;
+        proxy_pass $admin_upstream;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# ==============================================================================
+# Domain 2: Dedicated Main Backend API (l-l-backend)
+# If DOMAIN_BACKEND is a separate domain (e.g. api.researchvia.in or testapi.researchvia.in),
+# this block handles all traffic for that domain.
 # ==============================================================================
 server {
     listen 80;
@@ -32,33 +99,6 @@ server {
         # Buffer adjustments for larger uploads
         proxy_buffering off;
         proxy_request_buffering off;
-    }
-}
-
-# ==============================================================================
-# Domain 2: Admin Panel Web Frontend (spresearchvia-admin-panel)
-# ==============================================================================
-server {
-    listen 80;
-    server_name ${DOMAIN_ADMIN};
-
-    client_max_body_size 20M;
-
-    # Let's Encrypt ACME challenge endpoint
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    # Flutter Web SPA Frontend
-    location / {
-        set $admin_upstream http://admin-panel:80;
-        proxy_pass $admin_upstream;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 

@@ -26,27 +26,30 @@ class AutomatedTradingDashboardScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'SRE Operations & Automated Trading',
-                          style: AppTheme.h1Style.copyWith(
-                            color: AppTheme.primaryBlue,
-                            fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SRE Operations & Automated Trading',
+                            style: AppTheme.h1Style.copyWith(
+                              color: AppTheme.primaryBlue,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Monitor system health, run trade reconciliation, and toggle emergency lock controls.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textSecondary,
-                            letterSpacing: 0.2,
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Monitor system health, run trade reconciliation, and toggle emergency lock controls.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondary,
+                              letterSpacing: 0.2,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 16),
                     IconButton(
                       icon: const Icon(Icons.refresh, color: AppTheme.primaryBlue),
                       onPressed: () => controller.refreshAdminData(),

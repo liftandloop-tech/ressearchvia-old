@@ -1033,11 +1033,13 @@ class LeadManagementScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
           width: 480,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Text(
                 'Add Follow-up for ${lead.fullName}',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -1214,12 +1216,13 @@ class LeadManagementScreen extends StatelessWidget {
                     onTap: () => controller.addFollowUpLog(lead.id),
                   ),
                 ],
-              )
+              ),
             ],
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _showSearchableRMDialog(
@@ -1503,99 +1506,109 @@ class LeadManagementScreen extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  pool.name,
-                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(width: 8),
-                                if (pool.isDefaultFresh) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.blue.shade200),
-                                    ),
-                                    child: Text(
-                                      'System Default',
-                                      style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                if (pool.isGlobal)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.teal.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.teal.shade200),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.public, size: 11, color: Colors.teal.shade700),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Global (All Staff)',
-                                          style: TextStyle(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.bold),
+                                Expanded(
+                                  child: Wrap(
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      Text(
+                                        pool.name,
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                                      ),
+                                      if (pool.isDefaultFresh)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.blue.shade200),
+                                          ),
+                                          child: Text(
+                                            'System Default',
+                                            style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                  )
-                                else
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.purple.shade200),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.groups_outlined, size: 11, color: Colors.purple.shade700),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Team Pool (${pool.createdByName ?? 'Owner\'s Team'})',
-                                          style: TextStyle(fontSize: 10, color: Colors.purple.shade700, fontWeight: FontWeight.bold),
+                                      if (pool.isGlobal)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.teal.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.teal.shade200),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.public, size: 11, color: Colors.teal.shade700),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Global (All Staff)',
+                                                style: TextStyle(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.purple.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.purple.shade200),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.groups_outlined, size: 11, color: Colors.purple.shade700),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Team Pool (${pool.createdByName ?? 'Owner\'s Team'})',
+                                                style: TextStyle(fontSize: 10, color: Colors.purple.shade700, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
-                                const Spacer(),
-                                IconButton(
-                                  icon: const Icon(Icons.download_rounded, size: 20, color: Colors.green),
-                                  tooltip: 'Pull (${pool.pullSize}) Leads From ${pool.name}',
-                                  onPressed: () {
-                                    controller.pullLeadsFromSelectedPool(poolId: pool.id);
-                                  },
                                 ),
-                                if (pool.canEdit)
-                                  IconButton(
-                                    icon: const Icon(Icons.tune_rounded, size: 20, color: AppTheme.primaryBlue),
-                                    tooltip: 'Edit Pool Limits & Details',
-                                    onPressed: () => _showEditLeadPoolDialog(context, controller, pool),
-                                  ),
-                                if (pool.canDelete)
-                                  IconButton(
-                                    icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade400),
-                                    tooltip: 'Delete Pool',
-                                    onPressed: () {
-                                      Get.defaultDialog(
-                                        title: 'Delete Lead Pool',
-                                        middleText: 'Are you sure you want to delete "${pool.name}"? This action cannot be undone and pool must be empty.',
-                                        textConfirm: 'Delete',
-                                        textCancel: 'Cancel',
-                                        confirmTextColor: Colors.white,
-                                        buttonColor: Colors.red,
-                                        onConfirm: () async {
-                                          Get.back();
-                                          await controller.deleteCustomLeadPool(pool.id);
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.download_rounded, size: 20, color: Colors.green),
+                                      tooltip: 'Pull (${pool.pullSize}) Leads From ${pool.name}',
+                                      onPressed: () {
+                                        controller.pullLeadsFromSelectedPool(poolId: pool.id);
+                                      },
+                                    ),
+                                    if (pool.canEdit)
+                                      IconButton(
+                                        icon: const Icon(Icons.tune_rounded, size: 20, color: AppTheme.primaryBlue),
+                                        tooltip: 'Edit Pool Limits & Details',
+                                        onPressed: () => _showEditLeadPoolDialog(context, controller, pool),
+                                      ),
+                                    if (pool.canDelete)
+                                      IconButton(
+                                        icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade400),
+                                        tooltip: 'Delete Pool',
+                                        onPressed: () {
+                                          Get.defaultDialog(
+                                            title: 'Delete Lead Pool',
+                                            middleText: 'Are you sure you want to delete "${pool.name}"? This action cannot be undone and pool must be empty.',
+                                            textConfirm: 'Delete',
+                                            textCancel: 'Cancel',
+                                            confirmTextColor: Colors.white,
+                                            buttonColor: Colors.red,
+                                            onConfirm: () async {
+                                              Get.back();
+                                              await controller.deleteCustomLeadPool(pool.id);
+                                            },
+                                          );
                                         },
-                                      );
-                                    },
-                                  ),
+                                      ),
+                                  ],
+                                ),
                               ],
                             ),
                             if (pool.description != null && pool.description!.isNotEmpty) ...[
@@ -1701,11 +1714,13 @@ class LeadManagementScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Container(
           width: MediaQuery.of(context).size.width > 520 ? 460 : MediaQuery.of(context).size.width * 0.92,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
           padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Row(
                 children: [
                   Container(
@@ -1851,7 +1866,8 @@ class LeadManagementScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   void _showEditLeadPoolDialog(BuildContext context, LeadsController controller, LeadPoolModel pool) {
@@ -1865,11 +1881,13 @@ class LeadManagementScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Container(
           width: MediaQuery.of(context).size.width > 520 ? 460 : MediaQuery.of(context).size.width * 0.92,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
           padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Row(
                 children: [
                   Container(
@@ -1987,6 +2005,7 @@ class LeadManagementScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

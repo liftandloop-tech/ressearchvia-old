@@ -8,9 +8,11 @@ WORKDIR /app
 # Build arguments for injecting custom backend domains into Flutter web
 ARG API_BASE_URL=http://localhost:8080/api
 ARG AUTOMATED_API_BASE_URL=http://localhost:3000
+ARG ADMIN_URL=http://localhost:8080
 
 ENV API_BASE_URL=${API_BASE_URL}
 ENV AUTOMATED_API_BASE_URL=${AUTOMATED_API_BASE_URL}
+ENV ADMIN_URL=${ADMIN_URL}
 
 # Copy dependency specifications first for caching
 COPY pubspec.yaml pubspec.lock ./
@@ -26,7 +28,8 @@ COPY . .
 RUN flutter build web --release \
   --no-tree-shake-icons \
   --dart-define=API_BASE_URL=${API_BASE_URL} \
-  --dart-define=AUTOMATED_API_BASE_URL=${AUTOMATED_API_BASE_URL}
+  --dart-define=AUTOMATED_API_BASE_URL=${AUTOMATED_API_BASE_URL} \
+  --dart-define=ADMIN_URL=${ADMIN_URL}
 
 # ==========================================
 # Stage 2: High Performance Nginx Web Server

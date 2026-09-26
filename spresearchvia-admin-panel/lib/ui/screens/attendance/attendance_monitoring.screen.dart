@@ -88,90 +88,116 @@ class AttendanceMonitoringScreen extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Obx(
-                    () => DropdownButtonFormField<String>(
-                      value: controller.selectedStaffId.value.isEmpty ? null : controller.selectedStaffId.value,
-                      hint: const Text('Filter Employee'),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                      ),
-                      items: controller.staffList
-                          .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
-                          .toList(),
-                      onChanged: (val) => controller.updateFilters(staffId: val ?? ''),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final staffField = Obx(
+                  () => DropdownButtonFormField<String>(
+                    value: controller.selectedStaffId.value.isEmpty ? null : controller.selectedStaffId.value,
+                    hint: const Text('Filter Employee'),
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
                     ),
+                    items: controller.staffList
+                        .map((s) => DropdownMenuItem(value: s.id, child: Text(s.name)))
+                        .toList(),
+                    onChanged: (val) => controller.updateFilters(staffId: val ?? ''),
                   ),
-                ),
-                const SizedBox(width: 16),
-                // Start Date
-                Expanded(
-                  child: Obx(
-                    () => ListTile(
-                      title: const Text('Start Date', style: TextStyle(fontSize: 12)),
-                      subtitle: Text(
-                        controller.startDate.value != null
-                            ? DateFormat('yyyy-MM-dd').format(controller.startDate.value!)
-                            : 'Select Date',
-                      ),
-                      trailing: const Icon(Icons.calendar_today, size: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: AppTheme.gray300),
-                      ),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 90)),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          controller.updateFilters(start: picked);
-                        }
-                      },
+                );
+
+                final startDateTile = Obx(
+                  () => ListTile(
+                    title: const Text('Start Date', style: TextStyle(fontSize: 12)),
+                    subtitle: Text(
+                      controller.startDate.value != null
+                          ? DateFormat('yyyy-MM-dd').format(controller.startDate.value!)
+                          : 'Select Date',
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // End Date
-                Expanded(
-                  child: Obx(
-                    () => ListTile(
-                      title: const Text('End Date', style: TextStyle(fontSize: 12)),
-                      subtitle: Text(
-                        controller.endDate.value != null
-                            ? DateFormat('yyyy-MM-dd').format(controller.endDate.value!)
-                            : 'Select Date',
-                      ),
-                      trailing: const Icon(Icons.calendar_today, size: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: AppTheme.gray300),
-                      ),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime.now().subtract(const Duration(days: 90)),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          controller.updateFilters(end: picked);
-                        }
-                      },
+                    trailing: const Icon(Icons.calendar_today, size: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: AppTheme.gray300),
                     ),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now().subtract(const Duration(days: 90)),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        controller.updateFilters(start: picked);
+                      }
+                    },
                   ),
-                ),
-                const SizedBox(width: 16),
-                TextButton(
+                );
+
+                final endDateTile = Obx(
+                  () => ListTile(
+                    title: const Text('End Date', style: TextStyle(fontSize: 12)),
+                    subtitle: Text(
+                      controller.endDate.value != null
+                          ? DateFormat('yyyy-MM-dd').format(controller.endDate.value!)
+                          : 'Select Date',
+                    ),
+                    trailing: const Icon(Icons.calendar_today, size: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: AppTheme.gray300),
+                    ),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now().subtract(const Duration(days: 90)),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        controller.updateFilters(end: picked);
+                      }
+                    },
+                  ),
+                );
+
+                final clearBtn = TextButton(
                   onPressed: () => controller.resetFilters(),
                   child: const Text('Clear Filters'),
-                )
-              ],
+                );
+
+                if (constraints.maxWidth < 800) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: staffField),
+                          const SizedBox(width: 12),
+                          clearBtn,
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: startDateTile),
+                          const SizedBox(width: 12),
+                          Expanded(child: endDateTile),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: staffField),
+                    const SizedBox(width: 16),
+                    Expanded(child: startDateTile),
+                    const SizedBox(width: 16),
+                    Expanded(child: endDateTile),
+                    const SizedBox(width: 16),
+                    clearBtn,
+                  ],
+                );
+              },
             ),
           ),
         ),
