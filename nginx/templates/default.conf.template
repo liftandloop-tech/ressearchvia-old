@@ -5,6 +5,7 @@
 # ==============================================================================
 server {
     listen 80;
+    listen [::]:80;
     server_name ${DOMAIN_ADMIN};
 
     client_max_body_size 100M;
@@ -70,6 +71,7 @@ server {
 # ==============================================================================
 server {
     listen 80;
+    listen [::]:80;
     server_name ${DOMAIN_BACKEND};
 
     client_max_body_size 100M;
@@ -107,6 +109,7 @@ server {
 # ==============================================================================
 server {
     listen 80;
+    listen [::]:80;
     server_name ${DOMAIN_AUTOMATED_API};
 
     client_max_body_size 50M;
@@ -144,6 +147,7 @@ server {
 # ==============================================================================
 server {
     listen 80 default_server;
+    listen [::]:80 default_server;
     server_name _;
 
     location /.well-known/acme-challenge/ {
