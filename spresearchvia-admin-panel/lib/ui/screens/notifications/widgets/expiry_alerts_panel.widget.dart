@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
 import '../../../../controllers/notifications/expiry_alerts.controller.dart';
-import 'alert_item.widget.dart';
 
 class ExpiryAlertsPanel extends StatelessWidget {
   const ExpiryAlertsPanel({super.key});

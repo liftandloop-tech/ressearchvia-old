@@ -9,13 +9,11 @@ import 'package:spresearch_web/models/user_details.model.dart';
 import 'package:spresearch_web/models/subscription_plan.model.dart';
 import 'package:spresearch_web/models/segment.model.dart';
 import 'package:intl/intl.dart';
-import 'package:collection/collection.dart';
 import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/segment.service.dart';
 import 'package:spresearch_web/services/auth.service.dart';
-import 'package:spresearch_web/services/refund.service.dart';
 
 class ManageSubscriptionController extends GetxController {
   late final SubscriptionService _subscriptionService;
@@ -25,7 +23,6 @@ class ManageSubscriptionController extends GetxController {
   late final AcquisitionService _acquisitionService;
   late final SegmentService _segmentService;
   late final AuthService _authService;
-  late final RefundService _refundService;
 
   var isLoading = false.obs;
   var userSubscriptions = <Map<String, dynamic>>[].obs;
@@ -71,7 +68,6 @@ class ManageSubscriptionController extends GetxController {
     _acquisitionService = Get.find<AcquisitionService>();
     _segmentService = Get.find<SegmentService>();
     _authService = Get.find<AuthService>();
-    _refundService = Get.find<RefundService>();
     super.onInit();
     _loadCurrentUser();
     fetchAvailablePlans();
@@ -1346,24 +1342,6 @@ class ManageSubscriptionController extends GetxController {
         ),
       ),
     );
-  }
-
-  // --- TopUp Partial Plan ---
-  void showTopUpDialog(Map<String, dynamic> sub) {
-    final userId = sub['userId'] ?? (Get.arguments?['id'] ?? ''); // userId
-    // Wait, sub doesn't have userId directly if it's from list.
-    // We fetch subcription list for a specific user, so we should have userId in controller state?
-    // Not directly stored. We pass it to fetchUserSubscriptions(userId).
-    // Let's rely on argument passed or stored.
-    // Actually, fetchUserSubscriptions populates userSubscriptions.
-    // The userId is passed to showDialog usually.
-    // Let's trust we can get it or pass it.
-    // The ManageSubscriptionController is instantiated for ONE user? No, it's generic?
-    // It seems to be used inside a Dialog triggered from User List.
-    // Ah, 'fetchUserSubscriptions(String userId)' is called.
-
-    // We need to know which user this sub belongs to.
-    // Let's assume we pass userId to this function.
   }
 
   Future<void> triggerTopUp(

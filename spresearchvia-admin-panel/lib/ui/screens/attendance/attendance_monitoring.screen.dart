@@ -5,7 +5,6 @@ import 'package:data_table_2/data_table_2.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/attendance/attendance.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
-import 'package:spresearch_web/models/attendance.model.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 
 class AttendanceMonitoringScreen extends StatelessWidget {

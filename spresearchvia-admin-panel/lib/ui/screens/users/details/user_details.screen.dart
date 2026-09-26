@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
-import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/controllers/users/user_details.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'widgets/user_header.widget.dart';

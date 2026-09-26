@@ -2,12 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
-import 'package:spresearch_web/services/subscription.service.dart';
-import 'package:spresearch_web/models/subscription_plan.model.dart';
 import 'package:spresearch_web/services/user.service.dart';
-import 'package:spresearch_web/services/staff.service.dart';
-import 'package:spresearch_web/models/staff.model.dart';
-import 'package:spresearch_web/models/segment.model.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 
 class CreateUserScreen extends StatefulWidget {
@@ -20,10 +15,6 @@ class CreateUserScreen extends StatefulWidget {
 class _CreateUserScreenState extends State<CreateUserScreen> {
   final _formKey = GlobalKey<FormState>();
   final _userService = Get.find<UserService>();
-  final _subscriptionService = Get.find<SubscriptionService>();
-  final _staffService = Get.put(
-    StaffService(),
-  ); // Put if not already in bindings
   final _userManagementController = Get.find<UserManagementController>();
   final _navigationController = Get.find<UsersNavigationController>();
 
@@ -31,46 +22,8 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
   String _phone = '';
   String _mpin = ''; // Added MPIN
   String _email = '';
-  String _userType = 'user'; // user, admin, staff
-  String _registrationType = 'YEARLY'; // YEARLY, LIFETIME
-
-  final List<String> _selectedPlanIds = [];
-  final Map<String, Map<String, dynamic>> _planConfigs =
-      {}; // Track segment, isPartial, paidAmount, raId, etc
-  List<SubscriptionPlanModel> _availablePlans = [];
-  List<SegmentModel> _availableSegments = [];
-  List<StaffModel> _availableRAs = [];
-  bool _isLoadingPlans = true;
+  final String _userType = 'user'; // user, admin, staff
   bool _isSubmitting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchPlans();
-  }
-
-  Future<void> _fetchPlans() async {
-    final result = await _subscriptionService.getSubscriptionPlans(
-      pageSize: 100,
-      status: 'active',
-    );
-    final segments = await _subscriptionService.getSegments();
-
-    // Fetch RAs (Staff)
-    List<StaffModel> ras = [];
-    try {
-      ras = await _staffService.getStaffList();
-    } catch (e) {
-      debugPrint('Error fetching RAs: $e');
-    }
-
-    setState(() {
-      _availablePlans = result.plans;
-      _availableSegments = segments;
-      _availableRAs = ras;
-      _isLoadingPlans = false;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +40,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),

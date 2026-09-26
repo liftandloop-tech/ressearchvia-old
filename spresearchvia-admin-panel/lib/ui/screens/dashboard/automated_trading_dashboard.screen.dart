@@ -505,7 +505,7 @@ class AutomatedTradingDashboardScreen extends StatelessWidget {
 class _PublishSignalSection extends StatefulWidget {
   final AdminAutomatedTradingController controller;
 
-  const _PublishSignalSection({super.key, required this.controller});
+  const _PublishSignalSection({required this.controller});
 
   @override
   State<_PublishSignalSection> createState() => _PublishSignalSectionState();

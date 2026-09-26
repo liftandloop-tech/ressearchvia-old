@@ -177,7 +177,7 @@ class AuthService extends ApiService {
             // Create UserModel from admin data
             final user = UserModel.fromJson(adminData);
 
-            return (user: user, token: token as String, error: null);
+            return (user: user, token: token, error: null);
           }
         }
 
@@ -276,7 +276,7 @@ class AuthService extends ApiService {
             // Create UserModel from staff data
             final user = UserModel.fromJson(staffData);
 
-            return (user: user, token: token as String, error: null);
+            return (user: user, token: token, error: null);
           }
         }
 
@@ -328,7 +328,7 @@ class AuthService extends ApiService {
             // Create UserModel from staff data
             final user = UserModel.fromJson(staffData);
 
-            return (user: user, token: token as String, error: null);
+            return (user: user, token: token, error: null);
           }
         }
 

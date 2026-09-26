@@ -5,7 +5,6 @@ import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/reports/reports_navigation.controller.dart';
 import 'package:spresearch_web/controllers/reports/report.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
-import 'package:spresearch_web/config/app.config.dart';
 import '../../../models/report.model.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;

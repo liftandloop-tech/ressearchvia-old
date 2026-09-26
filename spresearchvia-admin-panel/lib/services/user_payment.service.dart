@@ -14,7 +14,7 @@ class UserPaymentService extends ApiService {
       );
 
       if (response.status.hasError) {
-        return Future.error(
+        return await Future.error(
           response.statusText ?? 'Error fetching payment history',
         );
       }

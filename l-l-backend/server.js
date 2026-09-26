@@ -1,9 +1,7 @@
 import 'dotenv/config';
 import express from "express"
 import http from "http"
-import bodyParser from "body-parser"
 import helmet from "helmet"
-import dotenv from "dotenv"
 import cors from "cors"
 import MONGO_CLIENT from "./app/config/db.config.js"
 import initRoutes from "./app/routes/index.js"
@@ -13,7 +11,6 @@ import segmentCronJob from "./app/config/segmentCron.js"
 import partialCronJob from "./app/config/partialCrons.js"
 import { initScheduler } from "./app/config/scheduledNotificationCron.js";
 
-dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8080;
 var corsOptions = {
