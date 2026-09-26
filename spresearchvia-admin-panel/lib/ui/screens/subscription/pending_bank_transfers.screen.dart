@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/utils/invoice_pdf_generator.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import '../../../models/user.model.dart';
 
 class PendingBankTransfersScreen extends StatelessWidget {
@@ -121,12 +122,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
             final listEmpty = controller.consolidatedUsers.isEmpty;
 
             if (controller.isLoading.value && listEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(),
-                ),
-              );
+              return const TableSkeleton(rowCount: 7, columnCount: 6);
             }
 
             if (listEmpty) {
@@ -4819,11 +4815,9 @@ class PendingBankTransfersScreen extends StatelessWidget {
           Obx(() {
             if (controller.isLoading.value &&
                 controller.pendingKycUsers.isEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(40.0),
-                  child: CircularProgressIndicator(),
-                ),
+              return const SizedBox(
+                height: 450,
+                child: TableSkeleton(rowCount: 7, columnCount: 6),
               );
             }
 

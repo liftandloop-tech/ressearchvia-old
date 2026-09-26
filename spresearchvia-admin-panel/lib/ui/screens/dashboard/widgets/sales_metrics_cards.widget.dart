@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard.controller.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import 'metric_data_popup.widget.dart';
 
 class SalesMetricsCards extends StatelessWidget {
@@ -18,6 +19,10 @@ class SalesMetricsCards extends StatelessWidget {
     );
 
     return Obx(() {
+      if (controller.isLoading && controller.totalOrders == 0 && controller.totalSalesAmount == 0) {
+        return const MetricsCardsSkeleton(count: 6);
+      }
+
       final totalSales = controller.totalSalesAmount;
       final totalOrders = controller.totalOrders;
       final activeStaff = controller.activeStaffCount;

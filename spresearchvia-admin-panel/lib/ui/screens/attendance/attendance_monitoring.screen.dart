@@ -6,13 +6,16 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/attendance/attendance.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/models/attendance.model.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 
 class AttendanceMonitoringScreen extends StatelessWidget {
   const AttendanceMonitoringScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(AttendanceController());
+    final controller = Get.isRegistered<AttendanceController>()
+        ? Get.find<AttendanceController>()
+        : Get.put(AttendanceController(), permanent: true);
 
     return DefaultTabController(
       length: 2,
@@ -206,14 +209,21 @@ class AttendanceMonitoringScreen extends StatelessWidget {
         // Attendance list
         Expanded(
           child: Obx(() {
-            if (controller.isLoading.value) {
-              return const Center(child: CircularProgressIndicator());
+            if (controller.isLoading.value && controller.attendanceRecords.isEmpty) {
+              return const TableSkeleton(rowCount: 8, columnCount: 6);
             }
             if (controller.attendanceRecords.isEmpty) {
               return Center(
-                child: Text(
-                  'No attendance logs recorded for selected dates.',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.event_busy_outlined, size: 56, color: AppTheme.gray400),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No attendance logs recorded for selected dates.',
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                    ),
+                  ],
                 ),
               );
             }
@@ -226,94 +236,117 @@ class AttendanceMonitoringScreen extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: DataTable2(
-                  columnSpacing: 12,
-                  horizontalMargin: 12,
-                  minWidth: 800,
-                  columns: const [
-                    DataColumn2(label: Text('Employee'), size: ColumnSize.L),
-                    DataColumn2(label: Text('Login Time')),
-                    DataColumn2(label: Text('Logout Time')),
-                    DataColumn2(label: Text('Working Hours')),
-                    DataColumn2(label: Text('Status')),
-                    DataColumn2(label: Text('Face Verifications')),
-                  ],
-                  rows: controller.attendanceRecords.map((rec) {
-                    final workingHrs = rec.totalWorkingMinutes > 0
-                        ? '${(rec.totalWorkingMinutes / 60).toStringAsFixed(1)} hrs'
-                        : 'Active';
-
-                    final failCount = rec.activityLogs.where((l) => !l.faceDetected).length;
-
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(rec.staffName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              Text('${rec.staffCode} - ${rec.deviceInfo ?? ""}',
-                                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                  overflow: TextOverflow.ellipsis),
-                            ],
-                          ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (controller.isLoading.value)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: LinearProgressIndicator(
+                          minHeight: 2,
+                          color: AppTheme.primaryBlue,
+                          backgroundColor: Colors.transparent,
                         ),
-                        DataCell(Text(DateFormat('yyyy-MM-dd HH:mm').format(rec.loginTime))),
-                        DataCell(
-                          Text(rec.logoutTime != null
-                              ? DateFormat('yyyy-MM-dd HH:mm').format(rec.logoutTime!)
-                              : 'Session Active'),
-                        ),
-                        DataCell(Text(workingHrs)),
-                        DataCell(
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: (rec.isRemote ? Colors.purple : AppTheme.primaryBlue).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              rec.isRemote ? 'Remote' : 'Office Premises',
-                              style: TextStyle(
-                                color: rec.isRemote ? Colors.purple : AppTheme.primaryBlue,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11,
+                      ),
+                    Expanded(
+                      child: DataTable2(
+                        columnSpacing: 12,
+                        horizontalMargin: 12,
+                        minWidth: 800,
+                        columns: const [
+                          DataColumn2(label: Text('Employee'), size: ColumnSize.L),
+                          DataColumn2(label: Text('Login Time')),
+                          DataColumn2(label: Text('Logout Time')),
+                          DataColumn2(label: Text('Working Hours')),
+                          DataColumn2(label: Text('Status')),
+                          DataColumn2(label: Text('Face Verifications')),
+                        ],
+                        rows: controller.attendanceRecords.map((rec) {
+                          final workingHrs = rec.totalWorkingMinutes > 0
+                              ? '${(rec.totalWorkingMinutes / 60).toStringAsFixed(1)} hrs'
+                              : 'Active';
+
+                          final failCount = rec.activityLogs.where((l) => !l.faceDetected).length;
+
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(rec.staffName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    Text('${rec.staffCode} - ${rec.deviceInfo ?? ""}',
+                                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                        overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
-                            failCount > 0 ? '$failCount detection failures' : 'All Clear (${rec.activityLogs.length} pings)',
-                            style: TextStyle(
-                              color: failCount > 0 ? Colors.red : Colors.green,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+                              DataCell(Text(DateFormat('yyyy-MM-dd HH:mm').format(rec.loginTime))),
+                              DataCell(
+                                Text(rec.logoutTime != null
+                                    ? DateFormat('yyyy-MM-dd HH:mm').format(rec.logoutTime!)
+                                    : 'Session Active'),
+                              ),
+                              DataCell(Text(workingHrs)),
+                              DataCell(
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: (rec.isRemote ? Colors.purple : AppTheme.primaryBlue).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    rec.isRemote ? 'Remote' : 'Office Premises',
+                                    style: TextStyle(
+                                      color: rec.isRemote ? Colors.purple : AppTheme.primaryBlue,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  failCount > 0 ? '$failCount detection failures' : 'All Clear (${rec.activityLogs.length} pings)',
+                                  style: TextStyle(
+                                    color: failCount > 0 ? Colors.red : Colors.green,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
           }),
-        )
+        ),
       ],
     );
   }
 
   Widget _buildPerformanceTab(BuildContext context, AttendanceController controller) {
     return Obx(() {
-      if (controller.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
+      if (controller.isLoading.value && controller.performanceOverview.isEmpty) {
+        return const TableSkeleton(rowCount: 8, columnCount: 7, hasAvatarColumn: false);
       }
       if (controller.performanceOverview.isEmpty) {
         return Center(
-          child: Text(
-            'No performance data generated yet.',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.bar_chart_outlined, size: 56, color: AppTheme.gray400),
+              const SizedBox(height: 12),
+              Text(
+                'No performance data generated yet.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+              ),
+            ],
           ),
         );
       }
@@ -326,8 +359,21 @@ class AttendanceMonitoringScreen extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: DataTable2(
-            columnSpacing: 12,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (controller.isLoading.value)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppTheme.primaryBlue,
+                    backgroundColor: Colors.transparent,
+                  ),
+                ),
+              Expanded(
+                child: DataTable2(
+                  columnSpacing: 12,
             horizontalMargin: 12,
             minWidth: 800,
             columns: const [
@@ -364,9 +410,12 @@ class AttendanceMonitoringScreen extends StatelessWidget {
                 ],
               );
             }).toList(),
+            ),
           ),
-        ),
-      );
-    });
-  }
+        ],
+      ),
+    ),
+  );
+});
+}
 }

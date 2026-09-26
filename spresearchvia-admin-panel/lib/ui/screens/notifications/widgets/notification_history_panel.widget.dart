@@ -4,13 +4,16 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/controllers/notifications/push_notifications.controller.dart';
 import 'package:intl/intl.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 
 class NotificationHistoryPanel extends StatelessWidget {
   const NotificationHistoryPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(PushNotificationsController());
+    final controller = Get.isRegistered<PushNotificationsController>()
+        ? Get.find<PushNotificationsController>()
+        : Get.put(PushNotificationsController(), permanent: true);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -44,7 +47,12 @@ class NotificationHistoryPanel extends StatelessWidget {
           Obx(() {
             if (controller.isLoadingHistory.value &&
                 controller.notificationHistory.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const TableSkeleton(
+                rowCount: 6,
+                columnCount: 5,
+                hasAvatarColumn: false,
+                showPaginationBar: false,
+              );
             }
 
             if (controller.notificationHistory.isEmpty) {

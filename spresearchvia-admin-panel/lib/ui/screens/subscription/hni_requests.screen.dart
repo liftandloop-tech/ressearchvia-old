@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../controllers/hni_request.controller.dart';
 import '../../../config/theme.config.dart';
 import '../../widgets/button.widget.dart';
+import '../../widgets/skeleton_loader.widget.dart';
 
 class HniRequestsScreen extends StatefulWidget {
   const HniRequestsScreen({super.key});
@@ -12,11 +13,14 @@ class HniRequestsScreen extends StatefulWidget {
 }
 
 class _HniRequestsScreenState extends State<HniRequestsScreen> {
-  final controller = Get.put(HniRequestController());
+  late final HniRequestController controller;
 
   @override
   void initState() {
     super.initState();
+    controller = Get.isRegistered<HniRequestController>()
+        ? Get.find<HniRequestController>()
+        : Get.put(HniRequestController(), permanent: true);
     controller.fetchHniRequests();
   }
 
@@ -49,8 +53,8 @@ class _HniRequestsScreenState extends State<HniRequestsScreen> {
               ),
               const SizedBox(height: 32),
               Obx(() {
-                if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                if (controller.isLoading.value && controller.requests.isEmpty) {
+                  return const TableSkeleton(rowCount: 6, columnCount: 6);
                 }
 
                 if (controller.requests.isEmpty) {

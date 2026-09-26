@@ -12,8 +12,7 @@ class DashboardLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure controller is registered
-    final controller = Get.put(MainDashboardController());
+    final controller = Get.find<MainDashboardController>();
     final authController = Get.find<AuthController>();
 
     return SelectionArea(

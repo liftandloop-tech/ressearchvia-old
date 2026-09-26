@@ -7,6 +7,8 @@ import 'package:spresearch_web/ui/screens/subscription/widgets/segment_header.wi
 import 'package:spresearch_web/ui/screens/subscription/widgets/segment_row.widget.dart';
 import 'package:spresearch_web/models/segment.model.dart';
 
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
+
 class SegmentsTable extends StatelessWidget {
   final SubscriptionController controller;
 
@@ -16,19 +18,11 @@ class SegmentsTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       if (controller.isLoadingSegments.value) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: AppTheme.gray200),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: CircularProgressIndicator(color: AppTheme.primaryBlue),
-            ),
-          ),
+        return const TableSkeleton(
+          rowCount: 4,
+          columnCount: 4,
+          hasAvatarColumn: false,
+          showPaginationBar: false,
         );
       }
 

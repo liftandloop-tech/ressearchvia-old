@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/subscription/manage_subscription.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 
 class CurrentSubscriptionDetails extends StatelessWidget {
   final ManageSubscriptionController controller;
@@ -53,7 +54,12 @@ class CurrentSubscriptionDetails extends StatelessWidget {
           const SizedBox(height: 20),
           Obx(() {
             if (controller.isLoading.value) {
-              return const Center(child: CircularProgressIndicator());
+              return const TableSkeleton(
+                rowCount: 3,
+                columnCount: 5,
+                hasAvatarColumn: false,
+                showPaginationBar: false,
+              );
             }
             final subscriptions = controller.userSubscriptions.where((sub) {
               final name = sub['packageName']?.toString().toLowerCase() ?? '';

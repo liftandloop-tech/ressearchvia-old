@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard.controller.dart';
 
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
+
 class StaffSalesLeaderboardTable extends StatelessWidget {
   const StaffSalesLeaderboardTable({super.key});
 
@@ -20,16 +22,14 @@ class StaffSalesLeaderboardTable extends StatelessWidget {
 
     return Obx(() {
       final isLoading = controller.isLoading;
-      if (isLoading) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(48.0),
-            child: CircularProgressIndicator(),
-          ),
+      final list = controller.filteredStaffPerformance;
+
+      if (isLoading && list.isEmpty) {
+        return const SizedBox(
+          height: 400,
+          child: TableSkeleton(rowCount: 6, columnCount: 5),
         );
       }
-
-      final list = controller.filteredStaffPerformance;
       final totalItems = list.length;
       final totalPages = totalItems > 0 ? (totalItems / itemsPerPage).ceil() : 1;
       final startIndex = (currentPage.value - 1) * itemsPerPage;

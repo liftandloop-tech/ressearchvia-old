@@ -13,8 +13,10 @@ class UsersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(UserController());
-    final navController = Get.put(UsersNavigationController());
+    final controller = Get.isRegistered<UserController>()
+        ? Get.find<UserController>()
+        : Get.put(UserController(), permanent: true);
+    final navController = Get.find<UsersNavigationController>();
 
     final isRegistered = isRegisteredClients ||
         Get.currentRoute.startsWith('/registered-clients') ||

@@ -15,8 +15,12 @@ class ReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Get.put(ReportController());
-    final navController = Get.put(ReportsNavigationController());
+    if (!Get.isRegistered<ReportController>()) {
+      Get.put(ReportController(), permanent: true);
+    }
+    final navController = Get.isRegistered<ReportsNavigationController>()
+        ? Get.find<ReportsNavigationController>()
+        : Get.put(ReportsNavigationController(), permanent: true);
 
     return Obx(() {
       return DashboardLayout(

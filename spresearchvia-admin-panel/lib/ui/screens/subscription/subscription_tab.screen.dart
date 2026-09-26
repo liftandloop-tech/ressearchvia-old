@@ -15,8 +15,12 @@ class SubscriptionTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(SubscriptionController());
-    final navController = Get.put(SubscriptionNavigationController());
+    final controller = Get.isRegistered<SubscriptionController>()
+        ? Get.find<SubscriptionController>()
+        : Get.put(SubscriptionController(), permanent: true);
+    final navController = Get.isRegistered<SubscriptionNavigationController>()
+        ? Get.find<SubscriptionNavigationController>()
+        : Get.put(SubscriptionNavigationController(), permanent: true);
 
     return Obx(() {
       return DashboardLayout(

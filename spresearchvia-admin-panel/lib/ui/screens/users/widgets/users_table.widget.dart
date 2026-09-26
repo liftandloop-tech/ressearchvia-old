@@ -6,6 +6,7 @@ import 'package:spresearch_web/controllers/users/user.controller.dart';
 import 'package:spresearch_web/controllers/users/users_table.controller.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import 'table_pagination.widget.dart';
 import 'user_data_row.dart';
 import 'user_table_header_cell.widget.dart';
@@ -35,6 +36,10 @@ class UsersTable extends StatelessWidget {
       final displayedUsers = users;
       final isLoading = userManagementController.isLoading.value;
 
+      if (isLoading && displayedUsers.isEmpty) {
+        return const TableSkeleton(rowCount: 8, columnCount: 7);
+      }
+
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -50,18 +55,27 @@ class UsersTable extends StatelessWidget {
                 color: AppTheme.primaryBlue,
                 backgroundColor: AppTheme.border,
               ),
-            if (isLoading && displayedUsers.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(color: AppTheme.primaryBlue),
-                ),
-              )
-            else if (displayedUsers.isEmpty)
+            if (displayedUsers.isEmpty)
               Expanded(
                 child: Center(
-                  child: Text(
-                    'No users found',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.people_outline_rounded,
+                        size: 48,
+                        color: AppTheme.gray400,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No clients found matching the selected filters',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               )

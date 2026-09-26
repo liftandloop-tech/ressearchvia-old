@@ -4,6 +4,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import '../../widgets/button.widget.dart';
 import 'widgets/staff_table.widget.dart';
 import 'widgets/staff_pagination.widget.dart';
@@ -13,25 +14,25 @@ class StaffScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(StaffController());
+    final controller = Get.isRegistered<StaffController>()
+        ? Get.find<StaffController>()
+        : Get.put(StaffController(), permanent: true);
 
     return DashboardLayout(
       child: Container(
         color: AppTheme.gray50,
-        child: Obx(
-          () => controller.isLoading.value
-              ? Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppTheme.primaryBlue,
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+        child: Obx(() {
+          if (controller.isLoading.value && controller.staffList.isEmpty) {
+            return const ScreenSkeleton(hasFilterBar: true, rowCount: 8);
+          }
+
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final isNarrow = constraints.maxWidth < 700;
@@ -233,9 +234,22 @@ class StaffScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (controller.isLoading.value)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(
+                      minHeight: 3,
+                      color: AppTheme.primaryBlue,
+                      backgroundColor: Colors.transparent,
+                    ),
+                  ),
+              ],
+            );
+          }),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildEmptyState() {

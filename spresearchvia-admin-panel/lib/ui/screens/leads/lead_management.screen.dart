@@ -10,13 +10,16 @@ import 'package:spresearch_web/models/lead.model.dart';
 import 'package:spresearch_web/models/lead_pool.model.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 
 class LeadManagementScreen extends StatelessWidget {
   const LeadManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(LeadsController());
+    final controller = Get.isRegistered<LeadsController>()
+        ? Get.find<LeadsController>()
+        : Get.put(LeadsController(), permanent: true);
 
     return DashboardLayout(
       child: Container(
@@ -353,14 +356,21 @@ class LeadManagementScreen extends StatelessWidget {
             // Leads Table
             Expanded(
               child: Obx(() {
-                if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                if (controller.isLoading.value && controller.leadsList.isEmpty) {
+                  return const TableSkeleton(rowCount: 10, columnCount: 8);
                 }
                 if (controller.leadsList.isEmpty) {
                   return Center(
-                    child: Text(
-                      'No leads found matching query.',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_search_outlined, size: 56, color: AppTheme.gray400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No leads found matching query.',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                        ),
+                      ],
                     ),
                   );
                 }
@@ -376,6 +386,15 @@ class LeadManagementScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (controller.isLoading.value)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8),
+                            child: LinearProgressIndicator(
+                              minHeight: 2,
+                              color: AppTheme.primaryBlue,
+                              backgroundColor: Colors.transparent,
+                            ),
+                          ),
                         Expanded(
                           child: DataTable2(
                             columnSpacing: 12,
@@ -1461,7 +1480,12 @@ class LeadManagementScreen extends StatelessWidget {
               Expanded(
                 child: Obx(() {
                   if (controller.isPoolsLoading.value && controller.leadPoolsList.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const TableSkeleton(
+                      rowCount: 4,
+                      columnCount: 4,
+                      hasAvatarColumn: false,
+                      showPaginationBar: false,
+                    );
                   }
 
                   if (controller.leadPoolsList.isEmpty) {

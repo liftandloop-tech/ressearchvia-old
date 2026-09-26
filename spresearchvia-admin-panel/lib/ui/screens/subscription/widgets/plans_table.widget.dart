@@ -4,6 +4,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/subscription/subscription.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription_navigation.controller.dart';
 import 'package:spresearch_web/models/subscription_plan.model.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import 'plans_table_header_cell.widget.dart';
 import 'plan_row.widget.dart';
 import 'plans_pagination.widget.dart';
@@ -15,20 +16,10 @@ class PlansTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<SubscriptionController>();
     return Obx(() {
-      if (controller.isLoadingPlans.value) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: AppTheme.gray200),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: CircularProgressIndicator(color: AppTheme.primaryBlue),
-            ),
-          ),
+      if (controller.isLoadingPlans.value && controller.plans.isEmpty) {
+        return const SizedBox(
+          height: 420,
+          child: TableSkeleton(rowCount: 6, columnCount: 6),
         );
       }
 

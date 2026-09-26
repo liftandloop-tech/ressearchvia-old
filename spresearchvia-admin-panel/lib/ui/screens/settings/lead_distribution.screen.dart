@@ -5,6 +5,7 @@ import '../../../config/theme.config.dart';
 import '../../../services/lead.service.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../leads/lead_management.screen.dart';
+import '../../widgets/skeleton_loader.widget.dart';
 
 class LeadDistributionScreen extends StatefulWidget {
   const LeadDistributionScreen({super.key});
@@ -89,7 +90,7 @@ class _LeadDistributionScreenState extends State<LeadDistributionScreen> {
         color: AppTheme.gray50,
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
+            ? const ScreenSkeleton(hasFilterBar: false, rowCount: 6)
             : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

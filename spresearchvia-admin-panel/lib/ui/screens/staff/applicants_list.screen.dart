@@ -9,13 +9,16 @@ import 'package:spresearch_web/ui/widgets/button.widget.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../config/app.config.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 
 class ApplicantsListScreen extends StatelessWidget {
   const ApplicantsListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(ApplicantsListController());
+    final controller = Get.isRegistered<ApplicantsListController>()
+        ? Get.find<ApplicantsListController>()
+        : Get.put(ApplicantsListController(), permanent: true);
 
     return DashboardLayout(
       child: Container(
@@ -48,14 +51,21 @@ class ApplicantsListScreen extends StatelessWidget {
             // Table of Applicants
             Expanded(
               child: Obx(() {
-                if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                if (controller.isLoading.value && controller.applicants.isEmpty) {
+                  return const TableSkeleton(rowCount: 8, columnCount: 7);
                 }
                 if (controller.applicants.isEmpty) {
                   return Center(
-                    child: Text(
-                      'No pending applicants at this time.',
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.badge_outlined, size: 56, color: AppTheme.gray400),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No pending applicants at this time.',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                        ),
+                      ],
                     ),
                   );
                 }

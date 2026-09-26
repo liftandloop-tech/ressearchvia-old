@@ -15,7 +15,9 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(DashboardController());
+    final controller = Get.isRegistered<DashboardController>()
+        ? Get.find<DashboardController>()
+        : Get.put(DashboardController(), permanent: true);
 
     return Container(
       color: AppTheme.gray50,

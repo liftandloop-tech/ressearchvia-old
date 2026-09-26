@@ -28,6 +28,7 @@ import 'package:spresearch_web/services/refund.service.dart';
 
 import 'package:spresearch_web/services/api.service.dart';
 import 'package:spresearch_web/controllers/notifications/research_notification.controller.dart';
+import 'package:spresearch_web/controllers/dashboard/main_dashboard.controller.dart';
 
 class InitialBinding extends Bindings {
   @override
@@ -51,20 +52,20 @@ class InitialBinding extends Bindings {
     Get.put(LeadService(), permanent: true);
     Get.put(PermissionService(), permanent: true);
 
-
-    // Controllers
-    Get.put(AuthController(), permanent: true); // Keep AuthController active
+    // Controllers (Permanent singletons for zero-lag tab transitions & instant caching)
+    Get.put(AuthController(), permanent: true);
+    Get.put(MainDashboardController(), permanent: true);
+    Get.put(DashboardManagementController(), permanent: true);
+    Get.put(UserManagementController(), permanent: true);
+    Get.put(StaffManagementController(), permanent: true);
+    Get.put(SubscriptionManagementController(), permanent: true);
+    Get.put(ReportManagementController(), permanent: true);
+    Get.put(KycManagementController(), permanent: true);
     Get.put(ResearchNotificationController(), permanent: true);
-    Get.lazyPut(() => UserManagementController(), fenix: true);
-    Get.lazyPut(() => ReportManagementController(), fenix: true);
-    Get.lazyPut(() => SubscriptionManagementController(), fenix: true);
-    Get.lazyPut(() => KycManagementController(), fenix: true);
-    Get.lazyPut(() => StaffManagementController(), fenix: true);
-    Get.lazyPut(() => DashboardManagementController(), fenix: true);
 
     // Navigation Controllers
-    Get.lazyPut(() => UsersNavigationController(), fenix: true);
-    Get.lazyPut(() => ReportsNavigationController(), fenix: true);
-    Get.lazyPut(() => SubscriptionNavigationController(), fenix: true);
+    Get.put(UsersNavigationController(), permanent: true);
+    Get.put(ReportsNavigationController(), permanent: true);
+    Get.put(SubscriptionNavigationController(), permanent: true);
   }
 }

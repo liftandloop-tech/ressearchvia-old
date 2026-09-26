@@ -15,7 +15,9 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(NotificationsController());
+    final controller = Get.isRegistered<NotificationsController>()
+        ? Get.find<NotificationsController>()
+        : Get.put(NotificationsController(), permanent: true);
 
     return DashboardLayout(
       child: Container(

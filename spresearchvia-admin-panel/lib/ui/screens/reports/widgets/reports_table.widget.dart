@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/reports/report.controller.dart';
+import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import 'reports_table_header_cell.widget.dart';
 import 'report_row.widget.dart';
 import 'reports_pagination.widget.dart';
@@ -14,10 +15,15 @@ class ReportsTable extends StatelessWidget {
     final controller = Get.find<ReportController>();
 
     return Obx(() {
-      if (controller.isLoading.value) {
-        return Center(child: CircularProgressIndicator());
-      }
+      final isLoading = controller.isLoading.value;
       final reports = controller.reports;
+
+      if (isLoading && reports.isEmpty) {
+        return const SizedBox(
+          height: 420,
+          child: TableSkeleton(rowCount: 7, columnCount: 6),
+        );
+      }
 
       return Container(
         decoration: AppTheme.cardDecoration.copyWith(
@@ -26,6 +32,12 @@ class ReportsTable extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
+            if (isLoading)
+              const LinearProgressIndicator(
+                minHeight: 3,
+                color: AppTheme.primaryBlue,
+                backgroundColor: Colors.transparent,
+              ),
             Table(
               defaultVerticalAlignment: TableCellVerticalAlignment.top,
               border: TableBorder(
