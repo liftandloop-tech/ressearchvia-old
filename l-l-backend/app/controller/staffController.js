@@ -72,6 +72,7 @@ const staffController = {
 
     getStaffAssignedUsers: async (req, res) => {
         try {
+            console.log('>>> [BACKEND getStaffAssignedUsers CALLED] query:', req.query);
             // Get staff ID from the authenticated user (from JWT token)
             const staffId = req.user._id;
             const response = await staffService.getStaffAssignedUsers({ staffId, user: req.user, query: req.query });
@@ -108,6 +109,33 @@ const staffController = {
         try {
             const { staffId } = req.params;
             const response = await staffService.getPublicStaffVerification(staffId);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
+    getStaffProfileMe: async (req, res) => {
+        try {
+            const response = await staffService.getStaffProfileMe({ user: req.user });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
+    updateStaffProfileMe: async (req, res) => {
+        try {
+            const response = await staffService.updateStaffProfileMe({ user: req.user, body: req.body });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
+    changeStaffMpinMe: async (req, res) => {
+        try {
+            const response = await staffService.changeStaffMpinMe({ user: req.user, body: req.body });
             res.status(response.status).send(response);
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: null });

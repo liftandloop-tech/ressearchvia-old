@@ -88,4 +88,58 @@ export async function getSupervisedStaffIds(callerId) {
   };
 }
 
-export default { getSupervisedStaffIds };
+/**
+ * Resolves all direct and indirect upstream managers/directors for a given staff member.
+ * e.g., if Staff -> Team Lead -> Sales Director, returns [TeamLeadId, SalesDirectorId].
+ */
+export async function getUpstreamSupervisorIds(callerId) {
+  if (!callerId || !mongoose.isValidObjectId(callerId)) return [];
+  const upstream = [];
+  const visited = new Set();
+  let currentId = callerId.toString();
+  visited.add(currentId);
+
+  while (currentId) {
+    const staff = await staffModel.findById(currentId).select('assignedDirector').lean();
+    if (!staff || !staff.assignedDirector) break;
+
+    const nextId = staff.assignedDirector.toString();
+    if (nextId === 'admin' || nextId === 'unassigned' || !mongoose.isValidObjectId(nextId)) break;
+    if (visited.has(nextId)) break; // avoid loops
+
+    visited.add(nextId);
+    upstream.push(new mongoose.Types.ObjectId(nextId));
+    currentId = nextId;
+  }
+  return upstream;
+}
+
+/**
+ * Generates the MongoDB filter for Lead Pools based on caller's hierarchy.
+ * - System Admin: Sees all pools within company.
+ * - Non-Admin: Sees global pools + pools created by themselves + pools created by their upstream managers (owner's team).
+ */
+export async function getAccessibleLeadPoolFilter(callerId, companyId) {
+  const baseFilter = { companyId: companyId || "default_company" };
+  const hierarchy = await getSupervisedStaffIds(callerId);
+
+  if (hierarchy.isSystemAdmin) {
+    return baseFilter;
+  }
+
+  const callerObjId = mongoose.isValidObjectId(callerId) ? new mongoose.Types.ObjectId(callerId.toString()) : null;
+  const upstreamIds = await getUpstreamSupervisorIds(callerId);
+  const allowedCreators = callerObjId ? [callerObjId, ...upstreamIds] : upstreamIds;
+
+  return {
+    ...baseFilter,
+    $or: [
+      { isGlobal: true },
+      { isGlobal: { $exists: false } },
+      { createdBy: null },
+      { createdBy: { $in: allowedCreators } }
+    ]
+  };
+}
+
+export default { getSupervisedStaffIds, getUpstreamSupervisorIds, getAccessibleLeadPoolFilter };

@@ -5,7 +5,8 @@ import '../../../config/app.config.dart';
 import '../../../controllers/settings/settings.controller.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
-import 'lead_distribution.screen.dart';
+import '../leads/lead_management.screen.dart';
+import '../../../models/staff.model.dart';
 
 class GeneralSettingsScreen extends StatelessWidget {
   const GeneralSettingsScreen({super.key});
@@ -23,7 +24,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                   child: CircularProgressIndicator(color: AppTheme.primaryBlue),
                 )
               : SingleChildScrollView(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -34,28 +35,43 @@ class GeneralSettingsScreen extends StatelessWidget {
                             icon: const Icon(Icons.arrow_back),
                             onPressed: () => Get.back(),
                             color: AppTheme.primaryBlue,
+                            iconSize: 20,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'General Settings',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'General Settings',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Configure company bank accounts, default staff assignments, permissions, and lead flow policies.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 32),
-                        Wrap(
-                          spacing: 24,
-                          runSpacing: 24,
-                          children: [
-                            _buildBankDetailsCard(controller),
-                            _buildRolesPermissionsCard(),
-                            _buildLeadDistributionCard(),
-                          ],
-                        ),
+                      const SizedBox(height: 24),
+                      Wrap(
+                        spacing: 20,
+                        runSpacing: 20,
+                        children: [
+                          _buildBankDetailsCard(controller),
+                          _buildDefaultRMCard(controller),
+                          _buildRolesPermissionsCard(),
+                          _buildLeadDistributionCard(),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -68,12 +84,20 @@ class GeneralSettingsScreen extends StatelessWidget {
     return Obx(() {
       final editing = controller.isEditing.value;
       return Container(
-        width: 600,
-        padding: const EdgeInsets.all(24),
+        width: 580,
+        constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppTheme.gray200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,15 +108,23 @@ class GeneralSettingsScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.account_balance_outlined,
-                      color: AppTheme.primaryBlue,
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.account_balance_outlined,
+                        color: AppTheme.primaryBlue,
+                        size: 18,
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(
+                    const SizedBox(width: 10),
+                    const Text(
                       'Bank Transfer Details',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textPrimary,
                       ),
@@ -121,9 +153,9 @@ class GeneralSettingsScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'These details will be shown to users when they choose Bank Transfer as payment method in the mobile app.',
-              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Fields — view-only or editable
             if (editing) ...[
@@ -221,19 +253,381 @@ class GeneralSettingsScreen extends StatelessWidget {
     });
   }
 
+  Widget _buildDefaultRMCard(SettingsController controller) {
+    return Obx(() {
+      final editing = controller.isEditingRM.value;
+      return Container(
+        width: 580,
+        constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.gray200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row with title + Edit / Save buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.support_agent_rounded,
+                        color: AppTheme.primaryBlue,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Default Relationship Manager (RM)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'App Dashboard & Contact RM Fallback',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.gray500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (!editing)
+                  OutlinedButton.icon(
+                    onPressed: controller.startEditingRM,
+                    icon: const Icon(Icons.edit_outlined, size: 15),
+                    label: const Text('Edit RM', style: TextStyle(fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryBlue,
+                      side: BorderSide(color: AppTheme.primaryBlue),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: controller.cancelEditRM,
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(color: AppTheme.gray500, fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: controller.isSavingRM.value
+                            ? null
+                            : controller.updateDefaultRM,
+                        icon: controller.isSavingRM.value
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.check, size: 15),
+                        label: const Text('Save RM', style: TextStyle(fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'When a mobile app client does not have an individually assigned relationship manager, this default RM is shown on their mobile app dashboard and "Contact RM" screen.',
+              style: TextStyle(fontSize: 12.5, color: AppTheme.gray500, height: 1.4),
+            ),
+            const SizedBox(height: 20),
+
+            if (editing) ...[
+              // Quick Select Staff Member Dropdown
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Link to Staff Member (Optional Quick-Fill)',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<StaffModel?>(
+                    initialValue: controller.selectedStaff.value,
+                    isExpanded: true,
+                    style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppTheme.gray50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.gray300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.gray200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.primaryBlue),
+                      ),
+                    ),
+                    hint: const Text('Select a staff member or enter manually below', style: TextStyle(fontSize: 13)),
+                    items: [
+                      const DropdownMenuItem<StaffModel?>(
+                        value: null,
+                        child: Text('Custom / Manual Entry', style: TextStyle(fontSize: 13)),
+                      ),
+                      ...controller.staffList.map(
+                        (staff) => DropdownMenuItem<StaffModel?>(
+                          value: staff,
+                          child: Text(
+                            '${staff.name} (${staff.staffId}) • ${staff.department.isNotEmpty ? staff.department : staff.role}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: controller.onSelectStaff,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              _buildTextField(
+                label: 'RM Full Name *',
+                controller: controller.rmNameController,
+                hint: 'e.g. Jaya Verma',
+              ),
+              const SizedBox(height: 14),
+              _buildTextField(
+                label: 'Mobile / WhatsApp Number *',
+                controller: controller.rmPhoneController,
+                hint: 'e.g. +91 9755016839',
+              ),
+              const SizedBox(height: 14),
+              _buildTextField(
+                label: 'Email Address',
+                controller: controller.rmEmailController,
+                hint: 'e.g. info@researchvia.in',
+              ),
+              const SizedBox(height: 14),
+              _buildTextField(
+                label: 'Department / Designation',
+                controller: controller.rmDepartmentController,
+                hint: 'e.g. Relationship Manager',
+              ),
+            ] else ...[
+              // Read-only Card View
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.gray50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.gray200),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: AppTheme.primaryBlue,
+                      child: Text(
+                        controller.rmNameController.text.isNotEmpty
+                            ? controller.rmNameController.text[0].toUpperCase()
+                            : 'R',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                controller.rmNameController.text.isNotEmpty
+                                    ? controller.rmNameController.text
+                                    : 'Not Configured',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              if (controller.rmStaffId.value.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    controller.rmStaffId.value,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.indigo.shade700,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            controller.rmDepartmentController.text.isNotEmpty
+                                ? controller.rmDepartmentController.text
+                                : 'Relationship Manager',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppTheme.primaryBlue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.green.shade600,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Active on Dashboard',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              _buildViewRow(
+                'Full Name',
+                controller.rmNameController.text,
+              ),
+              _buildViewRow(
+                'Mobile Number',
+                controller.rmPhoneController.text,
+              ),
+              _buildViewRow(
+                'Email Address',
+                controller.rmEmailController.text.isEmpty
+                    ? '—'
+                    : controller.rmEmailController.text,
+              ),
+              _buildViewRow(
+                'Designation',
+                controller.rmDepartmentController.text.isEmpty
+                    ? '—'
+                    : controller.rmDepartmentController.text,
+              ),
+              _buildViewRow(
+                'Linked Staff ID',
+                controller.rmStaffId.value.isEmpty
+                    ? 'Custom / None'
+                    : controller.rmStaffId.value,
+              ),
+            ],
+          ],
+        ),
+      );
+    });
+  }
+
   /// Read-only label + value row
   Widget _buildViewRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 150,
+            width: 140,
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: AppTheme.textSecondary,
               ),
@@ -243,8 +637,8 @@ class GeneralSettingsScreen extends StatelessWidget {
             child: Text(
               value.isEmpty ? '—' : value,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
                 color: AppTheme.textPrimary,
               ),
             ),
@@ -265,21 +659,23 @@ class GeneralSettingsScreen extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
             color: AppTheme.textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         TextField(
           controller: controller,
+          style: const TextStyle(fontSize: 13),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: TextStyle(fontSize: 13, color: AppTheme.gray400),
             filled: true,
             fillColor: AppTheme.gray50,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
+              horizontal: 14,
+              vertical: 10,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -309,8 +705,8 @@ class GeneralSettingsScreen extends StatelessWidget {
         Text(
           'QR Code',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
             color: editing ? AppTheme.textPrimary : AppTheme.textSecondary,
           ),
         ),
@@ -334,11 +730,11 @@ class GeneralSettingsScreen extends StatelessWidget {
                     child: Stack(
                       children: [
                         Container(
-                          width: 160,
-                          height: 160,
+                          width: 140,
+                          height: 140,
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: AppTheme.primaryBlue.withOpacity(0.4),
+                              color: AppTheme.primaryBlue.withValues(alpha: 0.4),
                             ),
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -356,13 +752,13 @@ class GeneralSettingsScreen extends StatelessWidget {
                                         Icon(
                                           Icons.broken_image_outlined,
                                           color: AppTheme.gray400,
-                                          size: 32,
+                                          size: 28,
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
                                           'Cannot load image',
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             color: AppTheme.gray400,
                                           ),
                                         ),
@@ -379,7 +775,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.45),
+                              color: Colors.black.withValues(alpha: 0.45),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Icon(
@@ -395,8 +791,8 @@ class GeneralSettingsScreen extends StatelessWidget {
                 // In edit mode: normal non-tappable image
                 if (editing)
                   Container(
-                    width: 160,
-                    height: 160,
+                    width: 140,
+                    height: 140,
                     decoration: BoxDecoration(
                       border: Border.all(color: AppTheme.gray300),
                       borderRadius: BorderRadius.circular(8),
@@ -413,13 +809,13 @@ class GeneralSettingsScreen extends StatelessWidget {
                               Icon(
                                 Icons.broken_image_outlined,
                                 color: AppTheme.gray400,
-                                size: 32,
+                                size: 28,
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Cannot load image',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   color: AppTheme.gray400,
                                 ),
                               ),
@@ -435,11 +831,11 @@ class GeneralSettingsScreen extends StatelessWidget {
                     icon: const Icon(
                       Icons.delete_outline,
                       color: Colors.red,
-                      size: 16,
+                      size: 15,
                     ),
                     label: const Text(
                       'Remove',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ),
               ],
@@ -450,7 +846,7 @@ class GeneralSettingsScreen extends StatelessWidget {
           if (!editing) {
             return Text(
               'No QR Code uploaded',
-              style: TextStyle(fontSize: 14, color: AppTheme.gray400),
+              style: TextStyle(fontSize: 13, color: AppTheme.gray400),
             );
           }
 
@@ -458,8 +854,8 @@ class GeneralSettingsScreen extends StatelessWidget {
             onTap: controller.pickAndUploadQR,
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              width: 160,
-              height: 160,
+              width: 140,
+              height: 140,
               decoration: BoxDecoration(
                 color: AppTheme.gray50,
                 border: Border.all(
@@ -473,13 +869,13 @@ class GeneralSettingsScreen extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.add_photo_alternate_outlined,
-                    size: 36,
+                    size: 32,
                     color: AppTheme.gray500,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     'Upload QR Code',
-                    style: TextStyle(color: AppTheme.gray500, fontSize: 13),
+                    style: TextStyle(color: AppTheme.gray500, fontSize: 12),
                   ),
                 ],
               ),
@@ -496,7 +892,7 @@ class GeneralSettingsScreen extends StatelessWidget {
       barrierColor: Colors.black54,
       builder: (ctx) {
         final screenSize = MediaQuery.of(ctx).size;
-        final dialogSize = screenSize.width / 3;
+        final dialogSize = (screenSize.width / 3).clamp(280.0, 480.0);
 
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -514,7 +910,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 24,
                       offset: const Offset(0, 8),
                     ),
@@ -531,13 +927,13 @@ class GeneralSettingsScreen extends StatelessWidget {
                         children: [
                           const Icon(
                             Icons.broken_image_outlined,
-                            size: 48,
+                            size: 40,
                             color: Colors.grey,
                           ),
                           const SizedBox(height: 8),
                           const Text(
                             'Cannot load QR image',
-                            style: TextStyle(color: Colors.grey),
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
                           ),
                         ],
                       ),
@@ -559,7 +955,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 6,
                         ),
                       ],
@@ -581,53 +977,70 @@ class GeneralSettingsScreen extends StatelessWidget {
 
   Widget _buildRolesPermissionsCard() {
     return Container(
-      width: 600,
-      padding: const EdgeInsets.all(24),
+      width: 580,
+      constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.security_outlined,
-                color: AppTheme.primaryBlue,
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.security_outlined,
+                  color: AppTheme.primaryBlue,
+                  size: 18,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               const Text(
                 'Roles & Dynamic Permissions',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           const Text(
             'Configure dynamic user roles, customize permission groups, and assign granular feature access (Create, Read, Update, Delete) to staff members.',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12.5,
               color: AppTheme.gray500,
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => Get.toNamed('/settings/roles-permissions'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Manage Roles & Permissions'),
+            child: const Text('Manage Roles & Permissions', style: TextStyle(fontSize: 13)),
           ),
         ],
       ),
@@ -636,50 +1049,71 @@ class GeneralSettingsScreen extends StatelessWidget {
 
   Widget _buildLeadDistributionCard() {
     return Container(
-      width: 600,
-      padding: const EdgeInsets.all(24),
+      width: 580,
+      constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.bolt_rounded, color: Colors.orange.shade700),
-              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  color: AppTheme.primaryBlue,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
               const Text(
-                'Lead Distribution',
+                'Lead Pools & Distribution',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           const Text(
-            'Configure maximum fresh and unread lead limits per staff member, and set how many leads are pulled per pull action.',
+            'Lead distribution rules (batch pull size, staff capacity caps, and team visibility) are now unified directly per Lead Pool. Navigate to Lead Pools to manage or adjust quotas.',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12.5,
               color: AppTheme.gray500,
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => Get.to(() => const LeadDistributionScreen()),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.tune_rounded, size: 16),
+            label: const Text('Manage Lead Pools & Distribution', style: TextStyle(fontSize: 13)),
+            onPressed: () => Get.to(() => const LeadManagementScreen()),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade700,
+              backgroundColor: AppTheme.primaryBlue,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('Configure Lead Distribution'),
           ),
         ],
       ),

@@ -2,6 +2,7 @@ import leadModel from "../models/leadModel.js";
 import leadPoolModel from "../models/leadPoolModel.js";
 import generalSettingsModel from "../models/generalSettingsModel.js";
 import { ensureDefaultFreshPool } from "./leadPoolController.js";
+import { getAccessibleLeadPoolFilter } from "../utils/staffHierarchy.js";
 
 // Load lead distribution config with defaults
 const getDistributionConfig = async (companyId) => {
@@ -24,13 +25,16 @@ const leadPullController = {
             const config = await getDistributionConfig(companyId);
             const freshPool = await ensureDefaultFreshPool(companyId);
 
-            // Fetch all active pools for this company
-            const allPools = await leadPoolModel.find({ companyId, isActive: { $ne: false } }).sort({ createdAt: 1 }).lean();
+            // Fetch only active pools accessible to this staff member / role
+            const poolFilter = await getAccessibleLeadPoolFilter(staffId, companyId);
+            poolFilter.isActive = { $ne: false };
+            const allPools = await leadPoolModel.find(poolFilter).sort({ createdAt: 1 }).lean();
 
             // Calculate live per-pool stats
             const poolsStats = await Promise.all(allPools.map(async (p) => {
-                const pMax = p.maxPerStaff || config.freshMaxPerStaff || 100;
-                const pSize = p.pullSize || config.freshPullSize || 20;
+                const isDefaultFresh = p.name === "Fresh Leads";
+                const pMax = (isDefaultFresh && config.freshMaxPerStaff) ? config.freshMaxPerStaff : (p.maxPerStaff || config.freshMaxPerStaff || 100);
+                const pSize = (isDefaultFresh && config.freshPullSize) ? config.freshPullSize : (p.pullSize || config.freshPullSize || 20);
 
                 const availableLeads = await leadModel.countDocuments({
                     companyId,
@@ -65,7 +69,9 @@ const leadPullController = {
                     myLeads,
                     remainingCapacity: Math.max(0, pMax - myLeads),
                     totalLeads,
-                    isDefaultFresh: p.name === "Fresh Leads"
+                    isDefaultFresh: p.name === "Fresh Leads",
+                    isGlobal: p.isGlobal !== false,
+                    createdByName: p.createdByName || (p.name === "Fresh Leads" ? "System Admin" : "Staff")
                 };
             }));
 
@@ -113,9 +119,11 @@ const leadPullController = {
             const targetPoolId = poolId || leadPoolId;
 
             if (targetPoolId) {
-                targetPool = await leadPoolModel.findOne({ _id: targetPoolId, companyId });
+                const poolFilter = await getAccessibleLeadPoolFilter(staffId, companyId);
+                poolFilter._id = targetPoolId;
+                targetPool = await leadPoolModel.findOne(poolFilter);
                 if (!targetPool) {
-                    return res.status(404).send({ status: 404, message: "Specified Lead Pool not found" });
+                    return res.status(404).send({ status: 404, message: "Specified Lead Pool not found or you do not have permission to access it" });
                 }
             } else {
                 targetPool = await ensureDefaultFreshPool(companyId);
@@ -125,8 +133,9 @@ const leadPullController = {
                 return res.status(400).send({ status: 400, message: `Lead Pool '${targetPool.name}' is currently inactive` });
             }
 
-            const poolMax = targetPool.maxPerStaff || config.freshMaxPerStaff || 100;
-            const poolPullSize = targetPool.pullSize || config.freshPullSize || 20;
+            const isDefaultFresh = targetPool.name === "Fresh Leads";
+            const poolMax = (isDefaultFresh && config.freshMaxPerStaff) ? config.freshMaxPerStaff : (targetPool.maxPerStaff || config.freshMaxPerStaff || 100);
+            const poolPullSize = (isDefaultFresh && config.freshPullSize) ? config.freshPullSize : (targetPool.pullSize || config.freshPullSize || 20);
 
             // Count current leads held by this staff member in this specific pool
             const myPoolLeads = await leadModel.countDocuments({

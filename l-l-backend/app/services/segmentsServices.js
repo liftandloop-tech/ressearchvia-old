@@ -20,6 +20,7 @@ import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
 import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 import Refund from "../models/refundModel.js";
+import salesRevenueService from "./salesRevenueService.js";
 
 const segmentsService = {
   createSegments: async ({ body }) => {
@@ -153,22 +154,23 @@ const segmentsService = {
         return { status: 404, message: "segment not found", data: {} };
       }
 
-      // HNI Plan Request Check
-      if (segmentPlanId) {
-        const plan = await segmentsPlanModel.findById(segmentPlanId);
-        if (plan && plan.isHni) {
-          const existingRequest = await HniRequest.findOne({ userId, planId: segmentPlanId, status: 'PENDING' });
-          if (existingRequest) {
-            return { status: 200, message: "Request already submitted. Our team will contact you.", data: {} };
-          }
-          await HniRequest.create({
-            userId,
-            segmentId,
-            planId: segmentPlanId
-          });
-          return { status: 200, message: "HNI Custom Plan requested successfully. Our team will contact you shortly.", data: {} };
-        }
+      // Single Active Plan Guard
+      const activePlanEntitlement = await Entitlement.findOne({
+        userId,
+        type: 'PLAN',
+        status: { $in: ['ACTIVE', 'SUSPENDED'] },
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
+      }).populate('resourceId');
+      if (activePlanEntitlement) {
+        const currentPlanName = activePlanEntitlement.resourceId?.planName || 'Plan';
+        return {
+          status: 400,
+          message: `You already have an active subscription for "${currentPlanName}". A user can only hold one plan at a time. You can activate or switch segments in Settings.`,
+          data: {}
+        };
       }
+
 
       // Fetch Plan (Source of Truth)
       if (!segmentPlanId) {
@@ -923,7 +925,7 @@ const segmentsService = {
       }
       // --- SYNC LEGACY PAYMENTS END ---
 
-      let { page, pageSize, search, status } = query;
+      let { page, pageSize, search, status, userId, startDate, endDate } = query;
       page = page ? parseInt(page) : 1;
       pageSize = pageSize ? parseInt(pageSize) : 20;
       const skip = (page - 1) * pageSize;
@@ -932,7 +934,9 @@ const segmentsService = {
         $or: [
           { proofImage: { $ne: null, $exists: true } }, // Regular payment with proof (legacy)
           { 'proofImages.0': { $exists: true } }, // Regular payment with multiple proofs
-          { 'partialPaymentsHistory.0': { $exists: true } } // Partial payment with at least one history entry
+          { 'partialPaymentsHistory.0': { $exists: true } }, // Partial payment with at least one history entry
+          { purchaseType: 'REGISTRATION' },
+          { paymentMethod: 'BANK_TRANSFER' }
         ]
       };
 
@@ -945,10 +949,10 @@ const segmentsService = {
         } else if (status === 'Rejected') {
           queryArgs.status = 'REJECTED';
         } else if (status === 'Pending') {
-          queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] };
+          queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING'] };
         }
       } else {
-        queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
+        queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
       }
 
       // Restrict payments by staff/director/manager assignment hierarchy
@@ -961,6 +965,40 @@ const segmentsService = {
           const assignedUserIds = assignments.map(a => a.userId);
           queryArgs.userId = { $in: assignedUserIds };
         }
+      }
+
+      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+        if (queryArgs.userId && queryArgs.userId.$in) {
+          const isAllowed = queryArgs.userId.$in.some(id => id.toString() === userId.toString());
+          queryArgs.userId = isAllowed ? new mongoose.Types.ObjectId(userId) : new mongoose.Types.ObjectId();
+        } else {
+          queryArgs.userId = new mongoose.Types.ObjectId(userId);
+        }
+      }
+
+      if (startDate || endDate) {
+        const dateCond = {};
+        if (startDate) {
+          dateCond.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          dateCond.$lte = end;
+        }
+
+        const dateOrClause = {
+          $or: [
+            { createdAt: dateCond },
+            { 'partialPaymentsHistory.transactionDate': dateCond },
+            { 'partialPaymentsHistory.verifiedAt': dateCond }
+          ]
+        };
+
+        if (!queryArgs.$and) {
+          queryArgs.$and = [];
+        }
+        queryArgs.$and.push(dateOrClause);
       }
 
       if (search && search.trim() !== '') {
@@ -984,18 +1022,19 @@ const segmentsService = {
         }).select('_id');
         const segmentIds = matchedSegments.map(s => s._id);
 
-        queryArgs.$and = [
-          {
-            $or: [
-              { userId: { $in: userIds } },
-              { planId: { $in: planIds } },
-              { preferredSegmentId: { $in: segmentIds } },
-              { utrNumber: searchRegex },
-              { 'partialPaymentsHistory.utrNumber': searchRegex },
-              { razorpayOrderId: searchRegex }
-            ]
-          }
-        ];
+        if (!queryArgs.$and) {
+          queryArgs.$and = [];
+        }
+        queryArgs.$and.push({
+          $or: [
+            { userId: { $in: userIds } },
+            { planId: { $in: planIds } },
+            { preferredSegmentId: { $in: segmentIds } },
+            { utrNumber: searchRegex },
+            { 'partialPaymentsHistory.utrNumber': searchRegex },
+            { razorpayOrderId: searchRegex }
+          ]
+        });
       }
 
       console.log('[getPendingBankTransfers] Querying PaymentIntent with:', JSON.stringify(queryArgs, null, 2));
@@ -1015,7 +1054,7 @@ const segmentsService = {
                       $cond: [
                         {
                           $or: [
-                            { $in: ['$status', ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING']] },
+                            { $in: ['$status', ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING']] },
                             {
                               $gt: [
                                 {
@@ -1054,7 +1093,7 @@ const segmentsService = {
               {
                 $match: {
                   $or: [
-                    { status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] } },
+                    { status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING'] } },
                     { 'partialPaymentsHistory.status': 'PENDING' }
                   ]
                 }
@@ -1068,9 +1107,26 @@ const segmentsService = {
       const userStats = globalSummaryAgg[0]?.byUser[0] || {};
       const pendingIntentsCount = globalSummaryAgg[0]?.pendingIntents[0]?.total || 0;
 
+      const realizedGst = await salesRevenueService.computeRealizedMetrics({
+        callerId,
+        startDate,
+        endDate,
+        search,
+      });
+
       const summaryStats = {
         totalCustomers: userStats.totalCustomers || 0,
-        totalVolume: userStats.totalVolume || 0,
+        totalVolume: realizedGst.grossTurnover,
+        grossTurnover: realizedGst.grossTurnover,
+        taxableTurnover: realizedGst.taxableTurnover,
+        totalTax: realizedGst.totalTax,
+        cgst: realizedGst.cgst,
+        sgst: realizedGst.sgst,
+        igst: realizedGst.igst,
+        b2bCount: realizedGst.b2bCount,
+        b2cCount: realizedGst.b2cCount,
+        b2bAmount: realizedGst.b2bAmount,
+        b2cAmount: realizedGst.b2cAmount,
         actionRequiredCustomers: userStats.actionRequiredCustomers || 0,
         totalPayments: userStats.totalPayments || 0,
         pendingPaymentsCount: pendingIntentsCount
@@ -1081,30 +1137,42 @@ const segmentsService = {
         let planObj = intent.planId;
         let segmentName = 'N/A';
 
-        // Fetch segment name if ID exists
-        if (intent.preferredSegmentId) {
-          const seg = await segmentsModel.findById(intent.preferredSegmentId);
-          if (seg) segmentName = seg.segmentName;
-        }
-
-        if (intent.purchaseType === 'REGISTRATION') {
-          const isLifetime = intent.baseAmount === 10000;
+        if (intent.purchaseType === 'REGISTRATION' || intent.preferredSegmentId === 'REGISTRATION') {
+          const isLifetime = (intent.baseAmount === 10000 || intent.totalAmount === 10000);
           planObj = {
             _id: 'REGISTRATION',
             planName: isLifetime ? 'Gold Registration' : 'Silver Registration',
-            price: intent.baseAmount,
+            price: intent.baseAmount || intent.totalAmount || 0,
             duration: isLifetime ? '3652' : '365',
             segmentsName: 'Platform'
           };
           segmentName = 'Platform';
-        } else if (!planObj) {
-          planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
         } else {
-          // Flatten segmentsName into planObj for easier frontend access if desired
-          planObj = {
-            ...planObj.toObject ? planObj.toObject() : planObj,
-            segmentsName: segmentName
-          };
+          // Fetch segment name if ID exists and is a valid ObjectId
+          if (intent.preferredSegmentId && mongoose.Types.ObjectId.isValid(intent.preferredSegmentId)) {
+            const seg = await segmentsModel.findById(intent.preferredSegmentId).lean();
+            if (seg) segmentName = seg.segmentName;
+          }
+
+          if (!planObj && intent.preferredPlanId && mongoose.Types.ObjectId.isValid(intent.preferredPlanId)) {
+            const plan = await segmentsPlanModel.findById(intent.preferredPlanId).lean();
+            if (plan) {
+              planObj = {
+                ...plan,
+                segmentsName: segmentName
+              };
+            } else {
+              planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
+            }
+          } else if (!planObj) {
+            planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
+          } else {
+            // Flatten segmentsName into planObj for easier frontend access if desired
+            planObj = {
+              ...planObj.toObject ? planObj.toObject() : planObj,
+              segmentsName: segmentName
+            };
+          }
         }
 
         // Construct full URL for proof image
@@ -1159,6 +1227,9 @@ const segmentsService = {
           correctionHistory: intent.correctionHistory || [],
           discount: intent.discount || 0,
           status: displayStatus,
+          baseAmount: intent.baseAmount || 0,
+          gstAmount: intent.gstAmount || 0,
+          gstRateUsed: intent.gstRateUsed || 18,
           invoiceNumber: linkedInvoice?.invoiceNumber || null,
           paymentMethod: intent.paymentMethod || 'BANK_TRANSFER',
           preferredSegmentId: intent.preferredSegmentId,
@@ -1196,17 +1267,18 @@ const segmentsService = {
         const intents = await PaymentIntent
           .find({
             userId: { $in: pageUserIds },
-            status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] },
+            status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] },
             $or: [
               { proofImage: { $ne: null, $exists: true } },
               { 'proofImages.0': { $exists: true } },
               { 'partialPaymentsHistory.0': { $exists: true } },
-              { purchaseType: 'REGISTRATION' }
+              { purchaseType: 'REGISTRATION' },
+              { paymentMethod: 'BANK_TRANSFER' }
             ]
           })
           .populate({
             path: 'userId',
-            select: 'fullName phone email kycStatus registrationType'
+            select: 'fullName phone email kycStatus registrationType gstin firmName panNumber userObject'
           })
           .populate({
             path: 'planId',
@@ -1264,7 +1336,7 @@ const segmentsService = {
           group.totalAmount += amtTarget;
           group.remainingBalance += remaining;
 
-          const isPending = p.status === 'PENDING_BANK_TRANSFER' || p.status === 'VERIFICATION_PENDING';
+          const isPending = p.status === 'PENDING_BANK_TRANSFER' || p.status === 'VERIFICATION_PENDING' || p.status === 'PENDING';
           const hasPendingInstallment = (p.partialPaymentsHistory || []).some(h => h.status === 'PENDING');
           if (isPending || hasPendingInstallment) {
             group.pendingCount += 1;
@@ -1281,7 +1353,18 @@ const segmentsService = {
           }
         }
 
-        const usersList = Array.from(userMap.values()).filter(g => g.user);
+        const usersList = Array.from(userMap.values()).map(g => {
+          if (!g.user) {
+            g.user = {
+              _id: 'GUEST_' + (g.payments[0]?._id || 'UNKNOWN'),
+              fullName: 'Direct / Offline Client',
+              phone: '-',
+              email: '-',
+              registrationType: 'STANDARD'
+            };
+          }
+          return g;
+        });
 
         return {
           status: 200,
@@ -1300,7 +1383,7 @@ const segmentsService = {
         .find(queryArgs)
         .populate({
           path: 'userId',
-          select: 'fullName phone email kycStatus registrationType'
+          select: 'fullName phone email kycStatus registrationType gstin firmName panNumber userObject'
         })
         .populate({
           path: 'planId',
@@ -1666,6 +1749,325 @@ const segmentsService = {
       return { status: 400, message: error.message, data: [] };
     }
   },
+  getUserPlanSegments: async ({ user, query }) => {
+    try {
+      const userId = user?._id || query?.userId;
+      if (!userId) {
+        return { status: 400, message: "User ID is required", data: {} };
+      }
+
+      const now = new Date();
+      const activeEntitlements = await Entitlement.find({
+        userId,
+        type: 'PLAN',
+        status: 'ACTIVE',
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        startDate: { $lte: now },
+        $or: [
+          { endDate: null },
+          { endDate: { $gte: now } }
+        ]
+      }).populate({
+        path: 'resourceId',
+        model: 'segmentsPlan'
+      }).populate({
+        path: 'segmentId',
+        model: 'segments'
+      });
+
+      if (!activeEntitlements || activeEntitlements.length === 0) {
+        return {
+          status: 200,
+          message: "No active plan found",
+          data: {
+            hasActivePlan: false,
+            activePlan: null,
+            segments: []
+          }
+        };
+      }
+
+      const primaryEnt = activeEntitlements[0];
+      const planDoc = primaryEnt.resourceId;
+      const isLifetime = !primaryEnt.endDate;
+      const remainingDays = primaryEnt.endDate
+        ? Math.max(0, Math.ceil((new Date(primaryEnt.endDate) - now) / (1000 * 60 * 60 * 24)))
+        : 3650;
+
+      const activePlan = {
+        planId: planDoc?._id || primaryEnt.resourceId,
+        planName: planDoc?.planName || 'Active Plan',
+        price: planDoc?.price || 0,
+        duration: planDoc?.duration || primaryEnt.days || 365,
+        day: planDoc?.day || 'days',
+        startDate: primaryEnt.startDate,
+        endDate: primaryEnt.endDate,
+        isLifetime,
+        remainingDays,
+        isHni: planDoc?.isHni || false
+      };
+
+      const activeSegmentIdSet = new Set();
+      for (const ent of activeEntitlements) {
+        if (ent.segmentId) {
+          const sId = ent.segmentId._id ? ent.segmentId._id.toString() : ent.segmentId.toString();
+          activeSegmentIdSet.add(sId);
+        }
+      }
+
+      const allSegments = await segmentsModel.find({ segmentStatus: 'active' }).sort({ segmentName: 1 });
+      const mappedSegments = allSegments.map(seg => ({
+        _id: seg._id,
+        segmentName: seg.segmentName,
+        segmentDiscription: seg.segmentDiscription,
+        isActive: activeSegmentIdSet.has(seg._id.toString())
+      }));
+
+      return {
+        status: 200,
+        message: "User plan segments fetched successfully",
+        data: {
+          hasActivePlan: true,
+          activePlan,
+          segments: mappedSegments
+        }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: {} };
+    }
+  },
+  toggleUserSegment: async ({ user, body }) => {
+    try {
+      const userId = user?._id;
+      const { segmentId, activate } = body;
+
+      if (!userId) {
+        return { status: 401, message: "Unauthorized", data: {} };
+      }
+      if (!segmentId) {
+        return { status: 400, message: "segmentId is required", data: {} };
+      }
+      if (typeof activate !== 'boolean') {
+        return { status: 400, message: "activate boolean flag is required", data: {} };
+      }
+
+      const now = new Date();
+      const activeEntitlements = await Entitlement.find({
+        userId,
+        type: 'PLAN',
+        status: 'ACTIVE',
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        startDate: { $lte: now },
+        $or: [
+          { endDate: null },
+          { endDate: { $gte: now } }
+        ]
+      });
+
+      if (!activeEntitlements || activeEntitlements.length === 0) {
+        return { status: 400, message: "No active plan found. Please purchase a plan first.", data: {} };
+      }
+
+      const templateEnt = activeEntitlements[0];
+      const planId = templateEnt.resourceId;
+      const startDate = templateEnt.startDate;
+      const endDate = templateEnt.endDate;
+
+      if (!activate) {
+        const currentlyActiveSegmentsCount = activeEntitlements.filter(e => e.segmentId).length;
+        if (currentlyActiveSegmentsCount <= 1) {
+          return { status: 400, message: "At least one segment must remain active.", data: {} };
+        }
+
+        await Entitlement.updateMany(
+          { userId, type: 'PLAN', segmentId, status: 'ACTIVE' },
+          { $set: { status: 'INACTIVE', revokedReason: 'USER_DEACTIVATED', revokedAt: new Date() } }
+        );
+        await userActiveSegmentModel.updateMany(
+          { userId, segmentId },
+          { $set: { isActive: false } }
+        );
+
+        return {
+          status: 200,
+          message: "Segment deactivated successfully",
+          data: { segmentId, isActive: false }
+        };
+      } else {
+        const segmentDoc = await segmentsModel.findById(segmentId);
+        if (!segmentDoc) {
+          return { status: 404, message: "Segment not found", data: {} };
+        }
+
+        const isAlreadyActive = activeEntitlements.some(
+          e => e.segmentId && e.segmentId.toString() === segmentId.toString()
+        );
+        if (isAlreadyActive) {
+          return {
+            status: 200,
+            message: "Segment is already active",
+            data: { segmentId, isActive: true }
+          };
+        }
+
+        const existingEnt = await Entitlement.findOne({
+          userId,
+          type: 'PLAN',
+          resourceId: planId,
+          segmentId
+        });
+
+        if (existingEnt) {
+          existingEnt.status = 'ACTIVE';
+          existingEnt.startDate = startDate;
+          existingEnt.endDate = endDate;
+          existingEnt.revokedReason = null;
+          existingEnt.revokedAt = null;
+          await existingEnt.save();
+        } else {
+          await Entitlement.create({
+            userId,
+            type: 'PLAN',
+            resourceId: planId,
+            segmentId,
+            startDate,
+            endDate,
+            status: 'ACTIVE',
+            grantedBy: 'SYSTEM',
+            grantReason: 'ONLINE_PAYMENT',
+            sourceRefId: templateEnt.sourceRefId,
+            remarks: 'Activated by user from Settings'
+          });
+        }
+
+        await userActiveSegmentModel.findOneAndUpdate(
+          { userId, segmentId },
+          {
+            isActive: true,
+            purchaseDate: startDate,
+            expiryDate: endDate || new Date(Date.now() + 3652 * 86400000)
+          },
+          { upsert: true, new: true }
+        );
+
+        return {
+          status: 200,
+          message: "Segment activated successfully",
+          data: { segmentId, isActive: true }
+        };
+      }
+    } catch (error) {
+      return { status: 400, message: error.message, data: {} };
+    }
+  },
+  adminAllocateSegments: async ({ body, user }) => {
+    try {
+      const { userId, segmentIds } = body;
+      const adminId = user ? user._id : null;
+
+      if (!userId) {
+        return { status: 400, message: "userId is required", data: {} };
+      }
+      if (!Array.isArray(segmentIds) || segmentIds.length === 0) {
+        return { status: 400, message: "At least one segment must be selected", data: {} };
+      }
+
+      const now = new Date();
+      const activeEntitlements = await Entitlement.find({
+        userId,
+        type: 'PLAN',
+        status: 'ACTIVE',
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        startDate: { $lte: now },
+        $or: [
+          { endDate: null },
+          { endDate: { $gte: now } }
+        ]
+      });
+
+      if (!activeEntitlements || activeEntitlements.length === 0) {
+        return { status: 400, message: "User has no active plan to allocate segments to.", data: {} };
+      }
+
+      const templateEnt = activeEntitlements[0];
+      const planId = templateEnt.resourceId;
+      const startDate = templateEnt.startDate;
+      const endDate = templateEnt.endDate;
+      const targetSegmentIdStrs = new Set(segmentIds.map(id => id.toString()));
+
+      for (const sId of segmentIds) {
+        const existing = await Entitlement.findOne({
+          userId,
+          type: 'PLAN',
+          resourceId: planId,
+          segmentId: sId
+        });
+
+        if (existing) {
+          existing.status = 'ACTIVE';
+          existing.startDate = startDate;
+          existing.endDate = endDate;
+          existing.revokedReason = null;
+          existing.revokedAt = null;
+          await existing.save();
+        } else {
+          await Entitlement.create({
+            userId,
+            type: 'PLAN',
+            resourceId: planId,
+            segmentId: sId,
+            startDate,
+            endDate,
+            status: 'ACTIVE',
+            grantedBy: 'ADMIN',
+            grantReason: 'MANUAL',
+            sourceRefId: templateEnt.sourceRefId,
+            remarks: 'Admin allocated segment'
+          });
+        }
+
+        await userActiveSegmentModel.findOneAndUpdate(
+          { userId, segmentId: sId },
+          {
+            isActive: true,
+            purchaseDate: startDate,
+            expiryDate: endDate || new Date(Date.now() + 3652 * 86400000)
+          },
+          { upsert: true, new: true }
+        );
+      }
+
+      for (const ent of activeEntitlements) {
+        if (ent.segmentId && !targetSegmentIdStrs.has(ent.segmentId.toString())) {
+          ent.status = 'REVOKED';
+          ent.revokedReason = 'ADMIN_REALLOCATE';
+          ent.revokedAt = new Date();
+          await ent.save();
+
+          await userActiveSegmentModel.updateMany(
+            { userId, segmentId: ent.segmentId },
+            { $set: { isActive: false } }
+          );
+        }
+      }
+
+      await AdminAuditLog.create({
+        adminId: adminId || userId,
+        action: 'ADMIN_ALLOCATE_SEGMENTS',
+        targetUserId: userId,
+        reason: 'Admin modified segment allocation',
+        meta: { segmentIds }
+      });
+
+      return {
+        status: 200,
+        message: "Segments allocated successfully",
+        data: { userId, allocatedSegmentIds: segmentIds }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: {} };
+    }
+  },
   expireSegments: async ({ }) => {
     try {
       const result = await userActiveSegmentModel.updateMany(
@@ -1819,7 +2221,7 @@ const segmentsService = {
           // It's a Segment Plan
           planName = intent.planId?.planName || 'Plan';
           // Find segment name if available
-          if (intent.preferredSegmentId) {
+          if (intent.preferredSegmentId && mongoose.Types.ObjectId.isValid(intent.preferredSegmentId)) {
             const seg = await segmentsModel.findById(intent.preferredSegmentId).lean();
             if (seg) segmentName = seg.segmentName;
           }
@@ -1950,17 +2352,20 @@ const segmentsService = {
     try {
       let { planName, segmentsId, duration, day, price, discription, planFeatures, planStatus } = body;
 
+      const cleanName = (planName || '').trim().toUpperCase();
+      if (!['SPARK', 'SPLENDID'].includes(cleanName)) {
+        return {
+          status: 400,
+          message: 'Strict Policy: Plan name must be either "SPARK" or "SPLENDID".',
+          data: {}
+        };
+      }
+
       let totalDays = parseInt(duration) || 0;
       let perDayCharge = (totalDays > 0) ? Math.round(price / totalDays) : 0;
 
-      if (body.isHni) {
-        duration = "0";
-        price = 0;
-        perDayCharge = 0;
-      }
-
       const planData = {
-        planName: planName,
+        planName: cleanName,
         duration: duration,
         day: day,
         price: price,
@@ -1991,14 +2396,19 @@ const segmentsService = {
       let { id } = query
       let { planName, segmentsId, duration, day, price, discription, planFeatures, planStatus } = body;
 
+      if (planName) {
+        const cleanName = planName.trim().toUpperCase();
+        if (!['SPARK', 'SPLENDID'].includes(cleanName)) {
+          return {
+            status: 400,
+            message: 'Strict Policy: Plan name must be either "SPARK" or "SPLENDID".',
+            data: {}
+          };
+        }
+      }
+
       let totalDays = parseInt(duration) || 0;
       let perDayCharge = (totalDays > 0) ? Math.round(price / totalDays) : 0;
-
-      if (body.isHni) {
-        duration = "0";
-        price = 0;
-        perDayCharge = 0;
-      }
       const segmentPlan = await segmentsPlanModel.findOne({ _id: id })
       if (!segmentPlan) {
         return {
@@ -2008,7 +2418,9 @@ const segmentsService = {
         };
       }
 
-      segmentPlan.planName = planName
+      if (planName) {
+        segmentPlan.planName = planName.trim().toUpperCase();
+      }
       segmentPlan.duration = duration
       segmentPlan.day = day
       segmentPlan.discription = discription

@@ -31,7 +31,7 @@ class TableManagerDropdown extends StatelessWidget {
       }
 
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: AppTheme.white,
           border: Border.all(color: AppTheme.gray300),
@@ -41,8 +41,8 @@ class TableManagerDropdown extends StatelessWidget {
           child: DropdownButton<String>(
             value: selectedValue,
             isExpanded: true,
-            isDense: true,
-            itemHeight: 52.0,
+            isDense: false,
+            itemHeight: 48.0,
             icon: const Icon(
               Icons.keyboard_arrow_down,
               size: 18,
@@ -72,7 +72,7 @@ class TableManagerDropdown extends StatelessWidget {
                         Text(
                           m.name,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: AppTheme.textPrimary,
                             fontWeight: FontWeight.w500,
                           ),

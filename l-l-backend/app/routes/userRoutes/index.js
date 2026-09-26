@@ -45,7 +45,7 @@ const usersRoutes = () => {
   Router.post("/admin-create", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'create'), usersController.adminCreate)
   Router.put("/admin-update-user/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'update'), usersController.adminUpdateUser)
   Router.post("/admin-login", usersController.adminLogin) // Login must be public
-  Router.post("/bypass-payment", auth.tokenVerified, adminStrictOnly, checkPermission('Payments', 'update'), usersController.bypassPayment)
+  Router.post("/bypass-payment", auth.tokenVerified, adminStrictOnly, usersController.bypassPayment)
   Router.put("/generate-temp-pin/:id", auth.tokenVerified, adminStrictOnly, checkPermission('Users', 'update'), usersController.adminGenerateTempPin)
 
 

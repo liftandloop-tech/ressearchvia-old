@@ -56,6 +56,8 @@ abstract class ApiConfig {
       '/segments/segment-payment-history/$userId';
   static String getUserActiveSegment(String userId) =>
       '/segments/user-active-segment?userId=$userId';
+  static const String userPlanSegments = '/segments/user-plan-segments';
+  static const String toggleUserSegment = '/segments/toggle-user-segment';
   static const String requestHniPlan = '/segments/segment-purchase';
 
   static String getUserPlan(String userId) =>

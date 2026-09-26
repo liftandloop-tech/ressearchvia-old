@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../services/applicant.service.dart';
 import '../../models/staff.model.dart';
+import '../../models/role.model.dart';
 import '../staff/staff.controller.dart';
 import '../staff/staff_management.controller.dart';
 
@@ -14,14 +15,25 @@ class ApplicantsListController extends GetxController {
   // Dialog fields
   final mpinController = TextEditingController();
   final joiningDateController = TextEditingController();
+  var selectedRoleId = RxnString();
+  var selectedRole = ''.obs;
   var selectedDepartment = ''.obs;
   var isViewOnly = false.obs;
 
-  List<String> get availableDepartments {
+  List<RoleModel> get availableRoles {
     if (Get.isRegistered<StaffController>()) {
-      return Get.find<StaffController>().availableDepartments;
+      return Get.find<StaffController>().availableRoles;
     }
-    return ['Researcher', 'Director', 'Manager', 'Executive'];
+    return [];
+  }
+
+  void updateRole(String roleId) {
+    selectedRoleId.value = roleId;
+    final match = availableRoles.firstWhereOrNull((r) => r.id == roleId);
+    if (match != null) {
+      selectedRole.value = match.name;
+      selectedDepartment.value = match.departmentName ?? '';
+    }
   }
 
   @override
@@ -45,15 +57,21 @@ class ApplicantsListController extends GetxController {
   }
 
   Future<void> approveApplicant(String applicantId) async {
-    if (selectedDepartment.value.isEmpty || mpinController.text.trim().isEmpty) {
-      Get.snackbar('Alert', 'Please select a department and enter an MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
+    final hasRole = (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty) ||
+        selectedRole.value.isNotEmpty;
+    if (!hasRole || mpinController.text.trim().isEmpty) {
+      Get.snackbar('Alert', 'Please select a role and enter an MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
       return;
     }
 
     isLoading.value = true;
     try {
       final data = {
-        'deparment': selectedDepartment.value,
+        if (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty)
+          'roleId': selectedRoleId.value,
+        'role': selectedRole.value,
+        if (selectedDepartment.value.isNotEmpty)
+          'deparment': selectedDepartment.value,
         'mpin': mpinController.text.trim(),
         'isViewOnly': isViewOnly.value,
         'joiningDate': joiningDateController.text.trim().isEmpty ? null : joiningDateController.text.trim(),

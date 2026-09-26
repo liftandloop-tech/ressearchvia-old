@@ -36,6 +36,9 @@ const SegmentsRoutes = () => {
 
     // User Routes - Viewing Active Content / History
     Router.get("/user-active-segment", auth.tokenVerified, appAccess, registrationAccess, segmentsController.getUserActiveSegment) // Just logic to see what I have
+    Router.get("/user-plan-segments", auth.tokenVerified, appAccess, registrationAccess, segmentsController.getUserPlanSegments)
+    Router.post("/toggle-user-segment", auth.tokenVerified, appAccess, registrationAccess, segmentsController.toggleUserSegment)
+    Router.post("/admin-allocate-segments", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.adminAllocateSegments)
     Router.get("/segment-invoice", auth.tokenVerified, appAccess, registrationAccess, segmentsController.segmentInvoice)
     Router.get("/segment-payment-history/:id", auth.tokenVerified, appAccess, registrationAccess, segmentsController.segmentPaymentHistroy)
 

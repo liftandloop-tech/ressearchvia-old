@@ -453,8 +453,8 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     // Direct canonical key match
                     if (perm.actions.includes(requiredKey)) return true;
 
-                    // Alias resolution for legacy route keys
-                    if ((requiredKey === 'users.read' || requiredKey === 'users:read') &&
+                    // Alias resolution for legacy route keys and new button-level permission keys
+                    if ((requiredKey === 'users.read' || requiredKey === 'users:read' || requiredKey === 'users.view_assigned' || requiredKey === 'users.view_all') &&
                         (perm.actions.includes('users.view') || perm.actions.includes('users.view_all') || perm.actions.includes('users.view_assigned') || perm.actions.includes('read'))) return true;
 
                     if ((requiredKey === 'kyc.read' || requiredKey === 'kyc:read') &&
@@ -466,14 +466,26 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     if ((requiredKey === 'reports.read' || requiredKey === 'reports:read') &&
                         (perm.actions.includes('reports.view') || perm.actions.includes('read'))) return true;
 
+                    if ((requiredKey === 'reports.trading_call_popup') &&
+                        (perm.actions.includes('reports.trading_call_popup') || perm.actions.includes('trading_call_popup'))) return true;
+
                     if ((requiredKey === 'staff.read' || requiredKey === 'staff:read') &&
                         (perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
+
+                    if (requiredKey === 'staff.reset' &&
+                        (perm.actions.includes('staff.reset_mpin') || perm.actions.includes('staff.update') || perm.actions.includes('staff.reset'))) return true;
 
                     if ((requiredKey === 'settings.read' || requiredKey === 'settings:read') &&
                         (perm.actions.includes('settings.view') || perm.actions.includes('read'))) return true;
 
-                    if ((requiredKey === 'leads.read' || requiredKey === 'leads:read') &&
-                        (perm.actions.includes('leads.view_all') || perm.actions.includes('leads.view_assigned') || perm.actions.includes('leads.pull') || perm.actions.includes('leads.view') || perm.actions.includes('read'))) return true;
+                    if ((requiredKey === 'leads.read' || requiredKey === 'leads:read' || requiredKey === 'leads.view_all' || requiredKey === 'leads.view_assigned') &&
+                        (perm.actions.includes('leads.view') || perm.actions.includes('leads.view_all') || perm.actions.includes('leads.view_assigned') || perm.actions.includes('leads.pull') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'leads.update_all' || requiredKey === 'leads.update_assigned') &&
+                        (perm.actions.includes('leads.update') || perm.actions.includes('leads.update_all') || perm.actions.includes('leads.update_assigned'))) return true;
+
+                    if ((requiredKey === 'leads.follow_up_all' || requiredKey === 'leads.follow_up_assigned') &&
+                        (perm.actions.includes('leads.follow_up') || perm.actions.includes('leads.follow_up_all') || perm.actions.includes('leads.follow_up_assigned'))) return true;
 
                     // Legacy fallback matching if feature/action were passed
                     if (actionParam && perm.feature && perm.feature.toLowerCase() === feature.toLowerCase()) {

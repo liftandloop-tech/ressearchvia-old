@@ -508,4 +508,36 @@ class SubscriptionService extends ApiService {
       return false;
     }
   }
+
+  Future<Map<String, dynamic>?> getUserPlanSegments(String userId) async {
+    try {
+      final response = await get('/segments/user-plan-segments?userId=$userId');
+      if (response.statusCode == 200 && response.body != null) {
+        return Map<String, dynamic>.from(response.body['data'] ?? {});
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching user plan segments: $e');
+      return null;
+    }
+  }
+
+  Future<bool> adminAllocateSegments({
+    required String userId,
+    required List<String> segmentIds,
+  }) async {
+    try {
+      final body = {
+        "userId": userId,
+        "segmentIds": segmentIds,
+      };
+      final response = await post('/segments/admin-allocate-segments', body);
+      debugPrint('Admin allocate segments response: ${response.statusCode} - ${response.body}');
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      debugPrint('Error allocating segments (admin): $e');
+      return false;
+    }
+  }
 }
+

@@ -173,6 +173,8 @@ class ApplicantsListScreen extends StatelessWidget {
   void _showApproveDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
     controller.mpinController.clear();
     controller.joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    controller.selectedRoleId.value = null;
+    controller.selectedRole.value = '';
     controller.selectedDepartment.value = '';
     controller.isViewOnly.value = false;
 
@@ -191,18 +193,41 @@ class ApplicantsListScreen extends StatelessWidget {
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 24),
-              // Department selection
+              // Role selection
               Obx(
                 () => DropdownButtonFormField<String>(
-                  value: controller.selectedDepartment.value.isEmpty ? null : controller.selectedDepartment.value,
-                  hint: const Text('Select Role'),
-                  decoration: const InputDecoration(border: OutlineInputBorder()),
-                  items: controller.availableDepartments
-                      .map((x) => DropdownMenuItem(value: x, child: Text(x)))
+                  value: controller.selectedRoleId.value,
+                  hint: const Text('Select Role *'),
+                  decoration: const InputDecoration(
+                    labelText: 'Assign Role *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: controller.availableRoles
+                      .map((r) => DropdownMenuItem(
+                            value: r.id,
+                            child: Text(
+                              r.departmentName != null && r.departmentName!.isNotEmpty
+                                  ? '${r.name} (${r.departmentName})'
+                                  : r.name,
+                            ),
+                          ))
                       .toList(),
-                  onChanged: (val) => controller.selectedDepartment.value = val ?? '',
+                  onChanged: (val) {
+                    if (val != null) controller.updateRole(val);
+                  },
                 ),
               ),
+              Obx(() {
+                final dept = controller.selectedDepartment.value;
+                if (dept.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 4),
+                  child: Text(
+                    'Department: $dept (Auto-assigned)',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                );
+              }),
               const SizedBox(height: 16),
               // MPIN setting
               TextField(

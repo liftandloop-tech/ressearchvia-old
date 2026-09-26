@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../services/permission_service.dart';
 import '../../controllers/auth/auth.controller.dart';
 
 /// Reusable widget for capability-based UI gating.

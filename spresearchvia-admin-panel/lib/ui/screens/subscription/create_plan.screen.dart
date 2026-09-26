@@ -109,14 +109,21 @@ class CreatePlanScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: controller.planNameController,
+                          textCapitalization: TextCapitalization.characters,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
+                            if (value == null || value.trim().isEmpty) {
                               return 'Please enter plan name';
+                            }
+                            final val = value.trim().toUpperCase();
+                            if (val != 'SPARK' && val != 'SPLENDID') {
+                              return 'Strict Policy: Plan name must be either "SPARK" or "SPLENDID"';
                             }
                             return null;
                           },
                           decoration: InputDecoration(
-                            hintText: 'Enter plan name',
+                            hintText: 'Enter plan name (SPARK or SPLENDID)',
+                            helperText: 'Allowed values: SPARK or SPLENDID',
+                            helperStyle: TextStyle(color: AppTheme.primaryBlue, fontSize: 11),
                             hintStyle: TextStyle(color: AppTheme.gray300),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
@@ -154,10 +161,6 @@ class CreatePlanScreen extends StatelessWidget {
                                 value: controller.isHni.value,
                                 onChanged: (v) {
                                   controller.isHni.value = v;
-                                  if (v) {
-                                    controller.durationController.text = '0';
-                                    controller.priceController.text = '0';
-                                  }
                                 },
                                 activeColor: AppTheme.primary,
                               ),
@@ -165,7 +168,7 @@ class CreatePlanScreen extends StatelessWidget {
                             const SizedBox(width: 8),
                             const Expanded(
                               child: Text(
-                                'HNI plans use custom pricing and validity during user assignment.',
+                                'HNI Plan: Requires users to strictly input a valid GSTIN upon selection in the mobile app.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey,
@@ -192,41 +195,39 @@ class CreatePlanScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              Obx(
-                                () => TextFormField(
-                                  controller: controller.durationController,
-                                  keyboardType: TextInputType.number,
-                                  enabled: !controller.isHni.value,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Required';
-                                    }
-                                    if (int.tryParse(value) == null) {
-                                      return 'Invalid';
-                                    }
-                                    return null;
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: '30',
-                                    hintStyle: TextStyle(
-                                      color: AppTheme.gray300,
+                              TextFormField(
+                                controller: controller.durationController,
+                                keyboardType: TextInputType.number,
+                                enabled: true,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Required';
+                                  }
+                                  if (int.tryParse(value) == null) {
+                                    return 'Invalid';
+                                  }
+                                  return null;
+                                },
+                                decoration: InputDecoration(
+                                  hintText: '30',
+                                  hintStyle: TextStyle(
+                                    color: AppTheme.gray300,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(
+                                      color: AppTheme.gray200,
                                     ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                      borderSide: BorderSide(
-                                        color: AppTheme.gray200,
-                                      ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(
+                                      color: AppTheme.gray200,
                                     ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                      borderSide: BorderSide(
-                                        color: AppTheme.gray200,
-                                      ),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 12,
                                   ),
                                 ),
                               ),
@@ -257,20 +258,19 @@ class CreatePlanScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              Obx(
-                                () => TextFormField(
-                                  controller: controller.priceController,
-                                  keyboardType: TextInputType.number,
-                                  enabled: !controller.isHni.value,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter price';
-                                    }
-                                    if (double.tryParse(value) == null) {
-                                      return 'Invalid price';
-                                    }
-                                    return null;
-                                  },
+                              TextFormField(
+                                controller: controller.priceController,
+                                keyboardType: TextInputType.number,
+                                enabled: true,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter price';
+                                  }
+                                  if (double.tryParse(value) == null) {
+                                    return 'Invalid price';
+                                  }
+                                  return null;
+                                },
                                   decoration: InputDecoration(
                                     hintText: '₹ 29.99',
                                     hintStyle: TextStyle(
@@ -294,7 +294,6 @@ class CreatePlanScreen extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ),

@@ -4,7 +4,6 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import 'package:spresearch_web/services/subscription.service.dart';
 import 'package:spresearch_web/models/subscription_plan.model.dart';
-import 'package:spresearch_web/models/user.model.dart'; // Import for passing User if needed
 
 class AssignEntitlementsDialog extends StatefulWidget {
   final String userId;
@@ -98,7 +97,7 @@ class _AssignEntitlementsDialogState extends State<AssignEntitlementsDialog> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedRegType,
+                initialValue: _selectedRegType,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -128,9 +127,9 @@ class _AssignEntitlementsDialogState extends State<AssignEntitlementsDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -211,7 +210,7 @@ class _AssignEntitlementsDialogState extends State<AssignEntitlementsDialog> {
                   onPressed: _isSaving ? null : _handleSave,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
-                    disabledBackgroundColor: AppTheme.primary.withOpacity(0.6),
+                    disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.6),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 12,

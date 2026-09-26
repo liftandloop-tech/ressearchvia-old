@@ -119,7 +119,10 @@ class DashboardService extends ApiService {
 
   Future<List<Map<String, dynamic>>> getRenewalsList() async {
     try {
-      final response = await get('/user/user-list');
+      final response = await get(
+        '/user/user-list',
+        query: {'page': '1', 'pageSize': '50'},
+      );
 
       if (response.status.hasError) {
         debugPrint('Error fetching renewals list: ${response.statusText}');

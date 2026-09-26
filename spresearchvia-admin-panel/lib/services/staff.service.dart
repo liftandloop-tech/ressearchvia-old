@@ -260,4 +260,67 @@ class StaffService extends ApiService {
       return (success: false, message: e.toString());
     }
   }
+
+  Future<StaffModel?> getStaffProfileMe() async {
+    try {
+      final response = await get('/staff/me');
+      if (response.status.hasError) {
+        throw Exception(response.body?['message'] ?? 'Failed to load profile');
+      }
+      if (response.body != null && response.body['data'] != null) {
+        return StaffModel.fromJson(response.body['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting staff profile: $e');
+      rethrow;
+    }
+  }
+
+  Future<StaffModel?> updateStaffProfileMe(Map<String, dynamic> data) async {
+    try {
+      final response = await put('/staff/me', data);
+      if (response.status.hasError) {
+        throw Exception(response.body?['message'] ?? 'Failed to update profile');
+      }
+      if (response.body != null && response.body['data'] != null) {
+        return StaffModel.fromJson(response.body['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error updating staff profile: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> changeStaffMpinMe(String oldMpin, String newMpin) async {
+    try {
+      final response = await post('/staff/me/change-mpin', {
+        'oldMpin': oldMpin,
+        'newMpin': newMpin,
+      });
+      if (response.status.hasError) {
+        throw Exception(response.body?['message'] ?? 'Failed to change MPIN');
+      }
+      return response.body != null && (response.body['status'] == 200 || response.body['status'] == '200');
+    } catch (e) {
+      debugPrint('Error changing staff MPIN: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getPublicStaffVerification(String staffId) async {
+    try {
+      final response = await get('/staff/verify/$staffId');
+      if (!response.status.hasError && response.body != null && response.body is Map) {
+        if (response.body['status'] == 200 && response.body['data'] != null) {
+          return Map<String, dynamic>.from(response.body['data']);
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting public verification: $e');
+      return null;
+    }
+  }
 }

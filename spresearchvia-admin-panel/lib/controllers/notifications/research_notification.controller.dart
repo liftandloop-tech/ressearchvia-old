@@ -42,10 +42,14 @@ class ResearchNotificationController extends GetxController {
 
   Future<void> fetchLiveActivities({bool initial = false}) async {
     try {
-      // Only proceed if staff/user is authenticated
+      // Only proceed if staff/user is authenticated and has permission
       if (Get.isRegistered<AuthController>()) {
         final authController = Get.find<AuthController>();
         if (!authController.isAuthenticated.value) return;
+        final user = authController.user.value;
+        if (user != null && !user.isAdmin && !user.has('reports.trading_call_popup')) {
+          return;
+        }
       }
 
       final response = await _apiService.get(
@@ -102,6 +106,14 @@ class ResearchNotificationController extends GetxController {
   }
 
   void _showAutomaticPopup(ResearchActivityModel activity) {
+    if (Get.isRegistered<AuthController>()) {
+      final authController = Get.find<AuthController>();
+      final user = authController.user.value;
+      if (user != null && !user.isAdmin && !user.has('reports.trading_call_popup')) {
+        return;
+      }
+    }
+
     final isUpdate = activity.latestUpdate != null && activity.latestUpdate!.isNotEmpty;
 
     // Dismiss any previously open snackbar so notifications don't overlap

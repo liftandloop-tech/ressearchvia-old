@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
-import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import '../../../../models/user.model.dart';
 
 class TableActions extends StatelessWidget {

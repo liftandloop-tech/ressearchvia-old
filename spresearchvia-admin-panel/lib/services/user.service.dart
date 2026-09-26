@@ -17,6 +17,10 @@ class UserService extends ApiService {
     String? planType,
     String? date,
     String? kycStatus,
+    String? name,
+    String? phone,
+    String? sortBy,
+    String? sortOrder,
   }) async {
     try {
       // Check if the logged-in user is a staff member
@@ -56,6 +60,18 @@ class UserService extends ApiService {
       }
       if (kycStatus != null && kycStatus.isNotEmpty) {
         query['kycStatus'] = kycStatus;
+      }
+      if (name != null && name.isNotEmpty) {
+        query['name'] = name;
+      }
+      if (phone != null && phone.isNotEmpty) {
+        query['phone'] = phone;
+      }
+      if (sortBy != null && sortBy.isNotEmpty) {
+        query['sortBy'] = sortBy;
+      }
+      if (sortOrder != null && sortOrder.isNotEmpty) {
+        query['sortOrder'] = sortOrder;
       }
 
       // Use different endpoint based on user type

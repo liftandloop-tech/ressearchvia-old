@@ -51,14 +51,7 @@ class SubscriptionTab extends StatelessWidget {
                         const Spacer(),
                         Row(
                           children: [
-                            Button(
-                              title: 'HNI Requests',
-                              buttonType: ButtonType.blue,
-                              icon: Icons.workspace_premium,
-                              onTap: () =>
-                                  Get.toNamed('/subscriptions/hni-requests'),
-                            ),
-                            const SizedBox(width: 12),
+
                             Button(
                               title: AppStrings.createSegment,
                               buttonType: ButtonType.green,

@@ -44,6 +44,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
   late final SegmentPlanController segmentPlanController;
   SegmentPlan? selectedPlan;
   String? _currentPaymentId;
+  String? gstin;
 
   @override
   void initState() {
@@ -59,6 +60,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
 
     final args = Get.arguments as Map<String, dynamic>?;
     selectedPlan = args?['plan'];
+    gstin = args?['gstin'];
 
     if (selectedPlan != null) {
       _initializeValuesFromPlan();
@@ -207,6 +209,28 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       return;
     }
 
+    // Block if user already has an active plan
+    if (segmentPlanController.hasActiveSegment.value) {
+      SnackbarService.showError(
+        'Strict Policy: You already have an active subscription. A single user can only have one plan at a time. Manage your segments in Settings.',
+      );
+      return;
+    }
+
+    // Strictly validate plan is Spark or Splendid
+    final pName = selectedPlan!.name.toUpperCase();
+    if (!pName.contains('SPARK') && !pName.contains('SPLENDID')) {
+      SnackbarService.showError('Strict Policy: Only "SPARK" or "SPLENDID" plan is purchasable.');
+      return;
+    }
+
+    // Strictly validate segment is selected
+    final chosenSegmentId = segmentPlanController.selectedSegmentId.value ?? selectedPlan!.categoryId;
+    if (chosenSegmentId.trim().isEmpty) {
+      SnackbarService.showError('Please select 1 research segment for your plan.');
+      return;
+    }
+
     debugPrint('DEBUG: Selected Plan ID: ${selectedPlan!.id}');
     isProcessing.value = true;
 
@@ -220,6 +244,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
           planId: selectedPlan!.id,
           paymentMode: 'BANK_TRANSFER',
           isPartial: isPartial,
+          gstin: gstin,
         );
         
         isProcessing.value = false;
@@ -240,6 +265,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
                'paymentId': paymentId,
                'isPartial': isPartial,
                'totalToPay': totalPayable.value, // This is X + GST
+               if (gstin != null) 'gstin': gstin,
              }
           );
           return;
@@ -250,6 +276,7 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       final responseData = await segmentPlanController.purchaseSegment(
         categoryId: segmentPlanController.selectedSegmentId.value ?? selectedPlan!.categoryId,
         planId: selectedPlan!.id,
+        gstin: gstin,
       );
       debugPrint('DEBUG: purchaseSegment response: $responseData');
 
@@ -459,6 +486,10 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
                   ),
                   const SizedBox(height: 8),
                   DetailRow(label: 'Trader Type', value: 'Professional Trader'),
+                  if (gstin != null && gstin!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    DetailRow(label: 'GSTIN', value: gstin!),
+                  ],
                 ],
               ),
             ),

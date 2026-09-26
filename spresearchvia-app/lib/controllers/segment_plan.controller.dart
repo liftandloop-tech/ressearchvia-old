@@ -208,6 +208,10 @@ class SegmentPlanController extends GetxController {
         final List<dynamic> plansData = data['data']['data'] ?? [];
         availablePlans.value = plansData
             .map((json) => SegmentPlan.fromJson(json))
+            .where((p) {
+              final name = p.name.trim().toUpperCase();
+              return name.contains('SPARK') || name.contains('SPLENDID');
+            })
             .toList();
 
         // Auto-select first or popular plan
@@ -289,8 +293,28 @@ class SegmentPlanController extends GetxController {
     required String planId,
     String? paymentMode,
     bool isPartial = false,
+    String? gstin,
   }) async {
     try {
+      if (hasActiveSegment.value) {
+        SnackbarService.showError(
+          'You already have an active subscription. A single user can only have one plan at a time. Manage your segments in Settings.',
+        );
+        return null;
+      }
+      if (categoryId.trim().isEmpty) {
+        SnackbarService.showError('Please select 1 segment for your plan.');
+        return null;
+      }
+      final plan = availablePlans.firstWhereOrNull((p) => p.id == planId);
+      if (plan != null) {
+        final planName = plan.name.toUpperCase();
+        if (!planName.contains('SPARK') && !planName.contains('SPLENDID')) {
+          SnackbarService.showError('Users can only purchase "SPARK" or "SPLENDID" plan.');
+          return null;
+        }
+      }
+
       isLoading.value = true;
       final uid = await userId;
       if (uid == null) throw Exception('User not logged in');
@@ -299,9 +323,10 @@ class SegmentPlanController extends GetxController {
         ApiConfig.acquisitionPlanOrder,
         data: {
           'planId': planId,
-          'segmentId': categoryId, // Now required as plans are universal
+          'segmentId': categoryId, // Exactly 1 segment at plan purchase
           if (paymentMode != null) 'paymentMode': paymentMode,
           'isPartial': isPartial,
+          if (gstin != null && gstin.trim().isNotEmpty) 'gstin': gstin.trim().toUpperCase(),
         },
       );
 

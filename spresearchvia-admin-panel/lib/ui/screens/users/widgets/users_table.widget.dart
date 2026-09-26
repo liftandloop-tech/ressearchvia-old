@@ -6,18 +6,13 @@ import 'package:spresearch_web/controllers/users/user.controller.dart';
 import 'package:spresearch_web/controllers/users/users_table.controller.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
-import '../../../../models/user.model.dart';
 import 'table_pagination.widget.dart';
 import 'user_data_row.dart';
+import 'user_table_header_cell.widget.dart';
+import 'user_column_filter.widget.dart';
 
 class UsersTable extends StatelessWidget {
   const UsersTable({super.key});
-
-  static const TextStyle _headerStyle = TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    color: AppTheme.textPrimary,
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -37,9 +32,8 @@ class UsersTable extends StatelessWidget {
       final pageSize = userManagementController.pageSize.value;
       final totalPages = (totalCount / pageSize).ceil();
 
-      // With server-side pagination, the users list already contains only the items for the current page.
-      // However, UserController might have filtered them further client-side.
       final displayedUsers = users;
+      final isLoading = userManagementController.isLoading.value;
 
       return Container(
         decoration: BoxDecoration(
@@ -47,25 +41,38 @@ class UsersTable extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTheme.border),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
-            if (displayedUsers.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(48),
-                child: Text(
-                  'No users found',
-                  style: TextStyle(color: AppTheme.textSecondary),
+            if (isLoading)
+              const LinearProgressIndicator(
+                minHeight: 3,
+                color: AppTheme.primaryBlue,
+                backgroundColor: AppTheme.border,
+              ),
+            if (isLoading && displayedUsers.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+                ),
+              )
+            else if (displayedUsers.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    'No users found',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
                 ),
               )
             else
-              SizedBox(
-                height: MediaQuery.of(context).size.height - 50,
+              Expanded(
                 child: DataTable2(
-                  columnSpacing: 12,
-                  horizontalMargin: 16,
-                  minWidth: 1400,
-                  headingRowHeight: 56,
-                  dataRowHeight: 60,
+                  columnSpacing: 10,
+                  horizontalMargin: 12,
+                  minWidth: 850,
+                  headingRowHeight: 48,
+                  dataRowHeight: 54,
                   headingRowColor: WidgetStateProperty.all(
                     AppTheme.backgroundLight,
                   ),
@@ -77,64 +84,75 @@ class UsersTable extends StatelessWidget {
                   ),
                   columns: [
                     DataColumn2(
-                      fixedWidth: 50,
-                      label: Obx(
-                        () => Checkbox(
-                          value:
-                              displayedUsers.every(
-                                (u) => controller.selectedUsers.contains(u.id),
-                              ) &&
-                              displayedUsers.isNotEmpty,
-                          onChanged: (_) => _toggleSelectAllOnPage(
-                            controller,
-                            displayedUsers,
-                          ),
-                          activeColor: AppTheme.primary,
+                      fixedWidth: 115,
+                      label: const UserTableHeaderCell(
+                        title: 'Created At',
+                        sortKey: 'createdAt',
+                        filterWidget: UserColumnFilter(
+                          columnKey: 'createdAt',
+                          columnName: 'Created At',
                         ),
                       ),
                     ),
                     DataColumn2(
                       size: ColumnSize.M,
-                      label: Text('Created At', style: _headerStyle),
-                    ),
-                    DataColumn2(
-                      size: ColumnSize.L,
-                      label: Text('Name', style: _headerStyle),
-                    ),
-
-                    DataColumn2(
-                      size: ColumnSize.M,
-                      label: Text('Mobile No.', style: _headerStyle),
+                      label: const UserTableHeaderCell(
+                        title: 'Name',
+                        sortKey: 'name',
+                        filterWidget: UserColumnFilter(
+                          columnKey: 'name',
+                          columnName: 'Name',
+                        ),
+                      ),
                     ),
                     DataColumn2(
                       size: ColumnSize.M,
-                      label: Text('PAN Card', style: _headerStyle),
+                      label: const UserTableHeaderCell(
+                        title: 'Mobile No.',
+                        sortKey: 'mobile',
+                        filterWidget: UserColumnFilter(
+                          columnKey: 'mobile',
+                          columnName: 'Mobile No.',
+                        ),
+                      ),
                     ),
                     DataColumn2(
-                      size: ColumnSize.S,
-                      label: Text('Registration Status', style: _headerStyle),
-                    ),
-                    DataColumn2(
-                      size: ColumnSize.S,
-                      label: Text('KYC Status', style: _headerStyle),
+                      size: ColumnSize.M,
+                      label: const UserTableHeaderCell(
+                        title: 'KYC Status',
+                        sortKey: 'kycStatus',
+                        filterWidget: UserColumnFilter(
+                          columnKey: 'kycStatus',
+                          columnName: 'KYC Status',
+                        ),
+                        isCenter: true,
+                      ),
                     ),
                     if (!isDirector && canManageSubscription)
                       DataColumn2(
-                        size: ColumnSize.M,
-                        label: Center(
-                          child: Text('Subscription', style: _headerStyle),
+                        fixedWidth: 125,
+                        label: const UserTableHeaderCell(
+                          title: 'Subscription',
+                          isCenter: true,
                         ),
                       ),
                     DataColumn2(
-                      size: ColumnSize.L,
-                      label: Center(
-                        child: Text('Assign Manager', style: _headerStyle),
+                      size: ColumnSize.M,
+                      label: const UserTableHeaderCell(
+                        title: 'Assign Manager',
+                        sortKey: 'manager',
+                        filterWidget: UserColumnFilter(
+                          columnKey: 'manager',
+                          columnName: 'Manager',
+                        ),
+                        isCenter: true,
                       ),
                     ),
                     DataColumn2(
-                      size: ColumnSize.M,
-                      label: Center(
-                        child: Text('Actions', style: _headerStyle),
+                      fixedWidth: 75,
+                      label: const UserTableHeaderCell(
+                        title: 'Actions',
+                        isCenter: true,
                       ),
                     ),
                   ],
@@ -150,7 +168,7 @@ class UsersTable extends StatelessWidget {
                       .toList(),
                 ),
               ),
-            if (totalPages > 1)
+            if (totalCount > 0 || displayedUsers.isNotEmpty)
               TablePagination(
                 totalPages: totalPages,
                 tableController: tableController,
@@ -159,25 +177,5 @@ class UsersTable extends StatelessWidget {
         ),
       );
     });
-  }
-
-  void _toggleSelectAllOnPage(
-    UserController controller,
-    List<UserModel> displayedUsers,
-  ) {
-    final allSelected = displayedUsers.every(
-      (u) => controller.selectedUsers.contains(u.id),
-    );
-    if (allSelected) {
-      for (var user in displayedUsers) {
-        controller.selectedUsers.remove(user.id);
-      }
-    } else {
-      for (var user in displayedUsers) {
-        if (!controller.selectedUsers.contains(user.id)) {
-          controller.selectedUsers.add(user.id);
-        }
-      }
-    }
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../services/settings.service.dart';
-
+import '../../services/staff.service.dart';
+import '../../models/staff.model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:spresearch_web/config/app.config.dart';
+import 'package:spresearch_web/config/theme.config.dart';
 
 class SettingsController extends GetxController {
   final SettingsService _settingsService = Get.find<SettingsService>();
@@ -22,10 +24,26 @@ class SettingsController extends GetxController {
 
   final qrCodePath = ''.obs;
 
+  // Default Relationship Manager (RM) State
+  final isEditingRM = false.obs;
+  final isSavingRM = false.obs;
+  final isLoadingRM = false.obs;
+
+  final rmStaffId = ''.obs;
+  final rmNameController = TextEditingController();
+  final rmPhoneController = TextEditingController();
+  final rmEmailController = TextEditingController();
+  final rmDepartmentController = TextEditingController();
+
+  final staffList = <StaffModel>[].obs;
+  final selectedStaff = Rxn<StaffModel>();
+
   @override
   void onInit() {
     super.onInit();
     fetchBankDetails();
+    fetchDefaultRM();
+    loadStaffList();
   }
 
   void startEditing() => isEditing.value = true;
@@ -33,6 +51,13 @@ class SettingsController extends GetxController {
   void cancelEdit() {
     isEditing.value = false;
     fetchBankDetails(); // restore original values
+  }
+
+  void startEditingRM() => isEditingRM.value = true;
+
+  void cancelEditRM() {
+    isEditingRM.value = false;
+    fetchDefaultRM();
   }
 
   Future<void> fetchBankDetails() async {
@@ -54,6 +79,138 @@ class SettingsController extends GetxController {
       Get.snackbar('Error', 'Failed to fetch bank details: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchDefaultRM() async {
+    isLoadingRM.value = true;
+    try {
+      final response = await _settingsService.getSettings('default_rm');
+      if (response.status.isOk) {
+        final data = response.body['data'];
+        if (data != null && data is Map) {
+          rmStaffId.value = (data['staffId'] ?? '').toString();
+          rmNameController.text = (data['fullName'] ?? '').toString();
+          rmPhoneController.text = (data['mobileNumber'] ?? '').toString();
+          rmEmailController.text = (data['emailAddress'] ?? '').toString();
+          rmDepartmentController.text =
+              (data['department'] ?? 'Relationship Manager').toString();
+          _syncSelectedStaff();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch default RM: $e');
+    } finally {
+      isLoadingRM.value = false;
+    }
+  }
+
+  Future<void> loadStaffList() async {
+    try {
+      final staffService = Get.isRegistered<StaffService>()
+          ? Get.find<StaffService>()
+          : Get.put(StaffService());
+      final list = await staffService.getStaffList();
+      staffList.assignAll(list);
+      _syncSelectedStaff();
+    } catch (e) {
+      debugPrint('Error loading staff list: $e');
+    }
+  }
+
+  void _syncSelectedStaff() {
+    if (staffList.isEmpty) return;
+    if (rmStaffId.value.isNotEmpty) {
+      final found = staffList.firstWhereOrNull(
+        (s) => s.staffId == rmStaffId.value || s.id == rmStaffId.value,
+      );
+      if (found != null) {
+        selectedStaff.value = found;
+        return;
+      }
+    }
+    if (rmNameController.text.isNotEmpty) {
+      final foundByName = staffList.firstWhereOrNull(
+        (s) =>
+            s.name.toLowerCase().trim() ==
+            rmNameController.text.toLowerCase().trim(),
+      );
+      if (foundByName != null) {
+        selectedStaff.value = foundByName;
+        return;
+      }
+    }
+    selectedStaff.value = null;
+  }
+
+  void onSelectStaff(StaffModel? staff) {
+    selectedStaff.value = staff;
+    if (staff != null) {
+      rmStaffId.value = staff.staffId.isNotEmpty ? staff.staffId : staff.id;
+      rmNameController.text = staff.name;
+      rmPhoneController.text = staff.mobile;
+      rmEmailController.text = staff.email;
+      rmDepartmentController.text =
+          staff.department.isNotEmpty ? staff.department : staff.role;
+    } else {
+      rmStaffId.value = '';
+    }
+  }
+
+  Future<void> updateDefaultRM() async {
+    if (rmNameController.text.trim().isEmpty) {
+      Get.snackbar(
+        'Validation',
+        'RM Full Name is required',
+        backgroundColor: AppTheme.warningOrange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    if (rmPhoneController.text.trim().isEmpty) {
+      Get.snackbar(
+        'Validation',
+        'RM Contact Number is required',
+        backgroundColor: AppTheme.warningOrange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    isSavingRM.value = true;
+    try {
+      final rmData = {
+        'staffId': rmStaffId.value.trim(),
+        'fullName': rmNameController.text.trim(),
+        'mobileNumber': rmPhoneController.text.trim(),
+        'emailAddress': rmEmailController.text.trim(),
+        'department': rmDepartmentController.text.trim().isNotEmpty
+            ? rmDepartmentController.text.trim()
+            : 'Relationship Manager',
+      };
+
+      final response =
+          await _settingsService.updateSettings('default_rm', rmData);
+      if (response.status.isOk) {
+        isEditingRM.value = false;
+        Get.snackbar(
+          'Success',
+          'Default Relationship Manager updated successfully',
+          backgroundColor: AppTheme.successGreen,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          'Error',
+          response.body?['message'] ?? 'Failed to update Default RM',
+          backgroundColor: AppTheme.errorRed,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to update Default RM: $e');
+    } finally {
+      isSavingRM.value = false;
     }
   }
 
@@ -152,6 +309,10 @@ class SettingsController extends GetxController {
     accountNumberController.dispose();
     ifscCodeController.dispose();
     upiIdController.dispose();
+    rmNameController.dispose();
+    rmPhoneController.dispose();
+    rmEmailController.dispose();
+    rmDepartmentController.dispose();
     super.onClose();
   }
 }

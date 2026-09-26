@@ -36,6 +36,18 @@ const settingsController = {
                         }
                     });
                 }
+                if (key === 'default_rm') {
+                    return res.status(200).send({
+                        status: 200,
+                        data: {
+                            staffId: "",
+                            fullName: "Jaya Verma",
+                            mobileNumber: "+91 9755016839",
+                            emailAddress: "info@researchvia.in",
+                            department: "Relationship Manager"
+                        }
+                    });
+                }
                 return res.status(404).send({ status: 404, message: "Settings not found" });
             }
             res.status(200).send({ status: 200, data: settings.value });

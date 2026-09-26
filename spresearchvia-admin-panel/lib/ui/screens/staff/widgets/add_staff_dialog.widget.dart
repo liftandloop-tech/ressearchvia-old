@@ -111,7 +111,9 @@ class AddStaffDialog extends StatelessWidget {
                   const SizedBox(height: 14),
                   // MPIN field
                   Obx(() {
-                    if (controller.selectedDepartment.value.toLowerCase() == 'manager') {
+                    final roleLower = controller.selectedRole.value.toLowerCase().trim();
+                    final deptLower = controller.selectedDepartment.value.toLowerCase().trim();
+                    if (roleLower == 'manager' || deptLower == 'manager') {
                       return const SizedBox.shrink();
                     }
                     return Column(
@@ -133,7 +135,7 @@ class AddStaffDialog extends StatelessWidget {
                       ],
                     );
                   }),
-                  // Department / Role
+                  // Role
                   _buildLabel('Role', required: true),
                   const SizedBox(height: 6),
                   Container(
@@ -148,19 +150,14 @@ class AddStaffDialog extends StatelessWidget {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: Obx(() {
-                        final departments = controller.availableDepartments
-                            .toSet()
-                            .toList();
-                        final currentValue =
-                            controller.selectedDepartment.value.isEmpty
-                            ? null
-                            : controller.selectedDepartment.value;
-                        // Safety: if current value isn't in the list, treat as null (show hint)
-                        final safeValue =
-                            (currentValue != null &&
-                                departments.contains(currentValue))
-                            ? currentValue
-                            : null;
+                        final roles = controller.availableRoles;
+                        final currentRoleId = controller.selectedRoleId.value;
+                        final currentRoleName = controller.selectedRole.value;
+                        final match = roles.firstWhereOrNull((r) =>
+                            (currentRoleId != null && r.id == currentRoleId) ||
+                            r.name.toLowerCase().trim() == currentRoleName.toLowerCase().trim());
+                        final safeValue = match?.id;
+
                         return DropdownButton<String>(
                           value: safeValue,
                           isExpanded: true,
@@ -184,37 +181,70 @@ class AddStaffDialog extends StatelessWidget {
                                 ? const Color(0xFF6C757D)
                                 : const Color(0xFF212529),
                           ),
-                          items: departments
+                          items: roles
                               .map(
-                                (e) => DropdownMenuItem<String>(
-                                  value: e,
-                                  child: Text(
-                                    e,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: controller.isDirectorLoggedIn
-                                          ? const Color(0xFF6C757D)
-                                          : const Color(0xFF212529),
+                                (r) {
+                                  final deptName = r.departmentName;
+                                  return DropdownMenuItem<String>(
+                                    value: r.id,
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          r.name,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: controller.isDirectorLoggedIn
+                                                ? const Color(0xFF6C757D)
+                                                : const Color(0xFF212529),
+                                          ),
+                                        ),
+                                        if (deptName != null && deptName.isNotEmpty) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '• $deptName',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xFF6C757D),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                  ),
-                                ),
+                                  );
+                                },
                               )
                               .toList(),
                           onChanged: controller.isDirectorLoggedIn
                               ? null
                               : (v) {
                                   if (v != null) {
-                                    controller.updateDepartment(v);
+                                    controller.updateRole(v);
                                   }
                                 },
                         );
                       }),
                     ),
                   ),
+                  Obx(() {
+                    final deptName = controller.selectedDepartment.value;
+                    if (deptName.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 4),
+                      child: Text(
+                        'Department: $deptName (Auto-assigned)',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6C757D),
+                        ),
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 14),
                   // View Only Toggle (Only for Researcher)
                   Obx(() {
-                    if (controller.selectedDepartment.value != 'Researcher') {
+                    final isResearcher = controller.selectedRole.value.toLowerCase().contains('research') ||
+                        controller.selectedDepartment.value.toLowerCase().contains('research');
+                    if (!isResearcher) {
                       return const SizedBox.shrink();
                     }
                     return Column(
@@ -251,7 +281,9 @@ class AddStaffDialog extends StatelessWidget {
                   }),
                   // Assigned Director / Supervisor (For all staff roles)
                   Obx(() {
-                    final role = controller.selectedDepartment.value.toLowerCase().trim();
+                    final role = controller.selectedRole.value.toLowerCase().trim().isNotEmpty
+                        ? controller.selectedRole.value.toLowerCase().trim()
+                        : controller.selectedDepartment.value.toLowerCase().trim();
                     if (role == 'director') {
                       return const SizedBox.shrink();
                     }

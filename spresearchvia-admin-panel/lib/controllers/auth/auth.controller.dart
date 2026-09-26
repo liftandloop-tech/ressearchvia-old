@@ -44,6 +44,21 @@ class AuthController extends GetxController {
         if (hasBackup) {
           impersonatedStaffName.value = storedUser.fullName;
         }
+
+        // Fresh profile sync: If staff member's role or permissions were updated by admin,
+        // sync the latest profile from backend so the updated permissions take effect immediately.
+        if (!storedUser.isAdmin && !hasBackup) {
+          _staffService.getStaffProfileMe().then((freshStaff) async {
+            if (freshStaff != null && freshStaff.rawJson != null) {
+              final freshUser = UserModel.fromJson(freshStaff.rawJson!);
+              user.value = freshUser;
+              await _authService.saveUserData(freshStaff.rawJson!);
+              debugPrint('Staff profile refreshed with role: ${freshUser.subscriptionPlan}');
+            }
+          }).catchError((e) {
+            debugPrint('Failed to sync latest staff profile: $e');
+          });
+        }
       }
     } finally {
       isInitialized.value = true;

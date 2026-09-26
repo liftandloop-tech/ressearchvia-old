@@ -8,12 +8,17 @@ import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/services/role_permission.service.dart';
 import 'package:spresearch_web/models/role.model.dart';
+import 'package:spresearch_web/models/department.model.dart';
 
 class StaffController extends GetxController {
   late final StaffService _staffService;
   late final AuthController _authController;
   final _rolePermissionService = Get.put(RolePermissionService());
-  var rolesList = <String>[].obs;
+  var rolesList = <RoleModel>[].obs;
+  var selectedRoleId = RxnString();
+  var selectedRole = ''.obs;
+  var departmentsList = <DepartmentModel>[].obs;
+  var selectedDepartmentId = RxnString();
 
   final nameController = TextEditingController();
   final mobileController = TextEditingController();
@@ -33,6 +38,133 @@ class StaffController extends GetxController {
   final emergencyNameController = TextEditingController();
   final emergencyPhoneController = TextEditingController();
   final emergencyRelationController = TextEditingController();
+
+  // Walk-in form fields from Walk-in Interview Application Form
+  final appliedPositionController = TextEditingController();
+  final applicationDateController = TextEditingController();
+  final nativePlaceController = TextEditingController();
+  var maritalStatus = ''.obs;
+  final currentLocationController = TextEditingController();
+  final skypeController = TextEditingController();
+
+  // Declarations
+  var interviewedBefore = false.obs;
+  final interviewedBeforeDetailsController = TextEditingController();
+  var smoke = false.obs;
+  var alcohol = false.obs;
+  var differentlyAbled = false.obs;
+  final differentlyAbledDetailsController = TextEditingController();
+  var policeRecord = false.obs;
+  final policeRecordDetailsController = TextEditingController();
+  var majorIllness = false.obs;
+  final majorIllnessDetailsController = TextEditingController();
+  var source = ''.obs;
+  final sourceDetailsController = TextEditingController();
+
+  // Education Qualifications
+  var educationEntries = <EducationEntryModel>[].obs;
+  var academicGap = false.obs;
+  final academicGapDetailsController = TextEditingController();
+  final backlogsCountController = TextEditingController();
+
+  // Work Experience & Compensation
+  final currentOrganisationController = TextEditingController();
+  final currentDesignationController = TextEditingController();
+  final reportingManagerDesignationController = TextEditingController();
+  final reportingManagerNameController = TextEditingController();
+  final reporteesCountController = TextEditingController();
+  final totalExperienceController = TextEditingController();
+  final fixedSalaryController = TextEditingController();
+  final bonusIncentiveController = TextEditingController();
+  final totalSalaryController = TextEditingController();
+  final expectedSalaryController = TextEditingController();
+  final noticePeriodController = TextEditingController();
+
+  // Employment History
+  var employmentEntries = <EmploymentEntryModel>[].obs;
+  final careerGapController = TextEditingController();
+
+  void initDefaultEducationEntries() {
+    if (educationEntries.isEmpty) {
+      educationEntries.assignAll([
+        EducationEntryModel(standard: '10th'),
+        EducationEntryModel(standard: '12th'),
+        EducationEntryModel(standard: 'Graduation'),
+        EducationEntryModel(standard: 'Post graduation'),
+      ]);
+    }
+  }
+
+  void addEducationEntry() {
+    educationEntries.add(EducationEntryModel(standard: ''));
+  }
+
+  void removeEducationEntry(int index) {
+    if (index >= 0 && index < educationEntries.length) {
+      educationEntries.removeAt(index);
+    }
+  }
+
+  void addEmploymentEntry() {
+    employmentEntries.add(EmploymentEntryModel());
+  }
+
+  void removeEmploymentEntry(int index) {
+    if (index >= 0 && index < employmentEntries.length) {
+      employmentEntries.removeAt(index);
+    }
+  }
+
+  WalkInFormModel buildWalkInFormModel() {
+    return WalkInFormModel(
+      appliedPosition: appliedPositionController.text.trim(),
+      applicationDate: applicationDateController.text.trim(),
+      fullName: nameController.text.trim(),
+      dob: dobController.text.trim(),
+      nativePlace: nativePlaceController.text.trim(),
+      gender: genderController.text.trim(),
+      maritalStatus: maritalStatus.value,
+      mobileNumber: mobileController.text.trim(),
+      currentLocation: currentLocationController.text.trim(),
+      emailAddress: emailController.text.trim(),
+      skypeAddress: skypeController.text.trim(),
+      interviewedBefore: interviewedBefore.value,
+      interviewedBeforeDetails: interviewedBeforeDetailsController.text.trim(),
+      smoke: smoke.value,
+      alcohol: alcohol.value,
+      differentlyAbled: differentlyAbled.value,
+      differentlyAbledDetails: differentlyAbledDetailsController.text.trim(),
+      policeRecord: policeRecord.value,
+      policeRecordDetails: policeRecordDetailsController.text.trim(),
+      majorIllness: majorIllness.value,
+      majorIllnessDetails: majorIllnessDetailsController.text.trim(),
+      source: source.value,
+      sourceDetails: sourceDetailsController.text.trim(),
+      educationList: educationEntries.toList(),
+      academicGap: academicGap.value,
+      academicGapDetails: academicGapDetailsController.text.trim(),
+      backlogsCount: backlogsCountController.text.trim(),
+      currentOrganisation: currentOrganisationController.text.trim().isNotEmpty
+          ? currentOrganisationController.text.trim()
+          : previousCompanyController.text.trim(),
+      currentDesignation: currentDesignationController.text.trim(),
+      reportingManagerDesignation: reportingManagerDesignationController.text.trim(),
+      reportingManagerName: reportingManagerNameController.text.trim(),
+      reporteesCount: reporteesCountController.text.trim(),
+      totalExperience: totalExperienceController.text.trim().isNotEmpty
+          ? totalExperienceController.text.trim()
+          : experienceController.text.trim(),
+      fixedSalary: fixedSalaryController.text.trim(),
+      bonusIncentive: bonusIncentiveController.text.trim(),
+      totalSalary: totalSalaryController.text.trim().isNotEmpty
+          ? totalSalaryController.text.trim()
+          : lastCtcController.text.trim(),
+      expectedSalary: expectedSalaryController.text.trim(),
+      noticePeriod: noticePeriodController.text.trim(),
+      employmentList: employmentEntries.toList(),
+      careerGap: careerGapController.text.trim(),
+    );
+  }
 
   var isLoading = false.obs;
   var staffList = <StaffModel>[].obs;
@@ -71,8 +203,10 @@ class StaffController extends GetxController {
       _authController = Get.find<AuthController>();
     }
     _loadFiltersFromUrl();
+    initDefaultEducationEntries();
     fetchStaffList();
     fetchRolesList();
+    fetchDepartmentsList();
 
     // Listen to changes on filtering variables to dynamically keep the URL in sync
     ever(filterName, (_) => updateUrlQueryParameters());
@@ -137,12 +271,26 @@ class StaffController extends GetxController {
       final response = await _rolePermissionService.getRoles();
       if (!response.status.hasError && response.body != null) {
         final list = (response.body['data'] as List? ?? [])
-            .map((item) => RoleModel.fromJson(item).name)
+            .map((item) => RoleModel.fromJson(item))
             .toList();
         rolesList.assignAll(list);
       }
     } catch (e) {
       debugPrint('Error fetching roles: $e');
+    }
+  }
+
+  Future<void> fetchDepartmentsList() async {
+    try {
+      final response = await _rolePermissionService.getDepartments();
+      if (!response.status.hasError && response.body != null) {
+        final list = (response.body['data'] as List? ?? [])
+            .map((item) => DepartmentModel.fromJson(item))
+            .toList();
+        departmentsList.assignAll(list);
+      }
+    } catch (e) {
+      debugPrint('Error fetching departments: $e');
     }
   }
 
@@ -240,9 +388,21 @@ class StaffController extends GetxController {
     emailController.text = staff.email;
     mpinController.text = staff.mpin ?? '';
 
-    // Handle department and role
-    // Normalize department to ensure it matches our dropdown values
-    selectedDepartment.value = _normalizeDepartment(staff.department);
+    // Handle role and auto-assigned department
+    selectedRoleId.value = staff.roleId;
+    selectedRole.value = staff.role;
+    final matchingRole = rolesList.firstWhereOrNull((r) =>
+        (staff.roleId != null && r.id == staff.roleId) ||
+        r.name.toLowerCase().trim() == staff.role.toLowerCase().trim());
+    if (matchingRole != null) {
+      selectedRoleId.value = matchingRole.id;
+      selectedRole.value = matchingRole.name;
+      selectedDepartment.value = matchingRole.departmentName ?? _normalizeDepartment(staff.department);
+      selectedDepartmentId.value = matchingRole.departmentId ?? staff.departmentId;
+    } else {
+      selectedDepartment.value = _normalizeDepartment(staff.department);
+      selectedDepartmentId.value = staff.departmentId;
+    }
 
     if (staff.joiningDate != null) {
       final date = staff.joiningDate!;
@@ -283,6 +443,56 @@ class StaffController extends GetxController {
           assignedDirector.value = dirByName;
         }
       }
+    }
+
+    final w = staff.walkInForm;
+    if (w != null) {
+      appliedPositionController.text = w.appliedPosition;
+      applicationDateController.text = w.applicationDate;
+      nativePlaceController.text = w.nativePlace;
+      maritalStatus.value = w.maritalStatus;
+      currentLocationController.text = w.currentLocation;
+      skypeController.text = w.skypeAddress;
+      interviewedBefore.value = w.interviewedBefore;
+      interviewedBeforeDetailsController.text = w.interviewedBeforeDetails;
+      smoke.value = w.smoke;
+      alcohol.value = w.alcohol;
+      differentlyAbled.value = w.differentlyAbled;
+      differentlyAbledDetailsController.text = w.differentlyAbledDetails;
+      policeRecord.value = w.policeRecord;
+      policeRecordDetailsController.text = w.policeRecordDetails;
+      majorIllness.value = w.majorIllness;
+      majorIllnessDetailsController.text = w.majorIllnessDetails;
+      source.value = w.source;
+      sourceDetailsController.text = w.sourceDetails;
+      educationEntries.assignAll(w.educationList);
+      academicGap.value = w.academicGap;
+      academicGapDetailsController.text = w.academicGapDetails;
+      backlogsCountController.text = w.backlogsCount;
+      currentOrganisationController.text = w.currentOrganisation.isNotEmpty
+          ? w.currentOrganisation
+          : (staff.previousCompany ?? '');
+      currentDesignationController.text = w.currentDesignation;
+      reportingManagerDesignationController.text = w.reportingManagerDesignation;
+      reportingManagerNameController.text = w.reportingManagerName;
+      reporteesCountController.text = w.reporteesCount;
+      totalExperienceController.text = w.totalExperience.isNotEmpty
+          ? w.totalExperience
+          : (staff.experienceYears?.toString() ?? '');
+      fixedSalaryController.text = w.fixedSalary;
+      bonusIncentiveController.text = w.bonusIncentive;
+      totalSalaryController.text = w.totalSalary.isNotEmpty
+          ? w.totalSalary
+          : (staff.lastCtc ?? '');
+      expectedSalaryController.text = w.expectedSalary;
+      noticePeriodController.text = w.noticePeriod;
+      employmentEntries.assignAll(w.employmentList);
+      careerGapController.text = w.careerGap;
+    } else {
+      initDefaultEducationEntries();
+      currentOrganisationController.text = staff.previousCompany ?? '';
+      totalExperienceController.text = staff.experienceYears?.toString() ?? '';
+      totalSalaryController.text = staff.lastCtc ?? '';
     }
   }
 
@@ -461,10 +671,12 @@ class StaffController extends GetxController {
       }
     }
 
-    if (selectedDepartment.value.isEmpty || selectedDepartment.value == 'Select Department') {
+    final hasRole = (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty) ||
+        selectedRole.value.isNotEmpty;
+    if (!hasRole) {
       Get.snackbar(
         'Validation Error',
-        'Please select a role',
+        'Please select a role for this staff member',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
@@ -509,12 +721,17 @@ class StaffController extends GetxController {
 
     isLoading.value = true;
     try {
-      // Backend expects exact field names including typo "deparment"
       final Map<String, dynamic> data = {
         "fullName": nameController.text.trim(),
         "mobileNumber": "+91$mobileStr",
         "emailAddress": emailController.text.trim(),
-        "deparment": selectedDepartment.value, // Backend has typo
+        if (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty)
+          "roleId": selectedRoleId.value,
+        "role": selectedRole.value,
+        if (selectedDepartment.value.isNotEmpty)
+          "deparment": selectedDepartment.value, // Auto-derived department
+        if (selectedDepartmentId.value != null && selectedDepartmentId.value!.isNotEmpty)
+          "departmentId": selectedDepartmentId.value,
         "joiningDate": joiningDateController.text.isEmpty
             ? DateTime.now().toIso8601String()
             : _parseJoiningDate(joiningDateController.text),
@@ -527,24 +744,28 @@ class StaffController extends GetxController {
         if (lastCtcController.text.trim().isNotEmpty) "lastCtc": lastCtcController.text.trim(),
         if (localAddressController.text.trim().isNotEmpty) "localAddress": localAddressController.text.trim(),
         if (permanentAddressObj != null) "permanentAddress": permanentAddressObj,
-        if (emergencyNameController.text.trim().isNotEmpty ||
-            emergencyPhoneController.text.trim().isNotEmpty ||
-            emergencyRelationController.text.trim().isNotEmpty)
-          "emergencyContact": {
-            "name": emergencyNameController.text.trim(),
-            "phone": emergencyPhoneController.text.trim(),
-            "relation": emergencyRelationController.text.trim(),
-          },
+        "emergencyContact": (emergencyNameController.text.trim().isNotEmpty ||
+                emergencyPhoneController.text.trim().isNotEmpty ||
+                emergencyRelationController.text.trim().isNotEmpty)
+            ? {
+                "name": emergencyNameController.text.trim(),
+                "phone": emergencyPhoneController.text.trim(),
+                "relation": emergencyRelationController.text.trim(),
+              }
+            : null,
+        "walkInForm": buildWalkInFormModel().toJson(),
       };
 
-      if (selectedDepartment.value.toLowerCase() != 'manager' &&
-          mpinController.text.isNotEmpty) {
+      final roleLower = selectedRole.value.toLowerCase().trim();
+      final deptLower = selectedDepartment.value.toLowerCase().trim();
+      final isManager = roleLower == 'manager' || deptLower == 'manager';
+      if (!isManager && mpinController.text.isNotEmpty) {
         data["mpin"] = mpinController.text.trim();
       }
 
-      // Handle assigned director (Supervisor for all staff roles)
-      final deptLower = selectedDepartment.value.toLowerCase().trim();
-      if (deptLower != 'director') {
+      // Handle assigned director (Supervisor for all non-director staff roles)
+      final isDirector = roleLower == 'director' || deptLower == 'director';
+      if (!isDirector) {
         if (isDirectorLoggedIn) {
           data["assignedDirector"] = _authController.user.value!.id;
           data["assignedDirectorName"] = _authController.user.value!.fullName;
@@ -688,7 +909,47 @@ class StaffController extends GetxController {
     emergencyPhoneController.clear();
     emergencyRelationController.clear();
 
-    selectedDepartment.value = isDirectorLoggedIn ? 'Manager' : '';
+    appliedPositionController.clear();
+    applicationDateController.clear();
+    nativePlaceController.clear();
+    maritalStatus.value = '';
+    currentLocationController.clear();
+    skypeController.clear();
+    interviewedBefore.value = false;
+    interviewedBeforeDetailsController.clear();
+    smoke.value = false;
+    alcohol.value = false;
+    differentlyAbled.value = false;
+    differentlyAbledDetailsController.clear();
+    policeRecord.value = false;
+    policeRecordDetailsController.clear();
+    majorIllness.value = false;
+    majorIllnessDetailsController.clear();
+    source.value = '';
+    sourceDetailsController.clear();
+    educationEntries.clear();
+    initDefaultEducationEntries();
+    academicGap.value = false;
+    academicGapDetailsController.clear();
+    backlogsCountController.clear();
+    currentOrganisationController.clear();
+    currentDesignationController.clear();
+    reportingManagerDesignationController.clear();
+    reportingManagerNameController.clear();
+    reporteesCountController.clear();
+    totalExperienceController.clear();
+    fixedSalaryController.clear();
+    bonusIncentiveController.clear();
+    totalSalaryController.clear();
+    expectedSalaryController.clear();
+    noticePeriodController.clear();
+    employmentEntries.clear();
+    careerGapController.clear();
+
+    selectedRoleId.value = null;
+    selectedRole.value = '';
+    selectedDepartment.value = '';
+    selectedDepartmentId.value = null;
 
     isActive.value = true;
     isViewOnly.value = false;
@@ -792,7 +1053,7 @@ class StaffController extends GetxController {
       }
     }
     for (var r in rolesList) {
-      roles.add(r.trim());
+      roles.add(r.name.trim());
     }
     return roles.toList()..sort((a, b) => a == 'All' ? -1 : b == 'All' ? 1 : a.compareTo(b));
   }
@@ -964,19 +1225,55 @@ class StaffController extends GetxController {
   int get otherStaffTotalPages =>
       otherStaff.isEmpty ? 1 : (otherStaff.length / itemsPerPage).ceil();
 
-  // Department dropdown options for staff creation
+  // Available roles for staff assignment
+  List<RoleModel> get availableRoles {
+    if (isDirectorLoggedIn) {
+      final managers = rolesList.where((r) => r.name.toLowerCase().contains('manager')).toList();
+      if (managers.isNotEmpty) return managers;
+    }
+    return rolesList.toList();
+  }
+
+  List<String> get availableRoleNames => rolesList.map((r) => r.name).toList();
+
+  void updateRole(String roleId) {
+    selectedRoleId.value = roleId;
+    final match = rolesList.firstWhereOrNull((r) => r.id == roleId);
+    if (match != null) {
+      selectedRole.value = match.name;
+      selectedDepartment.value = match.departmentName ?? '';
+      selectedDepartmentId.value = match.departmentId;
+    }
+  }
+
+  void updateRoleByName(String roleName) {
+    selectedRole.value = roleName;
+    final match = rolesList.firstWhereOrNull((r) => r.name.toLowerCase().trim() == roleName.toLowerCase().trim());
+    if (match != null) {
+      selectedRoleId.value = match.id;
+      selectedDepartment.value = match.departmentName ?? '';
+      selectedDepartmentId.value = match.departmentId;
+    }
+  }
+
+  // Department dropdown options (legacy fallback, auto-assigned from role)
   List<String> get availableDepartments {
     if (isDirectorLoggedIn) {
       return ['Manager'];
     }
-    if (rolesList.isNotEmpty) {
-      return rolesList;
+    if (departmentsList.isNotEmpty) {
+      return departmentsList.map((d) => d.name).toList();
     }
-    return ['Researcher', 'Director', 'Manager', 'Executive'];
+    if (rolesList.isNotEmpty) {
+      return rolesList.map((r) => r.name).toList();
+    }
+    return ['Administration & Management', 'Research & Advisory', 'Sales & Relationship Management', 'Operations & Compliance'];
   }
 
   void updateDepartment(String dept) {
     selectedDepartment.value = dept;
+    final match = departmentsList.firstWhereOrNull((d) => d.name == dept);
+    selectedDepartmentId.value = match?.id;
   }
 
   Future<bool> assignSupervisor(String staffId, String? supervisorId, String? supervisorName) async {

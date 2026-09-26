@@ -1,6 +1,7 @@
 import staffModel from "../models/staffModel.js";
 import emailService from "../services/emailService.js";
 import axios from "axios";
+import { resolveRoleAndDepartment } from "../services/staffService.js";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 
@@ -87,6 +88,10 @@ const applicantController = {
                 applicant.experienceYears = experienceYears;
                 applicant.previousCompany = previousCompany;
                 applicant.lastCtc = lastCtc;
+                if (req.body.walkInForm) {
+                    applicant.walkInForm = req.body.walkInForm;
+                    applicant.markModified('walkInForm');
+                }
                 applicant.mobileOtp = mobileOtp;
                 applicant.mobileOtpExpires = expiry;
                 applicant.emailOtp = emailOtp;
@@ -114,6 +119,7 @@ const applicantController = {
                     experienceYears,
                     previousCompany,
                     lastCtc,
+                    walkInForm: req.body.walkInForm || {},
                     stage: 'Applicant',
                     mobileOtp,
                     mobileOtpExpires: expiry,
@@ -254,10 +260,10 @@ const applicantController = {
     approveApplicant: async (req, res) => {
         try {
             const { id } = req.params;
-            const { deparment, mpin, joiningDate, isViewOnly, assignedDirector } = req.body;
+            const { roleId, role, deparment, mpin, joiningDate, isViewOnly, assignedDirector } = req.body;
 
-            if (!deparment || !mpin) {
-                return res.status(400).send({ status: 400, message: "Department and MPIN are required to approve staff", data: {} });
+            if ((!roleId && !role && !deparment) || !mpin) {
+                return res.status(400).send({ status: 400, message: "Role and MPIN are required to approve staff", data: {} });
             }
 
             const applicant = await staffModel.findById(id);
@@ -265,9 +271,24 @@ const applicantController = {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
 
+            const resolved = await resolveRoleAndDepartment({
+                roleId,
+                roleName: role,
+                fallbackDept: deparment
+            });
+
             // Promote to Employee
             applicant.stage = 'Employee';
-            applicant.deparment = deparment;
+            if (resolved.roleId) {
+                applicant.roleId = resolved.roleId;
+                applicant.role = resolved.roleName;
+            }
+            if (resolved.departmentId) {
+                applicant.departmentId = resolved.departmentId;
+                applicant.deparment = resolved.departmentName;
+            } else if (deparment) {
+                applicant.deparment = deparment;
+            }
             applicant.mpin = mpin.toString();
             applicant.joiningDate = joiningDate ? new Date(joiningDate) : new Date();
             applicant.status = 'Active';

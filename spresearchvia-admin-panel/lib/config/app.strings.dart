@@ -46,17 +46,17 @@ class AppStrings {
   static const String supportTicketsDesc = 'View and manage tickets';
 
   // Navigation
-  static const String users = 'Users';
+  static const String users = 'Clients';
   static const String kyc = 'KYC';
   static const String subscriptions = 'Subscriptions';
   static const String reports = 'Reports';
   static const String communication = 'Communication';
   static const String settings = 'Settings';
 
-  // User Management
-  static const String userManagement = 'User Management';
+  // Client Management
+  static const String userManagement = 'Client Management';
   static const String userManagementDesc =
-      'Manage and monitor all user accounts';
+      'Manage and monitor all client accounts';
   static const String userId = 'User ID';
   static const String name = 'Name';
   static const String email = 'Email';
@@ -258,9 +258,9 @@ class AppStrings {
       'This feature is coming soon. You will be able to send bulk emails and SMS messages to your users.';
   static const String enterNotificationTitle = 'Enter notification title...';
   static const String enterYourMessage = 'Enter your message...';
-  static const String allUsers = 'All Users';
-  static const String activeUsers = 'Active Users';
-  static const String premiumUsers = 'Premium Users';
+  static const String allUsers = 'All Clients';
+  static const String activeUsers = 'Active Clients';
+  static const String premiumUsers = 'Premium Clients';
   static const String messageTemplate = 'Message Template';
   static const String livePreview = 'Live Preview';
   static const String availablePlaceholders = 'Available Placeholders:';

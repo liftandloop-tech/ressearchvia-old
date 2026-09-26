@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/subscription/manage_subscription.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 
 class CurrentSubscriptionDetails extends StatelessWidget {
   final ManageSubscriptionController controller;
@@ -172,20 +173,76 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  (() {
-                                    final segId = sub['segmentId'];
-                                    final seg = controller.segments
-                                        .firstWhereOrNull((s) => s.id == segId);
-                                    return seg?.segmentName ??
-                                        sub['segmentName'] ??
-                                        'Unknown Segment';
-                                  })(),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.primary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                Builder(
+                                  builder: (context) {
+                                    final planData = controller.userPlanSegmentsData;
+                                    if (status == 'active' &&
+                                        sub['isTrial'] != true &&
+                                        planData['hasActivePlan'] == true) {
+                                      final activeSegs = (planData['segments'] as List<dynamic>?)
+                                          ?.where((s) => s['isActive'] == true)
+                                          .toList() ?? [];
+                                      if (activeSegs.isNotEmpty) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(top: 2, bottom: 4),
+                                          child: Wrap(
+                                            spacing: 6,
+                                            runSpacing: 4,
+                                            children: activeSegs.map((s) {
+                                              return Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.primaryBlue.withOpacity(0.08),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(
+                                                    color: AppTheme.primaryBlue.withOpacity(0.3),
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.layers,
+                                                      size: 11,
+                                                      color: AppTheme.primaryBlue,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      s['segmentName'] ?? '',
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppTheme.primaryBlue,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                        );
+                                      }
+                                    }
+
+                                    return Text(
+                                      (() {
+                                        final segId = sub['segmentId'];
+                                        final seg = controller.segments
+                                            .firstWhereOrNull((s) => s.id == segId);
+                                        return seg?.segmentName ??
+                                            sub['segmentName'] ??
+                                            'Unknown Segment';
+                                      })(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.primary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 8),
                                 Row(
@@ -394,7 +451,20 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              if (status == 'active')
+                              if (status == 'active' && sub['isTrial'] != true && ((controller.isAdmin) || (Get.find<AuthController>().user.value?.has('subscriptions.manage_segments') ?? false)))
+                                ElevatedButton.icon(
+                                  onPressed: () => controller.showManageSegmentsDialog(
+                                    controller.currentUserId.value,
+                                  ),
+                                  icon: const Icon(Icons.tune, size: 16),
+                                  label: const Text('Manage Segments'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryBlue,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                  ),
+                                ),
+                              if (status == 'active' && ((controller.isAdmin) || (Get.find<AuthController>().user.value?.has('subscriptions.suspend') ?? false)))
                                 OutlinedButton(
                                   onPressed: () => controller.suspendSubscription(
                                     controller.currentUserId.value,
@@ -408,7 +478,7 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                   ),
                                   child: const Text('Suspend'),
                                 ),
-                              if (status == 'suspended')
+                              if (status == 'suspended' && ((controller.isAdmin) || (Get.find<AuthController>().user.value?.has('subscriptions.activate') ?? false)))
                                 OutlinedButton(
                                   onPressed: () =>
                                       controller.activateSubscription(
@@ -424,6 +494,7 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                   child: const Text('Activate'),
                                 ),
                               if (status == 'active' &&
+                                  ((controller.isAdmin) || (Get.find<AuthController>().user.value?.has('subscriptions.activate') ?? false)) &&
                                   ((sub['isPartial'] == true) ||
                                       (sub['packageName']
                                           .toString()
@@ -444,7 +515,7 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                   child: const Text('Add Money'),
                                 ),
                               if (sub['paymentIntentId'] != null &&
-                                  controller.isAdmin) ...[
+                                  (controller.isAdmin || (Get.find<AuthController>().user.value?.has('subscriptions.edit_correction') ?? false))) ...[
                                 ElevatedButton.icon(
                                   onPressed: () => controller
                                       .showSubscriptionCorrectionDialog(sub),

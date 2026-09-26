@@ -239,7 +239,7 @@ export const initiateRegistrationPurchase = async (userId, type, paymentMode, se
     }
 };
 
-export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartial = false, segmentId = null, calledBySystem = false) => {
+export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartial = false, segmentId = null, calledBySystem = false, gstin = null) => {
     // 1. Verify User Registration Status
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
@@ -252,6 +252,42 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
     const plan = await SegmentsPlan.findById(planId);
     if (!plan) throw new Error("Plan not found");
 
+    // Strictly validate plan name: ONLY SPARK or SPLENDID
+    const planName = (plan.planName || '').trim().toUpperCase();
+    if (!['SPARK', 'SPLENDID'].includes(planName)) {
+        throw new Error(`Strict Policy: Users can only purchase "SPARK" or "SPLENDID" plan.`);
+    }
+
+    // Strictly enforce exactly 1 segment selected at plan purchase
+    let finalSegmentId = segmentId;
+    if (Array.isArray(finalSegmentId)) {
+        if (finalSegmentId.length !== 1) {
+            throw new Error("Strict Policy: Exactly 1 segment must be selected at the time of plan purchase. Additional segments can be added later.");
+        }
+        finalSegmentId = finalSegmentId[0];
+    }
+    if (!finalSegmentId) {
+        throw new Error("Strict Policy: Exactly 1 segment must be selected at the time of plan purchase. Additional segments can be added later.");
+    }
+
+    const segmentDoc = await segmentsModel.findById(finalSegmentId);
+    if (!segmentDoc || segmentDoc.segmentStatus === 'inactive') {
+        throw new Error("Selected segment was not found or is inactive.");
+    }
+
+    // 2.1 Strictly enforce GSTIN for HNI plans
+    if (plan.isHni) {
+        const effectiveGstin = (gstin || user.gstin || '').trim().toUpperCase();
+        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+        if (!effectiveGstin || !gstRegex.test(effectiveGstin)) {
+            throw new Error("A valid 15-character GSTIN is strictly required to purchase an HNI plan.");
+        }
+        if (!user.gstin || user.gstin !== effectiveGstin) {
+            user.gstin = effectiveGstin;
+            await user.save();
+        }
+    }
+
     if (isPartial && paymentMode !== 'BANK_TRANSFER') {
         throw new Error("Partial payment is only available via Bank Transfer");
     }
@@ -262,73 +298,63 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
     const gstAmount = Math.round((basePrice * gstPercent) / 100);
     const totalAmount = basePrice + gstAmount;
 
-    // ── DUPLICATE PLAN GUARD ──────────────────────────────────────────────────
+    // ── SINGLE ACTIVE PLAN GUARD ──────────────────────────────────────────────
     if (!calledBySystem) {
-        // 1. Block if user has an active or admin-suspended plan
+        // 1. Block if user has ANY active or admin-suspended plan
         const activeEntitlement = await Entitlement.findOne({
             userId,
             type: 'PLAN',
-            resourceId: planId,
             status: { $in: ['ACTIVE', 'SUSPENDED'] },
             grantReason: { $ne: 'REGISTRATION_TRIAL' }, // Ignore trial plans during duplicate check
             $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
-        });
+        }).populate('resourceId');
         if (activeEntitlement) {
+            const currentPlanName = activeEntitlement.resourceId?.planName || 'Plan';
             throw new Error(
-                `You already have an active or suspended subscription for this plan. Cannot purchase again.`
+                `Strict Policy: A user can only hold one plan ('Spark' or 'Splendid') at a time. You already have an active subscription for "${currentPlanName}". You can add additional segments in Settings.`
             );
         }
 
-        // 2. Block or resume existing PARTIAL payment
-        const existingPartial = await PaymentIntent.findOne({
+        // 2. Block or resume existing pending payment for ANY plan
+        const existingPending = await PaymentIntent.findOne({
             userId,
-            planId: plan._id,
             purchaseType: 'PLAN',
-            isPartial: true,
             status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] }
-        }).sort({ createdAt: -1 });
+        }).populate('planId').sort({ createdAt: -1 });
 
-        if (existingPartial) {
-            if (paymentMode !== 'BANK_TRANSFER') {
-                throw new Error('You have an ongoing partial payment for this plan. Please complete it via Bank Transfer.');
+        if (existingPending) {
+            if (existingPending.status === 'VERIFICATION_PENDING') {
+                throw new Error('Your previous plan payment is currently under verification. Please wait for admin approval.');
             }
-            return {
-                amount: existingPartial.totalAmount,
-                currency: 'INR',
-                paymentIntentId: existingPartial._id,
-                message: 'Existing partial payment found. Please upload your next installment.',
-                isPartial: true,
-                totalToPay: existingPartial.totalAmount
-            };
-        }
-
-        // 3. Block or resume existing NON-PARTIAL bank/verification pending
-        const existingNonPartial = await PaymentIntent.findOne({
-            userId,
-            planId: plan._id,
-            purchaseType: 'PLAN',
-            isPartial: false,
-            status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] }
-        }).sort({ createdAt: -1 });
-
-        if (existingNonPartial) {
-            if (existingNonPartial.status === 'VERIFICATION_PENDING') {
-                throw new Error('Your previous payment is currently under verification. Please wait for admin approval.');
-            }
-            if (paymentMode === 'BANK_TRANSFER') {
+            if (existingPending.isPartial && existingPending.planId?._id?.toString() === plan._id.toString()) {
+                if (paymentMode !== 'BANK_TRANSFER') {
+                    throw new Error('You have an ongoing partial payment for this plan. Please complete it via Bank Transfer.');
+                }
                 return {
-                    amount: existingNonPartial.totalAmount,
+                    amount: existingPending.totalAmount,
                     currency: 'INR',
-                    paymentIntentId: existingNonPartial._id,
-                    message: 'Bank Transfer Initiated',
-                    isPartial: false,
-                    totalToPay: existingNonPartial.totalAmount
+                    paymentIntentId: existingPending._id,
+                    message: 'Existing partial payment found. Please upload your next installment.',
+                    isPartial: true,
+                    totalToPay: existingPending.totalAmount
                 };
             }
-            // paymentMode == RAZORPAY + existing offline → allow (user switching modes). Falls through.
+            if (!existingPending.isPartial && existingPending.planId?._id?.toString() === plan._id.toString()) {
+                if (paymentMode === 'BANK_TRANSFER') {
+                    return {
+                        amount: existingPending.totalAmount,
+                        currency: 'INR',
+                        paymentIntentId: existingPending._id,
+                        message: 'Pending bank transfer found. Please upload payment proof.',
+                        isPartial: false,
+                        totalToPay: existingPending.totalAmount
+                    };
+                }
+            }
+            throw new Error(`You have a pending order for "${existingPending.planId?.planName || 'a plan'}". Please complete or wait for verification before purchasing another plan.`);
         }
 
-        // 4. Razorpay idempotency — same order returned if < 10 min old
+        // 3. Razorpay idempotency — same order returned if < 10 min old
         if (paymentMode !== 'BANK_TRANSFER') {
             const existingCreated = await PaymentIntent.findOne({
                 userId,
@@ -348,7 +374,7 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
             }
         }
     }
-    // ── END DUPLICATE GUARD ───────────────────────────────────────────────────
+    // ── END SINGLE ACTIVE PLAN GUARD ──────────────────────────────────────────
 
     // Use current plan values
     const currentGstPercent = 18;
@@ -372,7 +398,7 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
             status: 'PENDING_BANK_TRANSFER',
             paymentMethod: 'BANK_TRANSFER',
             isPartial: !!isPartial,
-            preferredSegmentId: segmentId,
+            preferredSegmentId: finalSegmentId,
             gstRateUsed: 18, // Snapshotting current GST
             originalPlanAmount: totalAmount,
             originalDuration: (function () {
@@ -438,7 +464,7 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
         totalAmount,
         razorpayOrderId: order.id,
         status: 'CREATED',
-        preferredSegmentId: segmentId,
+        preferredSegmentId: finalSegmentId,
         gstRateUsed: 18,
         originalPlanAmount: totalAmount,
         originalDuration: (function () {
@@ -636,6 +662,20 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
             sourceRefId: paymentIntent._id.toString(),
             segmentId: paymentIntent.preferredSegmentId
         });
+
+        if (paymentIntent.preferredSegmentId) {
+            const calculatedEndDate = new Date();
+            calculatedEndDate.setDate(calculatedEndDate.getDate() + days);
+            await userActiveSegmentModel.findOneAndUpdate(
+                { userId: paymentIntent.userId, segmentId: paymentIntent.preferredSegmentId },
+                {
+                    isActive: true,
+                    purchaseDate: new Date(),
+                    expiryDate: isLifetime ? null : calculatedEndDate
+                },
+                { upsert: true, new: true }
+            );
+        }
     }
 
     // 6. LEGACY SYNC (Create PlanPurchase & Payment records for Admin Panel/App History)
@@ -1477,9 +1517,16 @@ export const onboardOfflineUser = async (adminId, userData, entitlements) => {
 
     // 3. Grant Plans
     if (entitlements.plans && entitlements.plans.length > 0) {
+        if (entitlements.plans.length > 1) {
+            throw new Error("Strict Policy: A user can only be assigned 1 plan ('SPARK' or 'SPLENDID'). Additional segments can be allocated later.");
+        }
         for (const planId of entitlements.plans) {
             const plan = await SegmentsPlan.findById(planId);
             if (!plan) continue;
+            const planName = (plan.planName || '').trim().toUpperCase();
+            if (!['SPARK', 'SPLENDID'].includes(planName)) {
+                throw new Error("Strict Policy: A user can only be assigned 1 plan: 'SPARK' or 'SPLENDID'.");
+            }
             const days = plan.day ? parseInt(plan.day) : 30;
 
             await grantEntitlement({

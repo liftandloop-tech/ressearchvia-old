@@ -42,9 +42,10 @@ class MainDashboardController extends GetxController {
       return;
     }
 
-    // Admins and Directors have top-level access across all operational modules
     if (user.isAdmin) return;
-    if (currentRoute == AppRoutes.dashboard) return;
+    if (currentRoute == AppRoutes.dashboard ||
+        currentRoute == AppRoutes.profile ||
+        currentRoute.startsWith('/profile')) return;
 
     if (user.isDirector) {
       if (currentRoute.startsWith('/automated-trading') ||
@@ -65,9 +66,10 @@ class MainDashboardController extends GetxController {
     } else if (currentRoute.startsWith('/users') ||
         currentRoute.startsWith('/edit-user')) {
       isAllowed = user.hasPermission('Users', 'read');
-    } else if (currentRoute.startsWith('/approvals/kyc') ||
+    } else if (currentRoute.startsWith('/registered-clients') ||
+        currentRoute.startsWith('/approvals/kyc') ||
         currentRoute.startsWith('/kyc')) {
-      isAllowed = user.hasPermission('KYC', 'read');
+      isAllowed = user.hasPermission('KYC', 'read') || user.hasPermission('Users', 'read');
     } else if (currentRoute.startsWith('/approvals/payments')) {
       isAllowed = user.hasPermission('Payments', 'read');
     } else if (currentRoute.startsWith('/staff') ||
@@ -101,7 +103,10 @@ class MainDashboardController extends GetxController {
 
   void _updateTab() {
     final currentRoute = Get.currentRoute;
-    if (currentRoute == AppRoutes.userKyc)
+    if (currentRoute == AppRoutes.registeredClients ||
+        currentRoute == AppRoutes.userKyc ||
+        currentRoute.startsWith('/registered-clients') ||
+        currentRoute.startsWith('/approvals/kyc'))
       selectedTab.value = 7;
     else if (currentRoute == AppRoutes.pendingPayments)
       selectedTab.value = 8;
@@ -161,7 +166,7 @@ class MainDashboardController extends GetxController {
         }
         break;
       case 7:
-        Get.offNamed(AppRoutes.userKyc);
+        Get.offNamed(AppRoutes.registeredClients);
         break;
       case 8:
         Get.offNamed(AppRoutes.pendingPayments);

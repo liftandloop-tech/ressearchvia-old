@@ -4,7 +4,6 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/dashboard/main_dashboard.controller.dart';
 import '../screens/dashboard/widgets/dashboard_header.widget.dart';
-import '../widgets/footer.widget.dart';
 
 class DashboardLayout extends StatelessWidget {
   final Widget child;
@@ -90,7 +89,6 @@ class DashboardLayout extends StatelessWidget {
                       );
                     }),
                     Expanded(child: child),
-                    const Footer(),
                   ],
                 ),
               ),

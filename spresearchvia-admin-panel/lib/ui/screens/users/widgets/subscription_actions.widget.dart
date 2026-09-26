@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/controllers/subscription/manage_subscription.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 
 class SubscriptionActions extends StatelessWidget {
   final ManageSubscriptionController controller;
@@ -10,6 +12,12 @@ class SubscriptionActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final canRevoke = (authController.user.value?.isAdmin == true) ||
+        (authController.user.value?.has('subscriptions.revoke') ?? false);
+
+    if (!canRevoke) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(

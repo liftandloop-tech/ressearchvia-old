@@ -26,70 +26,133 @@ class LeadManagementScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Row
-            Row(
-              children: [
-                Text(
-                  'Lead Management',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => controller.fetchLeads(),
-                  icon: Icon(Icons.refresh, color: AppTheme.primaryBlue),
-                  tooltip: 'Refresh Leads',
-                ),
-                const SizedBox(width: 8),
-                Button(
-                  title: 'Lead Pools',
-                  buttonType: ButtonType.blue,
-                  icon: Icons.workspaces_outlined,
-                  onTap: () => _showLeadPoolsDialog(context, controller),
-                ),
-                const SizedBox(width: 8),
-                Button(
-                  title: 'Bulk Upload',
-                  buttonType: ButtonType.blue,
-                  icon: Icons.upload_file,
-                  onTap: () => controller.pickAndUploadBulkLeads(),
-                ),
-                const SizedBox(width: 8),
-                Button(
-                  title: 'Download Template',
-                  buttonType: ButtonType.blue,
-                  icon: Icons.download,
-                  onTap: () => controller.downloadTemplate(),
-                ),
-                const SizedBox(width: 12),
-                Obx(() {
-                  if (controller.selectedLeadIds.isEmpty) return const SizedBox();
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Button(
-                        title: 'Bulk Assign (${controller.selectedLeadIds.length})',
-                        buttonType: ButtonType.blue,
-                        icon: Icons.assignment_ind_rounded,
-                        onTap: () {
-                          _showSearchableRMDialog(context, controller, onSelected: (rmId) {
-                            controller.bulkAssignRM(rmId);
-                          });
-                        },
+            Builder(
+              builder: (context) {
+                final authUser = Get.find<AuthController>().user.value;
+                final canViewPools = (authUser?.isAdmin == true) || (authUser?.has('leads.view_pools') ?? false);
+                final canBulkUpload = (authUser?.isAdmin == true) || (authUser?.has('leads.bulk_upload') ?? false);
+                final canBulkAssign = (authUser?.isAdmin == true) || (authUser?.has('leads.bulk_assign') ?? false);
+                final canCreateLead = (authUser?.isAdmin == true) || (authUser?.has('leads.create') ?? false);
+
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 1180;
+
+                    final actionButtons = <Widget>[
+                      IconButton(
+                        onPressed: () => controller.fetchLeads(),
+                        icon: const Icon(Icons.refresh, color: AppTheme.primaryBlue),
+                        tooltip: 'Refresh Leads',
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                  );
-                }),
-                Button(
-                  title: 'Add New Lead',
-                  buttonType: ButtonType.green,
-                  icon: Icons.add,
-                  onTap: () => _showAddLeadDialog(context, controller),
-                ),
-              ],
+                      if (canViewPools) ...[
+                        const SizedBox(width: 8),
+                        Button(
+                          title: 'Lead Pools',
+                          buttonType: ButtonType.blue,
+                          icon: Icons.workspaces_outlined,
+                          onTap: () => _showLeadPoolsDialog(context, controller),
+                        ),
+                      ],
+                      if (canBulkUpload) ...[
+                        const SizedBox(width: 8),
+                        Button(
+                          title: 'Bulk Upload',
+                          buttonType: ButtonType.blue,
+                          icon: Icons.upload_file,
+                          onTap: () => controller.pickAndUploadBulkLeads(),
+                        ),
+                        const SizedBox(width: 8),
+                        Button(
+                          title: 'Download Template',
+                          buttonType: ButtonType.blue,
+                          icon: Icons.download,
+                          onTap: () => controller.downloadTemplate(),
+                        ),
+                      ],
+                      if (canBulkAssign)
+                        Obx(() {
+                          if (controller.selectedLeadIds.isEmpty) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Button(
+                              title: 'Bulk Assign (${controller.selectedLeadIds.length})',
+                              buttonType: ButtonType.blue,
+                              icon: Icons.assignment_ind_rounded,
+                              onTap: () {
+                                _showSearchableRMDialog(context, controller, onSelected: (rmId) {
+                                  controller.bulkAssignRM(rmId);
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                      if (canCreateLead) ...[
+                        const SizedBox(width: 8),
+                        Button(
+                          title: 'Add New Lead',
+                          buttonType: ButtonType.green,
+                          icon: Icons.add,
+                          onTap: () => _showAddLeadDialog(context, controller),
+                        ),
+                      ],
+                    ];
+
+                    final titleColumn = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Lead Management',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Track pipeline, manage distribution pools, and assign relationships',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    );
+
+                    if (isCompact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          titleColumn,
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: actionButtons,
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(child: titleColumn),
+                        const SizedBox(width: 16),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: actionButtons,
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
             const SizedBox(height: 24),
 
@@ -118,141 +181,170 @@ class LeadManagementScreen extends StatelessWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    // Search
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        onChanged: (val) => controller.updateFilters(search: val),
-                        decoration: InputDecoration(
-                          hintText: 'Search Name, Mobile, Email...',
-                          prefixIcon: Icon(Icons.search, color: AppTheme.gray400),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: AppTheme.gray300),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Stage Filter
-                    Expanded(
-                      child: Obx(
-                        () {
-                          const stages = ['All Stages', 'New', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'];
-                          final curStage = controller.selectedStage.value;
-                          final safeStage = (stages.contains(curStage) || curStage.isEmpty) ? curStage : '';
-                          return DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            value: safeStage,
-                            hint: const Text('Filter Stage'),
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: AppTheme.gray300),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                            ),
-                            items: stages
-                                .map((stage) => DropdownMenuItem(
-                                      value: stage == 'All Stages' ? '' : stage,
-                                      child: Text(stage),
-                                    ))
-                                .toList(),
-                            onChanged: (val) => controller.updateFilters(stage: val ?? ''),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Pool Filter
-                    Expanded(
-                      child: Obx(
-                        () {
-                          final currentPoolId = controller.selectedFilterPoolId.value;
-                          final poolItems = [
-                            const DropdownMenuItem(value: '', child: Text('All Pools')),
-                            ...controller.leadPoolsList.map((pool) => DropdownMenuItem(
-                                  value: pool.id,
-                                  child: Text(pool.name, overflow: TextOverflow.ellipsis),
-                                )),
-                          ];
-                          final safePoolId = poolItems.any((item) => item.value == currentPoolId) ? currentPoolId : '';
-                          return DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            value: safePoolId,
-                            hint: const Text('Filter Pool'),
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: AppTheme.gray300),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                            ),
-                            items: poolItems,
-                            onChanged: (val) => controller.updateFilters(poolId: val ?? ''),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // RM Filter
-                    Expanded(
-                      child: Obx(() {
-                        final currentRMId = controller.selectedRMId.value;
-                        final currentRM = controller.staffList.firstWhereOrNull((s) => s.id == currentRMId);
-                        final label = currentRM != null ? '${currentRM.name} (${currentRM.role})' : 'Filter Assigned RM';
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 1050;
 
-                        return InkWell(
-                          onTap: () {
-                            _showSearchableRMDialog(
-                              context,
-                              controller,
-                              unassignedLabel: 'All (Show All Leads)',
-                              unassignedSubtitle: 'Click to clear RM filter',
-                              onSelected: (rmId) {
-                                controller.updateFilters(rmId: rmId ?? '');
-                              },
-                            );
-                          },
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: AppTheme.gray300),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    final searchField = TextField(
+                      onChanged: (val) => controller.updateFilters(search: val),
+                      decoration: InputDecoration(
+                        hintText: 'Search Name, Mobile, Email...',
+                        prefixIcon: Icon(Icons.search, color: AppTheme.gray400),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: AppTheme.gray300),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                    );
+
+                    final stageFilter = Obx(
+                      () {
+                        const stages = ['All Stages', 'New', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'];
+                        final curStage = controller.selectedStage.value;
+                        final safeStage = (stages.contains(curStage) || curStage.isEmpty) ? curStage : '';
+                        return DropdownButtonFormField<String>(
+                          key: ValueKey(safeStage),
+                          isExpanded: true,
+                          initialValue: safeStage,
+                          hint: const Text('Filter Stage'),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: AppTheme.gray300),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: currentRM != null ? AppTheme.textPrimary : AppTheme.textSecondary,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const Icon(Icons.arrow_drop_down, color: AppTheme.gray600),
-                              ],
-                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                           ),
+                          items: stages
+                              .map((stage) => DropdownMenuItem(
+                                    value: stage == 'All Stages' ? '' : stage,
+                                    child: Text(stage),
+                                  ))
+                              .toList(),
+                          onChanged: (val) => controller.updateFilters(stage: val ?? ''),
                         );
-                      }),
-                    ),
-                    const SizedBox(width: 16),
-                    TextButton.icon(
+                      },
+                    );
+
+                    final poolFilter = Obx(
+                      () {
+                        final currentPoolId = controller.selectedFilterPoolId.value;
+                        final poolItems = [
+                          const DropdownMenuItem(value: '', child: Text('All Pools')),
+                          ...controller.leadPoolsList.map((pool) => DropdownMenuItem(
+                                value: pool.id,
+                                child: Text(pool.name, overflow: TextOverflow.ellipsis),
+                              )),
+                        ];
+                        final safePoolId = poolItems.any((item) => item.value == currentPoolId) ? currentPoolId : '';
+                        return DropdownButtonFormField<String>(
+                          key: ValueKey(safePoolId),
+                          isExpanded: true,
+                          initialValue: safePoolId,
+                          hint: const Text('Filter Pool'),
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: AppTheme.gray300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          items: poolItems,
+                          onChanged: (val) => controller.updateFilters(poolId: val ?? ''),
+                        );
+                      },
+                    );
+
+                    final rmFilter = Obx(() {
+                      final currentRMId = controller.selectedRMId.value;
+                      final currentRM = controller.staffList.firstWhereOrNull((s) => s.id == currentRMId);
+                      final label = currentRM != null ? '${currentRM.name} (${currentRM.role})' : 'Filter Assigned RM';
+
+                      return InkWell(
+                        onTap: () {
+                          _showSearchableRMDialog(
+                            context,
+                            controller,
+                            unassignedLabel: 'All (Show All Leads)',
+                            unassignedSubtitle: 'Click to clear RM filter',
+                            onSelected: (rmId) {
+                              controller.updateFilters(rmId: rmId ?? '');
+                            },
+                          );
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: AppTheme.gray300),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  label,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: currentRM != null ? AppTheme.textPrimary : AppTheme.textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const Icon(Icons.arrow_drop_down, color: AppTheme.gray600),
+                            ],
+                          ),
+                        ),
+                      );
+                    });
+
+                    final resetBtn = TextButton.icon(
                       onPressed: () => controller.resetFilters(),
                       icon: const Icon(Icons.clear_all),
                       label: const Text('Reset'),
                       style: TextButton.styleFrom(foregroundColor: AppTheme.primaryBlue),
-                    )
-                  ],
+                    );
+
+                    if (isCompact) {
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: searchField),
+                              const SizedBox(width: 8),
+                              resetBtn,
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(child: stageFilter),
+                              const SizedBox(width: 12),
+                              Expanded(child: poolFilter),
+                              const SizedBox(width: 12),
+                              Expanded(child: rmFilter),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(flex: 2, child: searchField),
+                        const SizedBox(width: 16),
+                        Expanded(child: stageFilter),
+                        const SizedBox(width: 16),
+                        Expanded(child: poolFilter),
+                        const SizedBox(width: 16),
+                        Expanded(child: rmFilter),
+                        const SizedBox(width: 16),
+                        resetBtn,
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -331,7 +423,7 @@ class LeadManagementScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8),
                                       decoration: BoxDecoration(
-                                        color: _getStageColor(lead.stage).withOpacity(0.1),
+                                        color: _getStageColor(lead.stage).withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: DropdownButtonHideUnderline(
@@ -375,9 +467,9 @@ class LeadManagementScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: Colors.indigo.withOpacity(0.08),
+                                        color: Colors.indigo.withValues(alpha: 0.08),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.indigo.withOpacity(0.2)),
+                                        border: Border.all(color: Colors.indigo.withValues(alpha: 0.2)),
                                       ),
                                       child: Text(
                                         lead.leadPoolName ?? 'Fresh Leads',
@@ -445,23 +537,37 @@ class LeadManagementScreen extends StatelessWidget {
                                             style: const TextStyle(fontSize: 13),
                                           ),
                                         ),
-                                        IconButton(
-                                          icon: const Icon(Icons.edit_note, color: AppTheme.primaryBlue, size: 20),
-                                          tooltip: 'Log Follow-up',
-                                          onPressed: () => _showFollowUpDialog(context, controller, lead),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
+                                        Builder(
+                                          builder: (context) {
+                                            final authUser = Get.find<AuthController>().user.value;
+                                            final canFollowUp = (authUser?.isAdmin == true) || (authUser?.has('leads.follow_up') ?? false);
+                                            if (!canFollowUp) return const SizedBox.shrink();
+                                            return IconButton(
+                                              icon: const Icon(Icons.edit_note, color: AppTheme.primaryBlue, size: 20),
+                                              tooltip: 'Log Follow-up',
+                                              onPressed: () => _showFollowUpDialog(context, controller, lead),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            );
+                                          },
                                         ),
                                       ],
                                     ),
                                   ),
                                   DataCell(
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.grey, size: 18),
-                                      tooltip: 'Edit details',
-                                      onPressed: () => _showAddLeadDialog(context, controller, lead: lead),
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                    Builder(
+                                      builder: (context) {
+                                        final authUser = Get.find<AuthController>().user.value;
+                                        final canUpdate = (authUser?.isAdmin == true) || (authUser?.has('leads.update') ?? false);
+                                        if (!canUpdate) return const SizedBox.shrink();
+                                        return IconButton(
+                                          icon: const Icon(Icons.edit, color: Colors.grey, size: 18),
+                                          tooltip: 'Edit details',
+                                          onPressed: () => _showAddLeadDialog(context, controller, lead: lead),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        );
+                                      },
                                     ),
                                   ),
                                 ],
@@ -528,134 +634,171 @@ class LeadManagementScreen extends StatelessWidget {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.25)),
+          side: BorderSide(color: AppTheme.primaryBlue.withValues(alpha: 0.2)),
         ),
-        color: AppTheme.primaryBlue.withOpacity(0.04),
+        color: AppTheme.primaryBlue.withValues(alpha: 0.03),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(Icons.bolt_rounded, color: AppTheme.primaryBlue, size: 28),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 980;
+
+                  final titleSection = Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Lead Distribution Pool: $poolName',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppTheme.textPrimary),
-                          ),
-                          if (selectedPool?.isDefaultFresh == true) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: Colors.blue.shade200),
-                              ),
-                              child: Text('Default', style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
+                      Icon(Icons.bolt_rounded, color: AppTheme.primaryBlue, size: 28),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'Lead Distribution Pool: $poolName',
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppTheme.textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (selectedPool?.isDefaultFresh == true) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.blue.shade200),
+                                    ),
+                                    child: Text('Default', style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Available in Pool: $available (Batch: $pullSize leads)',
+                              style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
                             ),
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Available in Pool: $available (Batch: $pullSize leads)',
-                        style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  // Pool selector dropdown if multiple pools
-                  if (pools.length > 1) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.3)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: pools.any((p) => p.id == selectedPool?.id) ? selectedPool?.id : (pools.isNotEmpty ? pools.first.id : null),
-                          hint: const Text('Select Pool'),
-                          icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryBlue),
-                          style: const TextStyle(fontSize: 13, color: AppTheme.primaryBlue, fontWeight: FontWeight.w600),
-                          items: pools.map((p) {
-                            return DropdownMenuItem<String>(
-                              value: p.id,
-                              child: Text('${p.name} (${p.availableLeads} avail)'),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              controller.selectedPullPoolId.value = val;
-                              controller.fetchPullStats();
-                            }
-                          },
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
-                  // My count badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: atLimit ? Colors.red.shade50 : AppTheme.primaryBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'My Leads: $myCount / $maxStaff',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: atLimit ? Colors.red.shade700 : AppTheme.primaryBlue,
+                    ],
+                  );
+
+                  final controlsSection = Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      // Pool selector dropdown if multiple pools
+                      if (pools.length > 1)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.25)),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isDense: true,
+                              value: pools.any((p) => p.id == selectedPool?.id) ? selectedPool?.id : (pools.isNotEmpty ? pools.first.id : null),
+                              hint: const Text('Select Pool'),
+                              icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryBlue),
+                              style: const TextStyle(fontSize: 13, color: AppTheme.primaryBlue, fontWeight: FontWeight.w600),
+                              items: pools.map((p) {
+                                return DropdownMenuItem<String>(
+                                  value: p.id,
+                                  child: Text('${p.name} (${p.availableLeads} avail)'),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  controller.selectedPullPoolId.value = val;
+                                  controller.fetchPullStats();
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      // My count badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: atLimit ? Colors.red.shade50 : AppTheme.primaryBlue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'My Leads: $myCount / $maxStaff',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                            color: atLimit ? Colors.red.shade700 : AppTheme.primaryBlue,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Pull button
-                  if (atLimit)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Text('Limit Reached', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                    )
-                  else if (noLeads)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.shade200),
-                      ),
-                      child: Text('No Leads Available', style: TextStyle(color: Colors.orange.shade700, fontSize: 13)),
-                    )
-                  else
-                    ElevatedButton.icon(
-                      onPressed: pulling ? null : () => controller.pullLeadsFromSelectedPool(),
-                      icon: pulling
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.download_rounded, size: 18),
-                      label: Text(pulling ? 'Pulling...' : 'Pull ($pullSize) Leads'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                ],
+                      // Pull button
+                      if (atLimit)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Text('Limit Reached', style: TextStyle(color: Colors.grey.shade600, fontSize: 12.5)),
+                        )
+                      else if (noLeads)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Text('No Leads Available', style: TextStyle(color: Colors.orange.shade700, fontSize: 12.5)),
+                        )
+                      else
+                        ElevatedButton.icon(
+                          onPressed: pulling ? null : () => controller.pullLeadsFromSelectedPool(),
+                          icon: pulling
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.download_rounded, size: 16),
+                          label: Text(pulling ? 'Pulling...' : 'Pull ($pullSize) Leads'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                    ],
+                  );
+
+                  if (isCompact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        titleSection,
+                        const SizedBox(height: 12),
+                        controlsSection,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(child: titleSection),
+                      const SizedBox(width: 16),
+                      controlsSection,
+                    ],
+                  );
+                },
               ),
               // Feedback message
               if (controller.pullMessage.value.isNotEmpty) ...[
@@ -776,7 +919,8 @@ class LeadManagementScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: safePoolId,
+                          key: ValueKey(safePoolId),
+                          initialValue: safePoolId,
                           decoration: const InputDecoration(
                             labelText: 'Target Lead Pool',
                             border: OutlineInputBorder(),
@@ -821,7 +965,8 @@ class LeadManagementScreen extends StatelessWidget {
                 // Stage Selection
                 Obx(
                   () => DropdownButtonFormField<String>(
-                    value: controller.leadStage.value,
+                    key: ValueKey(controller.leadStage.value),
+                    initialValue: controller.leadStage.value,
                     decoration: const InputDecoration(labelText: 'Lead Stage', border: OutlineInputBorder()),
                     items: ['New', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid']
                         .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -933,7 +1078,7 @@ class LeadManagementScreen extends StatelessWidget {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.withOpacity(0.1),
+                                      color: Colors.blue.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -945,7 +1090,7 @@ class LeadManagementScreen extends StatelessWidget {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: _getFollowUpStatusColor(logItem.status).withOpacity(0.1),
+                                      color: _getFollowUpStatusColor(logItem.status).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -962,7 +1107,7 @@ class LeadManagementScreen extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: Colors.purple.withOpacity(0.1),
+                                        color: Colors.purple.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -992,7 +1137,8 @@ class LeadManagementScreen extends StatelessWidget {
                   Expanded(
                     child: Obx(
                       () => DropdownButtonFormField<String>(
-                        value: controller.followUpType.value,
+                        key: ValueKey(controller.followUpType.value),
+                        initialValue: controller.followUpType.value,
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
                         items: [
@@ -1010,7 +1156,8 @@ class LeadManagementScreen extends StatelessWidget {
                   Expanded(
                     child: Obx(
                       () => DropdownButtonFormField<String>(
-                        value: controller.followUpStatus.value,
+                        key: ValueKey(controller.followUpStatus.value),
+                        initialValue: controller.followUpStatus.value,
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
                         items: ['Pending', 'Completed', 'Rescheduled', 'Cancelled', 'Skipped']
@@ -1228,7 +1375,7 @@ class LeadManagementScreen extends StatelessWidget {
   Widget _buildStaffRow(StaffModel s, Function(String? id) onSelected) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: AppTheme.primaryBlue.withOpacity(0.1),
+        backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
         child: Text(s.name.substring(0, 1).toUpperCase(), style: TextStyle(color: AppTheme.primaryBlue, fontWeight: FontWeight.bold)),
       ),
       title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
@@ -1261,9 +1408,9 @@ class LeadManagementScreen extends StatelessWidget {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 780,
-          constraints: const BoxConstraints(maxHeight: 700),
-          padding: const EdgeInsets.all(28),
+          width: MediaQuery.of(context).size.width > 840 ? 780 : MediaQuery.of(context).size.width * 0.92,
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1271,26 +1418,26 @@ class LeadManagementScreen extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                      color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.workspaces_outlined, color: AppTheme.primaryBlue, size: 24),
+                    child: const Icon(Icons.workspaces_outlined, color: AppTheme.primaryBlue, size: 20),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Lead Pools Management',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Manage custom lead pools, batch pull limits, and staff capacity quotas',
-                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
@@ -1303,7 +1450,7 @@ class LeadManagementScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
 
@@ -1321,9 +1468,9 @@ class LeadManagementScreen extends StatelessWidget {
                         children: [
                           Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade400),
                           const SizedBox(height: 12),
-                          const Text('No lead pools found', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          const Text('No lead pools found', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
-                          Text('Create a custom pool to categorize leads and customize pull rules.', style: TextStyle(color: AppTheme.textSecondary)),
+                          Text('Create a custom pool to categorize leads and customize pull rules.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                         ],
                       ),
                     );
@@ -1331,21 +1478,21 @@ class LeadManagementScreen extends StatelessWidget {
 
                   return ListView.separated(
                     itemCount: controller.leadPoolsList.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 14),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, idx) {
                       final pool = controller.leadPoolsList[idx];
                       return Container(
-                        padding: const EdgeInsets.all(18),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: pool.isDefaultFresh ? AppTheme.primaryBlue.withOpacity(0.3) : AppTheme.gray200,
+                            color: pool.isDefaultFresh ? AppTheme.primaryBlue.withValues(alpha: 0.3) : AppTheme.gray200,
                             width: pool.isDefaultFresh ? 1.5 : 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
+                              color: Colors.black.withValues(alpha: 0.02),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             )
@@ -1358,12 +1505,12 @@ class LeadManagementScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   pool.name,
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(width: 8),
-                                if (pool.isDefaultFresh)
+                                if (pool.isDefaultFresh) ...[
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Colors.blue.shade50,
                                       borderRadius: BorderRadius.circular(4),
@@ -1371,7 +1518,49 @@ class LeadManagementScreen extends StatelessWidget {
                                     ),
                                     child: Text(
                                       'System Default',
-                                      style: TextStyle(fontSize: 11, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                                      style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                if (pool.isGlobal)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.teal.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.public, size: 11, color: Colors.teal.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Global (All Staff)',
+                                          style: TextStyle(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.purple.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.groups_outlined, size: 11, color: Colors.purple.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Team Pool (${pool.createdByName ?? 'Owner\'s Team'})',
+                                          style: TextStyle(fontSize: 10, color: Colors.purple.shade700, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 const Spacer(),
@@ -1382,12 +1571,13 @@ class LeadManagementScreen extends StatelessWidget {
                                     controller.pullLeadsFromSelectedPool(poolId: pool.id);
                                   },
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.tune_rounded, size: 20, color: AppTheme.primaryBlue),
-                                  tooltip: 'Edit Pool Limits & Details',
-                                  onPressed: () => _showEditLeadPoolDialog(context, controller, pool),
-                                ),
-                                if (!pool.isDefaultFresh)
+                                if (pool.canEdit)
+                                  IconButton(
+                                    icon: const Icon(Icons.tune_rounded, size: 20, color: AppTheme.primaryBlue),
+                                    tooltip: 'Edit Pool Limits & Details',
+                                    onPressed: () => _showEditLeadPoolDialog(context, controller, pool),
+                                  ),
+                                if (pool.canDelete)
                                   IconButton(
                                     icon: Icon(Icons.delete_outline, size: 20, color: Colors.red.shade400),
                                     tooltip: 'Delete Pool',
@@ -1473,27 +1663,27 @@ class LeadManagementScreen extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
-    required MaterialColor color,
+    required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.shade50,
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.shade200),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 15, color: color.shade700),
-          const SizedBox(width: 6),
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
           Text(
             '$label: ',
-            style: TextStyle(fontSize: 12, color: color.shade800, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
           ),
           Text(
             value,
-            style: TextStyle(fontSize: 12, color: color.shade900, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 11, color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1510,8 +1700,8 @@ class LeadManagementScreen extends StatelessWidget {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Container(
-          width: 480,
-          padding: const EdgeInsets.all(26),
+          width: MediaQuery.of(context).size.width > 520 ? 460 : MediaQuery.of(context).size.width * 0.92,
+          padding: const EdgeInsets.all(22),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1519,47 +1709,83 @@ class LeadManagementScreen extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(7),
                     ),
-                    child: const Icon(Icons.add_business_outlined, color: AppTheme.primaryBlue, size: 22),
+                    child: const Icon(Icons.add_business_outlined, color: AppTheme.primaryBlue, size: 19),
                   ),
-                  const SizedBox(width: 12),
-                  const Text('Create Custom Lead Pool', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 10),
+                  const Text('Create Custom Lead Pool', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.shield_outlined, size: 16, color: Colors.blue.shade800),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Pool Access & Distribution: Pools created by Admin are globally accessible to all staff. Pools created by Managers/Team Leads are isolated to the creator and their reporting team.',
+                        style: TextStyle(fontSize: 11, color: Colors.blue.shade900, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
               TextField(
                 controller: nameCtrl,
+                style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Pool Name *',
                   hintText: 'e.g. VIP Campaigns, Inbound Webinars',
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextField(
                 controller: descCtrl,
+                style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Description (optional)',
                   hintText: 'Notes on channel, audience, or purpose',
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.tune_rounded, size: 15, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 6),
+                  const Text('Lead Distribution Policy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: pullSizeCtrl,
                       keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         labelText: 'Pull Size (batch) *',
                         hintText: '20',
                         helperText: 'Leads per staff fetch',
                         border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                   ),
@@ -1568,38 +1794,51 @@ class LeadManagementScreen extends StatelessWidget {
                     child: TextField(
                       controller: maxStaffCtrl,
                       keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         labelText: 'Max Per Staff *',
                         hintText: '100',
                         helperText: 'Staff capacity cap',
                         border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text('Cancel', style: TextStyle(fontSize: 13)),
+                  ),
+                  const SizedBox(width: 10),
                   Button(
                     title: 'Create Pool',
                     buttonType: ButtonType.green,
                     onTap: () async {
                       final name = nameCtrl.text.trim();
                       if (name.isEmpty) {
-                        Get.snackbar('Validation', 'Pool name is required', backgroundColor: Colors.orange.withOpacity(0.1));
+                        Get.snackbar('Validation', 'Pool name is required', backgroundColor: Colors.orange.withValues(alpha: 0.1));
                         return;
                       }
-                      final pullSize = int.tryParse(pullSizeCtrl.text.trim()) ?? 20;
-                      final maxStaff = int.tryParse(maxStaffCtrl.text.trim()) ?? 100;
+                      final pullSize = int.tryParse(pullSizeCtrl.text.trim());
+                      if (pullSize == null || pullSize <= 0) {
+                        Get.snackbar('Validation', 'Pull size must be a positive number', backgroundColor: Colors.orange.withValues(alpha: 0.1));
+                        return;
+                      }
+                      final maxStaff = int.tryParse(maxStaffCtrl.text.trim());
+                      if (maxStaff == null || maxStaff <= 0) {
+                        Get.snackbar('Validation', 'Max staff capacity must be a positive number', backgroundColor: Colors.orange.withValues(alpha: 0.1));
+                        return;
+                      }
                       final success = await controller.createCustomLeadPool(
                         name,
                         descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
-                        pullSize: pullSize > 0 ? pullSize : 20,
-                        maxPerStaff: maxStaff > 0 ? maxStaff : 100,
+                        pullSize: pullSize,
+                        maxPerStaff: maxStaff,
                       );
                       if (success) {
                         Get.back();
@@ -1625,8 +1864,8 @@ class LeadManagementScreen extends StatelessWidget {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: Container(
-          width: 480,
-          padding: const EdgeInsets.all(26),
+          width: MediaQuery.of(context).size.width > 520 ? 460 : MediaQuery.of(context).size.width * 0.92,
+          padding: const EdgeInsets.all(22),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1634,46 +1873,60 @@ class LeadManagementScreen extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(7),
                     ),
-                    child: const Icon(Icons.tune_rounded, color: AppTheme.primaryBlue, size: 22),
+                    child: const Icon(Icons.tune_rounded, color: AppTheme.primaryBlue, size: 19),
                   ),
-                  const SizedBox(width: 12),
-                  Text('Edit Pool: ${pool.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 10),
+                  Text('Edit Pool: ${pool.name}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               TextField(
                 controller: nameCtrl,
                 enabled: !pool.isDefaultFresh,
+                style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   labelText: 'Pool Name',
                   helperText: pool.isDefaultFresh ? 'System pool name cannot be changed' : null,
                   border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextField(
                 controller: descCtrl,
+                style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Description',
                   border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(Icons.tune_rounded, size: 15, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 6),
+                  const Text('Lead Distribution Policy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: pullSizeCtrl,
                       keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         labelText: 'Pull Size (batch) *',
                         helperText: 'Leads per staff fetch',
                         border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                   ),
@@ -1682,32 +1935,45 @@ class LeadManagementScreen extends StatelessWidget {
                     child: TextField(
                       controller: maxStaffCtrl,
                       keyboardType: TextInputType.number,
+                      style: const TextStyle(fontSize: 13),
                       decoration: const InputDecoration(
                         labelText: 'Max Per Staff *',
                         helperText: 'Staff capacity cap',
                         border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text('Cancel', style: TextStyle(fontSize: 13)),
+                  ),
+                  const SizedBox(width: 10),
                   Button(
                     title: 'Update Pool',
                     buttonType: ButtonType.blue,
                     onTap: () async {
-                      final pullSize = int.tryParse(pullSizeCtrl.text.trim()) ?? pool.pullSize;
-                      final maxStaff = int.tryParse(maxStaffCtrl.text.trim()) ?? pool.maxPerStaff;
+                      final pullSize = int.tryParse(pullSizeCtrl.text.trim());
+                      if (pullSize == null || pullSize <= 0) {
+                        Get.snackbar('Validation', 'Pull size must be a positive number', backgroundColor: Colors.orange.withValues(alpha: 0.1));
+                        return;
+                      }
+                      final maxStaff = int.tryParse(maxStaffCtrl.text.trim());
+                      if (maxStaff == null || maxStaff <= 0) {
+                        Get.snackbar('Validation', 'Max staff capacity must be a positive number', backgroundColor: Colors.orange.withValues(alpha: 0.1));
+                        return;
+                      }
                       final updateData = <String, dynamic>{
                         if (!pool.isDefaultFresh) 'name': nameCtrl.text.trim(),
                         'description': descCtrl.text.trim(),
-                        'pullSize': pullSize > 0 ? pullSize : 20,
-                        'maxPerStaff': maxStaff > 0 ? maxStaff : 100,
+                        'pullSize': pullSize,
+                        'maxPerStaff': maxStaff,
                       };
                       final success = await controller.updateCustomLeadPool(pool.id, updateData);
                       if (success) {

@@ -75,17 +75,17 @@ const staffSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    localAddress: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
     currentAddress: {
-        street: { type: String, default: null },
-        city: { type: String, default: null },
-        state: { type: String, default: null },
-        zip: { type: String, default: null }
+        type: mongoose.Schema.Types.Mixed,
+        default: null
     },
     permanentAddress: {
-        street: { type: String, default: null },
-        city: { type: String, default: null },
-        state: { type: String, default: null },
-        zip: { type: String, default: null }
+        type: mongoose.Schema.Types.Mixed,
+        default: null
     },
     emergencyContact: {
         name: { type: String, default: null },
@@ -179,6 +179,15 @@ const staffSchema = new mongoose.Schema({
     roleId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Role',
+        default: null
+    },
+    role: {
+        type: String,
+        default: null
+    },
+    departmentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Department',
         default: null
     },
     walkInForm: {

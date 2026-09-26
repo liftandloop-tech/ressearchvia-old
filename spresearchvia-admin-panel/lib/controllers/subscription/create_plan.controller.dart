@@ -89,13 +89,25 @@ class CreatePlanController extends GetxController {
   Future<void> savePlan() async {
     if (!formKey.currentState!.validate()) return;
 
+    final planNameClean = planNameController.text.trim().toUpperCase();
+    if (planNameClean != 'SPARK' && planNameClean != 'SPLENDID') {
+      Get.snackbar(
+        'Validation Error',
+        'Strict Policy: Plan name must be either "SPARK" or "SPLENDID".',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
     isLoading.value = true;
     try {
       bool success;
       if (isEditing) {
         success = await _subscriptionService.updatePlan(
           planId: planToEdit!.id,
-          name: planNameController.text,
+          name: planNameClean,
           duration: int.tryParse(durationController.text) ?? 0,
           day: 'days',
           price: double.tryParse(priceController.text) ?? 0,
@@ -106,7 +118,7 @@ class CreatePlanController extends GetxController {
         );
       } else {
         final data = {
-          "planName": planNameController.text,
+          "planName": planNameClean,
           "duration": int.tryParse(durationController.text) ?? 0,
           "day": 'days',
           "price": double.tryParse(priceController.text) ?? 0,

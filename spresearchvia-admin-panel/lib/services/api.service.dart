@@ -9,7 +9,6 @@ class ApiService extends GetConnect {
   static final Map<String, Future<dynamic>> _inflightRequests = {};
   static final Map<String, Response> _responseCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
-  static const int _cacheTtlSeconds = 15;
 
   ApiService() {
     httpClient.baseUrl = AppConfig.apiBaseUrl;
@@ -35,21 +34,22 @@ class ApiService extends GetConnect {
     Map<String, dynamic>? query,
     Decoder<T>? decoder,
     bool forceRefresh = false,
+    int cacheTtlSeconds = 0,
   }) async {
     final key = _generateFingerprint('GET', url, query);
 
-    // 1. Check Cache (TTL)
-    if (!forceRefresh && _responseCache.containsKey(key)) {
+    // 1. Check Cache (Disabled by default: only used if caller explicitly requested caching with cacheTtlSeconds > 0)
+    if (!forceRefresh && cacheTtlSeconds > 0 && _responseCache.containsKey(key)) {
       final timestamp = _cacheTimestamps[key];
       if (timestamp != null &&
-          DateTime.now().difference(timestamp).inSeconds < _cacheTtlSeconds) {
+          DateTime.now().difference(timestamp).inSeconds < cacheTtlSeconds) {
         debugPrint('ApiService: CACHE HIT: $url');
         return _responseCache[key]! as Response<T>;
       }
     }
 
-    // 2. Check In-flight (Deduplication)
-    if (_inflightRequests.containsKey(key)) {
+    // 2. Check In-flight (Deduplication) - only deduplicate if NOT explicitly force-refreshed
+    if (!forceRefresh && _inflightRequests.containsKey(key)) {
       debugPrint('ApiService: DEDUPLICATING GET: $url');
       return _inflightRequests[key]! as Future<Response<T>>;
     }
@@ -67,8 +67,8 @@ class ApiService extends GetConnect {
     try {
       final response = await future;
 
-      // 3. Store in Cache on Success
-      if (!response.status.hasError) {
+      // 3. Store in Cache on Success only if caching was explicitly requested
+      if (!response.status.hasError && cacheTtlSeconds > 0) {
         _responseCache[key] = response;
         _cacheTimestamps[key] = DateTime.now();
       }
@@ -79,6 +79,128 @@ class ApiService extends GetConnect {
     } finally {
       _inflightRequests.remove(key);
     }
+  }
+
+  @override
+  Future<Response<T>> post<T>(
+    String? url,
+    dynamic body, {
+    String? contentType,
+    Map<String, String>? headers,
+    Map<String, dynamic>? query,
+    Decoder<T>? decoder,
+    Progress? uploadProgress,
+  }) async {
+    clearAllCache();
+    final response = await super.post<T>(
+      url,
+      body,
+      contentType: contentType,
+      headers: headers,
+      query: query,
+      decoder: decoder,
+      uploadProgress: uploadProgress,
+    );
+    clearAllCache();
+    return response;
+  }
+
+  @override
+  Future<Response<T>> put<T>(
+    String url,
+    dynamic body, {
+    String? contentType,
+    Map<String, String>? headers,
+    Map<String, dynamic>? query,
+    Decoder<T>? decoder,
+    Progress? uploadProgress,
+  }) async {
+    clearAllCache();
+    final response = await super.put<T>(
+      url,
+      body,
+      contentType: contentType,
+      headers: headers,
+      query: query,
+      decoder: decoder,
+      uploadProgress: uploadProgress,
+    );
+    clearAllCache();
+    return response;
+  }
+
+  @override
+  Future<Response<T>> delete<T>(
+    String url, {
+    Map<String, String>? headers,
+    String? contentType,
+    Map<String, dynamic>? query,
+    Decoder<T>? decoder,
+  }) async {
+    clearAllCache();
+    final response = await super.delete<T>(
+      url,
+      headers: headers,
+      contentType: contentType,
+      query: query,
+      decoder: decoder,
+    );
+    clearAllCache();
+    return response;
+  }
+
+  @override
+  Future<Response<T>> patch<T>(
+    String url,
+    dynamic body, {
+    String? contentType,
+    Map<String, String>? headers,
+    Map<String, dynamic>? query,
+    Decoder<T>? decoder,
+    Progress? uploadProgress,
+  }) async {
+    clearAllCache();
+    final response = await super.patch<T>(
+      url,
+      body,
+      contentType: contentType,
+      headers: headers,
+      query: query,
+      decoder: decoder,
+      uploadProgress: uploadProgress,
+    );
+    clearAllCache();
+    return response;
+  }
+
+  @override
+  Future<Response<T>> request<T>(
+    String url,
+    String method, {
+    dynamic body,
+    String? contentType,
+    Map<String, String>? headers,
+    Map<String, dynamic>? query,
+    Decoder<T>? decoder,
+    Progress? uploadProgress,
+  }) async {
+    if (method.toUpperCase() != 'GET') {
+      clearAllCache();
+    }
+    final response = await super.request<T>(
+      url,
+      method,
+      body: body,
+      contentType: contentType,
+      headers: headers,
+      query: query,
+      decoder: decoder,
+      uploadProgress: uploadProgress,
+    );
+    if (method.toUpperCase() != 'GET') {
+      clearAllCache();
+    }
+    return response;
   }
 
   String _generateFingerprint(
@@ -97,11 +219,14 @@ class ApiService extends GetConnect {
     }
   }
 
-  void clearCache() {
+  static void clearAllCache() {
     _responseCache.clear();
     _cacheTimestamps.clear();
-    debugPrint('ApiService: Cache cleared');
+    _inflightRequests.clear();
+    debugPrint('ApiService: All cache & in-flight requests cleared');
   }
+
+  void clearCache() => clearAllCache();
 
   void _initializeModifiers() {
     // Add auth headers
@@ -164,7 +289,7 @@ class ApiService extends GetConnect {
         }
 
         if (isTokenError) {
-          print(
+          debugPrint(
             'Auth Token Invalid or Expired (Status: ${response.statusCode}). Redirecting to login.',
           );
 

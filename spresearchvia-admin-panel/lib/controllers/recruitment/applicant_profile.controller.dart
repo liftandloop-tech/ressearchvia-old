@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/applicant.service.dart';
 import '../../models/staff.model.dart';
+import '../../models/role.model.dart';
 import '../staff/staff.controller.dart';
 import '../staff/staff_management.controller.dart';
 
@@ -93,21 +94,45 @@ class ApplicantProfileController extends GetxController {
   }
 
   // Approval Controllers and Methods
+  final selectedRoleId = RxnString();
+  final selectedRole = ''.obs;
   final selectedDepartment = ''.obs;
   final mpinController = TextEditingController();
   final joiningDateController = TextEditingController();
   var isViewOnly = false.obs;
 
+  List<RoleModel> get availableRoles {
+    if (Get.isRegistered<StaffController>()) {
+      return Get.find<StaffController>().availableRoles;
+    }
+    return [];
+  }
+
+  void updateRole(String roleId) {
+    selectedRoleId.value = roleId;
+    final match = availableRoles.firstWhereOrNull((r) => r.id == roleId);
+    if (match != null) {
+      selectedRole.value = match.name;
+      selectedDepartment.value = match.departmentName ?? '';
+    }
+  }
+
   Future<bool> approveApplicant() async {
-    if (selectedDepartment.value.isEmpty || mpinController.text.trim().isEmpty) {
-      Get.snackbar('Alert', 'Please select a department and enter an MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
+    final hasRole = (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty) ||
+        selectedRole.value.isNotEmpty;
+    if (!hasRole || mpinController.text.trim().isEmpty) {
+      Get.snackbar('Alert', 'Please select a role and enter an MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
       return false;
     }
 
     isLoading.value = true;
     try {
       final data = {
-        'deparment': selectedDepartment.value,
+        if (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty)
+          'roleId': selectedRoleId.value,
+        'role': selectedRole.value,
+        if (selectedDepartment.value.isNotEmpty)
+          'deparment': selectedDepartment.value,
         'mpin': mpinController.text.trim(),
         'isViewOnly': isViewOnly.value,
         'joiningDate': joiningDateController.text.trim().isEmpty ? null : joiningDateController.text.trim(),

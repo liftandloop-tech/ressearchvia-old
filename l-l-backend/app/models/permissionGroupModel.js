@@ -14,6 +14,7 @@ const permissionSchema = new mongoose.Schema({
 const permissionGroupSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
     description: { type: String, default: null },
+    departmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
     permissions: [permissionSchema]
 }, { timestamps: true });
 

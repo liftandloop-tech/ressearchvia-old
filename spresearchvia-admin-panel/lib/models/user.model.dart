@@ -58,7 +58,8 @@ class UserModel {
   String get formattedPhone => mobile;
 
   bool get isAdmin {
-    if (isDirector || isManager || isResearcher) return false;
+    if (rawJson?['isAdmin'] == true) return true;
+    if (isDirector || isResearcher) return false;
     final dept = subscriptionPlan.toLowerCase();
     final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
     final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
@@ -68,6 +69,8 @@ class UserModel {
     }
     return dept == 'admin' ||
         dept == 'super_admin' ||
+        dept == 'administration' ||
+        dept.contains('admin') ||
         roleStr == 'admin' ||
         roleStr == 'super_admin' ||
         userTypeStr == 'admin' ||
@@ -76,7 +79,19 @@ class UserModel {
         roleIdName == 'super_admin';
   }
 
-  bool get isResearcher => subscriptionPlan.toLowerCase() == 'researcher';
+  bool get isResearcher {
+    final dept = subscriptionPlan.toLowerCase();
+    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
+    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
+    String roleIdName = '';
+    if (rawJson?['roleId'] is Map) {
+      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
+    }
+    return dept.contains('research') ||
+        roleStr.contains('research') ||
+        userTypeStr.contains('research') ||
+        roleIdName.contains('research');
+  }
 
   bool get isDirector {
     final dept = subscriptionPlan.toLowerCase();
@@ -186,8 +201,8 @@ class UserModel {
   bool hasPermission(String target, [String? optionalAction]) {
     if (isAdmin) return true; // System admins bypass permission checks
 
-    final t = target.toLowerCase();
-    final action = optionalAction?.toLowerCase() ?? '';
+    final t = target.trim().toLowerCase();
+    final action = (optionalAction ?? '').trim().toLowerCase();
 
     // 1. Director role: operational authority across users, staff, leads, reports, kyc, notifications
     // Settings, Automated Trading, and Plan Creation are strictly ADMIN-ONLY.
@@ -209,7 +224,244 @@ class UserModel {
       return true;
     }
 
-    // 2. Manager role: supervisor access over team operations (Users, Leads, Reports, KYC, Payments, Notifications, Attendance)
+    // Determine targetFeature and targetAction
+    String targetFeature;
+    String targetAction;
+
+    if (action.isNotEmpty) {
+      targetFeature = t;
+      targetAction = action;
+    } else if (t.contains('.')) {
+      final parts = t.split('.');
+      targetFeature = parts.first;
+      targetAction = parts.sublist(1).join('.');
+    } else if (t.contains(':')) {
+      final parts = t.split(':');
+      targetFeature = parts.first;
+      targetAction = parts.sublist(1).join(':');
+    } else {
+      targetFeature = t;
+      targetAction = '';
+    }
+
+    // Normalize feature name aliases
+    if (targetFeature == 'client' || targetFeature == 'clients') {
+      targetFeature = 'users';
+    }
+
+    final String requiredKey = targetAction.isNotEmpty 
+        ? '$targetFeature.$targetAction' 
+        : targetFeature;
+
+    // Normalize read/view intent
+    final bool isReadIntent = targetAction == 'read' || targetAction == 'view' || targetAction.isEmpty;
+
+    // Check direct permissions array on user if present (e.g. ['*'] for admin)
+    if (rawJson != null) {
+      final directPerms = rawJson!['permissions'];
+      if (directPerms is List) {
+        final List<String> pList = directPerms.map((p) => p.toString().toLowerCase()).toList();
+        if (pList.contains('*') || pList.contains('all') || pList.contains(requiredKey)) {
+          return true;
+        }
+        if (isReadIntent && pList.any((p) => p.startsWith('$targetFeature.') || p == targetFeature)) {
+          return true;
+        }
+      }
+    }
+
+    // Granular database-configured Role and Permission Groups check
+    if (rawJson != null) {
+      Map? roleMap;
+      if (rawJson!['roleId'] is Map) {
+        roleMap = rawJson!['roleId'] as Map;
+      } else if (rawJson!['role'] is Map) {
+        roleMap = rawJson!['role'] as Map;
+      }
+
+      final dynamic groups = roleMap?['permissionGroups'] ?? rawJson!['permissionGroups'];
+      if (groups is List && groups.isNotEmpty) {
+        for (var group in groups) {
+          if (group is! Map) continue;
+          final permissionsList = group['permissions'];
+          if (permissionsList is! List) continue;
+
+          for (var perm in permissionsList) {
+            if (perm is! Map) continue;
+            final actions = perm['actions'];
+            if (actions is! List) continue;
+
+            final String permFeatureRaw = (perm['feature'] ?? '').toString().toLowerCase();
+            final String permFeature = (permFeatureRaw == 'client' || permFeatureRaw == 'clients') ? 'users' : permFeatureRaw;
+            final List<String> actList = actions.map((a) => a.toString().toLowerCase()).toList();
+
+            // 1. Direct canonical action or wildcard match
+            if (actList.contains('*') || actList.contains('all') || actList.contains(requiredKey)) {
+              return true;
+            }
+
+            // 2. Feature-matching permission check
+            if (permFeature == targetFeature) {
+              // If targetAction is empty or read/view, any valid permission in this feature grants view access
+              if (isReadIntent && actList.isNotEmpty) {
+                return true;
+              }
+
+              // Specific action checks
+              if (actList.contains(targetAction)) {
+                return true;
+              }
+
+              // Write/Edit aliases
+              if ((targetAction == 'update' || targetAction == 'edit' || targetAction == 'write') &&
+                  (actList.contains('update') || actList.contains('edit') || actList.contains('write') ||
+                   actList.contains('$targetFeature.update') || actList.contains('$targetFeature.edit'))) {
+                return true;
+              }
+
+              // Create/Add aliases
+              if ((targetAction == 'create' || targetAction == 'add') &&
+                  (actList.contains('create') || actList.contains('add') ||
+                   actList.contains('$targetFeature.create') || actList.contains('$targetFeature.add'))) {
+                return true;
+              }
+
+              // Delete/Remove aliases
+              if ((targetAction == 'delete' || targetAction == 'remove') &&
+                  (actList.contains('delete') || actList.contains('remove') ||
+                   actList.contains('$targetFeature.delete'))) {
+                return true;
+              }
+            }
+
+            // 3. Cross-feature alias resolution matching accessMiddleware.js
+            // Leads
+            if (targetFeature == 'leads') {
+              if (isReadIntent || requiredKey == 'leads.view_all' || requiredKey == 'leads.view_assigned') {
+                if (actList.contains('leads.view') ||
+                    actList.contains('leads.view_all') ||
+                    actList.contains('leads.view_assigned') ||
+                    actList.contains('leads.pull') ||
+                    actList.contains('leads.create') ||
+                    actList.contains('read') ||
+                    actList.contains('view')) {
+                  return true;
+                }
+              }
+              if (requiredKey == 'leads.update_all' || requiredKey == 'leads.update_assigned' || requiredKey == 'leads.update') {
+                if (actList.contains('leads.update') || actList.contains('leads.update_all') || actList.contains('leads.update_assigned')) {
+                  return true;
+                }
+              }
+              if (requiredKey == 'leads.follow_up_all' || requiredKey == 'leads.follow_up_assigned' || requiredKey == 'leads.follow_up') {
+                if (actList.contains('leads.follow_up') || actList.contains('leads.follow_up_all') || actList.contains('leads.follow_up_assigned')) {
+                  return true;
+                }
+              }
+            }
+
+            // Users / Clients
+            if (targetFeature == 'users') {
+              if (isReadIntent || requiredKey == 'users.view_all' || requiredKey == 'users.view_assigned') {
+                if (actList.contains('users.view') ||
+                    actList.contains('users.view_all') ||
+                    actList.contains('users.view_assigned') ||
+                    actList.contains('read') ||
+                    actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+
+            // KYC
+            if (targetFeature == 'kyc') {
+              if (isReadIntent) {
+                if (actList.contains('kyc.view') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+
+            // Payments
+            if (targetFeature == 'payments') {
+              if (isReadIntent) {
+                if (actList.contains('payments.view_pending') || actList.contains('payments.export') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+
+            // Reports
+            if (targetFeature == 'reports') {
+              if (isReadIntent) {
+                if (actList.contains('reports.view') || actList.contains('reports.trading_call_popup') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+              if (requiredKey == 'reports.trading_call_popup' &&
+                  (actList.contains('reports.trading_call_popup') || actList.contains('trading_call_popup'))) {
+                return true;
+              }
+            }
+
+            // Notifications
+            if (targetFeature == 'notifications') {
+              if (isReadIntent) {
+                if (actList.contains('notifications.view') || actList.contains('notifications.preview') || actList.contains('notifications.send') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+
+            // Staff
+            if (targetFeature == 'staff') {
+              if (isReadIntent) {
+                if (actList.contains('staff.view') || actList.contains('staff.assignment') || actList.contains('staff.view_applicants') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+              if (requiredKey == 'staff.reset' &&
+                  (actList.contains('staff.reset_mpin') || actList.contains('staff.update') || actList.contains('staff.reset'))) {
+                return true;
+              }
+            }
+
+            // Settings
+            if (targetFeature == 'settings') {
+              if (isReadIntent) {
+                if (actList.contains('settings.view') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+
+            // Subscriptions
+            if (targetFeature == 'subscriptions') {
+              if (isReadIntent) {
+                if (actList.contains('subscriptions.view') || actList.contains('subscriptions.activate') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+
+            // Attendance
+            if (targetFeature == 'attendance') {
+              if (isReadIntent) {
+                if (actList.contains('attendance.view') || actList.contains('attendance.mark') || actList.contains('read') || actList.contains('view')) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Fallback for legacy role assignments if permissionGroups are empty
+    if (isResearcher && (targetFeature == 'reports' || targetFeature == 'notifications')) {
+      return true;
+    }
+
     if (isManager) {
       if (t.startsWith('automated') || t.startsWith('trading') || t.startsWith('subscription') || t.startsWith('settings')) {
         return false;
@@ -220,113 +472,30 @@ class UserModel {
       return true;
     }
 
-    // 3. Researcher role: reports and notifications access
-    if (isResearcher) {
+    // 5. Department-based fallback if permission groups are empty or unassigned
+    final dept = subscriptionPlan.toLowerCase();
+    if (dept.contains('sales') || dept.contains('executive') || dept.contains('advisory') || dept.contains('support')) {
+      if (t.startsWith('lead') || t.startsWith('user') || t.startsWith('notification') || t.startsWith('kyc') || t.startsWith('attendance') || t.startsWith('report')) {
+        return true;
+      }
+    }
+    if (dept.contains('research')) {
       if (t.startsWith('report') || t.startsWith('notification')) {
         return true;
       }
     }
-
-    if (rawJson == null) return false;
-
-    final String requiredKey = optionalAction == null
-        ? target.toLowerCase()
-        : '${target.toLowerCase()}.${optionalAction.toLowerCase()}';
-
-    // 4. Granular database-configured Role and Permission Groups check
-    final roleId = rawJson!['roleId'];
-    if (roleId is Map) {
-      final groups = roleId['permissionGroups'];
-      if (groups is List) {
-        for (var group in groups) {
-          if (group is Map) {
-            final permissionsList = group['permissions'];
-            if (permissionsList is List) {
-              for (var perm in permissionsList) {
-                if (perm is Map) {
-                  final actions = perm['actions'];
-                  if (actions is List) {
-                    final String permFeature = (perm['feature'] ?? '').toString().toLowerCase();
-                    final List<String> actList = actions.map((a) => a.toString().toLowerCase()).toList();
-
-                    // 1. Direct canonical key match
-                    if (actList.contains(requiredKey)) {
-                      return true;
-                    }
-
-                    // 2. Feature-based alias resolution
-                    final reqFeature = requiredKey.split('.').first;
-                    final reqAction = requiredKey.contains('.') ? requiredKey.split('.').last : '';
-                    if (permFeature == reqFeature) {
-                      if (reqAction.isNotEmpty) {
-                        if (actList.contains(reqAction) ||
-                            (reqAction == 'update' && (actList.contains('edit') || actList.contains('update') || actList.contains('write'))) ||
-                            (reqAction == 'edit' && (actList.contains('update') || actList.contains('edit') || actList.contains('write'))) ||
-                            (reqAction == 'delete' && actList.contains('delete')) ||
-                            (reqAction == 'create' && (actList.contains('create') || actList.contains('add') || actList.contains('write'))) ||
-                            (reqAction == 'view' && (actList.contains('read') || actList.contains('view'))) ||
-                            (reqAction == 'read' && (actList.contains('read') || actList.contains('view')))) {
-                          return true;
-                        }
-                      }
-                      if (requiredKey.startsWith('leads.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('leads.view_all') || actList.contains('leads.view_assigned'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('users.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('users.view') || actList.contains('users.view_all') || actList.contains('users.view_assigned'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('reports.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('reports.view'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('kyc.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('kyc.view'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('payments.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('payments.view_pending'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('staff.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('staff.view'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('settings.view') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('settings.view'))) {
-                        return true;
-                      }
-                      if (requiredKey.startsWith('subscriptions') &&
-                          (actList.contains('read') || actList.contains('view') || actList.contains('subscriptions.view') || actList.contains('subscriptions.activate'))) {
-                        return true;
-                      }
-                    }
-
-                    // Fallback check if feature and action were provided
-                    if (optionalAction != null && permFeature == target.toLowerCase()) {
-                      if (actList.contains(optionalAction.toLowerCase())) {
-                        return true;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // 5. Department-based fallback if permission groups are empty or unassigned
-    final dept = subscriptionPlan.toLowerCase();
-    if (dept.contains('sales') || dept.contains('executive') || dept.contains('advisory') || dept.contains('support')) {
-      if (t.startsWith('lead') || t.startsWith('user') || t.startsWith('notification') || t.startsWith('kyc') || t.startsWith('attendance')) {
+    if (dept.contains('compliance') || dept.contains('operations')) {
+      if (t.startsWith('kyc') || t.startsWith('report') || t.startsWith('user') || t.startsWith('notification') || t.startsWith('payment')) {
         return true;
       }
     }
-    if (dept.contains('compliance')) {
-      if (t.startsWith('kyc') || t.startsWith('report') || t.startsWith('user') || t.startsWith('notification')) {
+    if (dept.contains('hr') || dept.contains('human')) {
+      if (t.startsWith('staff') || t.startsWith('attendance') || t.startsWith('notification')) {
+        return true;
+      }
+    }
+    if (dept.contains('back office') || dept.contains('office')) {
+      if (t.startsWith('user') || t.startsWith('payment') || t.startsWith('kyc') || t.startsWith('subscription')) {
         return true;
       }
     }

@@ -32,6 +32,8 @@ import '../ui/screens/auth/applicant_onboard.screen.dart';
 import '../ui/screens/auth/applicant_continue_init.screen.dart';
 import '../ui/screens/staff/applicants_list.screen.dart';
 import '../ui/screens/staff/staff_details.screen.dart';
+import '../ui/screens/staff/staff_profile.screen.dart';
+import '../ui/screens/staff/public_staff_verification.screen.dart';
 
 import 'routes.config.dart';
 export 'routes.config.dart';
@@ -67,10 +69,12 @@ final appPages = [
     ),
   ),
   GetPage(
-    name: AppRoutes.userKyc,
-    page: () => DashboardLayout(
-      child: const PendingBankTransfersScreen(specificTab: 1),
-    ),
+    name: AppRoutes.registeredClients,
+    page: () => const UsersScreen(isRegisteredClients: true),
+  ),
+  GetPage(
+    name: '/approvals/kyc',
+    page: () => const UsersScreen(isRegisteredClients: true),
   ),
   GetPage(
     name: '/users/create',
@@ -159,5 +163,17 @@ final appPages = [
   GetPage(
     name: '/apply/continue',
     page: () => const ApplicantContinueInitScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.profile,
+    page: () => const StaffProfileScreen(),
+  ),
+  GetPage(
+    name: '/verify/staff/:id',
+    page: () => const PublicStaffVerificationScreen(),
+  ),
+  GetPage(
+    name: '/verify/:id',
+    page: () => const PublicStaffVerificationScreen(),
   ),
 ];

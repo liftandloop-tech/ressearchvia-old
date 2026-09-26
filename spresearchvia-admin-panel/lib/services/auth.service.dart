@@ -43,6 +43,8 @@ class AuthService extends ApiService {
     }
   }
 
+  Future<void> saveUserData(Map<String, dynamic> userData) => _saveUserData(userData);
+
   // Save admin backup before impersonating staff
   Future<void> saveAdminBackup(String token, Map<String, dynamic> userData) async {
     try {

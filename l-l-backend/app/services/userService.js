@@ -25,6 +25,7 @@ import staffService from "./staffService.js";
 import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
 import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
+import salesRevenueService from "./salesRevenueService.js";
 
 /* ==========================================================================
    HELPER FUNCTIONS (Refactored to reduce redundancy)
@@ -1588,11 +1589,26 @@ const userService = {
 
   userList: async ({ query, currentUserId }) => {
     try {
-      let { page, pageSize, search, status, manager, planType, date } = query;
-      let queryArgs = {};
+      let page = Math.max(1, parseInt(query.page) || 1);
+      let pageSize = Math.min(100, Math.max(1, parseInt(query.pageSize) || 15));
+      let { search, status, manager, planType, kycStatus, date, name, phone, sortBy, sortOrder } = query;
       search = search ? search.trim() : "";
-      page = page ? parseInt(page) : "";
-      pageSize = pageSize ? parseInt(pageSize) : "";
+      name = name ? name.trim() : "";
+      phone = phone ? phone.trim() : "";
+
+      // Sort configuration
+      let sortField = "createdAt";
+      let sortDir = -1;
+      if (sortBy) {
+        if (sortBy === 'name') sortField = "fullName";
+        else if (sortBy === 'mobile') sortField = "phone";
+        else if (sortBy === 'kycStatus') sortField = "kycStatus";
+        else if (sortBy === 'createdAt') sortField = "createdAt";
+      }
+      if (sortOrder) {
+        sortDir = sortOrder.toLowerCase() === 'asc' ? 1 : -1;
+      }
+      const sortObj = { [sortField]: sortDir };
 
       // Restrict users list by staff/director/manager assignment hierarchy
       let assignedUserIds = null;
@@ -1605,256 +1621,439 @@ const userService = {
         }
       }
 
-      const matchStage = {
+      const baseMatch = {
         userType: { $ne: "admin" },
         _id: { $ne: currentUserId ? new mongoose.Types.ObjectId(currentUserId) : null }
       };
 
       if (assignedUserIds !== null) {
-        matchStage._id.$in = assignedUserIds;
+        baseMatch._id = { ...(baseMatch._id || {}), $in: assignedUserIds };
       }
 
-      const aggregationPipeline = [
-        {
-          $match: matchStage,
-        },
-        {
-          $lookup: {
-            from: "files",
-            let: { userId: "$_id" },
-            pipeline: [
-              {
-                $match: {
-                  $expr: { $eq: ["$userId", "$$userId"] },
-                },
-              },
-            ],
-            as: "fileData",
-          },
-        },
-        {
-          $unwind: {
-            path: "$fileData",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        {
-          $lookup: {
-            from: "planpurchases",
-            let: { userId: "$_id" },
-            pipeline: [
-              {
-                $match: {
-                  $expr: { $eq: ["$userId", "$$userId"] },
-                },
-              },
-              { $sort: { createdAt: -1 } }
-            ],
-            as: "planpurchasesData",
-          },
-        },
-        /* REMOVED UNWIND of planpurchasesData to perform grouping */
-        // {
-        //   $unwind: {
-        //     path: "$planpurchasesData",
-        //     preserveNullAndEmptyArrays: true,
-        //   },
-        // },
-        {
-          $lookup: {
-            from: "staffassigments",
-            let: { userId: "$_id" },
-            pipeline: [
-              {
-                $match: {
-                  $expr: { $eq: ["$userId", "$$userId"] },
-                },
-              },
-            ],
-            as: "staffassigmentsData",
-          },
-        },
-        {
-          $unwind: {
-            path: "$staffassigmentsData",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        // NEW: Join Entitlements for accurate Plan Names (Segment - Plan)
-        {
-          $lookup: {
-            from: "entitlements",
-            let: { userId: "$_id" },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ["$userId", "$$userId"] },
-                      { $eq: ["$type", "PLAN"] },
-                      { $eq: ["$status", "ACTIVE"] }
-                    ]
+      // KYC Status Filter (direct field on user)
+      if (kycStatus && kycStatus !== 'All' && kycStatus.trim() !== '') {
+        const trimmed = kycStatus.trim();
+        if (trimmed.toUpperCase() === 'VERIFIED' || trimmed.toUpperCase() === 'APPROVED') {
+          baseMatch.kycStatus = { $in: [/^verified$/i, /^approved$/i] };
+        } else {
+          baseMatch.kycStatus = { $regex: new RegExp(`^${trimmed}$`, 'i') };
+        }
+      }
+
+      // Date Filter (direct field on user)
+      if (date && date.trim() !== '') {
+        try {
+          const parts = date.split('/');
+          if (parts.length === 3) {
+            const day = parseInt(parts[0]);
+            const month = parseInt(parts[1]);
+            const year = parseInt(parts[2]);
+            const startDate = new Date(year, month - 1, day, 0, 0, 0);
+            const endDate = new Date(year, month - 1, day, 23, 59, 59);
+            baseMatch.createdAt = { $gte: startDate, $lte: endDate };
+          }
+        } catch (e) {
+          console.error('Error parsing date filter:', e);
+        }
+      }
+
+      // Registration Plan Type: Silver and Gold are on user.registrationType
+      if (planType && planType !== 'All Statuses' && planType !== 'All Plans') {
+        if (planType === 'Silver') {
+          baseMatch.registrationType = { $regex: 'yearly', $options: 'i' };
+        } else if (planType === 'Gold') {
+          baseMatch.registrationType = { $regex: 'lifetime', $options: 'i' };
+        }
+      }
+
+      if (name) {
+        const nameRegex = { $regex: name, $options: "i" };
+        baseMatch.$and = baseMatch.$and || [];
+        baseMatch.$and.push({
+          $or: [
+            { "userObject.APP_NAME": nameRegex },
+            { fullName: nameRegex },
+          ]
+        });
+      }
+
+      if (phone) {
+        baseMatch.phone = { $regex: phone, $options: "i" };
+      }
+
+      // Check if any filters require lookups
+      const hasStatusFilter = status && status !== 'All Statuses';
+      const hasManagerFilter = manager && manager !== 'All Managers';
+      const hasSpecialPlanFilter = (planType === 'Pending for Approval' || planType === 'Not Registered');
+
+      // Helper function to build full user documents for given page user IDs
+      const fetchFullUserDataForIds = async (targetUserIds) => {
+        if (!targetUserIds || targetUserIds.length === 0) return [];
+        const fullPipeline = [
+          { $match: { _id: { $in: targetUserIds } } },
+          {
+            $lookup: {
+              from: "files",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: { $eq: ["$userId", "$$userId"] },
                   },
                 },
-              },
-              {
-                $lookup: {
-                  from: "segmentsplans",
-                  localField: "resourceId",
-                  foreignField: "_id",
-                  as: "planDetails"
-                }
-              },
-              { $unwind: { path: "$planDetails", preserveNullAndEmptyArrays: true } },
-              {
-                $project: {
-                  _id: 0,
-                  // Construct the name here: Segment - Plan
-                  packageName: {
-                    $concat: [
-                      { $ifNull: ["$planDetails.segmentsName", "Unknown"] },
-                      " - ",
-                      { $ifNull: ["$planDetails.planName", "Plan"] }
-                    ]
-                  },
-                  expiresAt: "$endDate"
-                }
-              }
-            ],
-            as: "activeEntitlements",
+              ],
+              as: "fileData",
+            },
           },
-        },
-        // NEW: Join Pending Registration Payment
-        {
-          $lookup: {
-            from: "paymentintents",
-            let: { userId: "$_id" },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ["$userId", "$$userId"] },
-                      { $eq: ["$purchaseType", "REGISTRATION"] },
-                      {
-                        $or: [
-                          { $in: ["$status", ["PENDING_BANK_TRANSFER", "VERIFICATION_PENDING", "PENDING_ADMIN_APPROVAL"]] },
-                          {
-                            $and: [
-                              { $eq: ["$status", "PAID"] },
-                              { $gte: ["$updatedAt", new Date(Date.now() - 24 * 60 * 60 * 1000)] }
-                            ]
-                          }
-                        ]
-                      }
-                    ]
+          {
+            $unwind: {
+              path: "$fileData",
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $lookup: {
+              from: "planpurchases",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: { $eq: ["$userId", "$$userId"] },
+                  },
+                },
+                { $sort: { createdAt: -1 } }
+              ],
+              as: "planpurchasesData",
+            },
+          },
+          {
+            $lookup: {
+              from: "staffassigments",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: { $eq: ["$userId", "$$userId"] },
+                  },
+                },
+              ],
+              as: "staffassigmentsData",
+            },
+          },
+          {
+            $unwind: {
+              path: "$staffassigmentsData",
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $lookup: {
+              from: "entitlements",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$userId", "$$userId"] },
+                        { $eq: ["$type", "PLAN"] },
+                        { $eq: ["$status", "ACTIVE"] }
+                      ]
+                    },
+                  },
+                },
+                {
+                  $lookup: {
+                    from: "segmentsplans",
+                    localField: "resourceId",
+                    foreignField: "_id",
+                    as: "planDetails"
+                  }
+                },
+                { $unwind: { path: "$planDetails", preserveNullAndEmptyArrays: true } },
+                {
+                  $project: {
+                    _id: 0,
+                    packageName: {
+                      $concat: [
+                        { $ifNull: ["$planDetails.segmentsName", "Unknown"] },
+                        " - ",
+                        { $ifNull: ["$planDetails.planName", "Plan"] }
+                      ]
+                    },
+                    expiresAt: "$endDate"
                   }
                 }
-              },
-              { $sort: { createdAt: -1 } },
-              { $limit: 1 }
-            ],
-            as: "pendingRegistrationPayment"
-          }
-        },
-        {
-          $unwind: {
-            path: "$pendingRegistrationPayment",
-            preserveNullAndEmptyArrays: true
-          }
-        },
-        {
-          $project: {
-            userDetails: "$userObject",
-            userStatus: "$userStatus", // Updated to use the new independent userStatus field
-            kycStatus: "$kycStatus",
-            registrationStatus: "$registrationStatus",
-            registrationType: "$registrationType",
-            registrationSource: "$registrationSource",
-            planSource: "$planSource",
-            userType: "$userType",
-            account_type: "$account_type",
-            onboarded_by: "$onboarded_by",
-            phone: "$phone",
-            filePath: "$fileData.filesObj.path",
-            ManagerId: "$staffassigmentsData.staffId",
-            Manager: "$staffassigmentsData.staffName",
-            // Ensure we use entitlements for the plan list if available, fallback to planPurchases for legacy
-            plans: {
-              $cond: {
-                if: { $gt: [{ $size: "$activeEntitlements" }, 0] },
-                then: "$activeEntitlements",
-                else: "$planpurchasesData"
-              }
+              ],
+              as: "activeEntitlements",
             },
-            packageName: { $ifNull: [{ $arrayElemAt: ["$activeEntitlements.packageName", 0] }, { $arrayElemAt: ["$planpurchasesData.packageName", 0] }, ""] },
-
-            // Keep existing fields from planpurchases for amounts/dates as entitlements might not have them readily joined without more lookups
-            packageAmount: { $ifNull: [{ $arrayElemAt: ["$planpurchasesData.amount", 0] }, 0] },
-            packagestatus: { $ifNull: [{ $arrayElemAt: ["$planpurchasesData.status", 0] }, ""] },
-            packageStartDate: { $ifNull: [{ $arrayElemAt: ["$planpurchasesData.startDate", 0] }, null] },
-            packageEndDate: { $ifNull: [{ $arrayElemAt: ["$activeEntitlements.expiresAt", 0] }, { $arrayElemAt: ["$planpurchasesData.endDate", 0] }, null] },
-            fullName: 1, // Added fullName to projection
-            email: 1, // Added email to projection explicitly
-            userId: 1, // Added userId to projection
-            paymentIntent: "$pendingRegistrationPayment", // Added paymentIntent
-            panCard: "$userObject.APP_PAN_NO", // Added panCard to projection
-            createdAt: 1,
-            updatedAt: 1,
           },
-        },
-        { $sort: { createdAt: -1 } },
-      ];
+          {
+            $lookup: {
+              from: "paymentintents",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$userId", "$$userId"] },
+                        { $eq: ["$purchaseType", "REGISTRATION"] },
+                        {
+                          $or: [
+                            { $in: ["$status", ["PENDING_BANK_TRANSFER", "VERIFICATION_PENDING", "PENDING_ADMIN_APPROVAL"]] },
+                            {
+                              $and: [
+                                { $eq: ["$status", "PAID"] },
+                                { $gte: ["$updatedAt", new Date(Date.now() - 24 * 60 * 60 * 1000)] }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                { $sort: { createdAt: -1 } },
+                { $limit: 1 }
+              ],
+              as: "pendingRegistrationPayment"
+            }
+          },
+          {
+            $unwind: {
+              path: "$pendingRegistrationPayment",
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $project: {
+              userDetails: "$userObject",
+              userStatus: "$userStatus",
+              kycStatus: "$kycStatus",
+              registrationStatus: "$registrationStatus",
+              registrationType: "$registrationType",
+              registrationSource: "$registrationSource",
+              planSource: "$planSource",
+              userType: "$userType",
+              account_type: "$account_type",
+              onboarded_by: "$onboarded_by",
+              phone: "$phone",
+              filePath: "$fileData.filesObj.path",
+              ManagerId: "$staffassigmentsData.staffId",
+              Manager: "$staffassigmentsData.staffName",
+              plans: {
+                $cond: {
+                  if: { $gt: [{ $size: "$activeEntitlements" }, 0] },
+                  then: "$activeEntitlements",
+                  else: "$planpurchasesData"
+                }
+              },
+              packageName: { $ifNull: [{ $arrayElemAt: ["$activeEntitlements.packageName", 0] }, { $arrayElemAt: ["$planpurchasesData.packageName", 0] }, ""] },
+              packageAmount: { $ifNull: [{ $arrayElemAt: ["$planpurchasesData.amount", 0] }, 0] },
+              packagestatus: { $ifNull: [{ $arrayElemAt: ["$planpurchasesData.status", 0] }, ""] },
+              packageStartDate: { $ifNull: [{ $arrayElemAt: ["$planpurchasesData.startDate", 0] }, null] },
+              packageEndDate: { $ifNull: [{ $arrayElemAt: ["$activeEntitlements.expiresAt", 0] }, { $arrayElemAt: ["$planpurchasesData.endDate", 0] }, null] },
+              fullName: 1,
+              email: 1,
+              userId: 1,
+              paymentIntent: "$pendingRegistrationPayment",
+              panCard: "$userObject.APP_PAN_NO",
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+          { $sort: { createdAt: -1 } },
+        ];
 
-      // Build filter conditions
+        let results = await userModel.aggregate(fullPipeline);
+        const idMap = new Map();
+        results.forEach(u => {
+          if (u.filePath && u.filePath.startsWith('app/')) {
+            u.filePath = u.filePath.replace(/^app\//, '');
+          }
+          idMap.set(u._id.toString(), u);
+        });
+        return targetUserIds.map(id => idMap.get(id.toString())).filter(Boolean);
+      };
+
+      if (!hasStatusFilter && !hasManagerFilter && !hasSpecialPlanFilter) {
+        // FAST PATH: All active filters are directly on userModel. No lookup needed to paginate!
+        if (search) {
+          const searchRegex = { $regex: search, $options: "i" };
+          baseMatch.$or = [
+            { "userObject.APP_NAME": searchRegex },
+            { fullName: searchRegex },
+            { phone: searchRegex },
+            { "userObject.APP_EMAIL": searchRegex },
+            { email: searchRegex },
+            { "userObject.APP_PAN_NO": searchRegex },
+            { panCard: searchRegex },
+            { userId: searchRegex }
+          ];
+        }
+
+        const [totalCount, pageDocs] = await Promise.all([
+          userModel.countDocuments(baseMatch),
+          userModel.find(baseMatch)
+            .sort(sortObj)
+            .skip((page - 1) * pageSize)
+            .limit(pageSize)
+            .select('_id')
+            .lean()
+        ]);
+
+        const pageIds = pageDocs.map(d => d._id);
+        const userData = await fetchFullUserDataForIds(pageIds);
+        return { status: 200, data: { totalCount, userData } };
+      }
+
+      // JOINED FILTER PATH: When filters need joined collections
+      const filterPipeline = [{ $match: baseMatch }];
+
+      if (hasManagerFilter || search) {
+        filterPipeline.push(
+          {
+            $lookup: {
+              from: "staffassigments",
+              let: { userId: "$_id" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$userId", "$$userId"] } } },
+              ],
+              as: "staffassigmentsData",
+            },
+          },
+          {
+            $unwind: {
+              path: "$staffassigmentsData",
+              preserveNullAndEmptyArrays: true,
+            },
+          }
+        );
+      }
+
+      if (hasStatusFilter || search) {
+        filterPipeline.push(
+          {
+            $lookup: {
+              from: "planpurchases",
+              let: { userId: "$_id" },
+              pipeline: [
+                { $match: { $expr: { $eq: ["$userId", "$$userId"] } } },
+                { $sort: { createdAt: -1 } },
+                { $limit: 1 }
+              ],
+              as: "planpurchasesData",
+            },
+          },
+          {
+            $lookup: {
+              from: "entitlements",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$userId", "$$userId"] },
+                        { $eq: ["$type", "PLAN"] },
+                        { $eq: ["$status", "ACTIVE"] }
+                      ]
+                    },
+                  },
+                },
+                { $limit: 1 }
+              ],
+              as: "activeEntitlements",
+            },
+          }
+        );
+      }
+
+      if (hasSpecialPlanFilter) {
+        filterPipeline.push(
+          {
+            $lookup: {
+              from: "paymentintents",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$userId", "$$userId"] },
+                        { $eq: ["$purchaseType", "REGISTRATION"] },
+                      ]
+                    }
+                  }
+                },
+                { $sort: { createdAt: -1 } },
+                { $limit: 1 }
+              ],
+              as: "pendingRegistrationPayment"
+            }
+          },
+          {
+            $unwind: {
+              path: "$pendingRegistrationPayment",
+              preserveNullAndEmptyArrays: true
+            }
+          }
+        );
+      }
+
       const matchConditions = [];
-
       if (search) {
         matchConditions.push({
           $or: [
-            { "userDetails.APP_NAME": { $regex: search, $options: "i" } },
+            { "userObject.APP_NAME": { $regex: search, $options: "i" } },
+            { fullName: { $regex: search, $options: "i" } },
             { phone: { $regex: search, $options: "i" } },
-            { "userDetails.APP_EMAIL": { $regex: search, $options: "i" } },
-            { "userDetails.APP_PAN_NO": { $regex: search, $options: "i" } }, // Search by PAN
-            { "plans.status": { $regex: search, $options: "i" } }, // Search in array
-            { "plans.packageName": { $regex: search, $options: "i" } }, // Search in array
-            { "activeEntitlements.packageName": { $regex: search, $options: "i" } }, // Search in Entitlements
-            { Manager: { $regex: search, $options: "i" } },
+            { "userObject.APP_EMAIL": { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+            { "userObject.APP_PAN_NO": { $regex: search, $options: "i" } },
+            { panCard: { $regex: search, $options: "i" } },
+            { userId: { $regex: search, $options: "i" } },
+            { "staffassigmentsData.staffName": { $regex: search, $options: "i" } },
           ],
         });
       }
 
-      // Status filter (subscription status)
-      if (status && status !== 'All Statuses') {
+      if (hasStatusFilter) {
         const statusLower = status.toLowerCase();
         if (statusLower === 'active') {
-          matchConditions.push({ packagestatus: 'active' });
-        } else if (statusLower === 'expired') {
-          matchConditions.push({ packagestatus: 'expired' });
-        } else if (statusLower === 'cancelled') {
-          matchConditions.push({ packagestatus: { $in: ['cancelled', 'failed'] } });
-        }
-      }
-
-      // Manager filter
-      if (manager && manager !== 'All Managers') {
-        if (manager === 'Unassigned') {
-          matchConditions.push({ $or: [{ Manager: null }, { Manager: '' }] });
-        } else {
-          matchConditions.push({ Manager: manager });
-        }
-      }
-
-      // Registration Status filter (planType parameter)
-      if (planType && planType !== 'All Statuses') {
-        if (planType === 'Silver') {
-          matchConditions.push({ registrationType: { $regex: 'yearly', $options: 'i' } });
-        } else if (planType === 'Gold') {
-          matchConditions.push({ registrationType: { $regex: 'lifetime', $options: 'i' } });
-        } else if (planType === 'Pending for Approval') {
           matchConditions.push({
-            paymentIntent: { $exists: true, $ne: null },
-            "paymentIntent.status": { $ne: 'PAID' }
+            $or: [
+              { "activeEntitlements.0": { $exists: true } },
+              { "planpurchasesData.status": 'active' }
+            ]
+          });
+        } else if (statusLower === 'expired') {
+          matchConditions.push({ "planpurchasesData.status": 'expired' });
+        } else if (statusLower === 'cancelled') {
+          matchConditions.push({ "planpurchasesData.status": { $in: ['cancelled', 'failed'] } });
+        }
+      }
+
+      if (hasManagerFilter) {
+        if (manager === 'Unassigned') {
+          matchConditions.push({
+            $or: [
+              { "staffassigmentsData.staffName": null },
+              { "staffassigmentsData.staffName": '' },
+              { staffassigmentsData: { $exists: false } }
+            ]
+          });
+        } else {
+          matchConditions.push({ "staffassigmentsData.staffName": manager });
+        }
+      }
+
+      if (hasSpecialPlanFilter) {
+        if (planType === 'Pending for Approval') {
+          matchConditions.push({
+            pendingRegistrationPayment: { $exists: true, $ne: null },
+            "pendingRegistrationPayment.status": { $ne: 'PAID' }
           });
         } else if (planType === 'Not Registered') {
           matchConditions.push({
@@ -1862,9 +2061,9 @@ const userService = {
               { registrationType: { $not: { $regex: 'yearly|lifetime', $options: 'i' } } },
               {
                 $or: [
-                  { paymentIntent: { $exists: false } },
-                  { paymentIntent: null },
-                  { "paymentIntent.status": 'PAID' }
+                  { pendingRegistrationPayment: { $exists: false } },
+                  { pendingRegistrationPayment: null },
+                  { "pendingRegistrationPayment.status": 'PAID' }
                 ]
               }
             ]
@@ -1872,58 +2071,28 @@ const userService = {
         }
       }
 
-      // Date filter
-      if (date && date.trim() !== '') {
-        try {
-          // Parse date in format D/M/YYYY
-          const parts = date.split('/');
-          if (parts.length === 3) {
-            const day = parseInt(parts[0]);
-            const month = parseInt(parts[1]);
-            const year = parseInt(parts[2]);
-
-            const startDate = new Date(year, month - 1, day, 0, 0, 0);
-            const endDate = new Date(year, month - 1, day, 23, 59, 59);
-
-            matchConditions.push({
-              createdAt: {
-                $gte: startDate,
-                $lte: endDate
-              }
-            });
-          }
-        } catch (e) {
-          console.error('Error parsing date filter:', e);
-        }
-      }
-
-      // Combine all match conditions
       if (matchConditions.length > 0) {
-        queryArgs = { $and: matchConditions };
+        filterPipeline.push({ $match: { $and: matchConditions } });
       }
 
-      aggregationPipeline.push({ $match: queryArgs });
-      let countPipeLine = [
-        ...aggregationPipeline,
-        { $group: { _id: null, count: { $sum: 1 } } },
-      ];
-      const countResult = await userModel.aggregate(countPipeLine);
-      let totalCount = countResult.length > 0 ? countResult[0].count : 0;
-      if (page && pageSize) {
-        aggregationPipeline.push(
-          { $skip: (page - 1) * pageSize },
-          { $limit: pageSize },
-        );
-      }
-      let userData = await userModel.aggregate(aggregationPipeline);
-
-      // Normalize filePath for frontend consumption
-      userData = userData.map(u => {
-        if (u.filePath && u.filePath.startsWith('app/')) {
-          u.filePath = u.filePath.replace(/^app\//, '');
+      filterPipeline.push(
+        { $sort: sortObj },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }],
+            pageDocs: [
+              { $skip: (page - 1) * pageSize },
+              { $limit: pageSize },
+              { $project: { _id: 1 } }
+            ]
+          }
         }
-        return u;
-      });
+      );
+
+      const facetResults = await userModel.aggregate(filterPipeline);
+      const totalCount = facetResults[0]?.metadata[0]?.total || 0;
+      const pageIds = (facetResults[0]?.pageDocs || []).map(d => d._id);
+      const userData = await fetchFullUserDataForIds(pageIds);
 
       return { status: 200, data: { totalCount, userData } };
     } catch (error) {
@@ -2256,232 +2425,17 @@ const userService = {
       const activeSubcription = await planPurchaseModel.countDocuments(planQuery);
       const pandingKyc = await userKycModel.countDocuments(kycQuery);
 
-      // --- STAFF SALES & ORDERS PERFORMANCE AGGREGATION ---
-      const staffListQuery = (!isSystemAdmin && targetStaffIds.length > 0)
-        ? { _id: { $in: targetStaffIds } }
-        : {};
-      const staffList = await staffModel.find(staffListQuery).select('fullName staffId deparment emailAddress mobileNumber status');
-
-      const assignmentQuery = (!isSystemAdmin && targetStaffIds.length > 0)
-        ? { staffId: { $in: targetStaffIds } }
-        : {};
-      const allAssignments = await staffAssigmentModel.find(assignmentQuery);
-      const userToStaffMap = {};
-      const staffClientCountMap = {};
-
-      const staffDeptMap = {};
-      staffList.forEach(s => {
-        staffDeptMap[s._id.toString()] = s.deparment || 'Sales';
+      // --- UNIFIED REALIZED SALES & PERFORMANCE AGGREGATION ---
+      const realizedMetrics = await salesRevenueService.computeRealizedMetrics({
+        callerId: currentUserId,
+        startDate,
+        endDate,
+        department,
+        staffMember,
+        staffId,
+        search,
+        status,
       });
-
-      allAssignments.forEach(ass => {
-        if (ass.userId && ass.staffId) {
-          const uId = ass.userId.toString();
-          const sId = ass.staffId.toString();
-          const dept = staffDeptMap[sId] || 'Sales';
-          userToStaffMap[uId] = { staffId: ass.staffId, staffName: ass.staffName, department: dept };
-          staffClientCountMap[sId] = (staffClientCountMap[sId] || 0) + 1;
-        }
-      });
-
-      // Filter Staff by Department or Staff Member / Staff ID if requested
-      let filteredStaffList = staffList;
-      if (department && department !== 'All Departments' && department !== 'All') {
-        const d = department.trim().toLowerCase();
-        filteredStaffList = filteredStaffList.filter(s => (s.deparment || '').toLowerCase() === d);
-      }
-      if (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') {
-        const sm = staffMember.trim().toLowerCase();
-        filteredStaffList = filteredStaffList.filter(s => (s.fullName || '').toLowerCase() === sm);
-      }
-      if (staffId) {
-        const sid = staffId.toString();
-        filteredStaffList = filteredStaffList.filter(s => s._id.toString() === sid || s.staffId === sid);
-      }
-
-      const allowedStaffIdSet = new Set(filteredStaffList.map(s => s._id.toString()));
-
-      let purchasesQuery = {};
-      if (userQuery._id && userQuery._id.$in) {
-        purchasesQuery.userId = { $in: userQuery._id.$in };
-      } else if (!isSystemAdmin) {
-        purchasesQuery.userId = { $in: [] };
-      }
-
-      // Date filtering on planPurchaseModel
-      if (startDate || endDate) {
-        purchasesQuery.createdAt = {};
-        if (startDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          purchasesQuery.createdAt.$gte = start;
-        }
-        if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          purchasesQuery.createdAt.$lte = end;
-        }
-      }
-
-      // Status filtering on planPurchaseModel
-      if (status && status !== 'All' && status !== 'all') {
-        purchasesQuery.status = { $regex: new RegExp(`^${status.trim()}$`, 'i') };
-      }
-
-      const purchases = await planPurchaseModel.find(purchasesQuery)
-        .populate('userId', 'fullName phone email userObject')
-        .sort({ createdAt: -1 });
-
-      let totalSalesAmount = 0;
-      let totalPaidOrders = 0;
-      const staffSalesMap = {};
-
-      let ordersList = purchases.map(p => {
-        const uId = p.userId?._id?.toString();
-        const staffInfo = uId ? userToStaffMap[uId] : null;
-
-        const amount = p.totalPlanAmount || (p.basicAmount ? p.basicAmount + (p.cgstAmount || 0) + (p.sgstAmount || 0) : 0);
-
-        const clientName = p.userId?.fullName || (p.userId?.userObject?.firstName ? `${p.userId.userObject.firstName} ${p.userId.userObject.lastName || ''}`.trim() : 'Unknown User');
-        const clientPhone = p.userId?.phone || p.userId?.userObject?.mobileNumber || '-';
-        const clientEmail = p.userId?.email || p.userId?.userObject?.emailAddress || '-';
-        const packageName = p.packageName || 'Standard Plan';
-        const orderId = p._id ? `ORD-${p._id.toString().slice(-6).toUpperCase()}` : 'ORD-UNKNOWN';
-        const staffName = staffInfo?.staffName || 'Unassigned';
-        const sId = staffInfo?.staffId ? staffInfo.staffId.toString() : null;
-        const staffDept = staffInfo?.department || (sId && staffDeptMap[sId] ? staffDeptMap[sId] : 'Sales');
-
-        const statusLower = (p.status || 'active').toLowerCase();
-        // Only count genuine paid orders - strictly exclude pending, partial, rejected, failed, suspended
-        const isPaid = (statusLower === 'active' || statusLower === 'paid') && p.isPartial !== true;
-
-        return {
-          id: p._id ? p._id.toString() : '',
-          orderId,
-          clientName,
-          clientPhone,
-          clientEmail,
-          packageName,
-          amount,
-          status: p.status || 'active',
-          isPartial: p.isPartial === true,
-          isPaid,
-          staffId: sId,
-          staffName,
-          department: staffDept,
-          createdAt: p.createdAt ? p.createdAt.toISOString() : new Date().toISOString(),
-          startDate: p.startDate ? p.startDate.toISOString() : null,
-          endDate: p.endDate ? p.endDate.toISOString() : null,
-        };
-      });
-
-      // Strictly restrict orders for non-admin to their target staff only
-      if (!isSystemAdmin && targetStaffIds.length > 0) {
-        const allowedTargetSet = new Set(targetStaffIds.map(id => id.toString()));
-        ordersList = ordersList.filter(o => o.staffId && allowedTargetSet.has(o.staffId.toString()));
-      }
-
-      // Filter orders by allowed staff (if department or staff filter active)
-      if ((department && department !== 'All Departments' && department !== 'All') ||
-          (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') ||
-          staffId) {
-        ordersList = ordersList.filter(o => o.staffId && allowedStaffIdSet.has(o.staffId));
-      }
-
-      // Filter orders by search query
-      if (search && search.trim().length > 0) {
-        const q = search.trim().toLowerCase();
-        ordersList = ordersList.filter(o => {
-          return (
-            (o.clientName && o.clientName.toLowerCase().includes(q)) ||
-            (o.clientPhone && o.clientPhone.toLowerCase().includes(q)) ||
-            (o.clientEmail && o.clientEmail.toLowerCase().includes(q)) ||
-            (o.packageName && o.packageName.toLowerCase().includes(q)) ||
-            (o.staffName && o.staffName.toLowerCase().includes(q)) ||
-            (o.orderId && o.orderId.toLowerCase().includes(q))
-          );
-        });
-      }
-
-      // Calculate totals and populate staffSalesMap from filtered orders (PAID CLIENTS ONLY)
-      ordersList.forEach(o => {
-        const statusLower = (o.status || '').toLowerCase();
-        const isPaid = (statusLower === 'active' || statusLower === 'paid') && o.isPartial !== true;
-
-        if (isPaid) {
-          totalSalesAmount += (o.amount || 0);
-          totalPaidOrders += 1;
-        }
-
-        if (o.staffId) {
-          if (!staffSalesMap[o.staffId]) {
-            staffSalesMap[o.staffId] = { ordersCount: 0, paidOrdersCount: 0, totalAmount: 0 };
-          }
-          if (isPaid) {
-            staffSalesMap[o.staffId].paidOrdersCount += 1;
-            staffSalesMap[o.staffId].ordersCount += 1;
-            staffSalesMap[o.staffId].totalAmount += (o.amount || 0);
-          } else {
-            // Unpaid/pending/partial/failed are not counted towards sales revenue
-          }
-        }
-      });
-
-      const totalOrders = totalPaidOrders;
-
-      let staffPerformanceList = filteredStaffList.map(s => {
-        const sId = s._id.toString();
-        const salesData = staffSalesMap[sId] || { ordersCount: 0, paidOrdersCount: 0, totalAmount: 0 };
-        return {
-          id: sId,
-          staffId: s.staffId || sId.slice(-6),
-          name: s.fullName || 'Staff Member',
-          department: s.deparment || 'Sales',
-          email: s.emailAddress || '-',
-          phone: s.mobileNumber || '-',
-          assignedClients: staffClientCountMap[sId] || 0,
-          ordersCount: salesData.paidOrdersCount || salesData.ordersCount,
-          totalSalesAmount: salesData.totalAmount,
-        };
-      });
-
-      // Also filter staff performance list by search if search is active
-      if (search && search.trim().length > 0) {
-        const q = search.trim().toLowerCase();
-        staffPerformanceList = staffPerformanceList.filter(s => {
-          return (
-            (s.name && s.name.toLowerCase().includes(q)) ||
-            (s.email && s.email.toLowerCase().includes(q)) ||
-            (s.department && s.department.toLowerCase().includes(q)) ||
-            (s.staffId && s.staffId.toLowerCase().includes(q))
-          );
-        });
-      }
-
-      staffPerformanceList.sort((a, b) => b.totalSalesAmount - a.totalSalesAmount);
-
-      const activeStaffCount = staffPerformanceList.filter(s => s.totalSalesAmount > 0 || s.assignedClients > 0).length;
-      const avgOrderValue = totalOrders > 0 ? Math.round(totalSalesAmount / totalOrders) : 0;
-
-      // Department Sales Distribution (Paid sales only)
-      const departmentSalesMap = {};
-      staffPerformanceList.forEach(s => {
-        const dept = s.department || 'Sales';
-        departmentSalesMap[dept] = (departmentSalesMap[dept] || 0) + s.totalSalesAmount;
-      });
-
-      const departmentSales = Object.keys(departmentSalesMap).map(dept => ({
-        department: dept,
-        totalSalesAmount: departmentSalesMap[dept],
-      }));
-
-      // Conversion Rate: % of assigned clients who became paid clients
-      const totalAssignedClients = staffPerformanceList.reduce((acc, s) => acc + s.assignedClients, 0);
-      const conversionRate = totalAssignedClients > 0 ? Math.round((totalOrders / totalAssignedClients) * 100) : (totalOrders > 0 ? 100 : 0);
-
-      const topPerformingStaff = staffPerformanceList.length > 0 && staffPerformanceList[0].totalSalesAmount > 0
-        ? staffPerformanceList[0]
-        : (staffPerformanceList.length > 0 ? staffPerformanceList[0] : null);
 
       return {
         status: 200,
@@ -2490,15 +2444,15 @@ const userService = {
           userCount,
           activeSubcription,
           pandingKyc,
-          totalSalesAmount,
-          totalOrders,
-          activeStaffCount,
-          avgOrderValue,
-          conversionRate,
-          topPerformingStaff,
-          departmentSales,
-          staffPerformanceList,
-          ordersList,
+          totalSalesAmount: realizedMetrics.totalSalesAmount,
+          totalOrders: realizedMetrics.totalOrders,
+          activeStaffCount: realizedMetrics.activeStaffCount,
+          avgOrderValue: realizedMetrics.avgOrderValue,
+          conversionRate: realizedMetrics.conversionRate,
+          topPerformingStaff: realizedMetrics.topPerformingStaff,
+          departmentSales: realizedMetrics.departmentSales,
+          staffPerformanceList: realizedMetrics.staffPerformanceList,
+          ordersList: realizedMetrics.ordersList,
         },
       };
     } catch (error) {

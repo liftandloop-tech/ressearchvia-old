@@ -13,9 +13,9 @@ export const initiateRegistration = async (req, res) => {
 
 export const initiatePlan = async (req, res) => {
     try {
-        const { planId, paymentMode, isPartial, segmentId } = req.body;
+        const { planId, paymentMode, isPartial, segmentId, gstin } = req.body;
         const userId = req.user._id;
-        const result = await acquisitionService.initiatePlanPurchase(userId, planId, paymentMode, isPartial, segmentId);
+        const result = await acquisitionService.initiatePlanPurchase(userId, planId, paymentMode, isPartial, segmentId, false, gstin);
         res.status(200).json({ status: 200, message: "Order created", data: result });
     } catch (error) {
         res.status(400).json({ status: 400, message: error.message });

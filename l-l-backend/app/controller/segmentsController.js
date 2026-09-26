@@ -66,6 +66,30 @@ const segmentsController = {
             res.status(400).send({ status: 400, message: error.message, data: {} });
         }
     },
+    getUserPlanSegments: async (req, res) => {
+        try {
+            const response = await segmentsService.getUserPlanSegments(req);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: {} });
+        }
+    },
+    toggleUserSegment: async (req, res) => {
+        try {
+            const response = await segmentsService.toggleUserSegment(req);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: {} });
+        }
+    },
+    adminAllocateSegments: async (req, res) => {
+        try {
+            const response = await segmentsService.adminAllocateSegments(req);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: {} });
+        }
+    },
     expireSegments: async (req, res) => {
         try {
             const response = await segmentsService.expireSegments(req);

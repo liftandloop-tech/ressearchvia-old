@@ -53,7 +53,7 @@ class InvoicePdfGenerator {
         : <String, dynamic>{};
     final planData = payment['segmentPlanId'];
     final Map<String, dynamic> plan = (planData is Map)
-        ? Map<String, dynamic>.from(planData as Map)
+        ? Map<String, dynamic>.from(planData)
         : {};
     final isRegistration = payment['purchaseType'] == 'REGISTRATION';
 
@@ -763,38 +763,6 @@ class InvoicePdfGenerator {
             font: fontBold,
             fontSize: 9,
             color: valueColor ?? brandBlue,
-          ),
-        ),
-      ],
-    ),
-  );
-
-  static pw.Widget _priceRow(
-    String label,
-    String value,
-    pw.Font font,
-    pw.Font fontBold, {
-    bool isBold = false,
-    PdfColor? valueColor,
-    double fontSize = 10,
-  }) => pw.Padding(
-    padding: const pw.EdgeInsets.symmetric(vertical: 2),
-    child: pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Text(
-          label,
-          style: pw.TextStyle(
-            font: isBold ? fontBold : font,
-            fontSize: fontSize,
-          ),
-        ),
-        pw.Text(
-          value,
-          style: pw.TextStyle(
-            font: isBold ? fontBold : font,
-            fontSize: fontSize,
-            color: valueColor,
           ),
         ),
       ],

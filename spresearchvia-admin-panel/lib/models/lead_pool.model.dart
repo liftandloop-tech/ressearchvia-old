@@ -11,6 +11,13 @@ class LeadPoolModel {
   final int myLeads;
   final int remainingCapacity;
   final bool isDefaultFresh;
+  final bool isGlobal;
+  final String? createdBy;
+  final String? createdByName;
+  final String? creatorRole;
+  final bool isOwner;
+  final bool canEdit;
+  final bool canDelete;
   final DateTime? createdAt;
 
   LeadPoolModel({
@@ -26,6 +33,13 @@ class LeadPoolModel {
     this.myLeads = 0,
     this.remainingCapacity = 0,
     this.isDefaultFresh = false,
+    this.isGlobal = true,
+    this.createdBy,
+    this.createdByName,
+    this.creatorRole,
+    this.isOwner = false,
+    this.canEdit = false,
+    this.canDelete = false,
     this.createdAt,
   });
 
@@ -40,6 +54,12 @@ class LeadPoolModel {
     final myLeads = (json['myLeads'] is num) ? (json['myLeads'] as num).toInt() : (int.tryParse(json['myLeads']?.toString() ?? '0') ?? 0);
     final remainingCapacity = (json['remainingCapacity'] is num) ? (json['remainingCapacity'] as num).toInt() : (int.tryParse(json['remainingCapacity']?.toString() ?? '0') ?? (maxPerStaff - myLeads).clamp(0, maxPerStaff));
 
+    final isDefaultFresh = name.toLowerCase() == 'fresh leads' || json['isDefaultFresh'] == true;
+    final isGlobal = isDefaultFresh || json['isGlobal'] != false;
+    final isOwner = json['isOwner'] == true;
+    final canEdit = json['canEdit'] == true || isOwner;
+    final canDelete = (json['canDelete'] == true || isOwner) && !isDefaultFresh;
+
     return LeadPoolModel(
       id: poolId,
       name: name,
@@ -52,7 +72,14 @@ class LeadPoolModel {
       assignedLeads: assignedLeads,
       myLeads: myLeads,
       remainingCapacity: remainingCapacity,
-      isDefaultFresh: name.toLowerCase() == 'fresh leads' || json['isDefaultFresh'] == true,
+      isDefaultFresh: isDefaultFresh,
+      isGlobal: isGlobal,
+      createdBy: json['createdBy']?.toString(),
+      createdByName: json['createdByName']?.toString() ?? (isDefaultFresh ? 'System Admin' : null),
+      creatorRole: json['creatorRole']?.toString() ?? (isDefaultFresh ? 'Admin' : null),
+      isOwner: isOwner,
+      canEdit: canEdit,
+      canDelete: canDelete,
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
     );
   }
@@ -65,6 +92,10 @@ class LeadPoolModel {
       'pullSize': pullSize,
       'maxPerStaff': maxPerStaff,
       'isActive': isActive,
+      'isGlobal': isGlobal,
+      'createdBy': createdBy,
+      'createdByName': createdByName,
+      'creatorRole': creatorRole,
     };
   }
 }

@@ -7,6 +7,8 @@ class UsersTableController extends GetxController {
 
   RxInt get currentPage => _userManagementController.currentPage;
   RxInt get itemsPerPage => _userManagementController.pageSize;
+  RxInt get totalCount => _userManagementController.totalCount;
+  RxBool get isLoading => _userManagementController.isLoading;
 
   void nextPage(int totalPages) {
     if (currentPage.value < totalPages) {
@@ -22,5 +24,9 @@ class UsersTableController extends GetxController {
 
   void goToPage(int page) {
     _userManagementController.fetchUsers(page: page);
+  }
+
+  void setPageSize(int size) {
+    _userManagementController.setPageSize(size);
   }
 }

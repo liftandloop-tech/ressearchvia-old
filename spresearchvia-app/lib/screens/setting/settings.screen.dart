@@ -26,6 +26,13 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           children: [
             SettingTile(
+              title: 'Manage Segments',
+              subtitle: 'Activate or change segments for your active plan',
+              icon: Icons.tune_outlined,
+              onTap: () => Get.toNamed(AppRoutes.manageSegments),
+            ),
+            const SizedBox(height: 10),
+            SettingTile(
               title: 'Automated Trading',
               subtitle: 'Link broker & authorize daily session',
               icon: Icons.auto_graph_outlined,

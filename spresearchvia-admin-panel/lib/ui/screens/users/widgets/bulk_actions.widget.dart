@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/user.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'bulk_action_button.widget.dart';
 
 class BulkActions extends StatelessWidget {
@@ -10,6 +11,11 @@ class BulkActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<UserController>();
+    final authController = Get.find<AuthController>();
+    final user = authController.user.value;
+
+    final canSendNotification = (user?.isAdmin == true) || (user?.has('notifications.send') ?? false);
+    final canSuspendActivate = (user?.isAdmin == true) || (user?.has('users.suspend_activate') ?? false);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -40,17 +46,20 @@ class BulkActions extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          BulkActionButton(
-            title: 'Send Notification',
-            color: AppTheme.successGreen,
-            icon: Icons.notifications,
-            onTap: controller.sendNotification,
-          ),
-          const SizedBox(width: 12),
-          BulkActionButton(
-            title: 'Activate',
-            color: AppTheme.successGreen,
-            icon: Icons.check_circle,
+          if (canSendNotification) ...[
+            BulkActionButton(
+              title: 'Send Notification',
+              color: AppTheme.successGreen,
+              icon: Icons.notifications,
+              onTap: controller.sendNotification,
+            ),
+            const SizedBox(width: 12),
+          ],
+          if (canSuspendActivate) ...[
+            BulkActionButton(
+              title: 'Activate',
+              color: AppTheme.successGreen,
+              icon: Icons.check_circle,
             onTap: () {
               Get.dialog(
                 AlertDialog(
@@ -146,6 +155,7 @@ class BulkActions extends StatelessWidget {
               );
             },
           ),
+          ],
         ],
       ),
     );

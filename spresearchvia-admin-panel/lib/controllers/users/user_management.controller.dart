@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spresearch_web/services/user.service.dart';
 import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
@@ -21,15 +21,47 @@ class UserManagementController extends GetxController {
   var statusFilter = 'All Statuses'.obs;
   var managerFilter = 'All Managers'.obs;
   var planTypeFilter = 'All Plans'.obs;
+  var kycStatusFilter = 'All'.obs;
   var dateFilter = ''.obs;
+
+  var nameFilter = ''.obs;
+  var phoneFilter = ''.obs;
+  var sortBy = ''.obs;
+  var sortOrder = ''.obs;
+
+  static const String pageSizeKey = 'user_table_page_size';
 
   @override
   void onInit() {
     _userService = Get.find<UserService>();
     _staffService = Get.find<StaffService>();
     super.onInit();
+    _loadPersistedPageSize();
     fetchUsers();
     fetchManagers();
+  }
+
+  void _loadPersistedPageSize() {
+    try {
+      if (Get.isRegistered<SharedPreferences>()) {
+        final prefs = Get.find<SharedPreferences>();
+        final savedSize = prefs.getInt(pageSizeKey);
+        if (savedSize != null && [10, 15, 25, 50, 100].contains(savedSize)) {
+          pageSize.value = savedSize;
+        }
+      } else {
+        SharedPreferences.getInstance().then((prefs) {
+          final savedSize = prefs.getInt(pageSizeKey);
+          if (savedSize != null && [10, 15, 25, 50, 100].contains(savedSize)) {
+            if (pageSize.value != savedSize) {
+              setPageSize(savedSize);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading persisted page size: $e');
+    }
   }
 
   Future<void> fetchManagers() async {
@@ -94,29 +126,46 @@ class UserManagementController extends GetxController {
 
   Future<void> fetchUsers({
     int? page,
+    int? pageSize,
     String? search,
     String? status,
     String? manager,
     String? planType,
+    String? kycStatus,
     String? date,
+    String? name,
+    String? phone,
+    String? sortBy,
+    String? sortOrder,
   }) async {
     if (page != null) currentPage.value = page;
+    if (pageSize != null) this.pageSize.value = pageSize;
     if (search != null) searchQuery.value = search;
     if (status != null) statusFilter.value = status;
     if (manager != null) managerFilter.value = manager;
     if (planType != null) planTypeFilter.value = planType;
+    if (kycStatus != null) kycStatusFilter.value = kycStatus;
     if (date != null) dateFilter.value = date;
+    if (name != null) nameFilter.value = name;
+    if (phone != null) phoneFilter.value = phone;
+    if (sortBy != null) this.sortBy.value = sortBy;
+    if (sortOrder != null) this.sortOrder.value = sortOrder;
 
     isLoading.value = true;
     try {
       final result = await _userService.getUsers(
         page: currentPage.value,
-        pageSize: pageSize.value,
+        pageSize: this.pageSize.value,
         search: searchQuery.value,
         status: statusFilter.value,
         manager: managerFilter.value,
         planType: planTypeFilter.value,
+        kycStatus: kycStatusFilter.value,
         date: dateFilter.value,
+        name: nameFilter.value,
+        phone: phoneFilter.value,
+        sortBy: this.sortBy.value,
+        sortOrder: this.sortOrder.value,
       );
       users.assignAll(result.users);
       totalCount.value = result.totalCount;
@@ -125,6 +174,22 @@ class UserManagementController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void setPageSize(int size) {
+    pageSize.value = size;
+    try {
+      if (Get.isRegistered<SharedPreferences>()) {
+        Get.find<SharedPreferences>().setInt(pageSizeKey, size);
+      } else {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setInt(pageSizeKey, size);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error saving page size: $e');
+    }
+    fetchUsers(page: 1, pageSize: size);
   }
 
   Future<bool> updateUser(String userId, Map<String, dynamic> data) async {

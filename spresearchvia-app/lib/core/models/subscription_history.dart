@@ -102,6 +102,10 @@ class SubscriptionHistory {
         ? DateTime.tryParse(json['endDate'].toString())
         : null;
 
+    if (endDate != null && endDate.isBefore(DateTime.now()) && headerStatus == SubscriptionStatus.active) {
+      headerStatus = SubscriptionStatus.expired;
+    }
+
     String paymentDate = 'N/A';
     if (startDate != null) {
       paymentDate =

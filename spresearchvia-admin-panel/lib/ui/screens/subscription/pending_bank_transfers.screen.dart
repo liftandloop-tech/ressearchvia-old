@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/utils/invoice_pdf_generator.dart';
+import '../../../models/user.model.dart';
 
 class PendingBankTransfersScreen extends StatelessWidget {
   final int? specificTab;
@@ -23,7 +24,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
     final content = specificTab == 1
         ? _buildKycTab(controller)
         : specificTab == 0
-        ? _buildPaymentsTab(controller)
+        ? _buildPaymentsTab(context, controller)
         : DefaultTabController(
             length: 2,
             child: Column(
@@ -42,7 +43,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       indicatorColor: AppTheme.primaryBlue,
                       tabs: [
                         Tab(text: "Payments approvals"),
-                        Tab(text: "User KYC"),
+                        Tab(text: "Registered Clients"),
                       ],
                     ),
                   ),
@@ -51,7 +52,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _buildPaymentsTab(controller),
+                      _buildPaymentsTab(context, controller),
                       _buildKycTab(controller),
                     ],
                   ),
@@ -74,7 +75,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
               children: [
                 Text(
                   specificTab == 1
-                      ? "User KYC Approvals"
+                      ? "Registered Clients"
                       : specificTab == 0
                       ? "Pending Payments Approvals"
                       : "Pending Approvals",
@@ -102,274 +103,21 @@ class PendingBankTransfersScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentsTab(PendingBankTransfersController controller) {
+  Widget _buildPaymentsTab(
+    BuildContext context,
+    PendingBankTransfersController controller,
+  ) {
     return SingleChildScrollView(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Filters Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.gray200),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    // Search Bar
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: controller.searchController,
-                        onChanged: (value) {
-                          controller.onSearchChanged(value);
-                        },
-                        decoration: InputDecoration(
-                          hintText:
-                              'Search by name, phone, registration, plan, or UTR',
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            size: 20,
-                            color: AppTheme.textSecondary,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(color: AppTheme.gray300),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(color: AppTheme.gray300),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(color: AppTheme.primaryBlue),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Status Filter
-                    Expanded(
-                      child: Obx(
-                        () => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppTheme.gray300),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: controller.statusFilter.value,
-                              isExpanded: true,
-                              items:
-                                  [
-                                    'All',
-                                    'Pending',
-                                    'Approved',
-                                    'Rejected',
-                                    'Partial',
-                                  ].map((String value) {
-                                    return DropdownMenuItem<String>(
-                                      value: value,
-                                      child: Text(value),
-                                    );
-                                  }).toList(),
-                              onChanged: (String? newValue) {
-                                if (newValue != null) {
-                                  controller.statusFilter.value = newValue;
-                                  controller.fetchPendingTransfers();
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // View Mode Switcher
-                    Obx(
-                      () => Container(
-                        decoration: BoxDecoration(
-                          color: AppTheme.gray100,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.gray300),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            InkWell(
-                              onTap: () => controller.setViewMode('grouped'),
-                              borderRadius: const BorderRadius.horizontal(
-                                left: Radius.circular(5),
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: controller.viewMode.value == 'grouped'
-                                      ? AppTheme.primaryBlue
-                                      : Colors.transparent,
-                                  borderRadius: const BorderRadius.horizontal(
-                                    left: Radius.circular(5),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.group,
-                                      size: 16,
-                                      color: controller.viewMode.value == 'grouped'
-                                          ? Colors.white
-                                          : AppTheme.textSecondary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'By Customer',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: controller.viewMode.value == 'grouped'
-                                            ? Colors.white
-                                            : AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () => controller.setViewMode('flat'),
-                              borderRadius: const BorderRadius.horizontal(
-                                right: Radius.circular(5),
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: controller.viewMode.value == 'flat'
-                                      ? AppTheme.primaryBlue
-                                      : Colors.transparent,
-                                  borderRadius: const BorderRadius.horizontal(
-                                    right: Radius.circular(5),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.receipt_long,
-                                      size: 16,
-                                      color: controller.viewMode.value == 'flat'
-                                          ? Colors.white
-                                          : AppTheme.textSecondary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'By Transaction',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: controller.viewMode.value == 'flat'
-                                            ? Colors.white
-                                            : AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Reset Button
-                    Button(
-                      title: 'Reset',
-                      buttonType: ButtonType.grey,
-                      icon: Icons.refresh,
-                      size: ButtonSize.small,
-                      onTap: controller.resetFilters,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // KPI Summary Chips Banner
+          // 1. Compact GST & Revenue Section (with integrated toolbar)
+          _buildGstSummaryCards(context, controller),
+
+          const SizedBox(height: 12),
+          // 2. Data Section (By Customer Table)
           Obx(() {
-            final isGrouped = controller.viewMode.value == 'grouped';
-            final stats = controller.summaryStats;
-
-            final totalCustomers = stats['totalCustomers'] ?? controller.totalPaymentsCount.value;
-            final totalPayments = stats['totalPayments'] ?? controller.totalPaymentsCount.value;
-            
-            final actionRequiredCount = isGrouped
-                ? (stats['actionRequiredCustomers'] ?? controller.filteredConsolidatedUsers.where((u) => u['hasPending'] == true).length)
-                : (stats['pendingPaymentsCount'] ?? stats['actionRequiredCustomers'] ?? controller.filteredPayments.where((p) => p['status'] == 'PENDING_BANK_TRANSFER' || p['status'] == 'VERIFICATION_PENDING').length);
-
-            final num rawVolume = stats['totalVolume'] ?? 0;
-            double totalVolume = rawVolume.toDouble();
-            if (totalVolume == 0 && controller.filteredConsolidatedUsers.isNotEmpty) {
-              for (var u in controller.filteredConsolidatedUsers) {
-                totalVolume += (u['totalPaid'] is num)
-                    ? (u['totalPaid'] as num).toDouble()
-                    : (double.tryParse(u['totalPaid']?.toString() ?? '0') ?? 0);
-              }
-            }
-
-            final mainCountStr = isGrouped ? "$totalCustomers" : "$totalPayments";
-            final hasActionRequired = actionRequiredCount is num && actionRequiredCount > 0;
-
-            return Row(
-              children: [
-                _buildSummaryChip(
-                  label: isGrouped ? "Total Customers" : "Total Payments",
-                  value: mainCountStr,
-                  icon: isGrouped
-                      ? Icons.people_alt_outlined
-                      : Icons.receipt_long_outlined,
-                  color: AppTheme.primaryBlue,
-                ),
-                const SizedBox(width: 12),
-                _buildSummaryChip(
-                  label: "Action Required",
-                  value:
-                      "$actionRequiredCount ${isGrouped ? (actionRequiredCount == 1 ? 'Customer' : 'Customers') : (actionRequiredCount == 1 ? 'Payment' : 'Payments')}",
-                  icon: Icons.pending_actions_outlined,
-                  color: hasActionRequired
-                      ? Colors.orange[800]!
-                      : Colors.grey[700]!,
-                  isWarning: hasActionRequired,
-                ),
-                const SizedBox(width: 12),
-                _buildSummaryChip(
-                  label: "Total Collection Volume",
-                  value: "₹${totalVolume.toStringAsFixed(0)}",
-                  icon: Icons.payments_outlined,
-                  color: Colors.green[700]!,
-                ),
-              ],
-            );
-          }),
-          const SizedBox(height: 16),
-          // Data Section
-          Obx(() {
-            final isGrouped = controller.viewMode.value == 'grouped';
-            final listEmpty = isGrouped
-                ? controller.consolidatedUsers.isEmpty
-                : controller.pendingPayments.isEmpty;
+            final listEmpty = controller.consolidatedUsers.isEmpty;
 
             if (controller.isLoading.value && listEmpty) {
               return const Center(
@@ -389,394 +137,444 @@ class PendingBankTransfersScreen extends StatelessWidget {
               );
             }
 
-            return isGrouped
-                ? _buildConsolidatedUsersTable(controller)
-                : _buildPaymentsTable(controller);
+            return _buildConsolidatedUsersTable(controller);
           }),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentsTable(PendingBankTransfersController controller) {
+  Widget _buildGstSummaryCards(
+    BuildContext context,
+    PendingBankTransfersController controller,
+  ) {
     return Obx(() {
-      if (controller.filteredPayments.isEmpty) {
-        return const Center(
-          child: Text("No payments match the selected filters."),
-        );
+      final selectedPeriod = controller.selectedGstPeriod.value;
+      final customStart = controller.customGstStartDate.value;
+      final customEnd = controller.customGstEndDate.value;
+      final isExporting = controller.isExportingGst.value;
+
+      final gross = controller.gstGrossTurnover.value;
+      final taxable = controller.gstTaxableTurnover.value;
+      final totalTax = controller.gstTotalTax.value;
+      final cgst = controller.gstCgst.value;
+      final sgst = controller.gstSgst.value;
+      final igst = controller.gstIgst.value;
+      final b2bCount = controller.gstB2bCount.value;
+      final b2cCount = controller.gstB2cCount.value;
+      final b2bAmt = controller.gstB2bAmount.value;
+      final b2cAmt = controller.gstB2cAmount.value;
+
+      String customDateText = "Select Dates";
+      if (customStart != null && customEnd != null) {
+        customDateText =
+            "${DateFormat('dd MMM').format(customStart)} - ${DateFormat('dd MMM').format(customEnd)}";
       }
 
-      final tableCard = Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: AppTheme.gray200),
+      String formatInr(double amount) {
+        try {
+          return NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0).format(amount);
+        } catch (_) {
+          return '₹${amount.toStringAsFixed(0)}';
+        }
+      }
+
+      final cards = [
+        _buildGstCard(
+          title: "Gross Turnover",
+          value: formatInr(gross),
+          subtitle: "Incl. 18% GST",
+          icon: Icons.currency_rupee,
+          accentColor: const Color(0xFF1E40AF),
+          bgColor: const Color(0xFFEFF6FF),
         ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final scrollController = ScrollController();
-            return Scrollbar(
-              controller: scrollController,
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                controller: scrollController,
-                scrollDirection: Axis.horizontal,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                  child: DataTable(
-                    dataRowHeight: 80,
-                    columnSpacing: 20,
-                    horizontalMargin: 12,
-                    headingRowColor: MaterialStateProperty.all(AppTheme.gray50),
-                    columns: [
-                      const DataColumn(label: Text('Date')),
-                      const DataColumn(label: Text('Customer')),
-                      const DataColumn(label: Text('Registration')),
-                      const DataColumn(label: Text('Plan')),
-                      const DataColumn(label: Text('Paid Amount + GST')),
-                      const DataColumn(label: Text('Status')),
-                      const DataColumn(label: Text('Invoice')),
-                      if ((Get.find<AuthController>().user.value?.has('payments.bypass') ?? false) ||
-                          (Get.find<AuthController>().user.value?.has('payments.view_pending') ?? false) ||
-                          controller.isDirector ||
-                          controller.canTakePaymentActions)
-                        const DataColumn(label: Text('Actions')),
-                    ],
-                    rows: controller.filteredPayments.map((payment) {
-                      final user = payment['userId'] ?? {};
-                      final planData = payment['segmentPlanId'];
-                      final Map<String, dynamic> plan = (planData is Map)
-                          ? Map<String, dynamic>.from(planData)
-                          : {};
-                      final isRegistration =
-                          payment['purchaseType'] == 'REGISTRATION';
+        _buildGstCard(
+          title: "Taxable Base",
+          value: formatInr(taxable),
+          subtitle: "Net (÷1.18)",
+          icon: Icons.trending_up,
+          accentColor: const Color(0xFF0F766E),
+          bgColor: const Color(0xFFF0FDFA),
+        ),
+        _buildGstCard(
+          title: "GST Liability",
+          value: formatInr(totalTax),
+          subtitle: "MP ₹${(cgst + sgst).toStringAsFixed(0)} | IGST ₹${igst.toStringAsFixed(0)}",
+          icon: Icons.account_balance_outlined,
+          accentColor: const Color(0xFFB45309),
+          bgColor: const Color(0xFFFFFBEB),
+        ),
+        _buildGstCard(
+          title: "GSTR-1 Split",
+          value: "$b2bCount B2B • $b2cCount B2C",
+          subtitle: "B2B ₹${(b2bAmt / 1000).toStringAsFixed(1)}k | B2C ₹${(b2cAmt / 1000).toStringAsFixed(1)}k",
+          icon: Icons.pie_chart_outline_rounded,
+          accentColor: const Color(0xFF6B21A8),
+          bgColor: const Color(0xFFFAF5FF),
+        ),
+      ];
 
-                      final amountPaid = (payment['amountPaid'] is num)
-                          ? (payment['amountPaid'] as num).toDouble()
-                          : (double.tryParse(
-                                  payment['amountPaid']?.toString() ?? '0',
-                                ) ??
-                                0);
-                      final totalAmount = (payment['amount'] is num)
-                          ? (payment['amount'] as num).toDouble()
-                          : (double.tryParse(
-                                  payment['amount']?.toString() ?? '0',
-                                ) ??
-                                0);
-                      final discount = (payment['discount'] is num)
-                          ? (payment['discount'] as num).toDouble()
-                          : (double.tryParse(
-                                  payment['discount']?.toString() ?? '0',
-                                ) ??
-                                0);
-                      final remaining = totalAmount - discount - amountPaid;
+      final isSmallScreen = context.width < 850;
 
-                      // Use createdAt for main table (when payment was initiated)
-                      final date = DateTime.tryParse(
-                        payment['createdAt'] ?? '',
-                      );
-
-                      final history =
-                          payment['partialPaymentsHistory'] as List? ?? [];
-
-                      final proofUrl =
-                          payment['paymentProof'] ??
-                          payment['paymentScreenshot'];
-
-                      // Effectively Partial only if balance remains
-                      final isPartialIntent = payment['isPartial'] == true;
-                      final isEffectivelyPartial =
-                          isPartialIntent && remaining > 0;
-
-                      // Row needs highlight if: main status is PENDING, or
-                      // any installment inside is still waiting for approval.
-                      final rowStatus = payment['status'] ?? 'PENDING';
-                      final hasPendingInstallment = history.any(
-                        (inst) => inst['status'] == 'PENDING',
-                      );
-                      final needsAttention =
-                          rowStatus == 'PENDING' || hasPendingInstallment;
-
-                      // "NEW" tag: only on rows that still need attention
-                      // AND were submitted within the last 48 hours.
-                      final isNew = needsAttention &&
-                          date != null &&
-                          DateTime.now().difference(date).inHours < 48;
-
-                      return DataRow(
-                        color: needsAttention
-                            ? MaterialStateProperty.all(
-                                Colors.amber[50],
-                              )
-                            : null,
-                        cells: [
-                          DataCell(
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                    date != null ? _getRelativeDate(date) : '-'),
-                                if (isNew) ...
-                                  [
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green[600],
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        'NEW',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                              ],
-                            ),
-                          ),
-                          DataCell(
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 200),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    user['fullName'] ?? '-',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    user['email'] ?? '-',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  Text(
-                                    user['phone'] ?? '-',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Text(
-                              isRegistration
-                                  ? (user['registrationType']
-                                                ?.toString()
-                                                .toUpperCase() ==
-                                            'LIFETIME'
-                                        ? 'Gold'
-                                        : (user['registrationType']
-                                                      ?.toString()
-                                                      .toUpperCase() ==
-                                                  'YEARLY'
-                                              ? 'Silver'
-                                              : user['registrationType'] ??
-                                                    '-'))
-                                  : '-',
-                            ),
-                          ),
-                          DataCell(
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 200),
-                              child: Text(
-                                isRegistration
-                                    ? '-'
-                                    : (plan['segmentsName'] != null &&
-                                              plan['segmentsName']
-                                                  .toString()
-                                                  .isNotEmpty
-                                          ? "${plan['planName']} (${plan['segmentsName']})"
-                                          : (plan['planName'] ?? '-')),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            Builder(
-                              builder: (context) {
-                                final double basePaid = amountPaid / 1.18;
-                                final double gstPaid = amountPaid - basePaid;
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '₹${basePaid.toStringAsFixed(0)} + ₹${gstPaid.toStringAsFixed(0)} GST',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-                          DataCell(
-                            _buildStatusChip(
-                              payment['status'] ?? 'PENDING',
-                              remaining: remaining,
-                              installmentCount: history.length,
-                            ),
-                          ),
-                          DataCell(
-                            IconButton(
-                              icon: const Icon(
-                                Icons.receipt_long,
-                                color: AppTheme.primaryBlue,
-                              ),
-                              tooltip: 'View Invoice',
-                              onPressed: () => _showInvoiceDialog(payment),
-                            ),
-                          ),
-                          if ((Get.find<AuthController>().user.value?.has('payments.bypass') ?? false) ||
-                              (Get.find<AuthController>().user.value?.has('payments.view_pending') ?? false) ||
-                              controller.isDirector ||
-                              controller.canTakePaymentActions)
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Button(
-                                    title: "Details",
-                                    buttonType: ButtonType.blue,
-                                    size: ButtonSize.small,
-                                    onTap: () =>
-                                        _showDetailsDialog(payment, controller),
-                                  ),
-                                  if (controller.canTakePaymentActions) ...[
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.edit,
-                                        color: Colors.orange,
-                                        size: 20,
-                                      ),
-                                      onPressed: () =>
-                                          controller.showCorrectionDialog(payment),
-                                      tooltip: "Correct Amount / Mode",
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
+      final periodSelector = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppTheme.gray200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.primaryBlue),
+            const SizedBox(width: 4),
+            DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isDense: true,
+                value: [
+                  'All Time',
+                  'This Month',
+                  'Last Month',
+                  'This Quarter (QRMP)',
+                  'Last Quarter (QRMP)',
+                  'Q1: Apr - Jun (Due 13 Jul)',
+                  'Q2: Jul - Sep (Due 13 Oct)',
+                  'Q3: Oct - Dec (Due 13 Jan)',
+                  'Q4: Jan - Mar (Due 13 Apr)',
+                  'Custom',
+                ].contains(selectedPeriod)
+                    ? selectedPeriod
+                    : (selectedPeriod == 'This Quarter'
+                        ? 'This Quarter (QRMP)'
+                        : (selectedPeriod == 'Last Quarter'
+                            ? 'Last Quarter (QRMP)'
+                            : 'All Time')),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
                 ),
-              ),
-            );
-          },
-        ),
-      );
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          tableCard,
-          const SizedBox(height: 16),
-          Text(
-            "Showing ${controller.filteredPayments.length} of ${controller.totalPaymentsCount.value} records",
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
-          if (controller.hasMorePages.value) ...[
-            const SizedBox(height: 16),
-            Center(
-              child: Button(
-                title: controller.isLoading.value ? "Loading..." : "Load More",
-                buttonType: ButtonType.blue,
-                size: ButtonSize.small,
-                onTap: controller.isLoading.value
-                    ? null
-                    : () => controller.fetchPendingTransfers(isLoadMore: true),
+                items: const [
+                  DropdownMenuItem(value: 'All Time', child: Text('All Time')),
+                  DropdownMenuItem(value: 'This Month', child: Text('This Month')),
+                  DropdownMenuItem(value: 'Last Month', child: Text('Last Month')),
+                  DropdownMenuItem(value: 'This Quarter (QRMP)', child: Text('This Quarter (QRMP)')),
+                  DropdownMenuItem(value: 'Last Quarter (QRMP)', child: Text('Last Quarter (QRMP)')),
+                  DropdownMenuItem(value: 'Q1: Apr - Jun (Due 13 Jul)', child: Text('Q1: Apr - Jun (Due 13 Jul)')),
+                  DropdownMenuItem(value: 'Q2: Jul - Sep (Due 13 Oct)', child: Text('Q2: Jul - Sep (Due 13 Oct)')),
+                  DropdownMenuItem(value: 'Q3: Oct - Dec (Due 13 Jan)', child: Text('Q3: Oct - Dec (Due 13 Jan)')),
+                  DropdownMenuItem(value: 'Q4: Jan - Mar (Due 13 Apr)', child: Text('Q4: Jan - Mar (Due 13 Apr)')),
+                  DropdownMenuItem(value: 'Custom', child: Text('Custom Range...')),
+                ],
+                onChanged: (val) async {
+                  if (val == null) return;
+                  if (val == 'Custom') {
+                    final picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      initialDateRange: (customStart != null && customEnd != null)
+                          ? DateTimeRange(start: customStart, end: customEnd)
+                          : DateTimeRange(
+                              start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+                              end: DateTime.now(),
+                            ),
+                    );
+                    if (picked != null) {
+                      controller.setGstPeriod('Custom', start: picked.start, end: picked.end);
+                    }
+                  } else {
+                    controller.setGstPeriod(val);
+                  }
+                },
               ),
             ),
           ],
-        ],
+        ),
+      );
+
+      final customDateBtn = (selectedPeriod == 'Custom')
+          ? OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                foregroundColor: AppTheme.primaryBlue,
+                side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.4)),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              onPressed: () async {
+                final picked = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  initialDateRange: (customStart != null && customEnd != null)
+                      ? DateTimeRange(start: customStart, end: customEnd)
+                      : DateTimeRange(
+                          start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+                          end: DateTime.now(),
+                        ),
+                );
+                if (picked != null) {
+                  controller.setGstPeriod('Custom', start: picked.start, end: picked.end);
+                }
+              },
+              icon: const Icon(Icons.date_range, size: 12),
+              label: Text(
+                customDateText,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+            )
+          : null;
+
+      final canExport = (Get.find<AuthController>().user.value?.isAdmin == true) ||
+          (Get.find<AuthController>().user.value?.has('payments.export') ?? false);
+
+      final exportBtn = canExport
+          ? ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                backgroundColor: const Color(0xFF107C41),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              onPressed: isExporting ? null : () => controller.exportGstReport(),
+              icon: isExporting
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.file_download_outlined, size: 14),
+              label: Text(
+                isExporting ? "Generating..." : "Export CA GST (CSV)",
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            )
+          : null;
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.gray200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.015),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Compact Header & Toolbar
+            if (isSmallScreen) ...[
+              Row(
+                children: [
+                  const Icon(Icons.receipt_long_outlined, size: 15, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 6),
+                  const Text(
+                    "GST & Revenue",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text("SAC 998371", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text("MP (23)", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green[800])),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  periodSelector,
+                  if (customDateBtn != null) customDateBtn,
+                  if (exportBtn != null) exportBtn,
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  const Icon(Icons.receipt_long_outlined, size: 15, color: AppTheme.primaryBlue),
+                  const SizedBox(width: 6),
+                  const Text(
+                    "GST & Revenue",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text("SAC 998371", style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.blue[800])),
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text("MP (23)", style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.green[800])),
+                  ),
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: "SAC 998371 (Market Research Services - 18% GST). Intra-state MP clients: 9% CGST + 9% SGST. Inter-state clients: 18% IGST. Export file matches GSTR-1.",
+                    child: Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
+                  ),
+                  const Spacer(),
+                  periodSelector,
+                  if (customDateBtn != null) ...[
+                    const SizedBox(width: 6),
+                    customDateBtn,
+                  ],
+                  if (exportBtn != null) ...[
+                    const SizedBox(width: 8),
+                    exportBtn,
+                  ],
+                ],
+              ),
+            ],
+            const SizedBox(height: 8),
+            // Cards Grid
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth >= 900) {
+                  return Row(
+                    children: [
+                      for (int i = 0; i < cards.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(child: cards[i]),
+                      ],
+                    ],
+                  );
+                } else if (constraints.maxWidth >= 500) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: cards[0]),
+                          const SizedBox(width: 8),
+                          Expanded(child: cards[1]),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Expanded(child: cards[2]),
+                          const SizedBox(width: 8),
+                          Expanded(child: cards[3]),
+                        ],
+                      ),
+                    ],
+                  );
+                } else {
+                  return Column(
+                    children: [
+                      for (int i = 0; i < cards.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 6),
+                        cards[i],
+                      ],
+                    ],
+                  );
+                }
+              },
+            ),
+          ],
+        ),
       );
     });
   }
 
-  Widget _buildSummaryChip({
-    required String label,
+  Widget _buildGstCard({
+    required String title,
     required String value,
+    required String subtitle,
     required IconData icon,
-    required Color color,
-    bool isWarning = false,
+    required Color accentColor,
+    required Color bgColor,
   }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isWarning ? Colors.orange[300]! : AppTheme.gray200,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: accentColor.withOpacity(0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Icon(icon, size: 14, color: accentColor),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: accentColor,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: isWarning ? Colors.orange[900] : AppTheme.textPrimary,
-                    ),
+                ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
                   ),
-                ],
-              ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -818,10 +616,8 @@ class PendingBankTransfersScreen extends StatelessWidget {
                     headingRowColor: MaterialStateProperty.all(AppTheme.gray50),
                     columns: const [
                       DataColumn(label: Text('Customer')),
-                      DataColumn(label: Text('Registration')),
-                      DataColumn(label: Text('Subscriptions / Plans')),
                       DataColumn(label: Text('Total Paid (LTV)')),
-                      DataColumn(label: Text('Approval Status')),
+                      DataColumn(label: Text('State (SGST Filing)')),
                       DataColumn(label: Text('Latest Activity')),
                       DataColumn(label: Text('Actions')),
                     ],
@@ -829,9 +625,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       final user = userGroup['user'] is Map
                           ? Map<String, dynamic>.from(userGroup['user'])
                           : <String, dynamic>{};
-                      final List payments = userGroup['payments'] is List
-                          ? userGroup['payments'] as List
-                          : [];
                       final double totalPaid = (userGroup['totalPaid'] is num)
                           ? (userGroup['totalPaid'] as num).toDouble()
                           : (double.tryParse(userGroup['totalPaid']?.toString() ?? '0') ?? 0);
@@ -845,16 +638,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       final int activeCount = userGroup['activePlansCount'] is int
                           ? userGroup['activePlansCount'] as int
                           : 0;
-
-                      final regType = (user['registrationType'] ?? '').toString().toUpperCase();
-                      String regDisplay = '-';
-                      if (regType.contains('LIFETIME')) {
-                        regDisplay = 'Gold (Lifetime)';
-                      } else if (regType.contains('YEARLY')) {
-                        regDisplay = 'Silver (Yearly)';
-                      } else if (regType.isNotEmpty) {
-                        regDisplay = user['registrationType'].toString();
-                      }
 
                       DateTime? latestDate;
                       if (userGroup['latestActivity'] != null) {
@@ -930,76 +713,6 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          // Registration
-                          DataCell(
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: regDisplay.startsWith('Gold')
-                                    ? Colors.amber[100]
-                                    : (regDisplay.startsWith('Silver') ? Colors.blueGrey[50] : Colors.grey[100]),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: regDisplay.startsWith('Gold')
-                                      ? Colors.amber[400]!
-                                      : Colors.grey[300]!,
-                                ),
-                              ),
-                              child: Text(
-                                regDisplay,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: regDisplay.startsWith('Gold')
-                                      ? Colors.amber[900]
-                                      : Colors.grey[800],
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Subscriptions count & plan names
-                          DataCell(
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 240),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          "${payments.length} ${payments.length == 1 ? 'Purchase' : 'Purchases'}",
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.primaryBlue,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    payments.map((p) {
-                                      if (p['purchaseType'] == 'REGISTRATION') return 'Registration';
-                                      final pl = p['segmentPlanId'];
-                                      if (pl is Map) return pl['planName']?.toString() ?? 'Plan';
-                                      return 'Plan';
-                                    }).toSet().join(', '),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
                           // Total Paid (LTV)
                           DataCell(
                             Column(
@@ -1033,55 +746,83 @@ class PendingBankTransfersScreen extends StatelessWidget {
                               ],
                             ),
                           ),
-                          // Approval Status
+                          // State (SGST Filing)
                           DataCell(
-                            hasPending
-                                ? Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange[50],
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.orange[300]!),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.pending_actions, size: 14, color: Colors.orange[900]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '$pendingCount Pending Slip${pendingCount > 1 ? 's' : ''}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.orange[900],
+                            Builder(
+                              builder: (context) {
+                                final payments = userGroup['payments'] as List? ?? [];
+                                final fallbackGstin = payments.isNotEmpty ? payments.first['gstin']?.toString() : null;
+                                final stateInfo = PendingBankTransfersController.resolveStateInfo(user, fallbackGstin: fallbackGstin);
+                                final isKnown = stateInfo.name != 'Unspecified';
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Tooltip(
+                                      message: stateInfo.code != '--'
+                                          ? 'State: ${stateInfo.name}\nGST Code: ${stateInfo.code}\nPAN Code: ${stateInfo.panCode}'
+                                          : 'State: Unspecified',
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.location_on_outlined,
+                                            size: 14,
+                                            color: stateInfo.isIntraState
+                                                ? Colors.green[800]
+                                                : (isKnown ? Colors.blue[800] : Colors.grey[600]),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[50],
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.green[200]!),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.check_circle_outline, size: 14, color: Colors.green[700]),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          activeCount > 0 ? '$activeCount Active' : 'Cleared',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.green[700],
+                                          const SizedBox(width: 4),
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 160),
+                                            child: Text(
+                                              stateInfo.code != '--' ? '${stateInfo.name} (${stateInfo.code})' : stateInfo.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: stateInfo.isIntraState
+                                                    ? Colors.green[900]
+                                                    : (isKnown ? AppTheme.textPrimary : Colors.grey[700]),
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 3),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: stateInfo.isIntraState
+                                            ? Colors.green[50]
+                                            : (isKnown ? Colors.blue[50] : Colors.grey[100]),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: stateInfo.isIntraState
+                                              ? Colors.green[300]!
+                                              : (isKnown ? Colors.blue[200]! : Colors.grey[300]!),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        stateInfo.isIntraState
+                                            ? "Intra: SGST + CGST (9%+9%)"
+                                            : (isKnown ? "Inter: IGST (18%)" : "Unspecified POS"),
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: stateInfo.isIntraState
+                                              ? Colors.green[800]
+                                              : (isKnown ? Colors.blue[800] : Colors.grey[700]),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                           // Latest Activity
                           DataCell(
@@ -1156,6 +897,30 @@ class PendingBankTransfersScreen extends StatelessWidget {
         ],
       );
     });
+  }
+
+  static Future<void> showUserDossierDialogByUserId(
+    String userId, {
+    UserModel? userModel,
+  }) async {
+    final controller = Get.isRegistered<PendingBankTransfersController>()
+        ? Get.find<PendingBankTransfersController>()
+        : Get.put(PendingBankTransfersController());
+
+    Get.dialog(
+      const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+      ),
+      barrierDismissible: false,
+    );
+
+    final userGroup = await controller.fetchUserPaymentDossier(userId, userModel);
+
+    if (Get.isDialogOpen ?? false) {
+      Get.back();
+    }
+
+    const PendingBankTransfersScreen()._showUserPaymentDossierDialog(userGroup, controller);
   }
 
   void _showUserPaymentDossierDialog(

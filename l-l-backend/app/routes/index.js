@@ -17,6 +17,7 @@ import staffReportRoutes from "./staffReportRoutes/index.js";
 import roleRoutes from "./roleRoutes/index.js";
 import permissionGroupRoutes from "./permissionGroupRoutes/index.js";
 import refundRoutes from "./refundRoutes/index.js";
+import departmentRoutes from "./departmentRoutes/index.js";
 
 const initRoutes = (app) => {
     app.get('/', (req, res) => res.status(200).send({
@@ -43,6 +44,7 @@ const initRoutes = (app) => {
     app.use('/api/staff-reports', staffReportRoutes())
     app.use('/api/roles', roleRoutes())
     app.use('/api/permission-groups', permissionGroupRoutes())
+    app.use('/api/departments', departmentRoutes())
     app.use('/api/refund', refundRoutes())
 }
 export default initRoutes;

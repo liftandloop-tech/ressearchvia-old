@@ -20,6 +20,7 @@ import PaymentIntent from "../models/paymentIntentModel.js";
 import { logSubscriptionExtended, logSubscriptionRevoked, logSubscriptionSuspended, logSubscriptionActivated, logPlanCreated, logPlanTopup } from "./activityLogService.js";
 import { getUserTokens } from "../repositories/user.repository.js";
 import segmentsModel from "../models/segmentsModel.js";
+import userActiveSegmentModel from "../models/userActiveSegmentsModel.js";
 
 
 const planPurchaseService = {
@@ -36,7 +37,34 @@ const planPurchaseService = {
         await activePlan.save();
       }
 
-      const entitlement = await grantEntitlement({
+      // Extend all active PLAN entitlements for this user
+      const now = new Date();
+      const activePlanEnts = await Entitlement.find({
+        userId: userId,
+        type: 'PLAN',
+        status: 'ACTIVE',
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        $or: [{ endDate: null }, { endDate: { $gte: now } }]
+      });
+
+      let lastEntitlement = null;
+      for (const ent of activePlanEnts) {
+        if (ent.endDate) {
+          const newEnd = new Date(ent.endDate);
+          newEnd.setDate(newEnd.getDate() + parseInt(days));
+          ent.endDate = newEnd;
+          await ent.save();
+          lastEntitlement = ent;
+          if (ent.segmentId) {
+            await userActiveSegmentModel.updateMany(
+              { userId, segmentId: ent.segmentId },
+              { $set: { expiryDate: newEnd } }
+            );
+          }
+        }
+      }
+
+      const entitlement = lastEntitlement || await grantEntitlement({
         userId: userId,
         type: 'PLAN',
         days: parseInt(days),
@@ -93,6 +121,11 @@ const planPurchaseService = {
       await Entitlement.updateMany(
         entitlementQuery,
         { $set: { status: 'REVOKED', revokedReason: 'ADMIN_REVOKE', revokedAt: new Date() } }
+      );
+
+      await userActiveSegmentModel.updateMany(
+        { userId: userId },
+        { $set: { isActive: false } }
       );
 
       await AdminAuditLog.create({
@@ -162,6 +195,27 @@ const planPurchaseService = {
         entitlement.revokedAt = new Date();
         await entitlement.save();
         relevantEntitlements.push(entitlement);
+
+        if (entitlement.type === 'PLAN') {
+          const siblingEnts = await Entitlement.find({
+            userId: entitlement.userId,
+            type: 'PLAN',
+            resourceId: entitlement.resourceId,
+            status: 'ACTIVE',
+            _id: { $ne: entitlement._id }
+          });
+          for (const sEnt of siblingEnts) {
+            sEnt.status = 'SUSPENDED';
+            sEnt.revokedReason = 'ADMIN_SUSPEND';
+            sEnt.revokedAt = new Date();
+            await sEnt.save();
+            relevantEntitlements.push(sEnt);
+          }
+          await userActiveSegmentModel.updateMany(
+            { userId: entitlement.userId, isActive: true },
+            { $set: { isActive: false } }
+          );
+        }
 
         let targetPlanId = entitlement.sourceRefId;
         if (targetPlanId) {
@@ -527,6 +581,59 @@ const planPurchaseService = {
 
       const resourceId = planId || segmentPlanId || null;
 
+      // Single Active Plan Guard (for non-registration plans)
+      const isRegistration = packageName && (packageName.toLowerCase().includes("registration"));
+      if (!isRegistration && !body.forceReplace) {
+        const existingActivePlan = await Entitlement.findOne({
+          userId,
+          type: 'PLAN',
+          status: { $in: ['ACTIVE', 'SUSPENDED'] },
+          grantReason: { $ne: 'REGISTRATION_TRIAL' },
+          $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
+        }).populate('resourceId');
+
+        if (existingActivePlan) {
+          const currentPlanName = existingActivePlan.resourceId?.planName || 'Plan';
+          return {
+            status: 400,
+            message: `Strict Policy: User already has an active subscription for "${currentPlanName}". A user can only hold one plan ("SPARK" or "SPLENDID") at a time. Please revoke the existing plan first or manage segments.`,
+            data: {}
+          };
+        }
+      }
+
+      if (!isRegistration) {
+        const planDoc = resourceId ? await segmentsPlanModel.findById(resourceId) : null;
+        const targetPlanName = (planDoc?.planName || packageName || '').trim().toUpperCase();
+        if (!['SPARK', 'SPLENDID'].includes(targetPlanName)) {
+          return {
+            status: 400,
+            message: `Strict Policy: Invalid plan "${targetPlanName}". A user can only purchase/hold 1 plan: "SPARK" or "SPLENDID".`,
+            data: {}
+          };
+        }
+
+        const segmentsToGrant = segmentIds && Array.isArray(segmentIds) && segmentIds.length > 0
+          ? segmentIds
+          : (segmentId ? [segmentId] : []);
+        if (segmentsToGrant.length !== 1) {
+          return {
+            status: 400,
+            message: "Strict Policy: Exactly 1 segment must be selected at the time of plan purchase/assignment. Additional segments can be added later.",
+            data: {}
+          };
+        }
+
+        const segExists = await segmentsModel.findById(segmentsToGrant[0]);
+        if (!segExists || segExists.segmentStatus === 'inactive') {
+          return {
+            status: 400,
+            message: "Selected segment was not found or is inactive.",
+            data: {}
+          };
+        }
+      }
+
       // Handle HNI Price & RA Assignment
       let fullPrice = Number(amount || 0);
       if (isHniGrant && totalAgreementPrice > 0) {
@@ -671,6 +778,14 @@ const planPurchaseService = {
             sourceRefId: paymentIntent._id.toString(),
             remarks: comment || ""
           });
+
+          if (sId && !isRegistration) {
+            await userActiveSegmentModel.findOneAndUpdate(
+              { userId, segmentId: sId },
+              { isActive: true, purchaseDate: start, expiryDate: partialEnd },
+              { upsert: true, new: true }
+            );
+          }
         }
 
         await AdminAuditLog.create({
@@ -743,6 +858,14 @@ const planPurchaseService = {
           sourceRefId: userPlan._id,
           remarks: comment || ""
         });
+
+        if (sId && entitlementType === 'PLAN') {
+          await userActiveSegmentModel.findOneAndUpdate(
+            { userId, segmentId: sId },
+            { isActive: true, purchaseDate: start, expiryDate: isLifetime ? null : end },
+            { upsert: true, new: true }
+          );
+        }
       }
 
       if (userToUpdate) {
@@ -1659,6 +1782,10 @@ const planPurchaseService = {
         { endDate: { $lt: today }, status: "active" },
         { $set: { status: "expired" } },
       );
+      await Entitlement.updateMany(
+        { endDate: { $ne: null, $lt: today }, status: "ACTIVE" },
+        { $set: { status: "EXPIRED" } },
+      );
 
       // PARTIAL PAYMENT - PHASE 3: Handle Wallet Overflow for Expired Partials
       try {
@@ -1986,6 +2113,12 @@ const planPurchaseService = {
           piData = await PaymentIntent.findById(paymentIntentId).lean();
         }
 
+        const now = new Date();
+        let effectiveStatus = ent.status ? ent.status.toLowerCase() : 'active';
+        if (effectiveStatus === 'active' && ent.endDate && new Date(ent.endDate) < now) {
+          effectiveStatus = 'expired';
+        }
+
         return {
           _id: ent._id,
           type: ent.type === 'REGISTRATION' ? 'registration' : 'plan',
@@ -1993,7 +2126,7 @@ const planPurchaseService = {
           planName: packageName, // For frontend compatibility
           startDate: ent.startDate,
           endDate: ent.endDate,
-          status: ent.status.toLowerCase(), // 'active', 'expired', 'revoked'
+          status: effectiveStatus, // 'active', 'expired', 'revoked'
           basicAmount: amount, // Approximated from plan/reg type or Override
           amount: amount,
           validity: validity,

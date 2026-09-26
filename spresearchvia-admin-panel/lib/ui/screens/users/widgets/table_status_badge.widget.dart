@@ -46,19 +46,30 @@ class TableStatusBadge extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(100),
       ),
       child: Text(
-        status.isEmpty ? 'N/A' : status[0].toUpperCase() + status.substring(1),
+        _formatStatusLabel(status),
+        maxLines: 1,
+        softWrap: false,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: FontWeight.w500,
           color: textColor,
         ),
       ),
     );
+  }
+
+  static String _formatStatusLabel(String raw) {
+    if (raw.isEmpty) return 'N/A';
+    final cleaned = raw.replaceAll('_', ' ').trim();
+    return cleaned.split(' ').map((w) {
+      if (w.isEmpty) return '';
+      return w[0].toUpperCase() + w.substring(1).toLowerCase();
+    }).join(' ');
   }
 }

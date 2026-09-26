@@ -18,7 +18,10 @@ const staffRoutes = () => {
     Router.get("/list", auth.tokenVerified, adminOnly, staffController.staffList)
     Router.delete("/cancle/:id", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
     Router.post("/staff-assignment", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.StaffAssignment)
-    Router.get("/assigned-users", auth.tokenVerified, checkPermission('Users', 'read'), staffController.getStaffAssignedUsers)
+    // Staff Self-Profile & Account Settings (Authenticated Staff / Admin)
+    Router.get("/me", auth.tokenVerified, staffController.getStaffProfileMe)
+    Router.put("/me", auth.tokenVerified, staffController.updateStaffProfileMe)
+    Router.post("/me/change-mpin", auth.tokenVerified, staffController.changeStaffMpinMe)
     Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
     Router.post("/impersonate", auth.tokenVerified, adminOnly, staffController.staffImpersonate)
 

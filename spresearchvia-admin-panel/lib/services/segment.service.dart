@@ -107,6 +107,9 @@ class SegmentService extends ApiService {
     String? search,
     String? status,
     String? groupBy,
+    String? userId,
+    String? startDate,
+    String? endDate,
   }) async {
     try {
       // Add timestamp to prevent browser caching
@@ -122,6 +125,15 @@ class SegmentService extends ApiService {
       }
       if (groupBy != null && groupBy.isNotEmpty) {
         url += '&groupBy=${Uri.encodeComponent(groupBy)}';
+      }
+      if (userId != null && userId.isNotEmpty) {
+        url += '&userId=${Uri.encodeComponent(userId)}';
+      }
+      if (startDate != null && startDate.isNotEmpty) {
+        url += '&startDate=${Uri.encodeComponent(startDate)}';
+      }
+      if (endDate != null && endDate.isNotEmpty) {
+        url += '&endDate=${Uri.encodeComponent(endDate)}';
       }
 
       final response = await get(url);

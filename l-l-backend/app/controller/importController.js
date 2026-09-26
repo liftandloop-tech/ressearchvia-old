@@ -2,6 +2,7 @@ import importJobModel from "../models/importJobModel.js";
 import importTemplateModel from "../models/importTemplateModel.js";
 import leadPoolModel from "../models/leadPoolModel.js";
 import importService from "../services/importService.js";
+import { getAccessibleLeadPoolFilter } from "../utils/staffHierarchy.js";
 
 const importController = {
     getImportFields: (req, res) => {
@@ -68,10 +69,12 @@ const importController = {
             let leadPoolId = null;
             if (importOptions && importOptions.leadPoolId) {
                 leadPoolId = importOptions.leadPoolId;
-                // Verify the leadPoolId belongs to the same companyId
-                const pool = await leadPoolModel.findOne({ _id: leadPoolId, companyId });
+                const callerId = req.user?._id || req.user?.userId || req.user?.id;
+                const poolFilter = await getAccessibleLeadPoolFilter(callerId, companyId);
+                poolFilter._id = leadPoolId;
+                const pool = await leadPoolModel.findOne(poolFilter);
                 if (!pool) {
-                    return res.status(400).send({ status: 400, message: "The selected Lead Pool is invalid or belongs to another company", data: {} });
+                    return res.status(400).send({ status: 400, message: "The selected Lead Pool is invalid, belongs to another company, or you lack permission to access it", data: {} });
                 }
             }
 

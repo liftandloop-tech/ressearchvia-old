@@ -19,11 +19,11 @@ class DashboardNavBar extends StatelessWidget {
       final allItems = [
         {'title': 'Dashboard', 'index': 0},
         {
-          'title': 'Users',
+          'title': 'Clients',
           'index': 1,
           'children': [
-            {'title': 'All Users', 'index': 1},
-            {'title': 'User KYC', 'index': 7},
+            {'title': 'All Clients', 'index': 1},
+            {'title': 'Registered Clients', 'index': 7},
             {'title': 'Payments', 'index': 8},
           ],
         },
@@ -49,16 +49,16 @@ class DashboardNavBar extends StatelessWidget {
               final title = item['title'] as String;
               if (title == 'Dashboard') return item;
 
-              if (title == 'Users') {
+              if (title == 'Clients' || title == 'Users') {
                 final children = ((item['children'] as List<Map<String, dynamic>>?) ?? [])
                     .where((child) {
                       final childTitle = child['title'] as String;
-                      if (childTitle == 'All Users') {
-                        return user?.has('users.view') ?? false;
-                      } else if (childTitle == 'User KYC') {
-                        return user?.has('kyc.view') ?? false;
+                      if (childTitle == 'All Clients' || childTitle == 'All Users') {
+                        return (user?.has('users.view') ?? user?.hasPermission('Users', 'read') ?? false);
+                      } else if (childTitle == 'Registered Clients' || childTitle == 'User KYC') {
+                        return (user?.has('kyc.view') ?? false) || (user?.has('users.view') ?? false) || (user?.hasPermission('KYC', 'read') ?? false) || (user?.hasPermission('Users', 'read') ?? false);
                       } else if (childTitle == 'Payments') {
-                        return user?.has('payments.view_pending') ?? false;
+                        return (user?.has('payments.view_pending') ?? user?.hasPermission('Payments', 'read') ?? false);
                       }
                       return false;
                     })
@@ -70,24 +70,24 @@ class DashboardNavBar extends StatelessWidget {
               }
 
               if (title == 'Staff') {
-                return (user?.has('staff.view') ?? false) ? item : null;
+                return (user?.has('staff.view') ?? user?.hasPermission('Staff', 'read') ?? false) ? item : null;
               }
               if (title == 'Reports') {
-                return (user?.has('reports.view') ?? false) ? item : null;
+                return (user?.has('reports.view') ?? user?.hasPermission('Reports', 'read') ?? false) ? item : null;
               }
               if (title == 'Notifications') {
-                return (user?.has('notifications.view') ?? false) ? item : null;
+                return (user?.has('notifications.view') ?? user?.hasPermission('Notifications', 'read') ?? false) ? item : null;
               }
               if (title == 'Settings') {
                 if (user?.isDirector ?? false) return null;
-                return (user?.has('settings.view') ?? false) ? item : null;
+                return (user?.has('settings.view') ?? user?.hasPermission('Settings', 'read') ?? false) ? item : null;
               }
               if (title == 'Leads') {
-                return (user?.has('leads.view_all') ?? user?.has('leads.view_assigned') ?? false) ? item : null;
+                return (user?.has('leads.view') ?? user?.has('leads.view_all') ?? user?.has('leads.view_assigned') ?? user?.hasPermission('Leads', 'read') ?? false) ? item : null;
               }
-              // if (title == 'Job Applicants') {
-              //   return (user?.has('staff.view_applicants') ?? false) ? item : null;
-              // }
+              if (title == 'Attendance') {
+                return (user?.has('attendance.view') ?? user?.hasPermission('Attendance', 'read') ?? false) ? item : null;
+              }
 
               return null;
             })
@@ -142,7 +142,7 @@ class DashboardNavBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
                 color: (isActive && !hasChildren)
-                    ? AppTheme.primaryBlue.withOpacity(0.1)
+                    ? AppTheme.primaryBlue.withValues(alpha: 0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
                 border: (isActive && !hasChildren)
@@ -156,7 +156,7 @@ class DashboardNavBar extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                       color: isActive
                           ? AppTheme.primaryBlue
@@ -178,7 +178,7 @@ class DashboardNavBar extends StatelessWidget {
           ),
         ),
         if (hasChildren && isExpanded)
-          ...children.map((child) => _buildChildNavItem(child)).toList(),
+          ...children.map((child) => _buildChildNavItem(child)),
       ],
     );
   }
@@ -194,7 +194,7 @@ class DashboardNavBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
           decoration: BoxDecoration(
             color: isActive
-                ? AppTheme.primaryBlue.withOpacity(0.05)
+                ? AppTheme.primaryBlue.withValues(alpha: 0.05)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: isActive

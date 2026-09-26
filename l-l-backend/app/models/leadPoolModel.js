@@ -28,6 +28,25 @@ const leadPoolSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: true
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "staff",
+        default: null,
+        index: true
+    },
+    createdByName: {
+        type: String,
+        default: "System Admin"
+    },
+    creatorRole: {
+        type: String,
+        default: "Admin"
+    },
+    isGlobal: {
+        type: Boolean,
+        default: false,
+        index: true
     }
 }, { timestamps: true, versionKey: false });
 

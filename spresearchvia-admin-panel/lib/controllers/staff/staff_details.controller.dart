@@ -9,6 +9,7 @@ class StaffDetailsController extends GetxController {
   var isLoading = false.obs;
   var staffId = ''.obs;
   var staff = Rxn<StaffModel>();
+  var selectedTabIndex = 0.obs;
 
   @override
   void onInit() {

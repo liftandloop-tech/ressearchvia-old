@@ -29,6 +29,8 @@ class ManageSubscriptionController extends GetxController {
 
   var isLoading = false.obs;
   var userSubscriptions = <Map<String, dynamic>>[].obs;
+  var userPlanSegmentsData = <String, dynamic>{}.obs;
+  var isAllocatingSegments = false.obs;
   var currentUserId = ''.obs;
   var userDetails = Rxn<UserDetailsModel>();
   String? _lastFetchedUserId;
@@ -91,10 +93,7 @@ class ManageSubscriptionController extends GetxController {
   Future<void> loadCorrectionPlansForSegment(String segmentId) async {
     isFetchingPlans.value = true;
     final list = await _segmentService.getPlansBySegment(segmentId);
-    // Filter out Custom/HNI plans as per Gap 17
-    plansForSelectedSegment.assignAll(
-      list.where((p) => p['isHni'] != true).toList(),
-    );
+    plansForSelectedSegment.assignAll(list);
     isFetchingPlans.value = false;
   }
 
@@ -134,6 +133,9 @@ class ManageSubscriptionController extends GetxController {
       final subs = await _subscriptionService.getUserSubscriptions(userId);
       userSubscriptions.value = subs;
 
+      final planSegs = await _subscriptionService.getUserPlanSegments(userId);
+      userPlanSegmentsData.value = planSegs ?? {};
+
       // Initialize controllers for dates
       for (var sub in subs) {
         final id = sub['_id'];
@@ -167,6 +169,187 @@ class ManageSubscriptionController extends GetxController {
     } catch (e) {
       return '';
     }
+  }
+
+  Future<void> showManageSegmentsDialog(String userId) async {
+    isAllocatingSegments.value = true;
+    final planSegsData = await _subscriptionService.getUserPlanSegments(userId);
+    userPlanSegmentsData.value = planSegsData ?? {};
+    isAllocatingSegments.value = false;
+
+    if (planSegsData == null || planSegsData['hasActivePlan'] != true) {
+      Get.snackbar(
+        'Notice',
+        'User does not have an active subscription plan to allocate segments for.',
+        backgroundColor: Colors.amber,
+        colorText: Colors.black,
+      );
+      return;
+    }
+
+    final activePlan = planSegsData['activePlan'] ?? {};
+    final planName = activePlan['planName'] ?? 'Active Plan';
+    final List<dynamic> rawSegs = planSegsData['segments'] ?? [];
+
+    final selectedSegmentIds = rawSegs
+        .where((s) => s['isActive'] == true)
+        .map((s) => s['_id'].toString())
+        .toSet();
+
+    await Get.dialog(
+      StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.tune, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Manage Segments: $planName',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: Container(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                    ),
+                    child: Text(
+                      'Select the market segments to allocate to this user\'s active plan. At least 1 segment must remain active.',
+                      style: TextStyle(fontSize: 13, color: Colors.blue.shade900),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Market Segments',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: rawSegs.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (ctx, idx) {
+                        final seg = rawSegs[idx];
+                        final segId = seg['_id'].toString();
+                        final segName = seg['segmentName'] ?? '';
+                        final isChecked = selectedSegmentIds.contains(segId);
+
+                        return CheckboxListTile(
+                          value: isChecked,
+                          title: Text(
+                            segName,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: seg['segmentDiscription'] != null &&
+                                  seg['segmentDiscription'].toString().isNotEmpty
+                              ? Text(
+                                  seg['segmentDiscription'].toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                )
+                              : null,
+                          activeColor: AppTheme.primary,
+                          onChanged: (bool? val) {
+                            setDialogState(() {
+                              if (val == true) {
+                                selectedSegmentIds.add(segId);
+                              } else {
+                                if (selectedSegmentIds.length <= 1) {
+                                  Get.snackbar(
+                                    'Warning',
+                                    'At least one segment must remain allocated.',
+                                    backgroundColor: Colors.orange,
+                                    colorText: Colors.white,
+                                  );
+                                  return;
+                                }
+                                selectedSegmentIds.remove(segId);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${selectedSegmentIds.length} of ${rawSegs.length} segments selected',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  if (selectedSegmentIds.isEmpty) {
+                    Get.snackbar(
+                      'Error',
+                      'Please select at least one segment.',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                    );
+                    return;
+                  }
+
+                  Get.back();
+                  isLoading.value = true;
+                  final ok = await _subscriptionService.adminAllocateSegments(
+                    userId: userId,
+                    segmentIds: selectedSegmentIds.toList(),
+                  );
+                  if (ok) {
+                    Get.snackbar(
+                      'Success',
+                      'Segments updated successfully for user.',
+                      backgroundColor: Colors.green,
+                      colorText: Colors.white,
+                    );
+                    await fetchUserSubscriptions(userId);
+                  } else {
+                    Get.snackbar(
+                      'Error',
+                      'Failed to update segment allocation.',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                    );
+                    isLoading.value = false;
+                  }
+                },
+                child: const Text('Save Segments'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> pickDate(
@@ -511,8 +694,11 @@ class ManageSubscriptionController extends GetxController {
     final plansToShow = availablePlans.where((p) {
       if (p.planStatus.toLowerCase() != 'active') return false;
 
-      final planNameNormalized = p.planName.trim().toLowerCase();
-      final isExcluded = activeSubscriptionNames.contains(planNameNormalized);
+      final planNameNormalized = p.planName.trim().toUpperCase();
+      if (!planNameNormalized.contains('SPARK') && !planNameNormalized.contains('SPLENDID')) {
+        return false;
+      }
+      final isExcluded = activeSubscriptionNames.contains(planNameNormalized.toLowerCase());
 
       return !isExcluded;
     }).toList();
@@ -527,13 +713,21 @@ class ManageSubscriptionController extends GetxController {
     final currentRegType = userDetails.value?.registrationType ?? 'N/A';
     bool isRegActive = currentRegStatus.toUpperCase() == 'ACTIVE';
     String? selectedRegType;
-    String? selectedSegmentId;
 
-    // HNI Fields
-    final totalAgreementPriceController = TextEditingController();
-    final customValidityController = TextEditingController();
-    String? selectedRaId;
-    var selectedHniSegments = <String>[].obs;
+    final activePlanSub = userSubscriptions.firstWhereOrNull((s) {
+      final status = s['status']?.toString().trim().toLowerCase() ?? '';
+      final name = s['packageName']?.toString().trim().toLowerCase() ?? '';
+      final grantReason = s['grantReason']?.toString().toUpperCase() ?? '';
+      final isTrial = s['isTrial'] == true || grantReason == 'REGISTRATION_TRIAL';
+      return ['active', 'suspended'].contains(status) && !isTrial && !name.contains('registration');
+    });
+    final bool hasActivePlan = activePlanSub != null;
+    final String activePlanName = activePlanSub != null ? (activePlanSub['packageName'] ?? 'Active Plan') : '';
+
+    final selectedSegmentIds = <String>{}.obs;
+    if (segments.isNotEmpty) {
+      selectedSegmentIds.add(segments.first.id);
+    }
 
     // Use Get.dialog with Stateful Builder to handle local state update
     await Get.dialog(
@@ -734,31 +928,75 @@ class ManageSubscriptionController extends GetxController {
                   ),
                   const SizedBox(height: 16),
 
-                  // Segment Dropdown (For Standard Plans)
-                  DropdownButtonFormField<String>(
-                    value: selectedSegmentId,
-                    decoration: InputDecoration(
-                      hintText: 'Select Standard Segment',
-                      helperText:
-                          'Required for standard plans, ignored for HNI plans',
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                  if (hasActivePlan) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.shade400),
                       ),
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.amber.shade900),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'User already has an active subscription: "$activePlanName". Policy permits only one active plan per user. To allocate or change segments, please use the "Manage Segments" button on their active plan.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.amber.shade900,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    items: segments.map((segment) {
-                      return DropdownMenuItem(
-                        value: segment.id,
-                        child: Text(segment.segmentName),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() => selectedSegmentId = val);
-                    },
-                  ),
+                  ] else ...[
+                    // Single Segment Selection ChoiceChips
+                    Text(
+                      'Select 1 Initial Segment for Plan Purchase',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Strict Rule: Only 1 segment can be selected at plan assignment. Additional segments can be allocated later via "Manage Segments".',
+                      style: TextStyle(fontSize: 12, color: Colors.blue.shade800),
+                    ),
+                    const SizedBox(height: 8),
+                    Obx(
+                      () => Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: segments.map((seg) {
+                          final isSelected = selectedSegmentIds.contains(seg.id);
+                          return ChoiceChip(
+                            label: Text(seg.segmentName),
+                            selected: isSelected,
+                            onSelected: (val) {
+                              if (val) {
+                                selectedSegmentIds.clear();
+                                selectedSegmentIds.add(seg.id);
+                              }
+                            },
+                            selectedColor: AppTheme.primary.withOpacity(0.2),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: isSelected
+                                  ? AppTheme.primary
+                                  : AppTheme.textPrimary,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Date Picker Row
@@ -884,324 +1122,96 @@ class ManageSubscriptionController extends GetxController {
                                                     ],
                                                   ],
                                                 ),
-                                                if (!isHni)
-                                                  Text(
-                                                    'Duration: ${plan.duration} ${plan.day}',
+                                                Text(
+                                                  'Duration: ${plan.duration} ${plan.day}',
+                                                ),
+                                                Text(
+                                                  'Price: ₹${plan.price}',
+                                                  style: const TextStyle(
+                                                    color: Colors.green,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
-                                                if (!isHni)
-                                                  Text(
-                                                    'Price: ₹${plan.price}',
-                                                    style: TextStyle(
-                                                      color: Colors.green,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  )
-                                                else
-                                                  Text(
-                                                    'Bespoke HNI Plan',
-                                                    style: TextStyle(
-                                                      color: Colors.grey[600],
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                      fontSize: 13,
-                                                    ),
-                                                  ),
+                                                ),
                                               ],
                                             ),
                                           ),
-                                          ElevatedButton(
-                                            onPressed:
-                                                (!isHni &&
-                                                    selectedSegmentId == null)
-                                                ? null
-                                                : () async {
-                                                    // HNI logic or Standard logic based on isHni
-                                                    final standardSegmentName =
-                                                        segments
-                                                            .firstWhereOrNull(
-                                                              (s) =>
-                                                                  s.id ==
-                                                                  selectedSegmentId,
-                                                            )
-                                                            ?.segmentName ??
-                                                        'Unknown Segment';
-
-                                                    // Dialog Controllers
-                                                    final amountController =
-                                                        TextEditingController();
-                                                    final commentController =
-                                                        TextEditingController();
-                                                    bool isPartialMode = false;
-
-                                                    // Reset HNI state for this specific assignment click
-                                                    if (isHni) {
-                                                      totalAgreementPriceController
-                                                          .clear();
-                                                      customValidityController
-                                                          .clear();
-                                                      selectedRaId = null;
-                                                      selectedHniSegments
-                                                          .clear();
-                                                    }
+                                          Obx(
+                                            () => ElevatedButton(
+                                              onPressed:
+                                                  (hasActivePlan || selectedSegmentIds.length != 1)
+                                                      ? null
+                                                      : () async {
+                                                          // Dialog Controllers
+                                                          final amountController =
+                                                              TextEditingController();
+                                                          final commentController =
+                                                              TextEditingController();
+                                                          bool isPartialMode = false;
 
                                                     await Get.dialog(
                                                       StatefulBuilder(
                                                         builder: (context, setDialogState) {
-                                                          final filteredStaff = staffList
-                                                              .where(
-                                                                (s) =>
-                                                                    s.role
-                                                                        .toUpperCase()
-                                                                        .contains(
-                                                                          'RESEARCH',
-                                                                        ) ||
-                                                                    s.role
-                                                                        .toUpperCase()
-                                                                        .contains(
-                                                                          'RA',
-                                                                        ) ||
-                                                                    s.role
-                                                                        .toUpperCase()
-                                                                        .contains(
-                                                                          'ANALYST',
-                                                                        ),
-                                                              )
-                                                              .toList();
+                                                          final selectedSegNames = segments
+                                                              .where((s) => selectedSegmentIds.contains(s.id))
+                                                              .map((s) => s.segmentName)
+                                                              .join(', ');
 
                                                           return AlertDialog(
-                                                            title: Text(
-                                                              isHni
-                                                                  ? 'HNI Plan Assignment: ${plan.planName}'
-                                                                  : 'Confirm Plan Assignment',
-                                                            ),
+                                                            title: Text('Confirm Plan Assignment: ${plan.planName}'),
                                                             content: SingleChildScrollView(
                                                               child: Container(
                                                                 width: 500,
                                                                 child: Column(
-                                                                  mainAxisSize:
-                                                                      MainAxisSize
-                                                                          .min,
-                                                                  crossAxisAlignment:
-                                                                      CrossAxisAlignment
-                                                                          .start,
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                                   children: [
-                                                                    if (!isHni)
-                                                                      Text(
-                                                                        'Assign ${plan.planName} ($standardSegmentName) to user starting from ${dateController.text}?',
-                                                                      )
-                                                                    else
-                                                                      Text(
-                                                                        'Configure HNI Plan details below for ${plan.planName} starting from ${dateController.text}.',
-                                                                        style: TextStyle(
-                                                                          fontWeight:
-                                                                              FontWeight.w500,
-                                                                        ),
-                                                                      ),
-
-                                                                    const SizedBox(
-                                                                      height:
-                                                                          20,
+                                                                    Text(
+                                                                      'Assign ${plan.planName} to user starting from ${dateController.text}?',
                                                                     ),
-
-                                                                    if (isHni) ...[
-                                                                      // HNI MULTI-SEGMENT
-                                                                      Text(
-                                                                        'Select Entitlements (Segments)',
-                                                                        style: TextStyle(
-                                                                          fontSize:
-                                                                              13,
-                                                                          fontWeight:
-                                                                              FontWeight.bold,
-                                                                          color:
-                                                                              Colors.grey[700],
-                                                                        ),
+                                                                    const SizedBox(height: 12),
+                                                                    Text(
+                                                                      'Allocated Segments (${selectedSegmentIds.length}): $selectedSegNames',
+                                                                      style: TextStyle(
+                                                                        fontWeight: FontWeight.w500,
+                                                                        color: Colors.blue.shade900,
                                                                       ),
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            8,
-                                                                      ),
-                                                                      Obx(
-                                                                        () => Wrap(
-                                                                          spacing:
-                                                                              8,
-                                                                          runSpacing:
-                                                                              8,
-                                                                          children: segments.map((
-                                                                            seg,
-                                                                          ) {
-                                                                            final isSelected = selectedHniSegments.contains(
-                                                                              seg.id,
-                                                                            );
-                                                                            return FilterChip(
-                                                                              label: Text(
-                                                                                seg.segmentName,
-                                                                              ),
-                                                                              selected: isSelected,
-                                                                              onSelected:
-                                                                                  (
-                                                                                    val,
-                                                                                  ) {
-                                                                                    if (val)
-                                                                                      selectedHniSegments.add(
-                                                                                        seg.id,
-                                                                                      );
-                                                                                    else
-                                                                                      selectedHniSegments.remove(
-                                                                                        seg.id,
-                                                                                      );
-                                                                                  },
-                                                                              selectedColor: AppTheme.primary.withOpacity(
-                                                                                0.2,
-                                                                              ),
-                                                                              labelStyle: TextStyle(
-                                                                                fontSize: 12,
-                                                                                color: isSelected
-                                                                                    ? AppTheme.primary
-                                                                                    : AppTheme.textPrimary,
-                                                                              ),
-                                                                            );
-                                                                          }).toList(),
-                                                                        ),
-                                                                      ),
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            16,
-                                                                      ),
-
-                                                                      // HNI PRICE & VALIDITY
-                                                                      Row(
-                                                                        children: [
-                                                                          Expanded(
-                                                                            child: TextField(
-                                                                              controller: totalAgreementPriceController,
-                                                                              keyboardType: TextInputType.number,
-                                                                              decoration: InputDecoration(
-                                                                                labelText: 'Total Agreement Price (₹)',
-                                                                                hintText: 'e.g. 50000',
-                                                                                border: OutlineInputBorder(),
-                                                                                prefixText: '₹ ',
-                                                                              ),
-                                                                            ),
-                                                                          ),
-                                                                          const SizedBox(
-                                                                            width:
-                                                                                12,
-                                                                          ),
-                                                                          Expanded(
-                                                                            child: TextField(
-                                                                              controller: customValidityController,
-                                                                              keyboardType: TextInputType.number,
-                                                                              decoration: InputDecoration(
-                                                                                labelText: 'Validity (Days)',
-                                                                                hintText: 'e.g. 365',
-                                                                                border: OutlineInputBorder(),
-                                                                                suffixText: 'days',
-                                                                              ),
-                                                                            ),
-                                                                          ),
-                                                                        ],
-                                                                      ),
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            16,
-                                                                      ),
-
-                                                                      // RA ASSIGNMENT
-                                                                      DropdownButtonFormField<
-                                                                        String
-                                                                      >(
-                                                                        value:
-                                                                            selectedRaId,
-                                                                        decoration: InputDecoration(
-                                                                          labelText:
-                                                                              'Assign Research Analyst',
-                                                                          border:
-                                                                              OutlineInputBorder(),
-                                                                        ),
-                                                                        items: filteredStaff
-                                                                            .map(
-                                                                              (
-                                                                                s,
-                                                                              ) => DropdownMenuItem(
-                                                                                value: s.id,
-                                                                                child: Text(
-                                                                                  s.name,
-                                                                                ),
-                                                                              ),
-                                                                            )
-                                                                            .toList(),
-                                                                        onChanged:
-                                                                            (
-                                                                              v,
-                                                                            ) =>
-                                                                                selectedRaId = v,
-                                                                      ),
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            16,
-                                                                      ),
-                                                                    ],
-
-                                                                    // Remarks Field (Always Visible)
+                                                                    ),
+                                                                    const SizedBox(height: 12),
+                                                                    Text('Duration: ${plan.duration} ${plan.day} • Price: ₹${plan.price}'),
+                                                                    const SizedBox(height: 16),
                                                                     TextField(
-                                                                      controller:
-                                                                          commentController,
-                                                                      decoration: InputDecoration(
-                                                                        labelText:
-                                                                            'Remarks / Comments',
-                                                                        hintText:
-                                                                            'Optional notes for this assignment',
-                                                                        border:
-                                                                            OutlineInputBorder(),
+                                                                      controller: commentController,
+                                                                      decoration: const InputDecoration(
+                                                                        labelText: 'Remarks / Comments',
+                                                                        hintText: 'Optional notes for this assignment',
+                                                                        border: OutlineInputBorder(),
                                                                       ),
-                                                                      maxLines:
-                                                                          2,
+                                                                      maxLines: 2,
                                                                     ),
-                                                                    const SizedBox(
-                                                                      height:
-                                                                          16,
-                                                                    ),
-
+                                                                    const SizedBox(height: 16),
                                                                     Row(
                                                                       children: [
                                                                         Checkbox(
-                                                                          value:
-                                                                              isPartialMode,
+                                                                          value: isPartialMode,
                                                                           onChanged: (val) {
                                                                             setDialogState(() {
-                                                                              isPartialMode =
-                                                                                  val ??
-                                                                                  false;
+                                                                              isPartialMode = val ?? false;
                                                                             });
                                                                           },
                                                                         ),
-                                                                        const Text(
-                                                                          'Partial Payment / Receipt Entered',
-                                                                        ),
+                                                                        const Text('Partial Payment / Receipt Entered'),
                                                                       ],
                                                                     ),
                                                                     if (isPartialMode) ...[
-                                                                      const SizedBox(
-                                                                        height:
-                                                                            8,
-                                                                      ),
+                                                                      const SizedBox(height: 8),
                                                                       TextField(
-                                                                        controller:
-                                                                            amountController,
-                                                                        keyboardType:
-                                                                            TextInputType.number,
+                                                                        controller: amountController,
+                                                                        keyboardType: TextInputType.number,
                                                                         decoration: InputDecoration(
-                                                                          labelText:
-                                                                              'Amount Paid (₹)',
-                                                                          hintText:
-                                                                              'Enter amount paid',
-                                                                          border:
-                                                                              OutlineInputBorder(),
-                                                                          helperText:
-                                                                              isHni
-                                                                              ? 'Total expected price set above'
-                                                                              : 'Standard Price: ₹${plan.price}',
+                                                                          labelText: 'Amount Paid (₹)',
+                                                                          hintText: 'Enter amount paid',
+                                                                          border: const OutlineInputBorder(),
+                                                                          helperText: 'Standard Price: ₹${plan.price}',
                                                                         ),
                                                                       ),
                                                                     ],
@@ -1211,63 +1221,15 @@ class ManageSubscriptionController extends GetxController {
                                                             ),
                                                             actions: [
                                                               TextButton(
-                                                                onPressed: () =>
-                                                                    Get.back(),
-                                                                child: Text(
-                                                                  'Cancel',
-                                                                ),
+                                                                onPressed: () => Get.back(),
+                                                                child: const Text('Cancel'),
                                                               ),
                                                               ElevatedButton(
                                                                 style: ElevatedButton.styleFrom(
-                                                                  backgroundColor:
-                                                                      Colors
-                                                                          .green,
-                                                                  foregroundColor:
-                                                                      Colors
-                                                                          .white,
+                                                                  backgroundColor: Colors.green,
+                                                                  foregroundColor: Colors.white,
                                                                 ),
                                                                 onPressed: () async {
-                                                                  // Validation for HNI
-                                                                  if (isHni) {
-                                                                    if (selectedHniSegments
-                                                                        .isEmpty) {
-                                                                      Get.snackbar(
-                                                                        'Error',
-                                                                        'Please select at least one segment',
-                                                                        backgroundColor:
-                                                                            Colors.red,
-                                                                        colorText:
-                                                                            Colors.white,
-                                                                      );
-                                                                      return;
-                                                                    }
-                                                                    if (totalAgreementPriceController
-                                                                        .text
-                                                                        .isEmpty) {
-                                                                      Get.snackbar(
-                                                                        'Error',
-                                                                        'Please enter total agreement price',
-                                                                        backgroundColor:
-                                                                            Colors.red,
-                                                                        colorText:
-                                                                            Colors.white,
-                                                                      );
-                                                                      return;
-                                                                    }
-                                                                    if (customValidityController
-                                                                        .text
-                                                                        .isEmpty) {
-                                                                      Get.snackbar(
-                                                                        'Error',
-                                                                        'Please enter validity in days',
-                                                                        backgroundColor:
-                                                                            Colors.red,
-                                                                        colorText:
-                                                                            Colors.white,
-                                                                      );
-                                                                      return;
-                                                                    }
-                                                                  }
 
                                                                   double?
                                                                   partialAmount;
@@ -1297,136 +1259,61 @@ class ManageSubscriptionController extends GetxController {
                                                                   Get.back(); // Close main list dialog
 
                                                                   // Calculate validity
-                                                                  int validity =
-                                                                      30;
-                                                                  if (isHni) {
-                                                                    validity =
-                                                                        int.tryParse(
-                                                                          customValidityController
-                                                                              .text,
-                                                                        ) ??
-                                                                        365;
-                                                                  } else if (plan
-                                                                      .day
-                                                                      .toLowerCase()
-                                                                      .contains(
-                                                                        'day',
-                                                                      )) {
-                                                                    validity =
-                                                                        int.tryParse(
-                                                                          plan.duration,
-                                                                        ) ??
-                                                                        30;
-                                                                  } else if (plan
-                                                                      .day
-                                                                      .toLowerCase()
-                                                                      .contains(
-                                                                        'month',
-                                                                      )) {
-                                                                    validity =
-                                                                        (int.tryParse(
-                                                                              plan.duration,
-                                                                            ) ??
-                                                                            1) *
-                                                                        30;
-                                                                  } else if (plan
-                                                                      .day
-                                                                      .toLowerCase()
-                                                                      .contains(
-                                                                        'year',
-                                                                      )) {
-                                                                    validity =
-                                                                        (int.tryParse(
-                                                                              plan.duration,
-                                                                            ) ??
-                                                                            1) *
-                                                                        365;
+                                                                  int validity = 30;
+                                                                  if (plan.day.toLowerCase().contains('day')) {
+                                                                    validity = int.tryParse(plan.duration) ?? 30;
+                                                                  } else if (plan.day.toLowerCase().contains('month')) {
+                                                                    validity = (int.tryParse(plan.duration) ?? 1) * 30;
+                                                                  } else if (plan.day.toLowerCase().contains('year')) {
+                                                                    validity = (int.tryParse(plan.duration) ?? 1) * 365;
+                                                                  }
+
+                                                                  if (selectedSegmentIds.length != 1) {
+                                                                    Get.snackbar(
+                                                                      'Error',
+                                                                      'Strict Policy: Exactly 1 segment must be selected at the time of plan assignment.',
+                                                                      backgroundColor: Colors.red,
+                                                                      colorText: Colors.white,
+                                                                    );
+                                                                    return;
                                                                   }
 
                                                                   // Call API
                                                                   final success = await _subscriptionService.adminCreatePlan(
-                                                                    userId:
-                                                                        userId,
-                                                                    packageName:
-                                                                        plan.planName,
-                                                                    amount: plan
-                                                                        .price
-                                                                        .toDouble(),
-                                                                    validity:
-                                                                        validity,
-                                                                    startDate:
-                                                                        selectedStart,
-                                                                    planId:
-                                                                        plan.id,
-                                                                    segmentId:
-                                                                        isHni
-                                                                        ? (selectedHniSegments.isNotEmpty
-                                                                              ? selectedHniSegments.first
-                                                                              : '')
-                                                                        : selectedSegmentId!,
-                                                                    segmentIds:
-                                                                        isHni
-                                                                        ? selectedHniSegments
-                                                                              .toList()
+                                                                    userId: userId,
+                                                                    packageName: plan.planName,
+                                                                    amount: plan.price.toDouble(),
+                                                                    validity: validity,
+                                                                    startDate: selectedStart,
+                                                                    planId: plan.id,
+                                                                    segmentId: selectedSegmentIds.first,
+                                                                    segmentIds: selectedSegmentIds.toList(),
+                                                                    isPartial: isPartialMode,
+                                                                    partialAmountPaid: partialAmount,
+                                                                    comment: commentController.text.trim().isNotEmpty
+                                                                        ? commentController.text.trim()
                                                                         : null,
-                                                                    isPartial:
-                                                                        isPartialMode,
-                                                                    partialAmountPaid:
-                                                                        partialAmount,
-                                                                    comment:
-                                                                        commentController
-                                                                            .text
-                                                                            .trim()
-                                                                            .isNotEmpty
-                                                                        ? commentController
-                                                                              .text
-                                                                              .trim()
-                                                                        : null,
-                                                                    totalAgreementPrice:
-                                                                        isHni
-                                                                        ? double.tryParse(
-                                                                            totalAgreementPriceController.text,
-                                                                          )
-                                                                        : null,
-                                                                    raId: isHni
-                                                                        ? selectedRaId
-                                                                        : null,
-                                                                    isHniGrant:
-                                                                        isHni,
+                                                                    isHniGrant: isHni,
                                                                   );
 
                                                                   if (success) {
                                                                     Get.snackbar(
                                                                       'Success',
                                                                       'Plan assigned successfully',
-                                                                      backgroundColor:
-                                                                          Colors
-                                                                              .green,
-                                                                      colorText:
-                                                                          Colors
-                                                                              .white,
+                                                                      backgroundColor: Colors.green,
+                                                                      colorText: Colors.white,
                                                                     );
-                                                                    fetchUserSubscriptions(
-                                                                      userId,
-                                                                    );
+                                                                    fetchUserSubscriptions(userId);
                                                                   } else {
                                                                     Get.snackbar(
                                                                       'Error',
                                                                       'Failed to assign plan',
-                                                                      backgroundColor:
-                                                                          Colors
-                                                                              .red,
-                                                                      colorText:
-                                                                          Colors
-                                                                              .white,
+                                                                      backgroundColor: Colors.red,
+                                                                      colorText: Colors.white,
                                                                     );
                                                                   }
                                                                 },
-                                                                child: Text(
-                                                                  isHni
-                                                                      ? 'Assign HNI Plan'
-                                                                      : 'Assign',
-                                                                ),
+                                                                child: const Text('Confirm Assignment'),
                                                               ),
                                                             ],
                                                           );
@@ -1436,12 +1323,13 @@ class ManageSubscriptionController extends GetxController {
                                                   },
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: isHni
-                                                  ? Colors.purple
+                                                  ? Colors.amber.shade800
                                                   : Colors.blue,
                                               foregroundColor: Colors.white,
                                             ),
-                                            child: Text('Assign'),
+                                            child: const Text('Assign Plan'),
                                           ),
+                                        ),
                                         ],
                                       ),
                                     ],

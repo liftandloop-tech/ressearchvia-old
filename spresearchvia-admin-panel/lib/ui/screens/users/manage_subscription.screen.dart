@@ -52,7 +52,8 @@ class ManageSubscriptionScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (currentUser?.isAdmin ?? false)
+                if ((currentUser?.isAdmin ?? false) ||
+                    (currentUser?.has('subscriptions.refund') ?? false))
                   ElevatedButton.icon(
                     onPressed: () {
                       final activeSub = controller.userSubscriptions
