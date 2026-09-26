@@ -523,7 +523,12 @@ const staffService = {
   },
   staffList: async ({ user }) => {
     try {
-      let query = { stage: { $ne: 'Applicant' } };
+      let query = {
+        $or: [
+          { stage: { $ne: 'Applicant' } },
+          { roleId: { $ne: null } }
+        ]
+      };
 
       console.log('=== staffList called ===');
       console.log('User:', user ? { userType: user.userType, deparment: user.deparment, _id: user._id } : 'No user');
@@ -544,7 +549,10 @@ const staffService = {
 
         if (!isSystemAdmin && !hasStaffViewAll) {
           query = {
-            stage: { $ne: 'Applicant' },
+            $or: [
+              { stage: { $ne: 'Applicant' } },
+              { roleId: { $ne: null } }
+            ],
             _id: { $in: hierarchy.staffIds }
           };
           console.log(`Staff list scoped for ${hierarchy.staffMember?.fullName} (${hierarchy.staffIds.length} staff):`, JSON.stringify(query));

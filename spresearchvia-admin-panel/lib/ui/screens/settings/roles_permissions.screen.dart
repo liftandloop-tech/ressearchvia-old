@@ -443,49 +443,59 @@ class RolesPermissionsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Expanded(
-            child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: group.permissions.map((perm) {
-                  final actionDescriptions = perm.actions
-                      .map((act) => '• ${controller.formatActionLabel(act)}: ${controller.formatActionDescription(act)}')
-                      .join('\n');
-                  return Tooltip(
-                    message: actionDescriptions.isNotEmpty ? actionDescriptions : '${perm.feature} permissions',
-                    triggerMode: TooltipTriggerMode.tap,
-                    waitDuration: Duration.zero,
-                    showDuration: const Duration(seconds: 5),
-                    preferBelow: false,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFF334155)),
-                    ),
-                    textStyle: const TextStyle(color: Colors.white, fontSize: 11, height: 1.35),
-                    constraints: const BoxConstraints(maxWidth: 320),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.gray100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${perm.feature}: ${perm.actions.join(",")}',
-                            style: const TextStyle(fontSize: 11, color: AppTheme.gray700, fontWeight: FontWeight.w500),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxChipWidth = constraints.maxWidth > 0 ? constraints.maxWidth : 380.0;
+                return SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: group.permissions.map((perm) {
+                      final actionDescriptions = perm.actions
+                          .map((act) => '• ${controller.formatActionLabel(act)}: ${controller.formatActionDescription(act)}')
+                          .join('\n');
+                      return Tooltip(
+                        message: actionDescriptions.isNotEmpty ? actionDescriptions : '${perm.feature} permissions',
+                        triggerMode: TooltipTriggerMode.tap,
+                        waitDuration: Duration.zero,
+                        showDuration: const Duration(seconds: 5),
+                        preferBelow: false,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        textStyle: const TextStyle(color: Colors.white, fontSize: 11, height: 1.35),
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: maxChipWidth),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.gray100,
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.info_outline_rounded, size: 12, color: AppTheme.gray400),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${perm.feature}: ${perm.actions.join(",")}',
+                                  style: const TextStyle(fontSize: 11, color: AppTheme.gray700, fontWeight: FontWeight.w500),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.info_outline_rounded, size: 12, color: AppTheme.gray400),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -624,7 +634,9 @@ class RolesPermissionsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Row(
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
             children: [
               if (deptName != null)
                 Container(
@@ -638,7 +650,6 @@ class RolesPermissionsScreen extends StatelessWidget {
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                   ),
                 ),
-              if (deptName != null) const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
