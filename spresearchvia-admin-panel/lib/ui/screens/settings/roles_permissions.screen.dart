@@ -808,10 +808,27 @@ class RolesPermissionsScreen extends StatelessWidget {
                         final isChecked = selectedPages.contains(pageKey) || isGlobal.value;
                         return CheckboxListTile(
                           dense: true,
-                          title: Text(pageLabel, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                          title: Text(
+                            pageLabel,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: isChecked ? AppTheme.primaryBlue : AppTheme.textPrimary,
+                            ),
+                          ),
                           subtitle: Text(pageDesc, style: const TextStyle(fontSize: 11, color: AppTheme.gray500)),
                           value: isChecked,
                           activeColor: AppTheme.primaryBlue,
+                          checkColor: Colors.white,
+                          side: BorderSide(
+                            color: isChecked ? AppTheme.primaryBlue : AppTheme.gray400,
+                            width: 1.5,
+                          ),
+                          checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          selected: isChecked,
+                          selectedTileColor: AppTheme.primaryBlue.withValues(alpha: 0.05),
                           onChanged: isGlobal.value
                               ? null
                               : (val) {
@@ -1104,6 +1121,12 @@ class RolesPermissionsScreen extends StatelessWidget {
                                             Checkbox(
                                               value: isChecked,
                                               activeColor: AppTheme.primaryBlue,
+                                              checkColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                              side: BorderSide(
+                                                color: isChecked ? AppTheme.primaryBlue : AppTheme.gray400,
+                                                width: 1.5,
+                                              ),
                                               onChanged: (val) {
                                                 if (val == true) {
                                                   actionsList.add(action);
@@ -1347,40 +1370,169 @@ class RolesPermissionsScreen extends StatelessWidget {
                   maxLines: 2,
                 ),
                 const SizedBox(height: 18),
-                const Text(
-                  'Select Permission Groups:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Select Permission Groups:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
+                        ),
+                        const SizedBox(width: 8),
+                        Obx(() => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: selectedGroups.isNotEmpty
+                                ? AppTheme.primaryBlue.withValues(alpha: 0.1)
+                                : AppTheme.gray100,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: selectedGroups.isNotEmpty
+                                  ? AppTheme.primaryBlue.withValues(alpha: 0.25)
+                                  : AppTheme.gray300,
+                            ),
+                          ),
+                          child: Text(
+                            '${selectedGroups.length} selected',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: selectedGroups.isNotEmpty ? AppTheme.primaryBlue : AppTheme.textSecondary,
+                            ),
+                          ),
+                        )),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: filteredGroups.isEmpty
+                              ? null
+                              : () {
+                                  for (final g in filteredGroups) {
+                                    if (!selectedGroups.contains(g.id)) {
+                                      selectedGroups.add(g.id);
+                                    }
+                                  }
+                                },
+                          child: const Text('Select All', style: TextStyle(fontSize: 12)),
+                        ),
+                        TextButton(
+                          onPressed: () => selectedGroups.clear(),
+                          child: const Text('Clear All', style: TextStyle(fontSize: 12, color: AppTheme.gray500)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Expanded(
                   child: Container(
-                    decoration: BoxDecoration(border: Border.all(color: AppTheme.gray200), borderRadius: BorderRadius.circular(8)),
-                    child: ListView.builder(
-                      itemCount: filteredGroups.length,
-                      itemBuilder: (context, idx) {
-                        final group = filteredGroups[idx];
-                        final isChecked = selectedGroups.contains(group.id);
-                        final deptName = group.departmentName ??
-                            controller.departments.firstWhereOrNull((d) => d.id == group.departmentId)?.name ??
-                            'General';
-
-                        return CheckboxListTile(
-                          title: Text(group.name),
-                          subtitle: Text('[$deptName] ${group.description ?? ""}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          value: isChecked,
-                          activeColor: AppTheme.primaryBlue,
-                          onChanged: (val) {
-                            if (val == true) {
-                              if (!selectedGroups.contains(group.id)) {
-                                selectedGroups.add(group.id);
-                              }
-                            } else {
-                              selectedGroups.remove(group.id);
-                            }
-                          },
-                        );
-                      },
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppTheme.gray200),
+                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.white,
                     ),
+                    clipBehavior: Clip.antiAlias,
+                    child: filteredGroups.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.folder_off_outlined, size: 40, color: AppTheme.gray400),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'No permission groups available',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Create permission groups in Tab 2 or choose "All Departments" above.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: filteredGroups.length,
+                            separatorBuilder: (context, idx) => const Divider(height: 1, color: AppTheme.gray200),
+                            itemBuilder: (context, idx) {
+                              final group = filteredGroups[idx];
+                              final deptName = group.departmentName ??
+                                  controller.departments.firstWhereOrNull((d) => d.id == group.departmentId)?.name ??
+                                  'General';
+
+                              return Obx(() {
+                                final isChecked = selectedGroups.contains(group.id);
+                                return CheckboxListTile(
+                                  dense: true,
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                  title: Text(
+                                    group.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13.5,
+                                      color: isChecked ? AppTheme.primaryBlue : AppTheme.textPrimary,
+                                    ),
+                                  ),
+                                  subtitle: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.18)),
+                                        ),
+                                        child: Text(
+                                          deptName,
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.primaryBlue),
+                                        ),
+                                      ),
+                                      if (group.description != null && group.description!.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            group.description!,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  value: isChecked,
+                                  activeColor: AppTheme.primaryBlue,
+                                  checkColor: Colors.white,
+                                  side: BorderSide(
+                                    color: isChecked ? AppTheme.primaryBlue : AppTheme.gray400,
+                                    width: 1.5,
+                                  ),
+                                  checkboxShape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  selected: isChecked,
+                                  selectedTileColor: AppTheme.primaryBlue.withValues(alpha: 0.05),
+                                  onChanged: (val) {
+                                    if (val == true) {
+                                      if (!selectedGroups.contains(group.id)) {
+                                        selectedGroups.add(group.id);
+                                      }
+                                    } else {
+                                      selectedGroups.remove(group.id);
+                                    }
+                                  },
+                                );
+                              });
+                            },
+                          ),
                   ),
                 ),
               ],
