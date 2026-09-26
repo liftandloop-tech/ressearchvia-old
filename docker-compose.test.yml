@@ -18,8 +18,8 @@ services:
     image: nginx:alpine
     container_name: trading-gateway-t
     ports:
-      - "${HTTP_PORT:-8088}:80"
-      - "${HTTPS_PORT:-8443}:443"
+      - "${HTTP_PORT:-8090}:80"
+      - "${HTTPS_PORT:-8444}:443"
     environment:
       - DOMAIN_BACKEND=${DOMAIN_BACKEND:-test.researchvia.in}
       - DOMAIN_ADMIN=${DOMAIN_ADMIN:-admintest.researchvia.in}
