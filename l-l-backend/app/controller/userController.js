@@ -146,9 +146,9 @@ const usersController = {
 	},
 	userList: async (req, res) => {
 		try {
-			console.log('>>> [BACKEND userList CALLED] query:', req.query);
-			// Pass current user ID for exclusion
-			let response = await userService.userList({ query: req.query, currentUserId: req.user?._id })
+			const currentUserId = req.user?._id || req.user?.userId || req.user?.id;
+			console.log('>>> [BACKEND userList CALLED]', { query: req.query, currentUserId, userType: req.user?.userType });
+			let response = await userService.userList({ query: req.query, currentUserId, user: req.user })
 			res.status(response.status).send(response);
 		} catch (error) {
 			res.status(400).send({ status: 400, message: error.message, data: {} });

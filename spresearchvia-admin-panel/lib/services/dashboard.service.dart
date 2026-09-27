@@ -122,6 +122,7 @@ class DashboardService extends ApiService {
       final response = await get(
         '/user/user-list',
         query: {'page': '1', 'pageSize': '50'},
+        forceRefresh: true,
       );
 
       if (response.status.hasError) {

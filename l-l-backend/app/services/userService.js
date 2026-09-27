@@ -1587,7 +1587,7 @@ const userService = {
     }
   },
 
-  userList: async ({ query, currentUserId }) => {
+  userList: async ({ query, currentUserId, user }) => {
     try {
       let page = Math.max(1, parseInt(query.page) || 1);
       let pageSize = Math.min(100, Math.max(1, parseInt(query.pageSize) || 15));
@@ -1611,20 +1611,40 @@ const userService = {
       const sortObj = { [sortField]: sortDir };
 
       // Restrict users list by staff/director/manager assignment hierarchy
+      const callerId = currentUserId || user?._id || user?.userId || user?.id;
       let assignedUserIds = null;
-      if (currentUserId) {
-        const hierarchy = await getSupervisedStaffIds(currentUserId);
+
+      if (callerId) {
+        const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
-          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];
-          const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-          assignedUserIds = assignments.map(a => a.userId);
+          const rawStaffIds = hierarchy.staffIds || [callerId];
+          const staffObjIds = rawStaffIds
+            .filter(id => id && mongoose.isValidObjectId(id))
+            .map(id => new mongoose.Types.ObjectId(id.toString()));
+          const staffStrIds = rawStaffIds.filter(Boolean).map(id => id.toString());
+          const allTargetStaffIds = [...new Set([...staffObjIds, ...staffStrIds])];
+
+          const assignments = await staffAssigmentModel.find({ staffId: { $in: allTargetStaffIds } }).select('userId');
+          const userObjIds = [];
+          for (const a of assignments) {
+            if (a.userId && mongoose.isValidObjectId(a.userId)) {
+              userObjIds.push(new mongoose.Types.ObjectId(a.userId.toString()));
+            }
+          }
+          assignedUserIds = [...new Set(userObjIds.map(id => id.toString()))].map(id => new mongoose.Types.ObjectId(id));
         }
+      } else {
+        // No callerId provided: restrict completely for non-verified callers
+        assignedUserIds = [];
       }
 
       const baseMatch = {
-        userType: { $ne: "admin" },
-        _id: { $ne: currentUserId ? new mongoose.Types.ObjectId(currentUserId) : null }
+        userType: { $ne: "admin" }
       };
+
+      if (callerId && mongoose.isValidObjectId(callerId)) {
+        baseMatch._id = { $ne: new mongoose.Types.ObjectId(callerId.toString()) };
+      }
 
       if (assignedUserIds !== null) {
         baseMatch._id = { ...(baseMatch._id || {}), $in: assignedUserIds };
@@ -2314,10 +2334,22 @@ const userService = {
       if (callerId && callerId.toString() !== id.toString()) {
         const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
-          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
+          const rawStaffIds = hierarchy.staffIds || [callerId];
+          const staffObjIds = rawStaffIds
+            .filter(sid => sid && mongoose.isValidObjectId(sid))
+            .map(sid => new mongoose.Types.ObjectId(sid.toString()));
+          const staffStrIds = rawStaffIds.filter(Boolean).map(sid => sid.toString());
+          const allTargetStaffIds = [...new Set([...staffObjIds, ...staffStrIds])];
+
+          const userQueryIds = [];
+          if (mongoose.isValidObjectId(id)) {
+            userQueryIds.push(new mongoose.Types.ObjectId(id.toString()));
+          }
+          userQueryIds.push(id.toString());
+
           const isAssigned = await staffAssigmentModel.exists({
-            userId: id,
-            staffId: { $in: targetStaffIds }
+            userId: { $in: userQueryIds },
+            staffId: { $in: allTargetStaffIds }
           });
           if (!isAssigned) {
             return { status: 403, message: "Access Denied. You can only view assigned users.", data: {} };
@@ -2428,14 +2460,27 @@ const userService = {
         isSystemAdmin = hierarchy.isSystemAdmin;
 
         if (!isSystemAdmin) {
-          targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];
-          const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-          const assignedUserIds = assignments.map(a => a.userId);
+          const rawStaffIds = hierarchy.staffIds || [currentUserId];
+          const staffObjIds = rawStaffIds
+            .filter(sid => sid && mongoose.isValidObjectId(sid))
+            .map(sid => new mongoose.Types.ObjectId(sid.toString()));
+          const staffStrIds = rawStaffIds.filter(Boolean).map(sid => sid.toString());
+          const allTargetStaffIds = [...new Set([...staffObjIds, ...staffStrIds])];
 
-          userQuery = { _id: { $in: assignedUserIds } };
-          kycQuery = { userId: { $in: assignedUserIds }, kycStatus: "pending" };
-          planQuery = { userId: { $in: assignedUserIds }, status: "active" };
+          const assignments = await staffAssigmentModel.find({ staffId: { $in: allTargetStaffIds } }).select('userId');
+          const assignedUserObjIds = assignments
+            .map(a => a.userId)
+            .filter(id => id && mongoose.isValidObjectId(id))
+            .map(id => new mongoose.Types.ObjectId(id.toString()));
+
+          userQuery = { _id: { $in: assignedUserObjIds } };
+          kycQuery = { userId: { $in: assignedUserObjIds }, kycStatus: "pending" };
+          planQuery = { userId: { $in: assignedUserObjIds }, status: "active" };
         }
+      } else {
+        userQuery = { _id: { $in: [] } };
+        kycQuery = { userId: { $in: [] }, kycStatus: "pending" };
+        planQuery = { userId: { $in: [] }, status: "active" };
       }
 
       const userCount = await userModel.countDocuments(userQuery);

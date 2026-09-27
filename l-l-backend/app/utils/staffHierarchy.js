@@ -36,15 +36,16 @@ export async function getSupervisedStaffIds(callerId) {
   let isSystemAdmin = false;
 
   if (staffMember) {
-    const roleName = (staffMember.roleId?.name || staffMember.role || "").toLowerCase();
-    const dept = (staffMember.departmentId?.name || staffMember.deparment || staffMember.department || "").toLowerCase();
-    isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
+    const roleName = (staffMember.roleId?.name || staffMember.role || "").toLowerCase().trim();
+    // Only real system admin role in staff model gets global access
+    isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || roleName === 'super admin';
   } else {
-    // Check primary userModel (e.g. system admin)
+    // Check primary userModel (system administrator account)
     const primaryUser = await userModel.findById(callerObjectId);
     if (primaryUser) {
-      const uType = (primaryUser.userType || "").toLowerCase();
-      isSystemAdmin = uType === 'admin' || uType === 'super_admin';
+      const uType = (primaryUser.userType || "").toLowerCase().trim();
+      const uRole = (primaryUser.role || "").toLowerCase().trim();
+      isSystemAdmin = uType === 'admin' || uType === 'super_admin' || uRole === 'admin' || uRole === 'super_admin';
     }
   }
 
@@ -63,8 +64,12 @@ export async function getSupervisedStaffIds(callerId) {
 
   let currentLevel = [callerObjectId];
   while (currentLevel.length > 0) {
+    const levelObjIds = currentLevel.map(id => mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id.toString()) : id);
+    const levelStrIds = currentLevel.map(id => id.toString());
+    const queryDirectors = [...new Set([...levelObjIds, ...levelStrIds])];
+
     const subordinates = await staffModel.find({
-      assignedDirector: { $in: currentLevel },
+      assignedDirector: { $in: queryDirectors },
       stage: { $ne: 'Applicant' }
     }).select('_id');
 

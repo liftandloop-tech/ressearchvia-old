@@ -1,9 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spresearch_web/services/api.service.dart';
 import '../models/user.model.dart';
-import 'dart:convert';
 
 class UserService extends ApiService {
   // onInit handled by ApiService
@@ -58,7 +56,11 @@ class UserService extends ApiService {
         query['sortOrder'] = sortOrder;
       }
 
-      final response = await get('/user/user-list', query: query);
+      final response = await get(
+        '/user/user-list',
+        query: query,
+        forceRefresh: true,
+      );
 
       if (response.status.hasError) {
         debugPrint('Error fetching users: ${response.statusText}');

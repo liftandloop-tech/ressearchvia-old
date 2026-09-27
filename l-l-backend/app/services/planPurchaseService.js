@@ -2362,11 +2362,22 @@ const planPurchaseService = {
         const staffAssignmentModel = (await import("../models/staffAssignmentModel.js")).default;
         const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
-          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
-          const assignments = await staffAssignmentModel.find({ staffId: { $in: targetStaffIds } });
-          const assignedUserIds = assignments.map(a => a.userId);
-          matchStage.userId = { $in: assignedUserIds };
+          const rawStaffIds = hierarchy.staffIds || [callerId];
+          const staffObjIds = rawStaffIds
+            .filter(sid => sid && mongoose.isValidObjectId(sid))
+            .map(sid => new mongoose.Types.ObjectId(sid.toString()));
+          const staffStrIds = rawStaffIds.filter(Boolean).map(sid => sid.toString());
+          const allTargetStaffIds = [...new Set([...staffObjIds, ...staffStrIds])];
+
+          const assignments = await staffAssignmentModel.find({ staffId: { $in: allTargetStaffIds } }).select('userId');
+          const assignedUserObjIds = assignments
+            .map(a => a.userId)
+            .filter(id => id && mongoose.isValidObjectId(id))
+            .map(id => new mongoose.Types.ObjectId(id.toString()));
+          matchStage.userId = { $in: assignedUserObjIds };
         }
+      } else {
+        matchStage.userId = { $in: [] };
       }
 
       const aggregationPipeline = [];

@@ -960,11 +960,21 @@ const segmentsService = {
       if (callerId) {
         const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
-          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
-          const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-          const assignedUserIds = assignments.map(a => a.userId);
-          queryArgs.userId = { $in: assignedUserIds };
+          const rawStaffIds = hierarchy.staffIds || [callerId];
+          const staffObjIds = rawStaffIds
+            .filter(sid => sid && mongoose.isValidObjectId(sid))
+            .map(sid => new mongoose.Types.ObjectId(sid.toString()));
+          const staffStrIds = rawStaffIds.filter(Boolean).map(sid => sid.toString());
+          const allTargetStaffIds = [...new Set([...staffObjIds, ...staffStrIds])];
+          const assignments = await staffAssigmentModel.find({ staffId: { $in: allTargetStaffIds } }).select('userId');
+          const assignedUserObjIds = assignments
+            .map(a => a.userId)
+            .filter(id => id && mongoose.isValidObjectId(id))
+            .map(id => new mongoose.Types.ObjectId(id.toString()));
+          queryArgs.userId = { $in: assignedUserObjIds };
         }
+      } else {
+        queryArgs.userId = { $in: [] };
       }
 
       if (userId && mongoose.Types.ObjectId.isValid(userId)) {

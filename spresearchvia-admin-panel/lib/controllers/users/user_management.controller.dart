@@ -263,4 +263,20 @@ class UserManagementController extends GetxController {
   Future<bool> deleteUser(String userId) async {
     return await suspendUser(userId);
   }
+
+  void resetState() {
+    users.clear();
+    totalCount.value = 0;
+    currentPage.value = 1;
+    searchQuery.value = '';
+    statusFilter.value = 'All Statuses';
+    managerFilter.value = 'All Managers';
+    planTypeFilter.value = 'All Plans';
+    kycStatusFilter.value = 'All';
+    dateFilter.value = '';
+    nameFilter.value = '';
+    phoneFilter.value = '';
+    sortBy.value = '';
+    sortOrder.value = '';
+  }
 }

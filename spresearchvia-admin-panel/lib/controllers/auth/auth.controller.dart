@@ -5,8 +5,10 @@ import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/user.model.dart';
 import 'package:spresearch_web/config/routes.config.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import 'package:spresearch_web/services/api.service.dart';
 import '../users/user_management.controller.dart';
 import '../users/user.controller.dart';
+import '../dashboard/dashboard_management.controller.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
@@ -83,6 +85,7 @@ class AuthController extends GetxController {
         isAuthenticated.value = true;
         isImpersonating.value = false;
 
+        _clearSessionStateAndCache();
         _navigateToInitialRoute(result.user!);
 
         return (success: true, error: null);
@@ -142,20 +145,7 @@ class AuthController extends GetxController {
           duration: const Duration(seconds: 3),
         );
 
-        if (Get.isRegistered<UserController>()) {
-          Get.delete<UserController>();
-        }
-        if (Get.isRegistered<UserManagementController>()) {
-          final umc = Get.find<UserManagementController>();
-          umc.managerFilter.value = 'All Managers';
-          umc.statusFilter.value = 'All Statuses';
-          umc.planTypeFilter.value = 'All Plans';
-          umc.kycStatusFilter.value = 'All';
-          umc.searchQuery.value = '';
-          umc.fetchUsers(page: 1);
-          umc.fetchManagers();
-        }
-
+        _clearSessionStateAndCache();
         _navigateToInitialRoute(staffUser);
       } else {
         Get.snackbar(
@@ -190,19 +180,7 @@ class AuthController extends GetxController {
         isImpersonating.value = false;
         impersonatedStaffName.value = '';
 
-        if (Get.isRegistered<UserController>()) {
-          Get.delete<UserController>();
-        }
-        if (Get.isRegistered<UserManagementController>()) {
-          final umc = Get.find<UserManagementController>();
-          umc.managerFilter.value = 'All Managers';
-          umc.statusFilter.value = 'All Statuses';
-          umc.planTypeFilter.value = 'All Plans';
-          umc.kycStatusFilter.value = 'All';
-          umc.searchQuery.value = '';
-          umc.fetchUsers(page: 1);
-          umc.fetchManagers();
-        }
+        _clearSessionStateAndCache();
 
         Get.snackbar(
           'Returned to Admin',
@@ -254,6 +232,7 @@ class AuthController extends GetxController {
     isAuthenticated.value = false;
     isImpersonating.value = false;
     impersonatedStaffName.value = '';
+    _clearSessionStateAndCache();
     Get.offAllNamed(AppRoutes.login);
   }
 
@@ -280,7 +259,26 @@ class AuthController extends GetxController {
     authToken.value = token;
     isAuthenticated.value = true;
 
+    _clearSessionStateAndCache();
     _navigateToInitialRoute(staffUser);
+  }
+
+  void _clearSessionStateAndCache() {
+    ApiService.clearAllCache();
+    if (Get.isRegistered<UserController>()) {
+      Get.delete<UserController>();
+    }
+    if (Get.isRegistered<UserManagementController>()) {
+      final umc = Get.find<UserManagementController>();
+      umc.resetState();
+      umc.fetchUsers(page: 1);
+      umc.fetchManagers();
+    }
+    if (Get.isRegistered<DashboardManagementController>()) {
+      final dmc = Get.find<DashboardManagementController>();
+      dmc.renewalsList.clear();
+      dmc.fetchDashboardData(force: true);
+    }
   }
 
   void _navigateToInitialRoute(UserModel user) {

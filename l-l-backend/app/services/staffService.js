@@ -680,9 +680,18 @@ const staffService = {
         targetStaffIds = hierarchy.staffIds;
       }
 
+      const staffObjIds = targetStaffIds
+        .filter(sid => sid && mongoose.isValidObjectId(sid))
+        .map(sid => new mongoose.Types.ObjectId(sid.toString()));
+      const staffStrIds = targetStaffIds.filter(Boolean).map(sid => sid.toString());
+      const allTargetStaffIds = [...new Set([...staffObjIds, ...staffStrIds])];
+
       // Get all user IDs assigned to this staff (or team)
-      const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
-      const assignedUserIds = assignments.map(a => a.userId);
+      const assignments = await staffAssigmentModel.find({ staffId: { $in: allTargetStaffIds } }).select('userId');
+      const assignedUserIds = assignments
+        .map(a => a.userId)
+        .filter(id => id && mongoose.isValidObjectId(id))
+        .map(id => new mongoose.Types.ObjectId(id.toString()));
 
       if (assignedUserIds.length === 0) {
         return { status: 200, message: "No users assigned", data: { totalCount: 0, userData: [] } };
