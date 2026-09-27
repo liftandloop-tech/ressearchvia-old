@@ -122,10 +122,11 @@ const staffService = {
   staffCreate: async ({ body, user }) => {
     try {
       console.log('staffCreate body:', body);
-      if (user) {
-        const hierarchy = await getSupervisedStaffIds(user._id);
+      const callerId = user?._id || user?.userId || user?.id;
+      if (callerId) {
+        const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
-          body.assignedDirector = user._id;
+          body.assignedDirector = callerId;
           body.assignedDirectorName = user.fullName;
         }
       }
@@ -431,8 +432,9 @@ const staffService = {
       staff.stage = 'Employee';
 
       // Hierarchy Check: Non-admins can only manage staff from their own team/hierarchy
-      if (user) {
-        const hierarchy = await getSupervisedStaffIds(user._id);
+      const callerId = user?._id || user?.userId || user?.id;
+      if (callerId) {
+        const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
           const isSupervised = hierarchy.staffIds?.some(id => id.toString() === staff._id.toString());
           if (!isSupervised) {
@@ -534,8 +536,9 @@ const staffService = {
       if (!staff) return { status: 200, message: "staff not exist", data: {} }
 
       // Hierarchy Check: Non-admins can only remove staff from their own team/hierarchy
-      if (user) {
-        const hierarchy = await getSupervisedStaffIds(user._id);
+      const callerId = user?._id || user?.userId || user?.id;
+      if (callerId) {
+        const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
           const isSupervised = hierarchy.staffIds?.some(id => id.toString() === staff._id.toString());
           if (!isSupervised) {
@@ -620,8 +623,9 @@ const staffService = {
         }
 
         // Hierarchy Check: Non-admins can only assign staff from their own team/hierarchy
-        if (requestingUser) {
-          const hierarchy = await getSupervisedStaffIds(requestingUser._id);
+        const requestingId = requestingUser?._id || requestingUser?.userId || requestingUser?.id;
+        if (requestingId) {
+          const hierarchy = await getSupervisedStaffIds(requestingId);
           if (!hierarchy.isSystemAdmin) {
             const isSupervised = hierarchy.staffIds?.some(id => id.toString() === assignmentData._id.toString());
             if (!isSupervised) {

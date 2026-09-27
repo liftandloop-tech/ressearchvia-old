@@ -16,8 +16,6 @@ const SegmentsRoutes = () => {
     Router.post("/revert-to-rejected", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.revertApproval)
     Router.post("/revert-to-approved", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.revertRejection)
     Router.get("/pending-bank-transfers", auth.tokenVerified, checkPermission('Payments', 'read'), segmentsController.getPendingBankTransfers)
-    Router.get("/hni-requests", auth.tokenVerified, segmentsController.getHniRequests)
-    Router.post("/admin-grant-hni-plan", auth.tokenVerified, segmentsController.adminGrantHniPlan)
     Router.get("/segment-user-list", auth.tokenVerified, checkPermission('Subscriptions', 'read'), segmentsController.userSegmentPlanList)
     Router.delete("/delete-segments", auth.tokenVerified, checkPermission('Subscriptions', 'delete'), segmentsController.segmentsDelete)
     Router.delete("/segment-plan-delete", auth.tokenVerified, checkPermission('Subscriptions', 'delete'), segmentsController.segmentsPlanDelete)

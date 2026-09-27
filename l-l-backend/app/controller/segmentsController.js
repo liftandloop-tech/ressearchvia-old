@@ -169,22 +169,6 @@ const segmentsController = {
             res.status(400).send({ status: 400, message: error.message, data: {} });
         }
     },
-    getHniRequests: async (req, res) => {
-        try {
-            const response = await segmentsService.getHniRequests({ query: req.query });
-            res.status(response.status).send(response);
-        } catch (error) {
-            res.status(400).send({ status: 400, message: error.message, data: {} });
-        }
-    },
-    adminGrantHniPlan: async (req, res) => {
-        try {
-            const response = await segmentsService.adminGrantHniPlan({ body: req.body, user: req.user });
-            res.status(response.status).send(response);
-        } catch (error) {
-            res.status(400).send({ status: 400, message: error.message, data: {} });
-        }
-    },
     fixPrices: async (req, res) => {
         try {
             const response = await segmentsService.fixPrices(req);

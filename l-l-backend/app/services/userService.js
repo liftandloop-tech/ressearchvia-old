@@ -524,15 +524,14 @@ const userService = {
           const {
             planId,
             segmentId, // singular fallback
-            segmentIds, // plural for HNI
+            segmentIds, // plural
             isPartial,
             paidAmount,
             remarks,
-            isHniGrant, // NEW: HNI specific flag
-            customPackageName, // NEW
-            customValidity, // NEW
-            totalAgreementPrice, // NEW: Full value of bespoke deal
-            raId // NEW: Staff/RA ID
+            customPackageName,
+            customValidity,
+            totalAgreementPrice,
+            raId
           } = planEntry;
 
           const segmentPlan = await segmentsPlanModel.findById(planId);
@@ -540,10 +539,10 @@ const userService = {
           if (segmentPlan) {
             const startDate = new Date();
             let duration = parseInt(segmentPlan.duration) || 30; // Original duration
-            const fullPrice = (isHniGrant && totalAgreementPrice) ? totalAgreementPrice : (segmentPlan.price || 0);
+            const fullPrice = totalAgreementPrice ? totalAgreementPrice : (segmentPlan.price || 0);
 
-            // HNI Custom Validity priority
-            if (isHniGrant && customValidity) {
+            // Custom validity priority
+            if (customValidity) {
               duration = parseInt(customValidity);
             } else if (isPartial && paidAmount && paidAmount < fullPrice) {
               // DYNAMIC VALIDITY CALCULATION for Partial Payments (Standard)
@@ -555,7 +554,7 @@ const userService = {
             const endDate = new Date(startDate);
             endDate.setDate(endDate.getDate() + duration);
 
-            const finalPackageName = (isHniGrant && customPackageName)
+            const finalPackageName = customPackageName
               ? customPackageName
               : `${segmentPlan.segmentsName || ''} - ${segmentPlan.planName}`;
 
@@ -566,7 +565,7 @@ const userService = {
               startDate: startDate,
               endDate: endDate,
               status: "active",
-              basicAmount: (isHniGrant || isPartial) ? paidAmount : fullPrice,
+              basicAmount: isPartial ? paidAmount : fullPrice,
               totalPlanAmount: fullPrice,
               isPartial: !!isPartial,
               cgstAmount: 0,
@@ -589,7 +588,7 @@ const userService = {
                 segmentId: sId,
                 days: duration,
                 grantedBy: 'ADMIN',
-                grantReason: isPartial ? 'MANUAL_PARTIAL' : (isHniGrant ? 'HNI_CUSTOM_GRANT' : 'MANUAL'),
+                grantReason: isPartial ? 'MANUAL_PARTIAL' : 'MANUAL',
                 sourceRefId: newUser._id,
                 remarks: remarks || null
               });
@@ -857,7 +856,6 @@ const userService = {
             isPartial,
             paidAmount,
             remarks,
-            isHniGrant,
             customPackageName,
             customValidity,
             totalAgreementPrice,
@@ -869,10 +867,10 @@ const userService = {
           if (segmentPlan) {
             const startDate = new Date();
             let duration = parseInt(segmentPlan.duration) || 30; // Original duration
-            const fullPrice = (isHniGrant && totalAgreementPrice) ? totalAgreementPrice : (segmentPlan.price || 0);
+            const fullPrice = totalAgreementPrice ? totalAgreementPrice : (segmentPlan.price || 0);
 
-            // HNI Custom Validity priority
-            if (isHniGrant && customValidity) {
+            // Custom validity priority
+            if (customValidity) {
               duration = parseInt(customValidity);
             } else if (isPartial && paidAmount && paidAmount < fullPrice) {
               // DYNAMIC VALIDITY CALCULATION for Partial Payments
@@ -884,7 +882,7 @@ const userService = {
             const endDate = new Date(startDate);
             endDate.setDate(endDate.getDate() + duration);
 
-            const finalPackageName = (isHniGrant && customPackageName)
+            const finalPackageName = customPackageName
               ? customPackageName
               : `${segmentPlan.segmentsName || ''} - ${segmentPlan.planName}`;
 
@@ -895,7 +893,7 @@ const userService = {
               startDate: startDate,
               endDate: endDate,
               status: "active",
-              basicAmount: (isHniGrant || isPartial) ? paidAmount : fullPrice,
+              basicAmount: isPartial ? paidAmount : fullPrice,
               totalPlanAmount: fullPrice,
               isPartial: !!isPartial,
               cgstAmount: 0,
@@ -918,7 +916,7 @@ const userService = {
                 segmentId: sId,
                 days: duration,
                 grantedBy: 'ADMIN',
-                grantReason: isPartial ? 'MANUAL_PARTIAL' : (isHniGrant ? 'HNI_CUSTOM_GRANT' : 'MANUAL'),
+                grantReason: isPartial ? 'MANUAL_PARTIAL' : 'MANUAL',
                 sourceRefId: user._id,
                 remarks: remarks || null
               });
@@ -2328,10 +2326,16 @@ const userService = {
   userDetails: async ({ params, user: caller }) => {
     try {
       let { id } = params;
+      if (!id) {
+        return { status: 400, message: "User ID parameter required", data: {} };
+      }
 
       // Access Scoping: Non-admin staff can only view details for their assigned users
-      const callerId = caller?._id || caller?.userId;
-      if (callerId && callerId.toString() !== id.toString()) {
+      const callerId = caller?._id || caller?.userId || caller?.id;
+      if (!callerId) {
+        return { status: 401, message: "Unauthorized. Identity required.", data: {} };
+      }
+      if (callerId.toString() !== id.toString()) {
         const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
           const rawStaffIds = hierarchy.staffIds || [callerId];

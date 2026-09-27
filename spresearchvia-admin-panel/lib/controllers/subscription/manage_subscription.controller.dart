@@ -1289,7 +1289,6 @@ class ManageSubscriptionController extends GetxController {
                                                                     comment: commentController.text.trim().isNotEmpty
                                                                         ? commentController.text.trim()
                                                                         : null,
-                                                                    isHniGrant: isHni,
                                                                   );
 
                                                                   if (success) {

@@ -3,7 +3,7 @@ import auth from "../../config/auth.js";
 import planPurchaseController from "../../controller/planPurchaseController.js";
 const Router = express.Router();
 
-import { appAccess, paymentGate } from "../../middleware/accessMiddleware.js";
+import { appAccess, paymentGate, checkPermission } from "../../middleware/accessMiddleware.js";
 
 import upload from "../../config/upload.js";
 
@@ -22,16 +22,17 @@ const purchasePlanRoutes = () => {
   Router.get("/billing-history/:id", auth.tokenVerified, planPurchaseController.billingHistory);
   Router.get("/recent-plan-payment-list", auth.tokenVerified, planPurchaseController.recentPaymentList)
 
-  Router.put("/extend-subscription", auth.tokenVerified, planPurchaseController.extendSubscription);
+  // --- Admin Subscription Management (Permission Guarded) ---
+  Router.put("/extend-subscription", auth.tokenVerified, checkPermission('subscriptions.edit_correction'), planPurchaseController.extendSubscription);
   // Router.put("/revoke-subscription", auth.tokenVerified, planPurchaseController.revokeSubscription); // Removed as per request
-  Router.put("/change-plan", auth.tokenVerified, planPurchaseController.changePlan);
-  Router.put("/suspend-subscription", auth.tokenVerified, planPurchaseController.suspendSubscription);
-  Router.put("/activate-subscription", auth.tokenVerified, planPurchaseController.activateSubscription);
-  Router.put("/update-subscription-dates", auth.tokenVerified, planPurchaseController.updateSubscriptionDates);
-  Router.post("/admin/create-plan", auth.tokenVerified, planPurchaseController.adminCreatePlan);
-  Router.post("/admin/topup-partial-plan", auth.tokenVerified, planPurchaseController.adminTopUpPartialPlan);
-  Router.post("/admin/update-payment", auth.tokenVerified, (req, res, next) => { req.query.type = 'payment-proof'; next(); }, upload.array('file', 5), planPurchaseController.adminUpdatePayment);
-  Router.post("/admin/preview-correction", auth.tokenVerified, planPurchaseController.adminPreviewCorrection);
+  Router.put("/change-plan", auth.tokenVerified, checkPermission('subscriptions.edit_correction'), planPurchaseController.changePlan);
+  Router.put("/suspend-subscription", auth.tokenVerified, checkPermission('subscriptions.suspend'), planPurchaseController.suspendSubscription);
+  Router.put("/activate-subscription", auth.tokenVerified, checkPermission('subscriptions.activate'), planPurchaseController.activateSubscription);
+  Router.put("/update-subscription-dates", auth.tokenVerified, checkPermission('subscriptions.edit_correction'), planPurchaseController.updateSubscriptionDates);
+  Router.post("/admin/create-plan", auth.tokenVerified, checkPermission('subscriptions.activate'), planPurchaseController.adminCreatePlan);
+  Router.post("/admin/topup-partial-plan", auth.tokenVerified, checkPermission('subscriptions.activate'), planPurchaseController.adminTopUpPartialPlan);
+  Router.post("/admin/update-payment", auth.tokenVerified, checkPermission('subscriptions.edit_correction'), (req, res, next) => { req.query.type = 'payment-proof'; next(); }, upload.array('file', 5), planPurchaseController.adminUpdatePayment);
+  Router.post("/admin/preview-correction", auth.tokenVerified, checkPermission('subscriptions.view'), planPurchaseController.adminPreviewCorrection);
 
   return Router;
 };

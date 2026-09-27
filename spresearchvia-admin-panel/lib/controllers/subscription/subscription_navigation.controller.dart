@@ -20,10 +20,6 @@ class SubscriptionNavigationController extends GetxController {
     navigationStack.add(CreateSegmentScreen(segmentToEdit: segmentToEdit));
   }
 
-  void showHniRequests() {
-    Get.toNamed('/subscriptions/hni-requests');
-  }
-
   void goBack() {
     if (navigationStack.isNotEmpty) {
       navigationStack.removeLast();

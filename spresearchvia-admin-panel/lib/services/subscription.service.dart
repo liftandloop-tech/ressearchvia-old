@@ -397,7 +397,6 @@ class SubscriptionService extends ApiService {
     String? comment,
     double? totalAgreementPrice,
     String? raId,
-    bool isHniGrant = false,
   }) async {
     try {
       final body = {
@@ -414,7 +413,6 @@ class SubscriptionService extends ApiService {
         if (totalAgreementPrice != null)
           "totalAgreementPrice": totalAgreementPrice,
         if (raId != null) "raId": raId,
-        "isHniGrant": isHniGrant,
       };
       final response = await post('/user/purchase/admin/create-plan', body);
       debugPrint(

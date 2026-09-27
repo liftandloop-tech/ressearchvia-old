@@ -47,7 +47,7 @@ const leadController = {
             const query = {};
 
             // Data-Scope Enforcement: If user has leads.view_assigned but not leads.view_all, restrict query to assignedRM
-            const callerId = req.user?._id || req.user?.userId;
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
             const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
             if (!isSuper && callerId) {
                 const hierarchy = await getSupervisedStaffIds(callerId);

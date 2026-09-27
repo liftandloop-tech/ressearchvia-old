@@ -498,6 +498,9 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     if ((requiredKey === 'reports.read' || requiredKey === 'reports:read') &&
                         (perm.actions.includes('reports.view') || perm.actions.includes('read'))) return true;
 
+                    if ((requiredKey === 'subscriptions.read' || requiredKey === 'subscriptions:read') &&
+                        (perm.actions.includes('subscriptions.view') || perm.actions.includes('read'))) return true;
+
                     if ((requiredKey === 'reports.trading_call_popup') &&
                         (perm.actions.includes('reports.trading_call_popup') || perm.actions.includes('trading_call_popup'))) return true;
 

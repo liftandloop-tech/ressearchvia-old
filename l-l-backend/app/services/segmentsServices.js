@@ -12,7 +12,7 @@ import Entitlement from "../models/entitlementModel.js"; // CHUNK 9 Audit Fix
 import PaymentIntent from "../models/paymentIntentModel.js";
 import planPurchaseModel from "../models/planPurchaseModel.js";
 import GeneralSettings from "../models/generalSettingsModel.js";
-import HniRequest from "../models/hniRequestModel.js";
+
 import AdminAuditLog from "../models/adminAuditLogModel.js";
 import { approvePartialPayment } from "./acquisitionService.js";
 import mongoose from "mongoose";
@@ -956,7 +956,7 @@ const segmentsService = {
       }
 
       // Restrict payments by staff/director/manager assignment hierarchy
-      const callerId = user?._id || user?.userId;
+      const callerId = user?._id || user?.userId || user?.id;
       if (callerId) {
         const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
@@ -1580,119 +1580,6 @@ const segmentsService = {
           data: {},
         };
       }
-    } catch (error) {
-      return { status: 400, message: error.message, data: {} };
-    }
-  },
-
-  getHniRequests: async ({ query }) => {
-    try {
-      const requests = await HniRequest.find()
-        .populate('userId', 'fullName email phone')
-        .populate('planId', 'planName')
-        .populate('segmentId', 'segmentName')
-        .sort({ createdAt: -1 });
-      return { status: 200, message: "HNI Requests Fetched", data: { requests } };
-    } catch (error) {
-      return { status: 400, message: error.message, data: {} };
-    }
-  },
-
-  adminGrantHniPlan: async ({ body, user }) => {
-    try {
-      const { requestId, userId, segmentId, planId, customPrice, customValidity, assignedRaId } = body;
-
-      // Update Request Status if requestId provided
-      if (requestId) {
-        await HniRequest.findByIdAndUpdate(requestId, { status: 'APPROVED' });
-      }
-
-      const plan = await segmentsPlanModel.findById(planId);
-      if (!plan) return { status: 404, message: "Plan not found", data: {} };
-
-      const purchaseDate = new Date();
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + parseInt(customValidity));
-
-      // 1. Create PaymentIntent (Unified Entry Point)
-      const paymentIntent = await PaymentIntent.create({
-        userId,
-        purchaseType: 'PLAN',
-        planId: planId,
-        baseAmount: customPrice,
-        gstAmount: 0,
-        totalAmount: customPrice,
-        amountPaid: customPrice,
-        status: 'PAID',
-        paymentMethod: 'ADMIN_ENTITLEMENT',
-        isHniGrant: true,
-        originalPlanAmount: customPrice,
-        originalDuration: parseInt(customValidity),
-        serviceStartDate: purchaseDate,
-        currentExpiryDate: expiryDate,
-        gstRateUsed: 0,
-        preferredSegmentId: segmentId,
-        notes: `HNI Grant by Admin. RA: ${assignedRaId}`
-      });
-
-      // 2. Create Legacy Payment Record (Compatibility)
-      const segmentsPayment = await segmentsPaymentModel.create({
-        userId,
-        segmentId,
-        segmentPlanId: planId,
-        razorpayOrderId: `HNI_GRANT_${paymentIntent._id}`,
-        razorpayPaymentId: `MANUAL_HNI_${Date.now()}`,
-        razorpaySignature: 'ADMIN_HNI',
-        razorpayCurrency: 'INR',
-        amount: customPrice,
-        gstAmount: 0,
-        paymentStatus: 'paid',
-        paymentMethod: 'Off-System/Custom',
-        purchaseDate,
-        expiryDate
-      });
-
-      // 3. Create Active Segment with RA
-      const userActiveSegment = await userActiveSegmentModel.create({
-        userId,
-        segmentId,
-        isActive: true,
-        purchaseDate,
-        expiryDate,
-        assignedRa: assignedRaId,
-        isCustomPlan: true
-      });
-
-      // 4. Grant Entitlement (Access Engine)
-      await grantEntitlement({
-        userId,
-        type: 'PLAN',
-        resourceId: planId,
-        segmentId,
-        days: parseInt(customValidity),
-        grantedBy: 'ADMIN',
-        grantReason: 'HNI_CUSTOM_GRANT',
-        sourceRefId: paymentIntent._id // Link to Intent for Corrections
-      });
-
-      // 5. Create Plan Purchase Record (Revenue Engine)
-      await planPurchaseModel.create({
-        userId,
-        packageName: `HNI Custom - ${plan.planName}`,
-        validity: parseInt(customValidity),
-        startDate: purchaseDate,
-        endDate: expiryDate,
-        status: "active",
-        basicAmount: customPrice,
-        cgstAmount: 0,
-        sgstAmount: 0,
-        paymentMethod: "CUSTOM",
-        expiryReminder: true,
-        linkedPaymentIntent: paymentIntent._id // Explicit Link
-      });
-
-      return { status: 200, message: "HNI Plan Granted Successfully", data: {} };
-
     } catch (error) {
       return { status: 400, message: error.message, data: {} };
     }

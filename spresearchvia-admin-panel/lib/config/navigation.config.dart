@@ -20,7 +20,7 @@ import '../ui/screens/users/details/user_details.screen.dart';
 import '../ui/screens/staff/add_staff.screen.dart';
 import '../ui/screens/users/edit_profile.screen.dart';
 import '../ui/screens/subscription/pending_bank_transfers.screen.dart';
-import '../ui/screens/subscription/hni_requests.screen.dart';
+
 import '../ui/screens/settings/general_settings.screen.dart';
 import '../ui/screens/settings/roles_permissions.screen.dart';
 import '../ui/screens/dashboard/automated_trading_dashboard.screen.dart';
@@ -114,10 +114,7 @@ final appPages = [
       child: EditUserProfile(userId: Get.parameters['id'] ?? ''),
     ),
   ),
-  GetPage(
-    name: AppRoutes.hniRequests,
-    page: () => DashboardLayout(child: const HniRequestsScreen()),
-  ),
+
   GetPage(name: AppRoutes.settings, page: () => const GeneralSettingsScreen()),
   GetPage(
     name: AppRoutes.rolesPermissions,

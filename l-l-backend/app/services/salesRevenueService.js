@@ -31,13 +31,14 @@ export const salesRevenueService = {
         targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
       }
     } else {
-      isSystemAdmin = true;
+      isSystemAdmin = false;
+      targetStaffIds = [];
     }
 
     // 1. Fetch Staff List & Department Hierarchy
-    const staffListQuery = (!isSystemAdmin && targetStaffIds.length > 0)
-      ? { _id: { $in: targetStaffIds } }
-      : {};
+    const staffListQuery = isSystemAdmin
+      ? {}
+      : { _id: { $in: targetStaffIds } };
     const staffList = await staffModel.find(staffListQuery).select('fullName staffId deparment emailAddress mobileNumber status');
 
     const staffDeptMap = {};
@@ -46,9 +47,9 @@ export const salesRevenueService = {
     });
 
     // 2. Fetch User-to-Staff Assignments
-    const assignmentQuery = (!isSystemAdmin && targetStaffIds.length > 0)
-      ? { staffId: { $in: targetStaffIds } }
-      : {};
+    const assignmentQuery = isSystemAdmin
+      ? {}
+      : { staffId: { $in: targetStaffIds } };
     const allAssignments = await staffAssignmentModel.find(assignmentQuery);
 
     const userToStaffMap = {};
@@ -92,7 +93,7 @@ export const salesRevenueService = {
     };
 
     // RBAC: Non-admin can only see payments for assigned users
-    if (!isSystemAdmin && targetStaffIds.length > 0) {
+    if (!isSystemAdmin) {
       const assignedUserIds = allAssignments.map(a => a.userId).filter(Boolean);
       queryArgs.userId = { $in: assignedUserIds };
     }

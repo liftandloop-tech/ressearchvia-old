@@ -571,7 +571,7 @@ const planPurchaseService = {
       const {
         userId, packageName, amount, validity, startDate, planId, segmentPlanId,
         segmentId, segmentIds, isPartial, comment,
-        totalAgreementPrice, raId, isHniGrant
+        totalAgreementPrice, raId
       } = body;
 
       const duration = parseInt(validity) || 365;
@@ -635,9 +635,9 @@ const planPurchaseService = {
         }
       }
 
-      // Handle HNI Price & RA Assignment
+      // Handle Price & RA Assignment
       let fullPrice = Number(amount || 0);
-      if (isHniGrant && totalAgreementPrice > 0) {
+      if (totalAgreementPrice > 0) {
         fullPrice = Number(totalAgreementPrice);
       }
 
@@ -654,8 +654,8 @@ const planPurchaseService = {
         const isRegistration = packageName && (packageName.toLowerCase().includes("registration"));
         const multiplier = isRegistration ? 1 : 1.5;
 
-        // Use fullPrice instead of amount for target calculation if HNI
-        const basePrice = (isHniGrant && totalAgreementPrice > 0) ? totalAgreementPrice : plan.price || 0;
+        // Use totalAgreementPrice if provided, otherwise plan.price
+        const basePrice = (totalAgreementPrice > 0) ? totalAgreementPrice : plan.price || 0;
         const gstPercent = 18;
         const gstAmountFull = Math.round((basePrice * gstPercent) / 100);
         const totalFullAmount = Math.ceil(basePrice + gstAmountFull);
@@ -855,7 +855,7 @@ const planPurchaseService = {
           isLifetime: isLifetime,
           startDate: start, // Include start date
           grantedBy: 'ADMIN',
-          grantReason: isHniGrant ? 'HNI_CUSTOM_GRANT' : 'MANUAL',
+          grantReason: 'MANUAL',
           sourceRefId: userPlan._id,
           remarks: comment || ""
         });
@@ -2356,7 +2356,7 @@ const planPurchaseService = {
   recentPaymentList: async ({ body, user }) => {
     try {
       const matchStage = {};
-      const callerId = user?._id || user?.userId;
+      const callerId = user?._id || user?.userId || user?.id;
       if (callerId) {
         const { getSupervisedStaffIds } = await import("../utils/staffHierarchy.js");
         const staffAssignmentModel = (await import("../models/staffAssignmentModel.js")).default;
