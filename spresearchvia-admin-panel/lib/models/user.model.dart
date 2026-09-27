@@ -417,6 +417,16 @@ class UserModel {
                   return true;
                 }
               }
+              if (requiredKey == 'leads.pull') {
+                if (actList.contains('leads.pull') ||
+                    actList.contains('leads.view') ||
+                    actList.contains('leads.view_assigned') ||
+                    actList.contains('leads.view_all') ||
+                    actList.contains('read') ||
+                    actList.contains('view')) {
+                  return true;
+                }
+              }
               if (requiredKey == 'leads.update_all' || requiredKey == 'leads.update_assigned' || requiredKey == 'leads.update') {
                 if (actList.contains('leads.update') || actList.contains('leads.update_all') || actList.contains('leads.update_assigned')) {
                   return true;

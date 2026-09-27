@@ -159,19 +159,12 @@ class LeadManagementScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Fresh Lead Pull Panel
-            Builder(
-              builder: (context) {
-                final currentUser = Get.find<AuthController>().user.value;
-                final canPull = (currentUser?.isAdmin ?? false) || (currentUser?.has('leads.pull') ?? false);
-                if (!canPull) return const SizedBox();
-                return Column(
-                  children: [
-                    _buildPullPanel(controller),
-                    const SizedBox(height: 24),
-                  ],
-                );
-              },
+            // Lead Pull Widget Bar (Always visible to all staff with Leads page access)
+            Column(
+              children: [
+                _buildPullPanel(controller),
+                const SizedBox(height: 24),
+              ],
             ),
 
             // Filters Bar

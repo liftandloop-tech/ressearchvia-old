@@ -6,6 +6,8 @@ import leadModel from "./app/models/leadModel.js";
 import leadPoolModel from "./app/models/leadPoolModel.js";
 import staffModel from "./app/models/staffModel.js";
 import roleModel from "./app/models/roleModel.js";
+import "./app/models/departmentModel.js";
+import "./app/models/permissionGroupModel.js";
 import { ensureDefaultFreshPool } from "./app/controller/leadPoolController.js";
 import leadPoolController from "./app/controller/leadPoolController.js";
 import leadPullController from "./app/controller/leadPullController.js";

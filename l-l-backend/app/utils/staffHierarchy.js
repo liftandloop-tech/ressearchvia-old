@@ -84,15 +84,22 @@ export async function getSupervisedStaffIds(callerId) {
     currentLevel = nextLevel;
   }
 
-  const roleLevel = staffMember.roleId?.level;
+  const roleName = (staffMember.roleId?.roleName || staffMember.roleId?.name || staffMember.role || "").toLowerCase().trim();
   const staffIds = Array.from(supervisedMap.values());
-  const isSupervisor = staffIds.length > 1 || (roleLevel !== undefined && roleLevel <= 2);
+  const hasSubordinates = staffIds.length > 1;
+
+  const isExecutiveTitle = /executive|analyst|bde|intern|trainee|junior|back office|associate/i.test(roleName);
+  const isLeadershipTitle = /director|head|manager|team leader|lead|supervisor|vp|president/i.test(roleName);
+
+  const isDirector = /director|head/i.test(roleName);
+  const isManager = /manager|team leader|lead/i.test(roleName);
+  const isSupervisor = hasSubordinates || (isLeadershipTitle && !isExecutiveTitle);
 
   return {
     isSystemAdmin: false,
     isSupervisor,
-    isDirector: roleLevel === 1,
-    isManager: roleLevel === 2,
+    isDirector,
+    isManager,
     isGlobalAccess: false,
     staffIds,
     staffMember
@@ -140,14 +147,25 @@ export async function getAccessibleLeadPoolFilter(callerId, companyId) {
 
   const callerObjId = mongoose.isValidObjectId(callerId) ? new mongoose.Types.ObjectId(callerId.toString()) : null;
   const upstreamIds = await getUpstreamSupervisorIds(callerId);
-  const allowedCreators = callerObjId ? [callerObjId, ...upstreamIds] : upstreamIds;
+  const supervisedIds = hierarchy.staffIds || [];
+
+  // Allowed pool creators:
+  // 1. The staff member themselves
+  // 2. Upstream supervisors/directors (who created pools for their team)
+  // 3. Subordinates reporting to this staff member (if caller is a team lead / manager viewing team pools)
+  const allowedCreators = [
+    ...new Set([
+      ...(callerObjId ? [callerObjId] : []),
+      ...upstreamIds,
+      ...supervisedIds
+    ])
+  ];
 
   return {
     ...baseFilter,
     $or: [
       { isGlobal: true },
-      { isGlobal: { $exists: false } },
-      { createdBy: null },
+      { name: "Fresh Leads" },
       { createdBy: { $in: allowedCreators } }
     ]
   };

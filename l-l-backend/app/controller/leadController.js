@@ -1,28 +1,47 @@
+import mongoose from "mongoose";
 import leadModel from "../models/leadModel.js";
 import staffModel from "../models/staffModel.js";
+import leadPoolModel from "../models/leadPoolModel.js";
 import xlsx from "xlsx";
 import fs from "fs";
 import csvParser from "csv-parser";
 import importService from "../services/importService.js";
 import importJobModel from "../models/importJobModel.js";
 import { ensureDefaultFreshPool } from "./leadPoolController.js";
-import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
+import { getSupervisedStaffIds, getAccessibleLeadPoolFilter } from "../utils/staffHierarchy.js";
 
 const leadController = {
     createLead: async (req, res) => {
         try {
-            const companyId = req.user.companyId || req.user.company || "default_company";
+            const companyId = req.user?.companyId || req.user?.company || "default_company";
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+
             let { leadPoolId } = req.body;
-            if (!leadPoolId) {
-                const defaultPool = await ensureDefaultFreshPool(companyId);
-                leadPoolId = defaultPool._id;
+            let targetPool = null;
+
+            if (leadPoolId) {
+                const poolFilter = await getAccessibleLeadPoolFilter(callerId, companyId);
+                poolFilter._id = leadPoolId;
+                targetPool = await leadPoolModel.findOne(poolFilter);
             }
+
+            if (!targetPool) {
+                targetPool = await ensureDefaultFreshPool(companyId);
+            }
+
+            // Leads must be added to a pool as unassigned (assignedRM: null).
+            // Staff subsequently pull from the pool based on lead distribution quotas.
+            // Only administrators can directly pre-assign leads at creation time.
+            const assignedRM = isSuper && req.body.assignedRM ? req.body.assignedRM : null;
+
             const lead = await leadModel.create({
                 ...req.body,
                 companyId,
-                leadPoolId
+                leadPoolId: targetPool._id,
+                assignedRM
             });
-            res.status(200).send({ status: 200, message: "Lead created successfully", data: { lead } });
+            res.status(200).send({ status: 200, message: "Lead created and added to lead pool successfully", data: { lead } });
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
@@ -35,6 +54,8 @@ const leadController = {
             const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
 
             let filter = { _id: id };
+            const updates = { ...req.body };
+
             if (!isSuper && callerId) {
                 const hierarchy = await getSupervisedStaffIds(callerId);
                 if (!hierarchy.isSystemAdmin) {
@@ -45,10 +66,23 @@ const leadController = {
                     if (!hasUpdateAll) {
                         filter.assignedRM = { $in: hierarchy.staffIds };
                     }
+
+                    // Protect lead assignment and pool placement:
+                    // Base sales executives (no subordinates) cannot reassign leads or change lead pools
+                    if (!hierarchy.isSupervisor && (!hierarchy.staffIds || hierarchy.staffIds.length <= 1)) {
+                        delete updates.assignedRM;
+                        delete updates.leadPoolId;
+                    } else if (updates.assignedRM) {
+                        // Team leaders / managers can only reassign to staff within their supervised team
+                        const targetStaffId = updates.assignedRM.toString();
+                        if (!hierarchy.staffIds.some(sid => sid.toString() === targetStaffId)) {
+                            return res.status(403).send({ status: 403, message: "Cannot reassign lead to staff outside your supervised team", data: {} });
+                        }
+                    }
                 }
             }
 
-            const lead = await leadModel.findOneAndUpdate(filter, req.body, { new: true });
+            const lead = await leadModel.findOneAndUpdate(filter, updates, { new: true });
             if (!lead) {
                 return res.status(404).send({ status: 404, message: "Lead not found or access denied", data: {} });
             }
@@ -63,27 +97,26 @@ const leadController = {
             const { page = 1, limit = 10, search = "", stage = "", assignedRM = "", leadPoolId = "" } = req.query;
             const query = {};
 
-            // Data-Scope Enforcement: If user has leads.view_assigned but not leads.view_all, restrict query to assignedRM
+            // Data-Scope Enforcement: Non-admins without leads.view_all are restricted to their team or themselves
             const callerId = req.user?._id || req.user?.userId || req.user?.id;
             const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
             if (!isSuper && callerId) {
                 const hierarchy = await getSupervisedStaffIds(callerId);
                 if (!hierarchy.isSystemAdmin) {
                     const staffMember = hierarchy.staffMember;
-                    if (staffMember && staffMember.roleId && staffMember.roleId.permissionGroups) {
-                        const hasViewAll = staffMember.roleId.permissionGroups.some(g =>
-                            g.permissions?.some(p => p.actions?.includes('leads.view_all'))
-                        );
-                        const hasViewAssigned = staffMember.roleId.permissionGroups.some(g =>
-                            g.permissions?.some(p => p.actions?.includes('leads.view_assigned') || p.actions?.includes('read'))
-                        );
+                    const hasViewAll = staffMember?.roleId?.permissionGroups?.some(g =>
+                        g.permissions?.some(p => p.actions?.includes('leads.view_all'))
+                    );
 
-                        if (hasViewAssigned && !hasViewAll) {
-                            if (hierarchy.staffIds && hierarchy.staffIds.length > 1) {
-                                query.assignedRM = { $in: hierarchy.staffIds };
-                            } else {
-                                query.assignedRM = staffMember._id;
-                            }
+                    // Unless explicitly granted leads.view_all, restrict query to assignedRM
+                    if (!hasViewAll) {
+                        if (hierarchy.staffIds && hierarchy.staffIds.length > 1) {
+                            // Team Leader / Manager: sees all leads assigned to their team
+                            query.assignedRM = { $in: hierarchy.staffIds };
+                        } else {
+                            // Individual Sales Executive: ONLY sees leads assigned to THEMSELVES
+                            const myId = staffMember?._id || (mongoose.isValidObjectId(callerId) ? new mongoose.Types.ObjectId(callerId.toString()) : callerId);
+                            query.assignedRM = myId;
                         }
                     }
                 }
@@ -273,10 +306,14 @@ const leadController = {
             if (!isSuper && callerId) {
                 const hierarchy = await getSupervisedStaffIds(callerId);
                 if (!hierarchy.isSystemAdmin) {
-                    leadFilter.$or = [
-                        { assignedRM: { $in: hierarchy.staffIds } },
-                        { assignedRM: null }
-                    ];
+                    // Base sales executives (no subordinates) CANNOT assign leads
+                    if (!hierarchy.isSupervisor && (!hierarchy.staffIds || hierarchy.staffIds.length <= 1)) {
+                        return res.status(403).send({ status: 403, message: "Only team leaders and administrators can assign leads" });
+                    }
+
+                    // A supervisor can reassign leads among their supervised team
+                    // Note: Unassigned pool leads (assignedRM: null) must be pulled via the pull system, not cherry-picked
+                    leadFilter.assignedRM = { $in: hierarchy.staffIds };
 
                     if (staffId && !hierarchy.staffIds.some(sid => sid.toString() === staffId.toString())) {
                         return res.status(403).send({ status: 403, message: "Cannot assign leads to staff outside your supervised team" });

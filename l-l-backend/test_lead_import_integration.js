@@ -8,6 +8,9 @@ import importService from "./app/services/importService.js";
 import importJobModel from "./app/models/importJobModel.js";
 import leadModel from "./app/models/leadModel.js";
 import staffModel from "./app/models/staffModel.js";
+import "./app/models/roleModel.js";
+import "./app/models/departmentModel.js";
+import "./app/models/permissionGroupModel.js";
 import leadPoolModel from "./app/models/leadPoolModel.js";
 import importController from "./app/controller/importController.js";
 
