@@ -364,6 +364,12 @@ const staffService = {
   },
   staffImpersonate: async ({ body, user }) => {
     try {
+      const callerRole = ((user?.role) || (user?.userType) || "").toLowerCase();
+      const isAdmin = callerRole === 'admin' || callerRole === 'super_admin' || callerRole === 'super admin';
+      if (!isAdmin) {
+        return { status: 403, message: "Access denied. Only administrators can impersonate staff.", data: {} };
+      }
+
       const { staffId } = body;
       if (!staffId) {
         return { status: 400, message: "Staff ID is required", data: {} };

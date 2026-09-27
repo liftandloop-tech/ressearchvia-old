@@ -6,7 +6,7 @@ import staffDocController from "../../controller/staffDocController.js";
 import staffAttendanceController from "../../controller/staffAttendanceController.js";
 import applicantController from "../../controller/applicantController.js";
 import usersController from "../../controller/userController.js";
-import { checkPermission, adminOnly } from "../../middleware/accessMiddleware.js";
+import { checkPermission, adminOnly, adminStrictOnlyNoStaff } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
 const staffRoutes = () => {
@@ -25,7 +25,7 @@ const staffRoutes = () => {
     Router.put("/me", auth.tokenVerified, staffController.updateStaffProfileMe)
     Router.post("/me/change-mpin", auth.tokenVerified, staffController.changeStaffMpinMe)
     Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
-    Router.post("/impersonate", auth.tokenVerified, adminOnly, staffController.staffImpersonate)
+    Router.post("/impersonate", auth.tokenVerified, adminStrictOnlyNoStaff, staffController.staffImpersonate)
 
     // Public applicant routes
     Router.post("/applicant/register", applicantController.registerApplicant)
@@ -37,9 +37,9 @@ const staffRoutes = () => {
     Router.post("/applicant/continue-verify", applicantController.verifyContinueApplication)
 
     // Admin applicant review & approval
-    Router.get("/applicants", auth.tokenVerified, applicantController.listApplicants)
-    Router.post("/applicant/approve/:id", auth.tokenVerified, applicantController.approveApplicant)
-    Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, applicantController.saveEvaluationRemarks)
+    Router.get("/applicants", auth.tokenVerified, adminOnly, checkPermission('staff.view_applicants'), applicantController.listApplicants)
+    Router.post("/applicant/approve/:id", auth.tokenVerified, adminOnly, checkPermission('staff.approve_applicant'), applicantController.approveApplicant)
+    Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, checkPermission('staff.approve_applicant'), applicantController.saveEvaluationRemarks)
 
     // Document uploads for staff onboarding
     Router.post("/upload-doc/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), staffDocController.uploadDocument)
@@ -48,10 +48,10 @@ const staffRoutes = () => {
     // Public staff verification route (for Digital ID QR Code scans)
     Router.get("/verify/:staffId", staffController.getPublicStaffVerification)
 
-    // Attendance and face pings
-    Router.post("/attendance/login", staffAttendanceController.loginSession)
-    Router.post("/attendance/logout", staffAttendanceController.logoutSession)
-    Router.post("/attendance/ping", staffAttendanceController.pingSession)
+    // Attendance and face pings (Authenticated)
+    Router.post("/attendance/login", auth.tokenVerified, staffAttendanceController.loginSession)
+    Router.post("/attendance/logout", auth.tokenVerified, staffAttendanceController.logoutSession)
+    Router.post("/attendance/ping", auth.tokenVerified, staffAttendanceController.pingSession)
     Router.get("/attendance/summary/:staffId", auth.tokenVerified, staffAttendanceController.getDailyWorkSummary)
 
     return Router

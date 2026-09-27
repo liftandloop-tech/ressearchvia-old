@@ -12,23 +12,24 @@ const webhookController = {
 
             // Validate Secret
             const signature = req.headers['x-digio-signature'];
-            const secret = "Research@12";
+            const secret = process.env.DIGIO_WEBHOOK_SECRET || "Research@12";
 
             const validateSignature = (body, signature, secret) => {
-                if (!signature) return false;
+                if (!signature || !secret) return false;
                 // Digio signature is HMAC-SHA256 of the raw request body
+                const rawData = req.rawBody || JSON.stringify(body);
                 const hmac = crypto.createHmac('sha256', secret);
-                const digest = hmac.update(JSON.stringify(body)).digest('hex');
-                return signature === digest;
+                const digest = hmac.update(rawData).digest('hex');
+                const sigBuf = Buffer.from(signature);
+                const digBuf = Buffer.from(digest);
+                if (sigBuf.length !== digBuf.length) return false;
+                return crypto.timingSafeEqual(sigBuf, digBuf);
             };
 
-            // Uncomment to enforce validation
-            /*
             if (!validateSignature(req.body, signature, secret)) {
-                 console.log("Invalid Webhook Signature. Expected:", signature);
-                 // return res.status(401).send("Invalid Signature");
+                console.warn("[Digio Webhook] Invalid signature from:", req.ip, "Signature:", signature);
+                return res.status(401).send("Invalid Signature");
             }
-            */
 
             if (!payload || !payload.document) {
                 return res.status(200).send("OK - No document payload");

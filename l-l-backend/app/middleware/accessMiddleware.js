@@ -118,7 +118,11 @@ export const registrationAccess = async (req, res, next) => {
             if (pendingReg) {
                 return next();
             } else {
-                return next();
+                return res.status(403).json({
+                    message: "Registration required to access this resource.",
+                    errorCode: "REGISTRATION_REQUIRED",
+                    action: "REDIRECT_TO_REGISTRATION"
+                });
             }
         }
 
@@ -270,7 +274,7 @@ export const adminStrictOnlyNoStaff = async (req, res, next) => {
 
         return res.status(403).json({
             status: 403,
-            message: "Access Denied. Refund processing is strictly restricted to Administrators only, not general staff.",
+            message: "Access Denied. This action is strictly restricted to Administrators only, not general staff.",
             errorCode: "ADMIN_ONLY_RESTRICTION"
         });
     } catch (error) {
@@ -504,8 +508,29 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     if ((requiredKey === 'reports.trading_call_popup') &&
                         (perm.actions.includes('reports.trading_call_popup') || perm.actions.includes('trading_call_popup'))) return true;
 
+                    if ((requiredKey === 'notifications.read' || requiredKey === 'notifications:read' || requiredKey === 'notifications.view') &&
+                        (perm.actions.includes('notifications.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'notifications.send') &&
+                        (perm.actions.includes('notifications.send') || perm.actions.includes('notifications.create') || perm.actions.includes('create'))) return true;
+
+                    if ((requiredKey === 'notifications.send_bulk_email') &&
+                        (perm.actions.includes('notifications.send_bulk_email') || perm.actions.includes('notifications.send') || perm.actions.includes('notifications.create') || perm.actions.includes('create'))) return true;
+
+                    if ((requiredKey === 'notifications.preview') &&
+                        (perm.actions.includes('notifications.preview') || perm.actions.includes('notifications.view') || perm.actions.includes('notifications.send') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'notifications.cancel_scheduled') &&
+                        (perm.actions.includes('notifications.cancel_scheduled') || perm.actions.includes('notifications.delete') || perm.actions.includes('delete'))) return true;
+
                     if ((requiredKey === 'staff.read' || requiredKey === 'staff:read') &&
                         (perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'staff.view_applicants') &&
+                        (perm.actions.includes('staff.view_applicants') || perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'staff.approve_applicant') &&
+                        (perm.actions.includes('staff.approve_applicant') || perm.actions.includes('staff.create') || perm.actions.includes('staff.update'))) return true;
 
                     if (requiredKey === 'staff.reset' &&
                         (perm.actions.includes('staff.reset_mpin') || perm.actions.includes('staff.update') || perm.actions.includes('staff.reset'))) return true;

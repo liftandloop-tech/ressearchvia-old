@@ -3,7 +3,15 @@ import staffAttendanceModel from "../models/staffAttendanceModel.js";
 const staffAttendanceController = {
     loginSession: async (req, res) => {
         try {
-            const { staffId, isRemote, deviceInfo } = req.body;
+            let { staffId, isRemote, deviceInfo } = req.body;
+            const callerId = req.user?._id || req.user?.userId;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin';
+            if (!isSuper && callerId) {
+                staffId = callerId.toString();
+            } else if (!staffId && callerId) {
+                staffId = callerId.toString();
+            }
+
             if (!staffId) {
                 return res.status(400).send({ status: 400, message: "Staff ID is required", data: {} });
             }
@@ -38,6 +46,12 @@ const staffAttendanceController = {
                 return res.status(404).send({ status: 404, message: "Session not found", data: {} });
             }
 
+            const callerId = req.user?._id || req.user?.userId;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin';
+            if (!isSuper && callerId && session.staffId && session.staffId.toString() !== callerId.toString()) {
+                return res.status(403).send({ status: 403, message: "Access denied: session belongs to another staff member", data: {} });
+            }
+
             session.logoutTime = new Date();
             const diffMs = session.logoutTime - session.loginTime;
             session.totalWorkingMinutes = Math.round(diffMs / 60000);
@@ -59,6 +73,12 @@ const staffAttendanceController = {
             const session = await staffAttendanceModel.findById(sessionId);
             if (!session) {
                 return res.status(404).send({ status: 404, message: "Session not found", data: {} });
+            }
+
+            const callerId = req.user?._id || req.user?.userId;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin';
+            if (!isSuper && callerId && session.staffId && session.staffId.toString() !== callerId.toString()) {
+                return res.status(403).send({ status: 403, message: "Access denied: session belongs to another staff member", data: {} });
             }
 
             session.activityLogs.push({

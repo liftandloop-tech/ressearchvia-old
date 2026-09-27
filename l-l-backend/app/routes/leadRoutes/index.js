@@ -18,7 +18,7 @@ const leadRoutes = () => {
     // Pull system
     Router.post("/pull", auth.tokenVerified, leadPullController.pullLeads);
     Router.get("/pull-stats", auth.tokenVerified, leadPullController.getPullStats);
-    Router.patch("/:id/read", auth.tokenVerified, leadController.markAsRead);
+    Router.patch("/:id/read", auth.tokenVerified, checkPermission('leads.view'), leadController.markAsRead);
 
     Router.post("/create", auth.tokenVerified, checkPermission('leads.create'), leadController.createLead);
     Router.post("/bulk-assign", auth.tokenVerified, checkPermission('leads.bulk_assign'), leadController.bulkAssign);

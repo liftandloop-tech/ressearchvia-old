@@ -31,9 +31,26 @@ const leadController = {
     updateLead: async (req, res) => {
         try {
             const { id } = req.params;
-            const lead = await leadModel.findByIdAndUpdate(id, req.body, { new: true });
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+
+            let filter = { _id: id };
+            if (!isSuper && callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                if (!hierarchy.isSystemAdmin) {
+                    const staffMember = hierarchy.staffMember;
+                    const hasUpdateAll = staffMember?.roleId?.permissionGroups?.some(g =>
+                        g.permissions?.some(p => p.actions?.includes('leads.update_all'))
+                    );
+                    if (!hasUpdateAll) {
+                        filter.assignedRM = { $in: hierarchy.staffIds };
+                    }
+                }
+            }
+
+            const lead = await leadModel.findOneAndUpdate(filter, req.body, { new: true });
             if (!lead) {
-                return res.status(404).send({ status: 404, message: "Lead not found", data: {} });
+                return res.status(404).send({ status: 404, message: "Lead not found or access denied", data: {} });
             }
             res.status(200).send({ status: 200, message: "Lead updated successfully", data: { lead } });
         } catch (error) {
@@ -114,9 +131,26 @@ const leadController = {
                 return res.status(400).send({ status: 400, message: "Notes and followUpDate are required", data: {} });
             }
 
-            const lead = await leadModel.findById(id);
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+
+            let filter = { _id: id };
+            if (!isSuper && callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                if (!hierarchy.isSystemAdmin) {
+                    const staffMember = hierarchy.staffMember;
+                    const hasFollowUpAll = staffMember?.roleId?.permissionGroups?.some(g =>
+                        g.permissions?.some(p => p.actions?.includes('leads.follow_up_all'))
+                    );
+                    if (!hasFollowUpAll) {
+                        filter.assignedRM = { $in: hierarchy.staffIds };
+                    }
+                }
+            }
+
+            const lead = await leadModel.findOne(filter);
             if (!lead) {
-                return res.status(404).send({ status: 404, message: "Lead not found", data: {} });
+                return res.status(404).send({ status: 404, message: "Lead not found or access denied", data: {} });
             }
 
             lead.followUps.push({
@@ -202,9 +236,20 @@ const leadController = {
     markAsRead: async (req, res) => {
         try {
             const { id } = req.params;
-            const lead = await leadModel.findByIdAndUpdate(id, { isRead: true }, { new: true });
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+
+            let filter = { _id: id };
+            if (!isSuper && callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                if (!hierarchy.isSystemAdmin) {
+                    filter.assignedRM = { $in: hierarchy.staffIds };
+                }
+            }
+
+            const lead = await leadModel.findOneAndUpdate(filter, { isRead: true }, { new: true });
             if (!lead) {
-                return res.status(404).send({ status: 404, message: "Lead not found" });
+                return res.status(404).send({ status: 404, message: "Lead not found or access denied" });
             }
             res.status(200).send({ status: 200, message: "Lead marked as read", data: { lead } });
         } catch (error) {
@@ -221,8 +266,26 @@ const leadController = {
 
             const staffId = assignedRM && assignedRM !== 'unassigned' ? assignedRM : null;
 
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+            let leadFilter = { _id: { $in: leadIds } };
+
+            if (!isSuper && callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                if (!hierarchy.isSystemAdmin) {
+                    leadFilter.$or = [
+                        { assignedRM: { $in: hierarchy.staffIds } },
+                        { assignedRM: null }
+                    ];
+
+                    if (staffId && !hierarchy.staffIds.some(sid => sid.toString() === staffId.toString())) {
+                        return res.status(403).send({ status: 403, message: "Cannot assign leads to staff outside your supervised team" });
+                    }
+                }
+            }
+
             await leadModel.updateMany(
-                { _id: { $in: leadIds } },
+                leadFilter,
                 { $set: { assignedRM: staffId } }
             );
 
