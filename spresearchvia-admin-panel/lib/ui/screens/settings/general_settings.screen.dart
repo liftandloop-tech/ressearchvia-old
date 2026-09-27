@@ -5,7 +5,6 @@ import '../../../config/app.config.dart';
 import '../../../controllers/settings/settings.controller.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
-import '../leads/lead_management.screen.dart';
 import '../../../models/staff.model.dart';
 
 class GeneralSettingsScreen extends StatelessWidget {
@@ -51,7 +50,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                               ),
                               SizedBox(height: 2),
                               Text(
-                                'Configure company bank accounts, default staff assignments, permissions, and lead flow policies.',
+                                'Configure company bank accounts, default staff assignments, and roles & permissions.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppTheme.textSecondary,
@@ -69,7 +68,6 @@ class GeneralSettingsScreen extends StatelessWidget {
                           _buildBankDetailsCard(controller),
                           _buildDefaultRMCard(controller),
                           _buildRolesPermissionsCard(),
-                          _buildLeadDistributionCard(),
                         ],
                       ),
                     ],
@@ -1041,79 +1039,6 @@ class GeneralSettingsScreen extends StatelessWidget {
               ),
             ),
             child: const Text('Manage Roles & Permissions', style: TextStyle(fontSize: 13)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeadDistributionCard() {
-    return Container(
-      width: 580,
-      constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.gray200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.inventory_2_outlined,
-                  color: AppTheme.primaryBlue,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Lead Pools & Distribution',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Lead distribution rules (batch pull size, staff capacity caps, and team visibility) are now unified directly per Lead Pool. Navigate to Lead Pools to manage or adjust quotas.',
-            style: TextStyle(
-              fontSize: 12.5,
-              color: AppTheme.gray500,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.tune_rounded, size: 16),
-            label: const Text('Manage Lead Pools & Distribution', style: TextStyle(fontSize: 13)),
-            onPressed: () => Get.to(() => const LeadManagementScreen()),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryBlue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
           ),
         ],
       ),
