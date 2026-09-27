@@ -79,20 +79,28 @@ export async function getSupervisedStaffIds(callerId) {
     currentLevel = nextLevel;
   }
 
-  const roleName = (staffMember?.roleId?.name || staffMember?.role || "").toLowerCase();
-  const dept = (staffMember?.departmentId?.name || staffMember?.deparment || staffMember?.department || "").toLowerCase();
-  const isDirector = dept.includes('director') || roleName.includes('director') || dept.includes('management');
-  const isManager = dept.includes('manager') || roleName.includes('manager') || roleName.includes('head');
+  const roleLevel = staffMember.roleId?.level;
+  const roleName = (staffMember.roleId?.name || staffMember.role || "").toLowerCase();
+  const deptName = (staffMember.departmentId?.name || staffMember.deparment || staffMember.department || "").toLowerCase();
 
-  // Cross-department operational visibility (Directors, Management, Operations, Compliance, Quality, Back Office, Research)
-  const isGlobalAccess = isDirector ||
-    dept.includes('management') ||
-    dept.includes('director') ||
-    dept.includes('operations') ||
-    dept.includes('compliance') ||
-    dept.includes('back office') ||
-    dept.includes('quality') ||
-    dept.includes('research');
+  // Dynamic role level classification
+  const isDirector = roleLevel === 1 || roleName === 'director' || deptName === 'management';
+  const isManager = roleLevel === 2 || roleName.includes('manager') || roleName.includes('head');
+
+  // Dynamic global access check:
+  // 1. Department explicitly flagged isGlobal
+  // 2. Or role permissions include global pool / view_all access
+  // 3. Or non-sales hierarchy departments (departments that are not pipeline-scoped)
+  const hasGlobalPoolPermission = Boolean(
+    staffMember.roleId?.permissionGroups?.some(pg =>
+      pg?.permissions?.some(perm =>
+        perm?.actions?.some(act => act === '*' || act.includes('view_pools') || act.includes('view_all'))
+      )
+    )
+  );
+
+  const isSalesHierarchy = deptName === 'sales' && !isDirector;
+  const isGlobalAccess = staffMember.departmentId?.isGlobal === true || hasGlobalPoolPermission || !isSalesHierarchy;
 
   const staffIds = Array.from(supervisedMap.values());
   const isSupervisor = staffIds.length > 1 || isDirector || isManager;
@@ -143,7 +151,7 @@ export async function getAccessibleLeadPoolFilter(callerId, companyId) {
   const baseFilter = { companyId: companyId || "default_company" };
   const hierarchy = await getSupervisedStaffIds(callerId);
 
-  if (hierarchy.isSystemAdmin) {
+  if (hierarchy.isSystemAdmin || hierarchy.isGlobalAccess) {
     return baseFilter;
   }
 

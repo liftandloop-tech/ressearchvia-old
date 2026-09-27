@@ -5,6 +5,8 @@ import 'package:spresearch_web/services/staff.service.dart';
 import 'package:spresearch_web/models/user.model.dart';
 import 'package:spresearch_web/config/routes.config.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import '../users/user_management.controller.dart';
+import '../users/user.controller.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = Get.find<AuthService>();
@@ -144,6 +146,20 @@ class AuthController extends GetxController {
           duration: const Duration(seconds: 3),
         );
 
+        if (Get.isRegistered<UserController>()) {
+          Get.delete<UserController>();
+        }
+        if (Get.isRegistered<UserManagementController>()) {
+          final umc = Get.find<UserManagementController>();
+          umc.managerFilter.value = 'All Managers';
+          umc.statusFilter.value = 'All Statuses';
+          umc.planTypeFilter.value = 'All Plans';
+          umc.kycStatusFilter.value = 'All';
+          umc.searchQuery.value = '';
+          umc.fetchUsers(page: 1);
+          umc.fetchManagers();
+        }
+
         if (staffUser.isResearcher) {
           Get.offAllNamed(AppRoutes.reports);
         } else {
@@ -181,6 +197,20 @@ class AuthController extends GetxController {
         isAuthenticated.value = true;
         isImpersonating.value = false;
         impersonatedStaffName.value = '';
+
+        if (Get.isRegistered<UserController>()) {
+          Get.delete<UserController>();
+        }
+        if (Get.isRegistered<UserManagementController>()) {
+          final umc = Get.find<UserManagementController>();
+          umc.managerFilter.value = 'All Managers';
+          umc.statusFilter.value = 'All Statuses';
+          umc.planTypeFilter.value = 'All Plans';
+          umc.kycStatusFilter.value = 'All';
+          umc.searchQuery.value = '';
+          umc.fetchUsers(page: 1);
+          umc.fetchManagers();
+        }
 
         Get.snackbar(
           'Returned to Admin',

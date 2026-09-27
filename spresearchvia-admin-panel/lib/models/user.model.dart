@@ -57,71 +57,81 @@ class UserModel {
   String get createdAt => registrationDate;
   String get formattedPhone => mobile;
 
-  bool get isAdmin {
-    if (rawJson?['isAdmin'] == true) return true;
-    if (isDirector || isResearcher) return false;
-    final dept = subscriptionPlan.toLowerCase();
-    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
-    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
-    String roleIdName = '';
-    if (rawJson?['roleId'] is Map) {
-      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
+  Map? get departmentData {
+    if (rawJson?['departmentId'] is Map) return rawJson!['departmentId'] as Map;
+    if (rawJson?['department'] is Map) return rawJson!['department'] as Map;
+    if (rawJson?['roleId'] is Map && rawJson!['roleId']['departmentId'] is Map) {
+      return rawJson!['roleId']['departmentId'] as Map;
     }
-    return dept == 'admin' ||
-        dept == 'super_admin' ||
-        dept == 'administration' ||
-        dept.contains('admin') ||
-        roleStr == 'admin' ||
-        roleStr == 'super_admin' ||
-        userTypeStr == 'admin' ||
-        userTypeStr == 'super_admin' ||
-        roleIdName == 'admin' ||
-        roleIdName == 'super_admin';
+    return null;
   }
 
-  bool get isResearcher {
-    final dept = subscriptionPlan.toLowerCase();
-    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
-    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
-    String roleIdName = '';
-    if (rawJson?['roleId'] is Map) {
-      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
+  Map? get roleData {
+    if (rawJson?['roleId'] is Map) return rawJson!['roleId'] as Map;
+    if (rawJson?['role'] is Map) return rawJson!['role'] as Map;
+    return null;
+  }
+
+  String get roleName {
+    if (roleData != null && roleData!['name'] != null) {
+      return roleData!['name'].toString().trim();
     }
-    return dept.contains('research') ||
-        roleStr.contains('research') ||
-        userTypeStr.contains('research') ||
-        roleIdName.contains('research');
+    return (rawJson?['role'] ?? '').toString().trim();
+  }
+
+  int? get roleLevel {
+    if (roleData != null && roleData!['level'] != null) {
+      return int.tryParse(roleData!['level'].toString());
+    }
+    return null;
+  }
+
+  String get departmentName {
+    if (departmentData != null && departmentData!['name'] != null) {
+      return departmentData!['name'].toString().trim();
+    }
+    return (rawJson?['deparment'] ?? rawJson?['department'] ?? '').toString().trim();
+  }
+
+  bool get isAdmin {
+    if (rawJson?['isAdmin'] == true) return true;
+    final r = roleName.toLowerCase();
+    final u = (rawJson?['userType'] ?? '').toString().toLowerCase();
+    if (r == 'admin' || r == 'super_admin' || r == 'super admin') return true;
+    if (u == 'admin' || u == 'super_admin') return true;
+    final d = departmentName.toLowerCase();
+    if (d == 'admin') return true;
+    if (d == 'administration & management') {
+      return r == 'admin' || r.isEmpty;
+    }
+    return false;
+  }
+
+  bool get isStaff {
+    if (isAdmin) return false;
+    return rawJson?['roleId'] != null ||
+        (rawJson?['userType'] ?? '').toString().toUpperCase() == 'STAFF' ||
+        rawJson?['staffId'] != null;
   }
 
   bool get isDirector {
-    final dept = subscriptionPlan.toLowerCase();
-    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
-    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
-    String roleIdName = '';
-    if (rawJson?['roleId'] is Map) {
-      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
-    }
-    return dept.contains('director') ||
-        roleStr.contains('director') ||
-        userTypeStr.contains('director') ||
-        roleIdName.contains('director');
+    final r = roleName.toLowerCase();
+    final d = departmentName.toLowerCase();
+    return r == 'director' || d == 'management' || roleLevel == 1;
   }
 
   bool get isManager {
-    final dept = subscriptionPlan.toLowerCase();
-    final roleStr = (rawJson?['role'] ?? '').toString().toLowerCase();
-    final userTypeStr = (rawJson?['userType'] ?? '').toString().toLowerCase();
-    String roleIdName = '';
-    if (rawJson?['roleId'] is Map) {
-      roleIdName = (rawJson!['roleId']['name'] ?? '').toString().toLowerCase();
-    }
-    return dept.contains('manager') ||
-        roleStr.contains('manager') ||
-        userTypeStr.contains('manager') ||
-        roleIdName.contains('manager');
+    final r = roleName.toLowerCase();
+    return r.contains('manager') || r.contains('head') || roleLevel == 2;
   }
 
   bool get isSupervisor => isDirector || isManager;
+
+  bool get isResearcher {
+    final d = departmentName.toLowerCase();
+    final r = roleName.toLowerCase();
+    return d.contains('research') || r.contains('analyst');
+  }
 
   static String _parseMongoId(dynamic id) {
     if (id is Map && id.containsKey('\$oid')) {
@@ -200,14 +210,6 @@ class UserModel {
     );
   }
 
-  Map? get departmentData {
-    if (rawJson?['departmentId'] is Map) return rawJson!['departmentId'] as Map;
-    if (rawJson?['department'] is Map) return rawJson!['department'] as Map;
-    if (rawJson?['roleId'] is Map && rawJson!['roleId']['departmentId'] is Map) {
-      return rawJson!['roleId']['departmentId'] as Map;
-    }
-    return null;
-  }
 
   /// Checks whether the user's assigned department has access to the specified page.
   /// If the department is global or user is admin, returns true.
@@ -267,34 +269,7 @@ class UserModel {
       }
     }
 
-    // Fallback based on known department string names if department object is unpopulated
-    final String deptStr = (rawJson?['deparment'] ?? rawJson?['department'] ?? '').toString().toLowerCase().trim();
-    final String roleStr = (rawJson?['role'] ?? '').toString().toLowerCase().trim();
-    final key = pageKey.toLowerCase().trim();
-
-    if (deptStr.contains('management') || deptStr.contains('director') || roleStr.contains('director')) {
-      return key != 'settings';
-    }
-    if (deptStr.contains('sales') || roleStr.contains('sales') || roleStr.contains('bde') || roleStr.contains('floor manager')) {
-      return key == 'leads' || key == 'lead' || key == 'users' || key == 'clients' || key == 'all clients' || key == 'reports' || key == 'report';
-    }
-    if (deptStr.contains('research') || roleStr.contains('research') || roleStr.contains('analyst')) {
-      return key == 'reports' || key == 'report' || key == 'subscriptions';
-    }
-    if (deptStr.contains('operations') || deptStr.contains('compliance') || roleStr.contains('operations') || roleStr.contains('compliance')) {
-      return key == 'users' || key == 'clients' || key == 'kyc' || key == 'payments';
-    }
-    if (deptStr.contains('quality')) {
-      return key == 'reports' || key == 'report' || key == 'leads' || key == 'lead' || key == 'users' || key == 'clients' || key == 'kyc';
-    }
-    if (deptStr.contains('hr') || roleStr.contains('hr')) {
-      return key == 'staff' || key == 'applicants';
-    }
-    if (deptStr.contains('back office') || roleStr.contains('back office')) {
-      return key == 'users' || key == 'clients' || key == 'payments' || key == 'subscriptions';
-    }
-
-    // Default deny for sensitive pages when department is unconfigured
+    // If department object is unconfigured or page not assigned, deny access
     return false;
   }
 
@@ -319,25 +294,6 @@ class UserModel {
     final t = target.trim().toLowerCase();
     final action = (optionalAction ?? '').trim().toLowerCase();
 
-    // 1. Director role: operational authority across users, staff, leads, reports, kyc, notifications
-    // Settings, Automated Trading, and Plan Creation are strictly ADMIN-ONLY.
-    // Payment approval, rejection, revert, and subscription modification actions are strictly ADMIN-ONLY.
-    // Directors are permitted to VIEW payments and subscriptions only.
-    if (isDirector) {
-      if (t.startsWith('automated') ||
-          t.startsWith('trading') ||
-          t.contains('plans.create') ||
-          t.startsWith('setting')) {
-        return false;
-      }
-      if (t.startsWith('payment') || t.startsWith('subscription')) {
-        if (action == 'view' || action == 'read' || (action.isEmpty && (t.contains('view') || t.contains('read')))) {
-          return true;
-        }
-        return false;
-      }
-      return true;
-    }
 
     // Determine targetFeature and targetAction
     String targetFeature;
@@ -391,22 +347,9 @@ class UserModel {
       }
     }
 
-    // Granular database-configured Role and Permission Groups check
-    bool hasConfiguredRole = false;
-    if (rawJson != null) {
-      Map? roleMap;
-      if (rawJson!['roleId'] is Map) {
-        roleMap = rawJson!['roleId'] as Map;
-      } else if (rawJson!['role'] is Map) {
-        roleMap = rawJson!['role'] as Map;
-      }
-
-      final dynamic groups = roleMap?['permissionGroups'] ?? rawJson!['permissionGroups'];
-      if (roleMap != null || groups != null || rawJson!['roleId'] != null) {
-        hasConfiguredRole = true;
-      }
-
-      if (groups is List && groups.isNotEmpty) {
+    // Dynamic database-configured Role and Permission Groups check
+    final dynamic groups = roleData?['permissionGroups'] ?? rawJson?['permissionGroups'];
+    if (groups is List && groups.isNotEmpty) {
         for (var group in groups) {
           if (group is! Map) continue;
           final permissionsList = group['permissions'];
@@ -581,64 +524,8 @@ class UserModel {
           }
         }
       }
-    }
 
-    // If the user has an assigned Role with permission groups, permissions MUST come from
-    // the assigned permission groups. Do NOT fall back to legacy substring heuristics!
-    if (hasConfiguredRole) {
-      return false;
-    }
-
-    // 4. Fallback for legacy role assignments if permissionGroups are empty
-    if (isResearcher && (targetFeature == 'reports' || targetFeature == 'notifications')) {
-      return isReadIntent || targetAction == 'create' || targetAction == 'update' || targetAction == 'publish';
-    }
-
-    if (isManager) {
-      if (t.startsWith('automated') || t.startsWith('trading') || t.startsWith('subscription') || t.startsWith('settings')) {
-        return false;
-      }
-      if (t.startsWith('staff') && (action == 'delete' || action == 'create')) {
-        return false;
-      }
-      return isReadIntent || targetAction == 'update';
-    }
-
-    // 5. Department-based fallback if permission groups are empty or unassigned
-    // Strictly basic read/standard permissions ONLY - NO elevated permissions like view_pools or bulk operations
-    final dept = subscriptionPlan.toLowerCase();
-    if (dept.contains('sales') || dept.contains('executive') || dept.contains('advisory') || dept.contains('support')) {
-      if (t == 'leads' || t == 'leads.view' || t == 'leads.pull' || t == 'leads.follow_up' || t == 'leads.view_assigned') {
-        return true;
-      }
-      if (t == 'users' || t == 'users.view' || t == 'users.view_assigned') {
-        return true;
-      }
-      if (isReadIntent && (targetFeature == 'leads' || targetFeature == 'users')) {
-        return true;
-      }
-    }
-    if (dept.contains('research')) {
-      if (isReadIntent && targetFeature == 'reports') {
-        return true;
-      }
-    }
-    if (dept.contains('compliance') || dept.contains('operations')) {
-      if (isReadIntent && (targetFeature == 'kyc' || targetFeature == 'users' || targetFeature == 'payments')) {
-        return true;
-      }
-    }
-    if (dept.contains('hr') || dept.contains('human')) {
-      if (isReadIntent && (targetFeature == 'staff' || targetFeature == 'attendance')) {
-        return true;
-      }
-    }
-    if (dept.contains('back office') || dept.contains('office')) {
-      if (isReadIntent && (targetFeature == 'users' || targetFeature == 'payments' || targetFeature == 'kyc' || targetFeature == 'subscriptions')) {
-        return true;
-      }
-    }
-
+    // Dynamic resolution: If not explicitly granted in database permission groups, access is denied
     return false;
   }
 

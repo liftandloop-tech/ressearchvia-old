@@ -98,7 +98,6 @@ class UserManagementController extends GetxController {
                       department: currentUser.subscriptionPlan,
                     ),
                   ];
-            managerFilter.value = currentUser.fullName;
             return;
           }
         }

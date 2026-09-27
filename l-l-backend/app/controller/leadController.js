@@ -50,16 +50,10 @@ const leadController = {
             const callerId = req.user?._id || req.user?.userId;
             const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
             if (!isSuper && callerId) {
-                const staffMember = await staffModel.findById(callerId).populate({
-                    path: 'roleId',
-                    populate: { path: 'permissionGroups' }
-                });
-
-                if (staffMember) {
-                    const dept = (staffMember.deparment || staffMember.department || "").toLowerCase();
-                    const isStaffAdmin = dept === 'admin' || dept === 'super_admin' || staffMember.role === 'Admin' || (staffMember.roleId && staffMember.roleId.name.toLowerCase() === 'admin');
-
-                    if (!isStaffAdmin && staffMember.roleId && staffMember.roleId.permissionGroups) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                if (!hierarchy.isSystemAdmin && !hierarchy.isGlobalAccess) {
+                    const staffMember = hierarchy.staffMember;
+                    if (staffMember && staffMember.roleId && staffMember.roleId.permissionGroups) {
                         const hasViewAll = staffMember.roleId.permissionGroups.some(g =>
                             g.permissions?.some(p => p.actions?.includes('leads.view_all'))
                         );
@@ -68,7 +62,6 @@ const leadController = {
                         );
 
                         if (hasViewAssigned && !hasViewAll) {
-                            const hierarchy = await getSupervisedStaffIds(callerId);
                             if (hierarchy.staffIds && hierarchy.staffIds.length > 1) {
                                 query.assignedRM = { $in: hierarchy.staffIds };
                             } else {
