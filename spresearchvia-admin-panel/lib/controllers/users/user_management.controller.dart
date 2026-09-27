@@ -73,31 +73,23 @@ class UserManagementController extends GetxController {
         final authController = Get.find<AuthController>();
         final currentUser = authController.user.value;
         if (currentUser != null && !currentUser.isAdmin) {
-          if (currentUser.isDirector || currentUser.isManager || list.length > 1) {
+          if (list.isNotEmpty) {
             managers.value = list;
             return;
           } else {
-            // Regular staff: only themselves in the manager dropdown
-            final myStaff = list
-                .where(
-                  (s) =>
-                      s.id == currentUser.id || s.name == currentUser.fullName,
-                )
-                .toList();
-            managers.value = myStaff.isNotEmpty
-                ? myStaff
-                : [
-                    StaffModel(
-                      id: currentUser.id,
-                      staffId: currentUser.userId ?? currentUser.id,
-                      name: currentUser.fullName,
-                      email: currentUser.email,
-                      mobile: currentUser.mobile,
-                      role: currentUser.subscriptionPlan,
-                      status: 'Active',
-                      department: currentUser.subscriptionPlan,
-                    ),
-                  ];
+            // Fallback: only themselves in the manager dropdown if list is empty
+            managers.value = [
+              StaffModel(
+                id: currentUser.id,
+                staffId: currentUser.userId ?? currentUser.id,
+                name: currentUser.fullName,
+                email: currentUser.email,
+                mobile: currentUser.mobile,
+                role: currentUser.roleName,
+                status: 'Active',
+                department: currentUser.departmentName,
+              ),
+            ];
             return;
           }
         }

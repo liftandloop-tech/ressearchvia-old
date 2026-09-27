@@ -80,37 +80,15 @@ export async function getSupervisedStaffIds(callerId) {
   }
 
   const roleLevel = staffMember.roleId?.level;
-  const roleName = (staffMember.roleId?.name || staffMember.role || "").toLowerCase();
-  const deptName = (staffMember.departmentId?.name || staffMember.deparment || staffMember.department || "").toLowerCase();
-
-  // Dynamic role level classification
-  const isDirector = roleLevel === 1 || roleName === 'director' || deptName === 'management';
-  const isManager = roleLevel === 2 || roleName.includes('manager') || roleName.includes('head');
-
-  // Dynamic global access check:
-  // 1. Department explicitly flagged isGlobal
-  // 2. Or role permissions include global pool / view_all access
-  // 3. Or non-sales hierarchy departments (departments that are not pipeline-scoped)
-  const hasGlobalPoolPermission = Boolean(
-    staffMember.roleId?.permissionGroups?.some(pg =>
-      pg?.permissions?.some(perm =>
-        perm?.actions?.some(act => act === '*' || act.includes('view_pools') || act.includes('view_all'))
-      )
-    )
-  );
-
-  const isSalesHierarchy = deptName === 'sales' && !isDirector;
-  const isGlobalAccess = staffMember.departmentId?.isGlobal === true || hasGlobalPoolPermission || !isSalesHierarchy;
-
   const staffIds = Array.from(supervisedMap.values());
-  const isSupervisor = staffIds.length > 1 || isDirector || isManager;
+  const isSupervisor = staffIds.length > 1 || (roleLevel !== undefined && roleLevel <= 2);
 
   return {
     isSystemAdmin: false,
     isSupervisor,
-    isDirector,
-    isManager,
-    isGlobalAccess,
+    isDirector: roleLevel === 1,
+    isManager: roleLevel === 2,
+    isGlobalAccess: false,
     staffIds,
     staffMember
   };
@@ -151,7 +129,7 @@ export async function getAccessibleLeadPoolFilter(callerId, companyId) {
   const baseFilter = { companyId: companyId || "default_company" };
   const hierarchy = await getSupervisedStaffIds(callerId);
 
-  if (hierarchy.isSystemAdmin || hierarchy.isGlobalAccess) {
+  if (hierarchy.isSystemAdmin) {
     return baseFilter;
   }
 

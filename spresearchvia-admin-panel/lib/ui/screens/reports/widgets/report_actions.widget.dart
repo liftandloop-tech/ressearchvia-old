@@ -17,14 +17,10 @@ class ReportActions extends StatelessWidget {
     final reportController = Get.find<ReportController>();
 
     final currentUser = Get.find<AuthController>().user.value;
-    final canUpdate = currentUser == null ||
-        currentUser.isAdmin ||
-        currentUser.isResearcher ||
-        currentUser.has('reports.update');
-    final canDelete = currentUser == null ||
-        currentUser.isAdmin ||
-        currentUser.isResearcher ||
-        currentUser.has('reports.delete');
+    final canUpdate = currentUser != null &&
+        (currentUser.isAdmin || currentUser.has('reports.update'));
+    final canDelete = currentUser != null &&
+        (currentUser.isAdmin || currentUser.has('reports.delete'));
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,

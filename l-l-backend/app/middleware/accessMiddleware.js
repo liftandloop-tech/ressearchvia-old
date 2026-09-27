@@ -15,10 +15,7 @@ import paymentIntentModel from "../models/paymentIntentModel.js";
 export const appAccess = async (req, res, next) => {
     try {
         const userType = (req.user?.userType || "").toLowerCase();
-        if (userType === 'admin' ||
-            userType === 'super_admin' ||
-            userType === 'researcher' ||
-            userType === 'director') {
+        if (userType === 'admin' || userType === 'super_admin') {
             return next();
         }
 
@@ -71,10 +68,7 @@ export const appAccess = async (req, res, next) => {
 export const registrationAccess = async (req, res, next) => {
     try {
         const userType = (req.user?.userType || "").toLowerCase();
-        if (userType === 'admin' ||
-            userType === 'super_admin' ||
-            userType === 'researcher' ||
-            userType === 'director') {
+        if (userType === 'admin' || userType === 'super_admin') {
             return next();
         }
 
@@ -139,10 +133,7 @@ export const registrationAccess = async (req, res, next) => {
 export const contentAccess = async (req, res, next) => {
     try {
         const userType = (req.user?.userType || "").toLowerCase();
-        if (userType === 'admin' ||
-            userType === 'super_admin' ||
-            userType === 'researcher' ||
-            userType === 'director') {
+        if (userType === 'admin' || userType === 'super_admin') {
             return next();
         }
 
@@ -197,10 +188,7 @@ export const contentAccess = async (req, res, next) => {
 export const adminOnly = async (req, res, next) => {
     try {
         const userType = (req.user?.userType || "").toLowerCase();
-        if (userType === 'admin' ||
-            userType === 'super_admin' ||
-            userType === 'researcher' ||
-            userType === 'director') {
+        if (userType === 'admin' || userType === 'super_admin') {
             return next();
         }
 
@@ -311,7 +299,7 @@ export const reportManagementAccess = async (req, res, next) => {
             return next();
         }
 
-        return res.status(403).json({ message: "Access Denied. Researchers, Directors, or Administrators only." });
+        return res.status(403).json({ message: "Access Denied. Staff or Administrator privileges required." });
     } catch (error) {
         console.error("Report Management Access Error:", error);
         return res.status(500).json({ message: "Internal Server Error" });
@@ -335,7 +323,7 @@ export const kycDownloadAccess = async (req, res, next) => {
             return next();
         }
 
-        return res.status(403).json({ message: "Administrator or Director access required for downloads." });
+        return res.status(403).json({ message: "Access Denied. Staff or Administrator privileges required." });
     } catch (error) {
         console.error("KYC Download Access Error:", error);
         return res.status(500).json({ message: "Internal Server Error" });

@@ -51,7 +51,7 @@ const leadController = {
             const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
             if (!isSuper && callerId) {
                 const hierarchy = await getSupervisedStaffIds(callerId);
-                if (!hierarchy.isSystemAdmin && !hierarchy.isGlobalAccess) {
+                if (!hierarchy.isSystemAdmin) {
                     const staffMember = hierarchy.staffMember;
                     if (staffMember && staffMember.roleId && staffMember.roleId.permissionGroups) {
                         const hasViewAll = staffMember.roleId.permissionGroups.some(g =>

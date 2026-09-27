@@ -26,7 +26,7 @@ export const salesRevenueService = {
 
     if (callerId) {
       const hierarchy = await getSupervisedStaffIds(callerId);
-      isSystemAdmin = hierarchy.isSystemAdmin || hierarchy.isGlobalAccess;
+      isSystemAdmin = hierarchy.isSystemAdmin;
       if (!isSystemAdmin) {
         targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
       }

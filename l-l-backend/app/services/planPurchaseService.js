@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import planPurchaseModel from "../models/planPurchaseModel.js";
 import userModel from "../models/userModel.js";
+import staffModel from "../models/staffModel.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import paymentModel from "../models/paymentModel.js";
@@ -1941,9 +1942,10 @@ const planPurchaseService = {
 
       // Filter out free trials from history by default, unless explicitly requested by Admin
       if (includeTrials === 'true') {
-        // Role check: Only admin, super_admin, or specific roles can view trials
-        const allowedRoles = ['admin', 'super_admin', 'Researcher', 'Director']; // Based on accessMiddleware
-        if (!user || (!allowedRoles.includes(user.userType) && !allowedRoles.includes(user.role))) {
+        const userType = (user?.userType || '').toLowerCase();
+        const isSystemAdmin = userType === 'admin' || userType === 'super_admin';
+        const isStaff = user?._id ? await staffModel.exists({ _id: user._id }) : false;
+        if (!isSystemAdmin && !isStaff) {
           return { status: 403, message: "Forbidden: Unauthorized access to trial data", data: {} };
         }
         // If authorized, we don't apply the NE filter, so trials ARE included
@@ -2351,9 +2353,27 @@ const planPurchaseService = {
     }
   },
 
-  recentPaymentList: async ({ body }) => {
+  recentPaymentList: async ({ body, user }) => {
     try {
-      const aggregationPipeline = [
+      const matchStage = {};
+      const callerId = user?._id || user?.userId;
+      if (callerId) {
+        const { getSupervisedStaffIds } = await import("../utils/staffHierarchy.js");
+        const staffAssignmentModel = (await import("../models/staffAssignmentModel.js")).default;
+        const hierarchy = await getSupervisedStaffIds(callerId);
+        if (!hierarchy.isSystemAdmin) {
+          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
+          const assignments = await staffAssignmentModel.find({ staffId: { $in: targetStaffIds } });
+          const assignedUserIds = assignments.map(a => a.userId);
+          matchStage.userId = { $in: assignedUserIds };
+        }
+      }
+
+      const aggregationPipeline = [];
+      if (Object.keys(matchStage).length > 0) {
+        aggregationPipeline.push({ $match: matchStage });
+      }
+      aggregationPipeline.push(
         {
           $lookup: {
             from: "users",
@@ -2383,8 +2403,7 @@ const planPurchaseService = {
         },
         { $sort: { createdAt: -1 } },
         { $limit: 5 }
-
-      ];
+      );
       const recentPaymentList = await planPurchaseModel.aggregate(aggregationPipeline);
       return {
         status: 200,

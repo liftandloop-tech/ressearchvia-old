@@ -11,17 +11,14 @@ class DashboardController extends GetxController {
       Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
   UserModel? get currentUser => _authController?.user.value;
   bool get isAdmin => currentUser?.isAdmin ?? false;
-  bool get isDirector => currentUser?.isDirector ?? false;
-  bool get isManager => currentUser?.isManager ?? false;
-  bool get isSupervisor => currentUser?.isSupervisor ?? false;
 
-  /// True if user manages a team (Admin, Director, Manager, or user with subordinates)
+  /// True if user manages a team (Admin, role level <= 2, staff management permissions, or user with subordinates)
   bool get hasTeamMembers {
-    if (isAdmin || isDirector || isManager) return true;
+    if (isAdmin) return true;
     final staffList = _dashboardManagementController.staffList;
     if (staffList.length > 1) return true;
-    final dept = (currentUser?.subscriptionPlan ?? '').toLowerCase();
-    if (dept.contains('director') || dept.contains('manager')) return true;
+    if (currentUser?.roleLevel != null && currentUser!.roleLevel! <= 2) return true;
+    if (currentUser?.has('staff.assign') == true || currentUser?.has('staff.manage') == true) return true;
     return false;
   }
 
@@ -88,8 +85,10 @@ class DashboardController extends GetxController {
         if (selectedManagerFilter.value != targetManager) {
           selectedManagerFilter.value = targetManager;
         }
-        final myDept = (currentUser?.subscriptionPlan ?? '').trim();
-        final targetDept = (myDept.isNotEmpty && myDept != 'N/A') ? myDept : 'Sales';
+        final myDept = (currentUser?.departmentName ?? '').trim();
+        final targetDept = (myDept.isNotEmpty && myDept != 'N/A')
+            ? myDept
+            : (departmentFilterItems.length > 1 ? departmentFilterItems[1] : 'All Departments');
         if (selectedDepartmentFilter.value != targetDept) {
           selectedDepartmentFilter.value = targetDept;
         }

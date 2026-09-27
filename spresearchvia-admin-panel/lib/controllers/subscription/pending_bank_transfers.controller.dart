@@ -76,9 +76,10 @@ class PendingBankTransfersController extends GetxController {
     return currentUser.value;
   }
 
-  bool get isDirector => effectiveUser?.isDirector ?? false;
-  bool get isAdmin => !isDirector && (effectiveUser?.isAdmin ?? true);
-  bool get canTakePaymentActions => isAdmin && !isDirector;
+  bool get isAdmin => effectiveUser?.isAdmin ?? false;
+  bool get canTakePaymentActions => (effectiveUser?.isAdmin ?? false) ||
+      (effectiveUser?.has('payments.approve') ?? false) ||
+      (effectiveUser?.has('payments.reject') ?? false);
 
   // Correction Engine Observables
   var segments = <Map<String, dynamic>>[].obs;

@@ -625,13 +625,6 @@ class StaffController extends GetxController {
       }
     }
 
-    // Assigned director validation for managers when directors are available
-    if (selectedDepartment.value.toLowerCase() == 'manager' && !isDirectorLoggedIn) {
-      if (assignedDirector.value == null && availableDirectors.isNotEmpty) {
-        // Optional warning or fallback, allow proceeding if admin prefers unassigned
-      }
-    }
-
     // Validate joining date if provided
     if (joiningDateController.text.trim().isNotEmpty) {
       final parsedDate = _validateJoiningDate(joiningDateController.text);
@@ -756,26 +749,17 @@ class StaffController extends GetxController {
         "walkInForm": buildWalkInFormModel().toJson(),
       };
 
-      final roleLower = selectedRole.value.toLowerCase().trim();
-      final deptLower = selectedDepartment.value.toLowerCase().trim();
-      final isManager = roleLower == 'manager' || deptLower == 'manager';
-      if (!isManager && mpinController.text.isNotEmpty) {
+      if (mpinController.text.isNotEmpty) {
         data["mpin"] = mpinController.text.trim();
       }
 
-      // Handle assigned director (Supervisor for all non-director staff roles)
-      final isDirector = roleLower == 'director' || deptLower == 'director';
-      if (!isDirector) {
-        if (isDirectorLoggedIn) {
-          data["assignedDirector"] = _authController.user.value!.id;
-          data["assignedDirectorName"] = _authController.user.value!.fullName;
-        } else if (assignedDirector.value != null) {
-          data["assignedDirector"] = assignedDirector.value!.id;
-          data["assignedDirectorName"] = assignedDirector.value!.name;
-        } else {
-          data["assignedDirector"] = null;
-          data["assignedDirectorName"] = null;
-        }
+      // Handle assigned supervisor / director
+      if (!_authController.user.value!.isAdmin) {
+        data["assignedDirector"] = _authController.user.value!.id;
+        data["assignedDirectorName"] = _authController.user.value!.fullName;
+      } else if (assignedDirector.value != null) {
+        data["assignedDirector"] = assignedDirector.value!.id;
+        data["assignedDirectorName"] = assignedDirector.value!.name;
       } else {
         data["assignedDirector"] = null;
         data["assignedDirectorName"] = null;
@@ -956,10 +940,6 @@ class StaffController extends GetxController {
     assignedDirector.value = null;
   }
 
-  bool get isDirectorLoggedIn {
-    if (!Get.isRegistered<AuthController>()) return false;
-    return _authController.user.value?.isDirector == true;
-  }
 
   bool get isAdminLoggedIn {
     if (!Get.isRegistered<AuthController>()) return false;
@@ -1064,12 +1044,7 @@ class StaffController extends GetxController {
           if (editingStaffId.value.isNotEmpty && s.id == editingStaffId.value) {
             return false;
           }
-          final dept = s.department.toLowerCase().trim();
-          final role = s.role.toLowerCase().trim();
-          return dept.contains('director') ||
-              role.contains('director') ||
-              dept.contains('admin') ||
-              role.contains('admin');
+          return s.status.toLowerCase() == 'active';
         })
         .toList();
     return directors;
@@ -1227,10 +1202,6 @@ class StaffController extends GetxController {
 
   // Available roles for staff assignment
   List<RoleModel> get availableRoles {
-    if (isDirectorLoggedIn) {
-      final managers = rolesList.where((r) => r.name.toLowerCase().contains('manager')).toList();
-      if (managers.isNotEmpty) return managers;
-    }
     return rolesList.toList();
   }
 
@@ -1258,9 +1229,6 @@ class StaffController extends GetxController {
 
   // Department dropdown options (legacy fallback, auto-assigned from role)
   List<String> get availableDepartments {
-    if (isDirectorLoggedIn) {
-      return ['Manager'];
-    }
     if (departmentsList.isNotEmpty) {
       return departmentsList.map((d) => d.name).toList();
     }

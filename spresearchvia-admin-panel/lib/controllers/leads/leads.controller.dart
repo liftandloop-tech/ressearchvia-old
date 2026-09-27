@@ -128,27 +128,22 @@ class LeadsController extends GetxController {
         final auth = Get.find<AuthController>();
         final currentUser = auth.user.value;
         if (currentUser != null && !currentUser.isAdmin) {
-          if (currentUser.isDirector || currentUser.isManager || list.length > 1) {
+          if (list.isNotEmpty) {
             staffList.assignAll(list);
             return;
           }
-          final myStaff = list
-              .where((s) => s.id == currentUser.id || s.name == currentUser.fullName)
-              .toList();
-          staffList.assignAll(myStaff.isNotEmpty
-              ? myStaff
-              : [
-                  StaffModel(
-                    id: currentUser.id,
-                    staffId: currentUser.userId ?? currentUser.id,
-                    name: currentUser.fullName,
-                    email: currentUser.email,
-                    mobile: currentUser.mobile,
-                    role: currentUser.subscriptionPlan,
-                    status: 'Active',
-                    department: currentUser.subscriptionPlan,
-                  ),
-                ]);
+          staffList.assignAll([
+            StaffModel(
+              id: currentUser.id,
+              staffId: currentUser.userId ?? currentUser.id,
+              name: currentUser.fullName,
+              email: currentUser.email,
+              mobile: currentUser.mobile,
+              role: currentUser.roleName,
+              status: 'Active',
+              department: currentUser.departmentName,
+            ),
+          ]);
           return;
         }
       }

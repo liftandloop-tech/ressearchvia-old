@@ -21,10 +21,13 @@ class ContactInfo extends StatelessWidget {
       final email = userDetails.email;
       final isEditing = controller.isEditingContact.value;
 
+      final canEdit = (Get.find<AuthController>().user.value?.isAdmin ?? false) ||
+          (Get.find<AuthController>().user.value?.has('users.update') ?? false);
+
       return InfoSection(
         title: 'Contact Information',
         icon: Icons.phone,
-        headerAction: Get.find<AuthController>().user.value?.isDirector == true
+        headerAction: !canEdit
             ? null
             : isEditing
             ? Row(

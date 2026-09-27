@@ -1614,7 +1614,7 @@ const userService = {
       let assignedUserIds = null;
       if (currentUserId) {
         const hierarchy = await getSupervisedStaffIds(currentUserId);
-        if (!hierarchy.isSystemAdmin && !hierarchy.isGlobalAccess) {
+        if (!hierarchy.isSystemAdmin) {
           const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];
           const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
           assignedUserIds = assignments.map(a => a.userId);
@@ -2305,9 +2305,26 @@ const userService = {
       return { status: 400, message: error.message, data: {} };
     }
   },
-  userDetails: async ({ params }) => {
+  userDetails: async ({ params, user: caller }) => {
     try {
       let { id } = params;
+
+      // Access Scoping: Non-admin staff can only view details for their assigned users
+      const callerId = caller?._id || caller?.userId;
+      if (callerId && callerId.toString() !== id.toString()) {
+        const hierarchy = await getSupervisedStaffIds(callerId);
+        if (!hierarchy.isSystemAdmin) {
+          const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
+          const isAssigned = await staffAssigmentModel.exists({
+            userId: id,
+            staffId: { $in: targetStaffIds }
+          });
+          if (!isAssigned) {
+            return { status: 403, message: "Access Denied. You can only view assigned users.", data: {} };
+          }
+        }
+      }
+
       const user = await userModel.findOne({ _id: id });
       if (!user) {
         return { status: 200, message: "User details not found", data: {} };
@@ -2408,7 +2425,7 @@ const userService = {
 
       if (currentUserId) {
         const hierarchy = await getSupervisedStaffIds(currentUserId);
-        isSystemAdmin = hierarchy.isSystemAdmin || hierarchy.isGlobalAccess;
+        isSystemAdmin = hierarchy.isSystemAdmin;
 
         if (!isSystemAdmin) {
           targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];

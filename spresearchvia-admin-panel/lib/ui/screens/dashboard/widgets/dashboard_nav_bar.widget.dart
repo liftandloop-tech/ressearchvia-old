@@ -90,7 +90,6 @@ class DashboardNavBar extends StatelessWidget {
                 return (user?.has('notifications.view') ?? user?.hasPermission('Notifications', 'read') ?? false) ? item : null;
               }
               if (title == 'Settings') {
-                if (user?.isDirector ?? false) return null;
                 if (user?.canAccessDepartmentPage('Settings') != true) return null;
                 return (user?.has('settings.view') ?? user?.hasPermission('Settings', 'read') ?? false) ? item : null;
               }

@@ -343,18 +343,15 @@ class AddStaffScreen extends StatelessWidget {
                   required: true,
                 ),
                 right: Obx(() {
-                  final roleLower = controller.selectedRole.value.toLowerCase().trim();
-                  final deptLower = controller.selectedDepartment.value.toLowerCase().trim();
-                  final isManager = roleLower == 'manager' || deptLower == 'manager';
                   return _buildInputField(
-                    label: isManager ? '4-Digit MPIN (Optional for Manager)' : '4-Digit Login MPIN',
+                    label: '4-Digit Login MPIN (Optional)',
                     controller: controller.mpinController,
                     hint: 'e.g. 1234',
                     prefixIcon: Icons.lock_outline,
                     keyboardType: TextInputType.number,
                     maxLength: 4,
                     obscureText: true,
-                    required: !isManager,
+                    required: false,
                   );
                 }),
               ),
@@ -416,11 +413,9 @@ class AddStaffScreen extends StatelessWidget {
                                 ),
                               );
                             }).toList(),
-                            onChanged: controller.isDirectorLoggedIn
-                                ? null
-                                : (v) {
-                                    if (v != null) controller.updateRole(v);
-                                  },
+                            onChanged: (v) {
+                              if (v != null) controller.updateRole(v);
+                            },
                           );
                         }),
                       ),
@@ -475,7 +470,7 @@ class AddStaffScreen extends StatelessWidget {
                     );
                   }
 
-                  if (controller.isDirectorLoggedIn) {
+                  if (!controller.isAdminLoggedIn) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

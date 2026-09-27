@@ -20,7 +20,7 @@ const purchasePlanRoutes = () => {
 
   Router.get("/user-subscription-history/:id", auth.tokenVerified, planPurchaseController.subcriptionHistory);
   Router.get("/billing-history/:id", auth.tokenVerified, planPurchaseController.billingHistory);
-  Router.get("/recent-plan-payment-list", planPurchaseController.recentPaymentList)
+  Router.get("/recent-plan-payment-list", auth.tokenVerified, planPurchaseController.recentPaymentList)
 
   Router.put("/extend-subscription", auth.tokenVerified, planPurchaseController.extendSubscription);
   // Router.put("/revoke-subscription", auth.tokenVerified, planPurchaseController.revokeSubscription); // Removed as per request

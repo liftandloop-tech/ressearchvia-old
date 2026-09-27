@@ -142,9 +142,7 @@ class AddStaffDialog extends StatelessWidget {
                     height: 40,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
-                      color: controller.isDirectorLoggedIn
-                          ? Colors.grey[200]
-                          : Colors.white,
+                      color: Colors.white,
                       border: Border.all(color: const Color(0xFFDEE2E6)),
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -168,18 +166,14 @@ class AddStaffDialog extends StatelessWidget {
                               color: Color(0xFFADB5BD),
                             ),
                           ),
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.keyboard_arrow_down,
                             size: 18,
-                            color: controller.isDirectorLoggedIn
-                                ? Colors.transparent
-                                : const Color(0xFF6C757D),
+                            color: Color(0xFF6C757D),
                           ),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: controller.isDirectorLoggedIn
-                                ? const Color(0xFF6C757D)
-                                : const Color(0xFF212529),
+                            color: Color(0xFF212529),
                           ),
                           items: roles
                               .map(
@@ -191,11 +185,9 @@ class AddStaffDialog extends StatelessWidget {
                                       children: [
                                         Text(
                                           r.name,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontSize: 13,
-                                            color: controller.isDirectorLoggedIn
-                                                ? const Color(0xFF6C757D)
-                                                : const Color(0xFF212529),
+                                            color: Color(0xFF212529),
                                           ),
                                         ),
                                         if (deptName != null && deptName.isNotEmpty) ...[
@@ -214,13 +206,11 @@ class AddStaffDialog extends StatelessWidget {
                                 },
                               )
                               .toList(),
-                          onChanged: controller.isDirectorLoggedIn
-                              ? null
-                              : (v) {
-                                  if (v != null) {
-                                    controller.updateRole(v);
-                                  }
-                                },
+                          onChanged: (v) {
+                            if (v != null) {
+                              controller.updateRole(v);
+                            }
+                          },
                         );
                       }),
                     ),
@@ -288,7 +278,7 @@ class AddStaffDialog extends StatelessWidget {
                       return const SizedBox.shrink();
                     }
 
-                    if (controller.isDirectorLoggedIn) {
+                    if (!controller.isAdminLoggedIn) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

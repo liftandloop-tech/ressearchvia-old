@@ -222,7 +222,7 @@ class UserModel {
       if (dept['isGlobal'] == true) return true;
 
       final dynamic rawPages = dept['assignedPages'];
-      if (rawPages is List) {
+      if (rawPages is List && rawPages.isNotEmpty) {
         final Set<String> assigned = rawPages
             .map((p) => p.toString().toLowerCase().trim())
             .toSet();
@@ -269,8 +269,8 @@ class UserModel {
       }
     }
 
-    // If department object is unconfigured or page not assigned, deny access
-    return false;
+    // If department has not explicitly restricted pages via assignedPages, allow access subject to role permissions
+    return true;
   }
 
   String? _getDepartmentPageForFeature(String feature) {

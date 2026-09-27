@@ -102,10 +102,8 @@ class ReportDetailsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if (Get.find<AuthController>().user.value?.isDirector !=
-                              true &&
-                          Get.find<AuthController>().user.value?.isViewOnly !=
-                              true)
+                      if ((Get.find<AuthController>().user.value?.isAdmin ?? false) ||
+                          (Get.find<AuthController>().user.value?.has('reports.update') ?? false))
                         ElevatedButton(
                           onPressed: () => navController.showUploadReport(
                             reportToEdit: report,
@@ -553,10 +551,8 @@ class ReportDetailsScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      if (Get.find<AuthController>().user.value?.isDirector !=
-                              true &&
-                          Get.find<AuthController>().user.value?.isViewOnly !=
-                              true)
+                      if ((Get.find<AuthController>().user.value?.isAdmin ?? false) ||
+                          (Get.find<AuthController>().user.value?.has('reports.update') ?? false))
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(

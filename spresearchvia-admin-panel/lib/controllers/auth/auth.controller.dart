@@ -83,11 +83,7 @@ class AuthController extends GetxController {
         isAuthenticated.value = true;
         isImpersonating.value = false;
 
-        if (result.user?.isResearcher == true) {
-          Get.offAllNamed(AppRoutes.reports);
-        } else {
-          Get.offAllNamed(AppRoutes.dashboard);
-        }
+        _navigateToInitialRoute(result.user!);
 
         return (success: true, error: null);
       } else {
@@ -160,11 +156,7 @@ class AuthController extends GetxController {
           umc.fetchManagers();
         }
 
-        if (staffUser.isResearcher) {
-          Get.offAllNamed(AppRoutes.reports);
-        } else {
-          Get.offAllNamed(AppRoutes.dashboard);
-        }
+        _navigateToInitialRoute(staffUser);
       } else {
         Get.snackbar(
           'Login As Failed',
@@ -288,12 +280,38 @@ class AuthController extends GetxController {
     authToken.value = token;
     isAuthenticated.value = true;
 
-    if (staffUser.isResearcher) {
-      print('Redirecting Researcher to Reports...');
-      Get.offAllNamed(AppRoutes.reports);
-    } else {
-      print('Redirecting Staff to Dashboard...');
+    _navigateToInitialRoute(staffUser);
+  }
+
+  void _navigateToInitialRoute(UserModel user) {
+    if (user.isAdmin || user.canAccessDepartmentPage('Dashboard')) {
       Get.offAllNamed(AppRoutes.dashboard);
+      return;
     }
+    if (user.canAccessDepartmentPage('Reports')) {
+      Get.offAllNamed(AppRoutes.reports);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Users')) {
+      Get.offAllNamed(AppRoutes.users);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Leads')) {
+      Get.offAllNamed(AppRoutes.leads);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Staff')) {
+      Get.offAllNamed(AppRoutes.staff);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Subscriptions')) {
+      Get.offAllNamed(AppRoutes.subscriptions);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Settings')) {
+      Get.offAllNamed(AppRoutes.settings);
+      return;
+    }
+    Get.offAllNamed(AppRoutes.dashboard);
   }
 }

@@ -9,6 +9,7 @@ import Entitlement from "../models/entitlementModel.js" // Chunk 9
 import userActiveSegmentModel from "../models/userActiveSegmentsModel.js"
 import users from "../models/userModel.js"
 import userKycModel from "../models/userKycModel.js"
+import staffModel from "../models/staffModel.js";
 import notificationService from "./notificationService.js"
 import devices from "../models/deviceModel.js";
 import PaymentIntent from "../models/paymentIntentModel.js";
@@ -246,11 +247,11 @@ const reportService = {
                 resourceId: { $in: report.planArray }
             });
 
-            // Admin Override (Chunk 9.5) - Case-insensitive check
             const userType = (req.user?.userType || '').toLowerCase();
-            const isAdmin = ['admin', 'super_admin', 'researcher', 'director'].includes(userType);
+            const isSystemAdmin = userType === 'admin' || userType === 'super_admin';
+            const isStaff = await staffModel.exists({ _id: userId });
 
-            if (!hasLifetimeOrActive && !isAdmin) {
+            if (!hasLifetimeOrActive && !isSystemAdmin && !isStaff) {
                 console.log(`[Security] Blocked download for User ${userId} on Report ${id}`);
                 return res.status(403).json({ status: 403, message: "Access Denied. No active subscription for this report.", data: {} });
             }

@@ -1,13 +1,19 @@
 import userModel from "../models/userModel.js";
+import staffModel from "../models/staffModel.js";
 
 export const disclaimerCheck = async (req, res, next) => {
     try {
         const userType = (req.user?.userType || "").toLowerCase();
-        if (userType === 'admin' ||
-            userType === 'super_admin' ||
-            userType === 'researcher' ||
-            userType === 'director') {
+        if (userType === 'admin' || userType === 'super_admin') {
             return next();
+        }
+
+        const callerId = req.user?._id || req.user?.userId;
+        if (callerId) {
+            const isStaff = await staffModel.exists({ _id: callerId });
+            if (isStaff) {
+                return next();
+            }
         }
 
         // req.user is populated by auth.tokenVerified

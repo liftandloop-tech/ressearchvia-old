@@ -23,11 +23,10 @@ class UsersTable extends StatelessWidget {
 
     return Obx(() {
       final authController = Get.find<AuthController>();
-      final isDirector = authController.user.value?.isDirector ?? false;
       final canManageSubscription = (authController.user.value?.isAdmin == true) ||
           (authController.user.value?.has('subscriptions.activate') ?? false) ||
           (authController.user.value?.has('subscriptions.revoke') ?? false) ||
-          (authController.user.value?.has('subscriptions.view') ?? false);
+          (authController.user.value?.has('subscriptions.manage') ?? false);
       final users = controller.filteredUsers;
       final totalCount = userManagementController.totalCount.value;
       final pageSize = userManagementController.pageSize.value;
@@ -142,7 +141,7 @@ class UsersTable extends StatelessWidget {
                         isCenter: true,
                       ),
                     ),
-                    if (!isDirector && canManageSubscription)
+                    if (canManageSubscription)
                       DataColumn2(
                         fixedWidth: 125,
                         label: const UserTableHeaderCell(
@@ -175,7 +174,6 @@ class UsersTable extends StatelessWidget {
                         (user) => UserDataRow(
                           user: user,
                           controller: controller,
-                          isDirector: isDirector,
                           canManageSubscription: canManageSubscription,
                         ),
                       )

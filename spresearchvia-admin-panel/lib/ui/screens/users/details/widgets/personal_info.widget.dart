@@ -25,10 +25,13 @@ class PersonalInfo extends StatelessWidget {
       final dob = userDetails.userObject?.appDobDt ?? 'Not Found';
       final isEditing = controller.isEditingPersonal.value;
 
+      final canEdit = (Get.find<AuthController>().user.value?.isAdmin ?? false) ||
+          (Get.find<AuthController>().user.value?.has('users.update') ?? false);
+
       return InfoSection(
         title: 'Personal Information',
         icon: Icons.person,
-        headerAction: Get.find<AuthController>().user.value?.isDirector == true
+        headerAction: !canEdit
             ? null
             : isEditing
             ? Row(

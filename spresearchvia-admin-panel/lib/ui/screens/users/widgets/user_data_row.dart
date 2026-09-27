@@ -13,7 +13,6 @@ class UserDataRow extends DataRow2 {
   UserDataRow({
     required UserModel user,
     UserController? controller,
-    required bool isDirector,
     required bool canManageSubscription,
   }) : super(
          cells: [
@@ -32,7 +31,7 @@ class UserDataRow extends DataRow2 {
 
            DataCell(Text(user.mobile, style: _cellStyle)),
            DataCell(Center(child: TableStatusBadge(status: user.kycStatus))),
-           if (!isDirector && canManageSubscription)
+           if (canManageSubscription)
              DataCell(
                Center(
                  child: Button(

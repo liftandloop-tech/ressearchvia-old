@@ -163,8 +163,7 @@ class LeadManagementScreen extends StatelessWidget {
             Builder(
               builder: (context) {
                 final currentUser = Get.find<AuthController>().user.value;
-                final isStaffRM = (currentUser?.isAdmin ?? false) == false && (currentUser?.isDirector ?? false) == false;
-                final canPull = (currentUser?.isAdmin ?? false) || (currentUser?.isDirector ?? false) || isStaffRM || (currentUser?.has('leads.pull') ?? false);
+                final canPull = (currentUser?.isAdmin ?? false) || (currentUser?.has('leads.pull') ?? false);
                 if (!canPull) return const SizedBox();
                 return Column(
                   children: [
@@ -503,7 +502,8 @@ class LeadManagementScreen extends StatelessWidget {
                                   ),
                                   DataCell(
                                     Get.find<AuthController>().user.value?.isAdmin == true ||
-                                            Get.find<AuthController>().user.value?.isDirector == true
+                                            (Get.find<AuthController>().user.value?.has('leads.bulk_assign') ?? false) ||
+                                            (Get.find<AuthController>().user.value?.has('leads.update') ?? false)
                                         ? InkWell(
                                             onTap: () {
                                               _showSearchableRMDialog(context, controller, onSelected: (rmId) {

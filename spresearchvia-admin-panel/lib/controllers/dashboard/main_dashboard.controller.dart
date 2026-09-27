@@ -47,55 +47,41 @@ class MainDashboardController extends GetxController {
         currentRoute == AppRoutes.profile ||
         currentRoute.startsWith('/profile')) return;
 
-    if (user.isDirector) {
-      if (currentRoute.startsWith('/automated-trading') ||
-          currentRoute.startsWith('/subscriptions/plans/create') ||
-          currentRoute.startsWith('/settings')) {
-        print('Access restricted for $currentRoute. Redirecting to dashboard...');
-        Future.microtask(() => Get.offNamed(AppRoutes.dashboard));
-        return;
-      }
-      return;
-    }
-
     bool isAllowed = true;
     if (currentRoute.startsWith('/manage-user')) {
-      isAllowed = (user.hasPermission('Subscriptions', 'view')) ||
+      isAllowed = user.canAccessDepartmentPage('Users') &&
+          ((user.hasPermission('Subscriptions', 'view')) ||
           (user.hasPermission('Subscriptions', 'activate')) ||
-          (user.hasPermission('Users', 'update'));
+          (user.hasPermission('Users', 'update')));
     } else if (currentRoute.startsWith('/users') ||
         currentRoute.startsWith('/edit-user')) {
-      isAllowed = user.hasPermission('Users', 'read');
+      isAllowed = user.canAccessDepartmentPage('Users') && user.hasPermission('Users', 'read');
     } else if (currentRoute.startsWith('/registered-clients') ||
         currentRoute.startsWith('/approvals/kyc') ||
         currentRoute.startsWith('/kyc')) {
-      isAllowed = user.hasPermission('KYC', 'read');
+      isAllowed = user.canAccessDepartmentPage('KYC') && user.hasPermission('KYC', 'read');
     } else if (currentRoute.startsWith('/approvals/payments')) {
-      isAllowed = user.hasPermission('Payments', 'read');
+      isAllowed = user.canAccessDepartmentPage('Payments') && user.hasPermission('Payments', 'read');
     } else if (currentRoute.startsWith('/staff') ||
         currentRoute.startsWith('/applicants') ||
         currentRoute.startsWith('/applicant/')) {
-      isAllowed = user.hasPermission('Staff', 'read');
+      isAllowed = user.canAccessDepartmentPage('Staff') && user.hasPermission('Staff', 'read');
     } else if (currentRoute.startsWith('/reports') ||
         currentRoute.startsWith('/upload-report')) {
-      isAllowed = user.hasPermission('Reports', 'read');
+      isAllowed = user.canAccessDepartmentPage('Reports') && user.hasPermission('Reports', 'read');
     } else if (currentRoute.startsWith('/notifications')) {
-      isAllowed = user.hasPermission('Notifications', 'read');
+      isAllowed = user.canAccessDepartmentPage('Notifications') && user.hasPermission('Notifications', 'read');
     } else if (currentRoute.startsWith('/settings')) {
-      if (user.isDirector) {
-        isAllowed = false;
-      } else {
-        isAllowed = user.hasPermission('Settings', 'read');
-      }
+      isAllowed = user.canAccessDepartmentPage('Settings') && user.hasPermission('Settings', 'read');
     } else if (currentRoute.startsWith('/leads')) {
-      isAllowed = user.hasPermission('Leads', 'read');
+      isAllowed = user.canAccessDepartmentPage('Leads') && user.hasPermission('Leads', 'read');
     } else if (currentRoute.startsWith('/automated-trading')) {
       isAllowed = false;
     } else if (currentRoute.startsWith('/subscriptions')) {
       if (currentRoute.startsWith('/subscriptions/plans/create')) {
         isAllowed = user.isAdmin;
       } else {
-        isAllowed = user.hasPermission('Subscriptions', 'read');
+        isAllowed = user.canAccessDepartmentPage('Subscriptions') && user.hasPermission('Subscriptions', 'read');
       }
     }
 
@@ -163,10 +149,10 @@ class MainDashboardController extends GetxController {
         Get.offNamed('/notifications');
         break;
       case 6:
-        if (currentUser?.isDirector ?? false) {
-          Get.offNamed('/dashboard');
-        } else {
+        if (currentUser?.canAccessDepartmentPage('Settings') ?? false) {
           Get.offNamed('/settings');
+        } else {
+          Get.offNamed('/dashboard');
         }
         break;
       case 7:

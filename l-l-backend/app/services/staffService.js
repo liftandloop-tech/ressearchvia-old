@@ -122,9 +122,12 @@ const staffService = {
   staffCreate: async ({ body, user }) => {
     try {
       console.log('staffCreate body:', body);
-      if (user && (user.userType === 'Director' || user.deparment === 'Director')) {
-        body.assignedDirector = user._id;
-        body.assignedDirectorName = user.fullName;
+      if (user) {
+        const hierarchy = await getSupervisedStaffIds(user._id);
+        if (!hierarchy.isSystemAdmin) {
+          body.assignedDirector = user._id;
+          body.assignedDirectorName = user.fullName;
+        }
       }
 
       if (!body.staffId) {
@@ -208,17 +211,8 @@ const staffService = {
         return { status: 200, message: "staff not found", data: {} }
       }
 
-      // Check for allowed staff roles
-      const allowedRoles = [
-        'director', 'researcher', 'research analyst', 'executive', 'manager', 
-        'advisory', 'compliance', 'sales', 'support', 'admin', 'quality & development', 
-        'quality', 'hr', 'human resources', 'back office', 'management', 'administration'
-      ];
-      const deptLower = (staff.deparment || '').toLowerCase();
-      const roleLower = (staff.role || '').toLowerCase();
-      const isAllowed = Boolean(staff.roleId) || allowedRoles.some(r => deptLower.includes(r) || roleLower.includes(r));
-      if (!isAllowed) {
-        return { status: 200, message: "Access denied. Role not permitted to log in.", data: {} }
+      if (staff.status && staff.status.toLowerCase() === 'inactive') {
+        return { status: 200, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
       const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
       const messageText = defaultTemplate.replaceAll('{OTP}', otp);
@@ -247,17 +241,8 @@ const staffService = {
         return { status: 200, message: "OTP Invalid", data: {} }
       }
 
-      // Check for allowed staff roles
-      const allowedRoles = [
-        'director', 'researcher', 'research analyst', 'executive', 'manager', 
-        'advisory', 'compliance', 'sales', 'support', 'admin', 'quality & development', 
-        'quality', 'hr', 'human resources', 'back office', 'management', 'administration'
-      ];
-      const deptLower = (staff.deparment || '').toLowerCase();
-      const roleLower = (staff.role || '').toLowerCase();
-      const isAllowed = Boolean(staff.roleId) || allowedRoles.some(r => deptLower.includes(r) || roleLower.includes(r));
-      if (!isAllowed) {
-        return { status: 200, message: "Access denied. Role not permitted to log in.", data: {} }
+      if (staff.status && staff.status.toLowerCase() === 'inactive') {
+        return { status: 200, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
       staff.otp = null;
       staff.otpExpires = null;
@@ -322,17 +307,8 @@ const staffService = {
         return { status: 200, message: "Staff not found", data: {} }
       }
 
-      // Check for allowed staff roles
-      const allowedRoles = [
-        'director', 'researcher', 'research analyst', 'executive', 'manager', 
-        'advisory', 'compliance', 'sales', 'support', 'admin', 'quality & development', 
-        'quality', 'hr', 'human resources', 'back office', 'management', 'administration'
-      ];
-      const deptLower = (staff.deparment || '').toLowerCase();
-      const roleLower = (staff.role || '').toLowerCase();
-      const isAllowed = Boolean(staff.roleId) || allowedRoles.some(r => deptLower.includes(r) || roleLower.includes(r));
-      if (!isAllowed) {
-        return { status: 200, message: "Access denied. Role not permitted to log in.", data: {} }
+      if (staff.status && staff.status.toLowerCase() === 'inactive') {
+        return { status: 200, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
 
       if (!staff.mpin) {
@@ -454,11 +430,14 @@ const staffService = {
       // Ensure stage is set to 'Employee' for active staff updates (prevents schema default demoting them to Applicant)
       staff.stage = 'Employee';
 
-      // Director Check: Only allow editing managers from their own team
-      if (user && (user.userType === 'Director' || user.deparment === 'Director')) {
-        const isOwnManager = staff.assignedDirector && staff.assignedDirector.toString() === user._id.toString();
-        if (!isOwnManager) {
-          return { status: 403, message: "Access Denied. You can only manage staff from your own team.", data: {} };
+      // Hierarchy Check: Non-admins can only manage staff from their own team/hierarchy
+      if (user) {
+        const hierarchy = await getSupervisedStaffIds(user._id);
+        if (!hierarchy.isSystemAdmin) {
+          const isSupervised = hierarchy.staffIds?.some(id => id.toString() === staff._id.toString());
+          if (!isSupervised) {
+            return { status: 403, message: "Access Denied. You can only manage staff from your own team.", data: {} };
+          }
         }
       }
       if (fullName) staff.fullName = fullName;
@@ -554,11 +533,14 @@ const staffService = {
       const staff = await staffModel.findOne({ _id: id })
       if (!staff) return { status: 200, message: "staff not exist", data: {} }
 
-      // Director Check: Only allow deleting managers from their own team
-      if (user && (user.userType === 'Director' || user.deparment === 'Director')) {
-        const isOwnManager = staff.assignedDirector && staff.assignedDirector.toString() === user._id.toString();
-        if (!isOwnManager) {
-          return { status: 403, message: "Access Denied. You can only remove staff from your own team.", data: {} };
+      // Hierarchy Check: Non-admins can only remove staff from their own team/hierarchy
+      if (user) {
+        const hierarchy = await getSupervisedStaffIds(user._id);
+        if (!hierarchy.isSystemAdmin) {
+          const isSupervised = hierarchy.staffIds?.some(id => id.toString() === staff._id.toString());
+          if (!isSupervised) {
+            return { status: 403, message: "Access Denied. You can only remove staff from your own team.", data: {} };
+          }
         }
       }
 
@@ -637,11 +619,14 @@ const staffService = {
           return { status: 200, message: "staff not exist", data: {} }
         }
 
-        // Director Check: Only allow assigning managers from their own team
-        if (requestingUser && (requestingUser.userType === 'Director' || requestingUser.deparment === 'Director')) {
-          const isOwnManager = assignmentData.assignedDirector && assignmentData.assignedDirector.toString() === requestingUser._id.toString();
-          if (!isOwnManager) {
-            return { status: 403, message: "Access Denied. You can only assign managers from your own team.", data: {} };
+        // Hierarchy Check: Non-admins can only assign staff from their own team/hierarchy
+        if (requestingUser) {
+          const hierarchy = await getSupervisedStaffIds(requestingUser._id);
+          if (!hierarchy.isSystemAdmin) {
+            const isSupervised = hierarchy.staffIds?.some(id => id.toString() === assignmentData._id.toString());
+            if (!isSupervised) {
+              return { status: 403, message: "Access Denied. You can only assign staff from your own team.", data: {} };
+            }
           }
         }
 
