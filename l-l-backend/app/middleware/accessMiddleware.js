@@ -1,6 +1,7 @@
 import users from "../models/userModel.js";
 import staff from "../models/staffModel.js";
 import departmentModel from "../models/departmentModel.js";
+import roleModel from "../models/roleModel.js";
 
 import { hasActiveRegistration, hasAnyActivePlan } from "../services/entitlementService.js";
 import paymentIntentModel from "../models/paymentIntentModel.js";
@@ -408,18 +409,47 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 .populate('departmentId')
                 .populate({
                     path: 'roleId',
-                    populate: {
-                        path: 'permissionGroups'
-                    }
+                    populate: [
+                        { path: 'permissionGroups' },
+                        { path: 'departmentId' }
+                    ]
                 });
 
             if (!staffMember) {
                 return res.status(403).json({ message: "Access Denied. Staff record not found." });
             }
 
+            // Fallback departmentId from roleId if staffMember.departmentId is null
+            if (!staffMember.departmentId && staffMember.roleId?.departmentId) {
+                staffMember.departmentId = staffMember.roleId.departmentId;
+            }
+
+            // Hierarchy Inheritance:
+            // If staff has a role with level > 1 and belongs to a department,
+            // inherit permission groups from all lower-level roles in the same department
+            if (staffMember.roleId && staffMember.roleId.level > 1 && staffMember.roleId.departmentId) {
+                const deptId = staffMember.roleId.departmentId._id || staffMember.roleId.departmentId;
+                const lowerRoles = await roleModel.find({
+                    departmentId: deptId,
+                    level: { $lt: staffMember.roleId.level },
+                    isActive: true
+                }).populate('permissionGroups');
+
+                const existingPgIds = new Set((staffMember.roleId.permissionGroups || []).map(g => (g._id || g).toString()));
+                for (const lr of lowerRoles) {
+                    for (const pg of (lr.permissionGroups || [])) {
+                        const pgIdStr = (pg._id || pg).toString();
+                        if (!existingPgIds.has(pgIdStr)) {
+                            existingPgIds.add(pgIdStr);
+                            staffMember.roleId.permissionGroups.push(pg);
+                        }
+                    }
+                }
+            }
+
             // If user's department, role, or userType is Admin or Super Admin, bypass
-            const dept = (staffMember.department || staffMember.deparment || "").toLowerCase();
-            const roleName = (staffMember.role || "").toLowerCase();
+            const dept = (staffMember.departmentId?.name || staffMember.department || staffMember.deparment || "").toLowerCase();
+            const roleName = (staffMember.roleId?.name || staffMember.role || "").toLowerCase();
             const userType = (req.user?.userType || staffMember.userType || "").toLowerCase();
             const isRoleAdmin = staffMember.roleId && (
                 staffMember.roleId.name.toLowerCase() === 'admin' ||
@@ -427,7 +457,7 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 staffMember.roleId.name.toLowerCase() === 'super admin'
             );
 
-            const isDirector = dept.includes('director') || roleName.includes('director') || userType.includes('director');
+            const isDirector = dept.includes('director') || roleName.includes('director') || userType.includes('director') || dept.includes('management');
 
             // Director is strictly barred from Settings operations
             if (isDirector && (requiredKey.toLowerCase().startsWith('settings') || (feature && feature.toLowerCase() === 'settings'))) {
@@ -444,8 +474,9 @@ export const checkPermission = (targetPermission, actionParam = null) => {
             }
 
             // Department page gating: If department specifies assignedPages, ensure requested module is allowed
-            if (staffMember.departmentId && !staffMember.departmentId.isGlobal && Array.isArray(staffMember.departmentId.assignedPages) && staffMember.departmentId.assignedPages.length > 0) {
-                const assigned = new Set(staffMember.departmentId.assignedPages.map(p => p.toLowerCase()));
+            const effectiveDept = staffMember.departmentId || staffMember.roleId?.departmentId;
+            if (effectiveDept && !effectiveDept.isGlobal && Array.isArray(effectiveDept.assignedPages) && effectiveDept.assignedPages.length > 0) {
+                const assigned = new Set(effectiveDept.assignedPages.map(p => p.toLowerCase()));
                 const targetMod = (feature || targetPermission.split('.')[0] || '').toLowerCase();
                 const modPageMap = {
                     'leads': 'leads',
@@ -468,15 +499,15 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                                         (expectedPage === 'payments' && (assigned.has('subscriptions') || assigned.has('users')));
                     if (!hasFallback) {
                         return res.status(403).json({
-                            message: `Access Denied. Department "${staffMember.departmentId.name}" does not have access to the ${expectedPage} module.`
+                            message: `Access Denied. Department "${effectiveDept.name}" does not have access to the ${expectedPage} module.`
                         });
                     }
                 }
             }
 
             // If staff has no role assigned, deny access
-            if (!staffMember.roleId || !staffMember.roleId.permissionGroups) {
-                return res.status(403).json({ message: `Access Denied. No role assigned. Required permission: ${requiredKey}` });
+            if (!staffMember.roleId || !staffMember.roleId.permissionGroups || staffMember.roleId.permissionGroups.length === 0) {
+                return res.status(403).json({ message: `Access Denied. No active role permissions assigned. Required permission: ${requiredKey}` });
             }
 
             // Check if staff has the exact canonical key, alias key, or legacy feature/action match

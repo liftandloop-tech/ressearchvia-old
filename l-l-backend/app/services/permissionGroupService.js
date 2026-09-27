@@ -1,4 +1,5 @@
 import permissionGroupModel from "../models/permissionGroupModel.js";
+import roleModel from "../models/roleModel.js";
 import { PERMISSION_REGISTRY } from "../config/permissionRegistry.js";
 import departmentService from "./departmentService.js";
 import departmentModel from "../models/departmentModel.js";
@@ -150,6 +151,13 @@ const permissionGroupService = {
                 return { status: 400, message: "Cannot delete the default admin group", data: {} };
             }
             await permissionGroupModel.findByIdAndDelete(id);
+
+            // Automatically remove deleted permission group from all roles
+            await roleModel.updateMany(
+                { permissionGroups: id },
+                { $pull: { permissionGroups: id } }
+            );
+
             return { status: 200, message: "Permission group deleted successfully", data: {} };
         } catch (error) {
             return { status: 400, message: error.message, data: {} };

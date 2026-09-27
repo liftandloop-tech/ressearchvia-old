@@ -423,12 +423,15 @@ class RolePermissionController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
-      final data = {
+      final data = <String, dynamic>{
         'name': name,
         if (code != null && code.trim().isNotEmpty) 'code': code.trim().toUpperCase(),
         'level': level,
         'description': description,
-        if (departmentId != null && departmentId.isNotEmpty) 'departmentId': departmentId,
+        if (id == null && departmentId != null && departmentId.isNotEmpty)
+          'departmentId': departmentId
+        else if (id != null)
+          'departmentId': (departmentId != null && departmentId.isNotEmpty) ? departmentId : null,
         'permissionGroups': groupIds,
       };
 
@@ -480,10 +483,13 @@ class RolePermissionController extends GetxController {
   }) async {
     isLoading.value = true;
     try {
-      final data = {
+      final data = <String, dynamic>{
         'name': name,
         'description': description,
-        if (departmentId != null && departmentId.isNotEmpty) 'departmentId': departmentId,
+        if (id == null && departmentId != null && departmentId.isNotEmpty)
+          'departmentId': departmentId
+        else if (id != null)
+          'departmentId': (departmentId != null && departmentId.isNotEmpty) ? departmentId : null,
         'permissions': permissions.map((p) => p.toJson()).toList(),
       };
 

@@ -267,7 +267,35 @@ class UserModel {
       }
     }
 
-    return true;
+    // Fallback based on known department string names if department object is unpopulated
+    final String deptStr = (rawJson?['deparment'] ?? rawJson?['department'] ?? '').toString().toLowerCase().trim();
+    final String roleStr = (rawJson?['role'] ?? '').toString().toLowerCase().trim();
+    final key = pageKey.toLowerCase().trim();
+
+    if (deptStr.contains('management') || deptStr.contains('director') || roleStr.contains('director')) {
+      return key != 'settings';
+    }
+    if (deptStr.contains('sales') || roleStr.contains('sales') || roleStr.contains('bde') || roleStr.contains('floor manager')) {
+      return key == 'leads' || key == 'lead' || key == 'users' || key == 'clients' || key == 'all clients' || key == 'reports' || key == 'report';
+    }
+    if (deptStr.contains('research') || roleStr.contains('research') || roleStr.contains('analyst')) {
+      return key == 'reports' || key == 'report' || key == 'subscriptions';
+    }
+    if (deptStr.contains('operations') || deptStr.contains('compliance') || roleStr.contains('operations') || roleStr.contains('compliance')) {
+      return key == 'users' || key == 'clients' || key == 'kyc' || key == 'payments';
+    }
+    if (deptStr.contains('quality')) {
+      return key == 'reports' || key == 'report' || key == 'leads' || key == 'lead' || key == 'users' || key == 'clients' || key == 'kyc';
+    }
+    if (deptStr.contains('hr') || roleStr.contains('hr')) {
+      return key == 'staff' || key == 'applicants';
+    }
+    if (deptStr.contains('back office') || roleStr.contains('back office')) {
+      return key == 'users' || key == 'clients' || key == 'payments' || key == 'subscriptions';
+    }
+
+    // Default deny for sensitive pages when department is unconfigured
+    return false;
   }
 
   String? _getDepartmentPageForFeature(String feature) {

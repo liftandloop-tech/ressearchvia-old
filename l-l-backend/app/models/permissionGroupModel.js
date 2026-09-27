@@ -18,5 +18,18 @@ const permissionGroupSchema = new mongoose.Schema({
     permissions: [permissionSchema]
 }, { timestamps: true });
 
+permissionGroupSchema.post(['findOneAndDelete', 'findByIdAndDelete', 'deleteOne'], async function (doc) {
+    if (doc && doc._id) {
+        try {
+            await mongoose.model("Role").updateMany(
+                { permissionGroups: doc._id },
+                { $pull: { permissionGroups: doc._id } }
+            );
+        } catch (err) {
+            console.error("Error pulling deleted permission group from roles:", err);
+        }
+    }
+});
+
 const permissionGroupModel = mongoose.model("PermissionGroup", permissionGroupSchema);
 export default permissionGroupModel;

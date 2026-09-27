@@ -959,7 +959,7 @@ const segmentsService = {
       const callerId = user?._id || user?.userId;
       if (callerId) {
         const hierarchy = await getSupervisedStaffIds(callerId);
-        if (!hierarchy.isSystemAdmin) {
+        if (!hierarchy.isSystemAdmin && !hierarchy.isGlobalAccess) {
           const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(callerId)];
           const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
           const assignedUserIds = assignments.map(a => a.userId);

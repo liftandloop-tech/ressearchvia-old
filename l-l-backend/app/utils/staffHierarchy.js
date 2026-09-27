@@ -23,12 +23,21 @@ export async function getSupervisedStaffIds(callerId) {
   }
 
   // Check if caller is in staffModel
-  const staffMember = await staffModel.findById(callerObjectId).populate('roleId');
+  const staffMember = await staffModel.findById(callerObjectId)
+    .populate('departmentId')
+    .populate({
+      path: 'roleId',
+      populate: [
+        { path: 'permissionGroups' },
+        { path: 'departmentId' }
+      ]
+    });
+
   let isSystemAdmin = false;
 
   if (staffMember) {
-    const roleName = (staffMember.roleId?.roleName || staffMember.roleId?.name || "").toLowerCase();
-    const dept = (staffMember.deparment || staffMember.department || "").toLowerCase();
+    const roleName = (staffMember.roleId?.name || staffMember.role || "").toLowerCase();
+    const dept = (staffMember.departmentId?.name || staffMember.deparment || staffMember.department || "").toLowerCase();
     isSystemAdmin = roleName === 'admin' || roleName === 'super_admin' || dept === 'admin' || dept === 'super_admin';
   } else {
     // Check primary userModel (e.g. system admin)
@@ -40,12 +49,12 @@ export async function getSupervisedStaffIds(callerId) {
   }
 
   if (isSystemAdmin) {
-    return { isSystemAdmin: true, isSupervisor: true, staffIds: null };
+    return { isSystemAdmin: true, isSupervisor: true, isDirector: true, isGlobalAccess: true, staffIds: null };
   }
 
   // If not staff member and not admin, return empty
   if (!staffMember) {
-    return { isSystemAdmin: false, isSupervisor: false, staffIds: [callerObjectId] };
+    return { isSystemAdmin: false, isSupervisor: false, isDirector: false, isGlobalAccess: false, staffIds: [callerObjectId] };
   }
 
   // Recursive traversal to collect all direct and indirect subordinates
@@ -70,10 +79,20 @@ export async function getSupervisedStaffIds(callerId) {
     currentLevel = nextLevel;
   }
 
-  const roleName = (staffMember?.roleId?.roleName || staffMember?.roleId?.name || "").toLowerCase();
-  const dept = (staffMember?.deparment || staffMember?.department || "").toLowerCase();
-  const isDirector = dept.includes('director') || roleName.includes('director');
-  const isManager = dept.includes('manager') || roleName.includes('manager');
+  const roleName = (staffMember?.roleId?.name || staffMember?.role || "").toLowerCase();
+  const dept = (staffMember?.departmentId?.name || staffMember?.deparment || staffMember?.department || "").toLowerCase();
+  const isDirector = dept.includes('director') || roleName.includes('director') || dept.includes('management');
+  const isManager = dept.includes('manager') || roleName.includes('manager') || roleName.includes('head');
+
+  // Cross-department operational visibility (Directors, Management, Operations, Compliance, Quality, Back Office, Research)
+  const isGlobalAccess = isDirector ||
+    dept.includes('management') ||
+    dept.includes('director') ||
+    dept.includes('operations') ||
+    dept.includes('compliance') ||
+    dept.includes('back office') ||
+    dept.includes('quality') ||
+    dept.includes('research');
 
   const staffIds = Array.from(supervisedMap.values());
   const isSupervisor = staffIds.length > 1 || isDirector || isManager;
@@ -83,6 +102,7 @@ export async function getSupervisedStaffIds(callerId) {
     isSupervisor,
     isDirector,
     isManager,
+    isGlobalAccess,
     staffIds,
     staffMember
   };

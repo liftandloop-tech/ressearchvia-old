@@ -1614,7 +1614,7 @@ const userService = {
       let assignedUserIds = null;
       if (currentUserId) {
         const hierarchy = await getSupervisedStaffIds(currentUserId);
-        if (!hierarchy.isSystemAdmin) {
+        if (!hierarchy.isSystemAdmin && !hierarchy.isGlobalAccess) {
           const targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];
           const assignments = await staffAssigmentModel.find({ staffId: { $in: targetStaffIds } });
           assignedUserIds = assignments.map(a => a.userId);
@@ -2408,7 +2408,7 @@ const userService = {
 
       if (currentUserId) {
         const hierarchy = await getSupervisedStaffIds(currentUserId);
-        isSystemAdmin = hierarchy.isSystemAdmin;
+        isSystemAdmin = hierarchy.isSystemAdmin || hierarchy.isGlobalAccess;
 
         if (!isSystemAdmin) {
           targetStaffIds = hierarchy.staffIds || [new mongoose.Types.ObjectId(currentUserId)];

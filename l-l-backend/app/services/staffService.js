@@ -77,6 +77,47 @@ export async function resolveRoleAndDepartment({ roleId, roleName, fallbackDept 
   };
 }
 
+export async function populateStaffHierarchy(staffDoc) {
+  if (!staffDoc) return staffDoc;
+  const staffObj = staffDoc.toObject ? staffDoc.toObject() : staffDoc;
+
+  // Fallback departmentId from roleId if staff.departmentId is null
+  if (!staffObj.departmentId && staffObj.roleId && staffObj.roleId.departmentId) {
+    staffObj.departmentId = staffObj.roleId.departmentId;
+  }
+
+  // Hierarchy Inheritance:
+  // If staff has a role with level > 1 and belongs to a department,
+  // inherit permission groups from all lower-level roles in the same department
+  if (staffObj.roleId && staffObj.roleId.level > 1 && staffObj.roleId.departmentId) {
+    const deptId = staffObj.roleId.departmentId._id || staffObj.roleId.departmentId;
+    const lowerRoles = await roleModel.find({
+      departmentId: deptId,
+      level: { $lt: staffObj.roleId.level },
+      isActive: true
+    }).populate({
+      path: 'permissionGroups',
+      populate: { path: 'departmentId' }
+    }).lean();
+
+    const existingPgIds = new Set((staffObj.roleId.permissionGroups || []).map(g => (g._id || g).toString()));
+    const mergedGroups = [...(staffObj.roleId.permissionGroups || [])];
+
+    for (const lr of lowerRoles) {
+      for (const pg of (lr.permissionGroups || [])) {
+        const pgIdStr = (pg._id || pg).toString();
+        if (!existingPgIds.has(pgIdStr)) {
+          existingPgIds.add(pgIdStr);
+          mergedGroups.push(pg);
+        }
+      }
+    }
+    staffObj.roleId.permissionGroups = mergedGroups;
+  }
+
+  return staffObj;
+}
+
 const staffService = {
   staffCreate: async ({ body, user }) => {
     try {
@@ -321,10 +362,13 @@ const staffService = {
         .populate('departmentId')
         .populate({
           path: 'roleId',
-          populate: {
-            path: 'permissionGroups'
-          }
+          populate: [
+            { path: 'permissionGroups' },
+            { path: 'departmentId' }
+          ]
         });
+
+      staff = await populateStaffHierarchy(staff);
 
       let token = jwt.sign(
         {
@@ -357,14 +401,17 @@ const staffService = {
       .populate('departmentId')
       .populate({
         path: 'roleId',
-        populate: {
-          path: 'permissionGroups'
-        }
+        populate: [
+          { path: 'permissionGroups' },
+          { path: 'departmentId' }
+        ]
       });
 
       if (!staff) {
         return { status: 404, message: "Staff member not found", data: {} };
       }
+
+      staff = await populateStaffHierarchy(staff);
 
       // Generate staff token for admin impersonation (valid for 2 hours)
       const token = jwt.sign(
@@ -975,10 +1022,15 @@ const staffService = {
         .populate('departmentId')
         .populate({
           path: 'roleId',
-          populate: {
-            path: 'permissionGroups'
-          }
+          populate: [
+            { path: 'permissionGroups' },
+            { path: 'departmentId' }
+          ]
         });
+
+      if (staff) {
+        staff = await populateStaffHierarchy(staff);
+      }
 
       if (!staff) {
         // Fallback: check if admin in userModel
