@@ -60,7 +60,7 @@ class DashboardNavBar extends StatelessWidget {
                       if (childTitle == 'All Clients' || childTitle == 'All Users') {
                         return canAccessUsers && (user?.has('users.view') ?? user?.hasPermission('Users', 'read') ?? false);
                       } else if (childTitle == 'Registered Clients' || childTitle == 'User KYC') {
-                        return (canAccessKyc || canAccessUsers) && ((user?.has('kyc.view') ?? false) || (user?.has('users.view') ?? false) || (user?.hasPermission('KYC', 'read') ?? false) || (user?.hasPermission('Users', 'read') ?? false));
+                        return canAccessKyc && ((user?.has('kyc.view') ?? false) || (user?.hasPermission('KYC', 'read') ?? false));
                       } else if (childTitle == 'Payments') {
                         return canAccessPayments && (user?.has('payments.view_pending') ?? user?.hasPermission('Payments', 'read') ?? false);
                       }

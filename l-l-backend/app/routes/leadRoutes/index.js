@@ -10,7 +10,7 @@ import { checkPermission } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
 const leadRoutes = () => {
-    Router.get("/pools", auth.tokenVerified, checkPermission('Leads', 'read'), leadPoolController.listLeadPools);
+    Router.get("/pools", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.listLeadPools);
     Router.post("/pools", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.createLeadPool);
     Router.put("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.updateLeadPool);
     Router.delete("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.deleteLeadPool);
@@ -20,27 +20,27 @@ const leadRoutes = () => {
     Router.get("/pull-stats", auth.tokenVerified, leadPullController.getPullStats);
     Router.patch("/:id/read", auth.tokenVerified, leadController.markAsRead);
 
-    Router.post("/create", auth.tokenVerified, checkPermission('Leads', 'create'), leadController.createLead);
-    Router.post("/bulk-assign", auth.tokenVerified, checkPermission('Leads', 'update'), leadController.bulkAssign);
-    Router.put("/update/:id", auth.tokenVerified, checkPermission('Leads', 'update'), leadController.updateLead);
-    Router.get("/", auth.tokenVerified, checkPermission('Leads', 'read'), leadController.listLeads);
-    Router.post("/follow-up/:id", auth.tokenVerified, checkPermission('Leads', 'update'), leadController.addFollowUp);
+    Router.post("/create", auth.tokenVerified, checkPermission('leads.create'), leadController.createLead);
+    Router.post("/bulk-assign", auth.tokenVerified, checkPermission('leads.bulk_assign'), leadController.bulkAssign);
+    Router.put("/update/:id", auth.tokenVerified, checkPermission('leads.update'), leadController.updateLead);
+    Router.get("/", auth.tokenVerified, checkPermission('leads.view'), leadController.listLeads);
+    Router.post("/follow-up/:id", auth.tokenVerified, checkPermission('leads.follow_up'), leadController.addFollowUp);
     Router.get("/template", leadController.getTemplate);
 
     // Dynamic Import Endpoints
-    Router.get("/import-fields", auth.tokenVerified, checkPermission('Leads', 'create'), importController.getImportFields);
-    Router.post("/import/:importId/preview", auth.tokenVerified, checkPermission('Leads', 'create'), importController.getPreview);
-    Router.post("/import/:importId/start", auth.tokenVerified, checkPermission('Leads', 'create'), importController.startImport);
-    Router.get("/import/:importId/status", auth.tokenVerified, checkPermission('Leads', 'read'), importController.getImportStatus);
-    Router.get("/import/:importId/errors", auth.tokenVerified, checkPermission('Leads', 'read'), importController.getImportErrors);
-    Router.get("/import/templates", auth.tokenVerified, checkPermission('Leads', 'read'), importController.getTemplates);
-    Router.post("/import/templates", auth.tokenVerified, checkPermission('Leads', 'create'), importController.saveTemplate);
+    Router.get("/import-fields", auth.tokenVerified, checkPermission('leads.bulk_upload'), importController.getImportFields);
+    Router.post("/import/:importId/preview", auth.tokenVerified, checkPermission('leads.bulk_upload'), importController.getPreview);
+    Router.post("/import/:importId/start", auth.tokenVerified, checkPermission('leads.bulk_upload'), importController.startImport);
+    Router.get("/import/:importId/status", auth.tokenVerified, checkPermission('leads.view'), importController.getImportStatus);
+    Router.get("/import/:importId/errors", auth.tokenVerified, checkPermission('leads.view'), importController.getImportErrors);
+    Router.get("/import/templates", auth.tokenVerified, checkPermission('leads.view'), importController.getTemplates);
+    Router.post("/import/templates", auth.tokenVerified, checkPermission('leads.bulk_upload'), importController.saveTemplate);
     
     // Bulk Lead Ingestion Route (Re-used for initial file upload)
     Router.post(
         "/bulk-upload", 
         auth.tokenVerified, 
-        checkPermission('Leads', 'create'),
+        checkPermission('leads.bulk_upload'),
         (req, res, next) => { req.uploadType = 'bulk-import'; next(); }, 
         upload.single("file"), 
         leadController.bulkUpload

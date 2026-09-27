@@ -7,10 +7,10 @@ const Router = express.Router();
 
 const SegmentsRoutes = () => {
     // Admin Routes (appAccess skips admin)
-    Router.post("/create-segments", auth.tokenVerified, segmentsController.createSegments)
-    Router.post("/segment-plan-create", auth.tokenVerified, segmentsController.segmentsPlanCreate)
-    Router.put("/segment-plan-update", auth.tokenVerified, segmentsController.segmentsPlanUpdate)
-    Router.put("/update-segments", auth.tokenVerified, segmentsController.updateSegments)
+    Router.post("/create-segments", auth.tokenVerified, checkPermission('Subscriptions', 'create'), segmentsController.createSegments)
+    Router.post("/segment-plan-create", auth.tokenVerified, checkPermission('Subscriptions', 'create'), segmentsController.segmentsPlanCreate)
+    Router.put("/segment-plan-update", auth.tokenVerified, checkPermission('Subscriptions', 'update'), segmentsController.segmentsPlanUpdate)
+    Router.put("/update-segments", auth.tokenVerified, checkPermission('Subscriptions', 'update'), segmentsController.updateSegments)
     Router.post("/admin-grant-segment", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.adminGrantSegment)
     Router.post("/reject-bank-transfer", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.rejectBankTransfer)
     Router.post("/revert-to-rejected", auth.tokenVerified, adminStrictOnlyNoStaff, segmentsController.revertApproval)
@@ -18,9 +18,9 @@ const SegmentsRoutes = () => {
     Router.get("/pending-bank-transfers", auth.tokenVerified, checkPermission('Payments', 'read'), segmentsController.getPendingBankTransfers)
     Router.get("/hni-requests", auth.tokenVerified, segmentsController.getHniRequests)
     Router.post("/admin-grant-hni-plan", auth.tokenVerified, segmentsController.adminGrantHniPlan)
-    Router.get("/segment-user-list", auth.tokenVerified, segmentsController.userSegmentPlanList)
-    Router.delete("/delete-segments", auth.tokenVerified, segmentsController.segmentsDelete)
-    Router.delete("/segment-plan-delete", auth.tokenVerified, segmentsController.segmentsPlanDelete)
+    Router.get("/segment-user-list", auth.tokenVerified, checkPermission('Subscriptions', 'read'), segmentsController.userSegmentPlanList)
+    Router.delete("/delete-segments", auth.tokenVerified, checkPermission('Subscriptions', 'delete'), segmentsController.segmentsDelete)
+    Router.delete("/segment-plan-delete", auth.tokenVerified, checkPermission('Subscriptions', 'delete'), segmentsController.segmentsPlanDelete)
 
     // User Routes - Purchasing
     // Must be registered to buy plans

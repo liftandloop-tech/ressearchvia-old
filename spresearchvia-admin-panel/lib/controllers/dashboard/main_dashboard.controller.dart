@@ -69,7 +69,7 @@ class MainDashboardController extends GetxController {
     } else if (currentRoute.startsWith('/registered-clients') ||
         currentRoute.startsWith('/approvals/kyc') ||
         currentRoute.startsWith('/kyc')) {
-      isAllowed = user.hasPermission('KYC', 'read') || user.hasPermission('Users', 'read');
+      isAllowed = user.hasPermission('KYC', 'read');
     } else if (currentRoute.startsWith('/approvals/payments')) {
       isAllowed = user.hasPermission('Payments', 'read');
     } else if (currentRoute.startsWith('/staff') ||
@@ -89,10 +89,14 @@ class MainDashboardController extends GetxController {
       }
     } else if (currentRoute.startsWith('/leads')) {
       isAllowed = user.hasPermission('Leads', 'read');
-    } else if (currentRoute.startsWith('/automated-trading') ||
-        currentRoute.startsWith('/subscriptions')) {
-      // Subscriptions and Automated Trading are admin-only features
+    } else if (currentRoute.startsWith('/automated-trading')) {
       isAllowed = false;
+    } else if (currentRoute.startsWith('/subscriptions')) {
+      if (currentRoute.startsWith('/subscriptions/plans/create')) {
+        isAllowed = user.isAdmin;
+      } else {
+        isAllowed = user.hasPermission('Subscriptions', 'read');
+      }
     }
 
     if (!isAllowed) {

@@ -495,13 +495,9 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 };
                 const expectedPage = modPageMap[targetMod];
                 if (expectedPage && !assigned.has(expectedPage)) {
-                    const hasFallback = (expectedPage === 'kyc' && assigned.has('users')) ||
-                                        (expectedPage === 'payments' && (assigned.has('subscriptions') || assigned.has('users')));
-                    if (!hasFallback) {
-                        return res.status(403).json({
-                            message: `Access Denied. Department "${effectiveDept.name}" does not have access to the ${expectedPage} module.`
-                        });
-                    }
+                    return res.status(403).json({
+                        message: `Access Denied. Department "${effectiveDept.name}" does not have access to the ${expectedPage} module.`
+                    });
                 }
             }
 
