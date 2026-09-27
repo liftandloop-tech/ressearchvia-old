@@ -23,22 +23,6 @@ class UserService extends ApiService {
     String? sortOrder,
   }) async {
     try {
-      // Check if the logged-in user is a staff member
-      final prefs = await SharedPreferences.getInstance();
-      final userStr = prefs.getString('user_data');
-      bool isStaff = false;
-
-      if (userStr != null) {
-        try {
-          final userData = jsonDecode(userStr);
-          // Check if this is a staff member (no userType field means staff)
-          isStaff =
-              userData['userType'] == null || userData['deparment'] != null;
-        } catch (e) {
-          debugPrint('Error parsing user data: $e');
-        }
-      }
-
       final query = <String, String>{
         'page': page.toString(),
         'pageSize': pageSize.toString(),
@@ -74,9 +58,7 @@ class UserService extends ApiService {
         query['sortOrder'] = sortOrder;
       }
 
-      // Use different endpoint based on user type
-      final endpoint = isStaff ? '/staff/assigned-users' : '/user/user-list';
-      final response = await get(endpoint, query: query);
+      final response = await get('/user/user-list', query: query);
 
       if (response.status.hasError) {
         debugPrint('Error fetching users: ${response.statusText}');

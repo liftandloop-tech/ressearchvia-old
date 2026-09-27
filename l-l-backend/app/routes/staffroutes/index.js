@@ -5,6 +5,7 @@ import staffController from "../../controller/staffController.js";
 import staffDocController from "../../controller/staffDocController.js";
 import staffAttendanceController from "../../controller/staffAttendanceController.js";
 import applicantController from "../../controller/applicantController.js";
+import usersController from "../../controller/userController.js";
 import { checkPermission, adminOnly } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
@@ -12,6 +13,7 @@ const staffRoutes = () => {
     Router.post("/staff-login", staffController.staffLogin)
     Router.post("/staff-mpin-login", staffController.staffMpinLogin)
     Router.post("/staff-otp-verify", staffController.staffOtpVerify)
+    Router.get("/assigned-users", auth.tokenVerified, adminOnly, checkPermission('Users', 'read'), usersController.userList)
     Router.post("/create", auth.tokenVerified, checkPermission('Staff', 'create'), staffController.staffCreate)
     Router.put("/reset", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.staffReset)
     Router.delete("/delete", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
