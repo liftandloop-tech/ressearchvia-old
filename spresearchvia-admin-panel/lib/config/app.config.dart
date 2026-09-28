@@ -17,7 +17,7 @@ class AppConfig {
       } catch (_) {}
     }
     return kReleaseMode
-        ? 'https://admintest.researchvia.in'
+        ? 'https://spadmin.researchvia.in'
         : 'http://localhost:8080';
   }
 
@@ -35,7 +35,7 @@ class AppConfig {
       } catch (_) {}
     }
     return kReleaseMode
-        ? 'https://test.researchvia.in/api'
+        ? 'https://api.researchvia.in/api'
         : 'http://localhost:8080/api';
   }
 

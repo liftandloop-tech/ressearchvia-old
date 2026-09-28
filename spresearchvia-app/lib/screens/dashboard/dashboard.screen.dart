@@ -29,11 +29,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     // Fetch required data for dashboard widgets
-    if (!Get.isRegistered<ReportController>()) {
-      Get.put(ReportController());
-    }
-    // Trigger silent refresh (Reports + Trading Calls)
-    Get.find<ReportController>().refreshData();
+    final reportCtrl = Get.isRegistered<ReportController>()
+        ? Get.find<ReportController>()
+        : Get.put(ReportController());
+    // Trigger fresh load of monthly counts and data
+    reportCtrl.fetchThisMonthCounts();
+    reportCtrl.refreshData();
     
     if (!Get.isRegistered<SegmentPlanController>()) {
       Get.put(SegmentPlanController());
@@ -185,9 +186,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: GetX<ReportController>(
                             init: ReportController(),
                             builder: (reportController) {
-                              final reportCount =
-                                  reportController.reports.length + 
-                                  reportController.tradingCalls.length;
+                              final callsCount =
+                                  reportController.thisMonthTradingCallsCount.value;
                                 return InkWell(
                                   onTap: () {
                                     final reportCtrl = Get.find<ReportController>();
@@ -220,7 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.center,
                                       children: [
                                         Text(
-                                          reportCount.toString(),
+                                          callsCount.toString(),
                                           style: TextStyle(
                                             fontFamily: 'Poppins',
                                             fontSize: responsive.sp(20),
@@ -257,7 +257,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: GetX<ReportController>(
                             init: ReportController(),
                             builder: (reportController) {
-                              final researchReportCount = reportController.reports.length;
+                              final researchReportCount =
+                                  reportController.thisMonthReportsCount.value;
                                 return InkWell(
                                   onTap: () {
                                     final reportCtrl = Get.find<ReportController>();

@@ -1,12 +1,9 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
-
 enum AppMode { development, production }
 
 enum FeatureFlag { paymentMockEnabled, debugLogsEnabled, crashReportingEnabled }
 
 class AppConfig {
-  static const AppMode _mode = kReleaseMode ? AppMode.production : AppMode.development;
+  static const AppMode _mode = AppMode.production;
   static final policyURL = Uri.parse('https://researchvia.in/privacy-policy/');
   static final deleteURL = Uri.parse('https://researchvia.in/delete-account/');
   static const int storageVersion = 2; // Increment this to clear stale local storage flags
@@ -39,22 +36,9 @@ class AppConfig {
     if (envUrl.isNotEmpty) return envUrl;
     switch (_mode) {
       case AppMode.development:
-        if (Platform.isAndroid) {
-          // Use 10.0.2.2 for Android Emulator (Host Loopback)
-          //return 'http://10.0.2.2:8080/api';
-          return 'https://test.researchvia.in/api';
-        }
-        // For iOS Physical Device: Use LAN IP (WiFi or USB Hotspot)
-        // For iOS Simulator: Use localhost
-        // 
-        // IMPORTANT: Make sure your iPhone and Mac are on the same WiFi network
-        // Current Mac IP: 192.168.29.35
-        return 'http://192.168.29.35:8080/api';
-        // For Simulator only: Use localhost
-        // return 'http://localhost:8080/api';
+        return 'https://api.researchvia.in/api';
       case AppMode.production:
-        return 'https://test.researchvia.in/api';
-        //return 'http://10.0.2.2:8080/api';
+        return 'https://api.researchvia.in/api';
     }
   }
 
@@ -63,10 +47,7 @@ class AppConfig {
     if (envUrl.isNotEmpty) return envUrl;
     switch (_mode) {
       case AppMode.development:
-        if (Platform.isAndroid) {
-          return 'http://10.0.2.2:3000';
-        }
-        return 'http://192.168.29.35:3000';
+        return 'https://tradetest.researchvia.in';
       case AppMode.production:
         return 'https://tradetest.researchvia.in';
     }

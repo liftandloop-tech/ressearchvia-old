@@ -41,6 +41,77 @@ class ReportController extends GetxController {
   DateTime? _lastRefreshTime;
   static const Duration _refreshThreshold = Duration(seconds: 30);
 
+  // This Month Statistics (1st of every month to current day)
+  final isMonthlyCountsLoading = false.obs;
+  final thisMonthTradingCallsCount = 0.obs;
+  final thisMonthReportsCount = 0.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    fetchThisMonthCounts();
+  }
+
+  Future<void> fetchThisMonthCounts() async {
+    try {
+      isMonthlyCountsLoading.value = true;
+      final userId = await _secureStorage.getUserId();
+      if (userId == null || userId.isEmpty) return;
+
+      final now = DateTime.now();
+      // From 1st of every month at 00:00:00 to current day of the month (23:59:59.999)
+      final startOfMonth = DateTime(now.year, now.month, 1, 0, 0, 0);
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+
+      final startIso = startOfMonth.toUtc().toIso8601String();
+      final endIso = endOfDay.toUtc().toIso8601String();
+
+      final callsFuture = _apiClient.get(
+        ApiConfig.userReportList(
+          userId,
+          reportType: 'Trading calls',
+          page: 1,
+          pageSize: 1,
+          startDate: startIso,
+          endDate: endIso,
+        ),
+      );
+
+      final reportsFuture = _apiClient.get(
+        ApiConfig.userReportList(
+          userId,
+          reportType: 'Detailed Reports',
+          page: 1,
+          pageSize: 1,
+          startDate: startIso,
+          endDate: endIso,
+        ),
+      );
+
+      final results = await Future.wait([callsFuture, reportsFuture]);
+      final callsResponse = results[0];
+      final reportsResponse = results[1];
+
+      if (callsResponse.statusCode == 200) {
+        final innerData = callsResponse.data?['data'];
+        final count = innerData?['totalReports'] ?? 0;
+        thisMonthTradingCallsCount.value =
+            (count is int) ? count : int.tryParse(count.toString()) ?? 0;
+      }
+
+      if (reportsResponse.statusCode == 200) {
+        final innerData = reportsResponse.data?['data'];
+        final count = innerData?['totalReports'] ?? 0;
+        thisMonthReportsCount.value =
+            (count is int) ? count : int.tryParse(count.toString()) ?? 0;
+      }
+    } catch (e) {
+      debugPrint('ReportController: Error fetching this month counts: $e');
+    } finally {
+      isMonthlyCountsLoading.value = false;
+    }
+  }
+
   Future<void> refreshData({bool force = false}) async {
     final now = DateTime.now();
     if (!force && _lastRefreshTime != null && 
@@ -53,6 +124,7 @@ class ReportController extends GetxController {
     await Future.wait([
       fetchTradingCalls(refresh: true),
       fetchReportList(refresh: true),
+      fetchThisMonthCounts(),
     ]);
   }
 
