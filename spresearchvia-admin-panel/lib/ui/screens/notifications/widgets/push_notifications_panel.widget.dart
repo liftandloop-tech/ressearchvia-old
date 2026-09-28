@@ -253,32 +253,40 @@ class PushNotificationsPanel extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value:
-                                      controller
-                                          .selectedAudienceId
-                                          .value
-                                          .isEmpty
-                                      ? null
-                                      : controller.selectedAudienceId.value,
-                                  isExpanded: true,
-                                  hint: Text(
-                                    'Choose ${controller.selectedAudienceType.value == 'Segment Specific' ? 'Segment' : 'Plan'}',
-                                    style: TextStyle(
-                                      color: AppTheme.gray300,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  items:
-                                      (controller.selectedAudienceType.value ==
-                                                  'Segment Specific'
-                                              ? controller.segments
-                                              : controller.plans)
+                                child: Builder(
+                                  builder: (context) {
+                                    final audienceType = controller.selectedAudienceType.value;
+                                    final rawList = audienceType == 'Segment Specific'
+                                        ? controller.segments
+                                        : controller.plans;
+                                    final seenIds = <String>{};
+                                    final validItems = rawList.where((e) {
+                                      final id = e['id']?.toString();
+                                      return id != null && id.isNotEmpty && seenIds.add(id);
+                                    }).toList();
+
+                                    final currentAudienceId = controller.selectedAudienceId.value;
+                                    final safeValue = (currentAudienceId.isNotEmpty &&
+                                            validItems.any((e) => e['id']?.toString() == currentAudienceId))
+                                        ? currentAudienceId
+                                        : null;
+
+                                    return DropdownButton<String>(
+                                      value: safeValue,
+                                      isExpanded: true,
+                                      hint: Text(
+                                        'Choose ${audienceType == 'Segment Specific' ? 'Segment' : 'Plan'}',
+                                        style: TextStyle(
+                                          color: AppTheme.gray300,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      items: validItems
                                           .map(
-                                            (e) => DropdownMenuItem(
-                                              value: e['id'],
+                                            (e) => DropdownMenuItem<String>(
+                                              value: e['id']?.toString(),
                                               child: Text(
-                                                e['name'] ?? '',
+                                                e['name']?.toString() ?? '',
                                                 style: const TextStyle(
                                                   fontSize: 14,
                                                 ),
@@ -286,7 +294,9 @@ class PushNotificationsPanel extends StatelessWidget {
                                             ),
                                           )
                                           .toList(),
-                                  onChanged: controller.updateAudienceId,
+                                      onChanged: controller.updateAudienceId,
+                                    );
+                                  },
                                 ),
                               ),
                             ),

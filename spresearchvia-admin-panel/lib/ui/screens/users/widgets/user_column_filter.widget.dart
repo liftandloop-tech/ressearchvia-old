@@ -105,24 +105,34 @@ class _UserColumnFilterState extends State<UserColumnFilter> {
 
   @override
   Widget build(BuildContext context) {
-    final isTextFilter = widget.columnKey == 'name' || widget.columnKey == 'mobile';
-    final isDateFilter = widget.columnKey == 'createdAt';
+    const knownKeys = {'createdAt', 'name', 'mobile', 'kycStatus', 'subscription', 'manager'};
+
+    if (!knownKeys.contains(widget.columnKey)) {
+      return _buildPopupMenu(false);
+    }
 
     return Obx(() {
       final active = _isFiltered;
+      return _buildPopupMenu(active);
+    });
+  }
 
-      return PopupMenuButton<void>(
-        tooltip: 'Filter by ${widget.columnName}',
-        offset: const Offset(0, 24),
-        padding: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-          child: Icon(
-            Icons.filter_alt,
-            size: 13,
-            color: active ? AppTheme.primaryBlue : AppTheme.gray400,
-          ),
+  Widget _buildPopupMenu(bool active) {
+    final isTextFilter = widget.columnKey == 'name' || widget.columnKey == 'mobile';
+    final isDateFilter = widget.columnKey == 'createdAt';
+
+    return PopupMenuButton<void>(
+      tooltip: 'Filter by ${widget.columnName}',
+      offset: const Offset(0, 24),
+      padding: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Icon(
+          Icons.filter_alt,
+          size: 13,
+          color: active ? AppTheme.primaryBlue : AppTheme.gray400,
         ),
+      ),
         itemBuilder: (context) {
           _initValues();
           return [
@@ -384,7 +394,6 @@ class _UserColumnFilterState extends State<UserColumnFilter> {
           ];
         },
       );
-    });
   }
 
   void _clearFilter() {

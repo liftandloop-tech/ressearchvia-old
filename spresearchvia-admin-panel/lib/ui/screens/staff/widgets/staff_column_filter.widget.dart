@@ -78,23 +78,32 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
 
   @override
   Widget build(BuildContext context) {
-    final isTextFilter = widget.columnKey == 'name' || widget.columnKey == 'mobile' || widget.columnKey == 'email';
+    const knownKeys = {'name', 'mobile', 'email', 'role', 'status'};
+
+    if (!knownKeys.contains(widget.columnKey)) {
+      return _buildPopupMenu(false);
+    }
 
     return Obx(() {
-      // Re-trigger visual highlight if controller state changes externally (e.g. on clear all)
       final activeFilter = _isFiltered;
+      return _buildPopupMenu(activeFilter);
+    });
+  }
 
-      return PopupMenuButton<void>(
-        icon: Icon(
-          Icons.filter_alt,
-          size: 14,
-          color: activeFilter ? AppTheme.primaryBlue : AppTheme.gray400,
-        ),
-        tooltip: 'Filter by ${widget.columnName}',
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(),
-        offset: const Offset(0, 24),
-        itemBuilder: (context) {
+  Widget _buildPopupMenu(bool activeFilter) {
+    final isTextFilter = widget.columnKey == 'name' || widget.columnKey == 'mobile' || widget.columnKey == 'email';
+
+    return PopupMenuButton<void>(
+      icon: Icon(
+        Icons.filter_alt,
+        size: 14,
+        color: activeFilter ? AppTheme.primaryBlue : AppTheme.gray400,
+      ),
+      tooltip: 'Filter by ${widget.columnName}',
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      offset: const Offset(0, 24),
+      itemBuilder: (context) {
           // Re-initialize active values whenever the popup opens
           _initValues();
           return [
@@ -233,7 +242,6 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
           ];
         },
       );
-    });
   }
 
   void _applyFilter() {

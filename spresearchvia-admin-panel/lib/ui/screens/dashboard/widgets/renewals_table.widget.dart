@@ -377,10 +377,14 @@ class ClientListTile extends StatelessWidget {
                 child: Obx(() {
                   final dmController =
                       Get.find<DashboardManagementController>();
+                  final rawStaffList = dmController.staffList;
+                  final seenStaffIds = <String>{};
+                  final staffList = rawStaffList.where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id)).toList();
+
                   // Ensure the current value exists in the list of items
                   String? currentValue = item['managerId'];
                   if (currentValue != null &&
-                      !dmController.staffList.any(
+                      !staffList.any(
                         (staff) => staff.id == currentValue,
                       )) {
                     currentValue = null;
@@ -411,7 +415,7 @@ class ClientListTile extends StatelessWidget {
                       fontFamily: 'Poppins',
                     ),
                     selectedItemBuilder: (BuildContext context) {
-                      return dmController.staffList.map<Widget>((staff) {
+                      return staffList.map<Widget>((staff) {
                         return Align(
                           alignment: Alignment.centerLeft,
                           child: Column(
@@ -445,7 +449,7 @@ class ClientListTile extends StatelessWidget {
                         );
                       }).toList();
                     },
-                    items: dmController.staffList.map((staff) {
+                    items: staffList.map((staff) {
                       return DropdownMenuItem<String>(
                         value: staff.id,
                         child: Container(

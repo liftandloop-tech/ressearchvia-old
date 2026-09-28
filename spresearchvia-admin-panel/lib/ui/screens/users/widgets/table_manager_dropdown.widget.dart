@@ -16,7 +16,9 @@ class TableManagerDropdown extends StatelessWidget {
     // final controller = Get.find<UserController>(); // UserManagementController handles this now
 
     return Obx(() {
-      final managers = userManagementController.managers;
+      final rawManagers = userManagementController.managers;
+      final seenIds = <String>{};
+      final managers = rawManagers.where((m) => m.id.isNotEmpty && seenIds.add(m.id)).toList();
       final currentManagerId = user.managerId;
 
       // Ensure we have a valid selection

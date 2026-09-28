@@ -729,20 +729,33 @@ class _ImportWizardState extends State<ImportWizard> {
             const SizedBox(width: 24),
             // Default RM
             Expanded(
-              child: DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Default Owner / RM', border: OutlineInputBorder()),
-                value: _assignedRM,
-                hint: const Text('None'),
-                items: [
-                  const DropdownMenuItem<String>(value: null, child: Text('None (Leave Unassigned)')),
-                  ..._leadsController.staffList.map((s) {
-                    return DropdownMenuItem<String>(
-                      value: s.id,
-                      child: Text(s.fullName),
-                    );
-                  }).toList(),
-                ],
-                onChanged: (val) => setState(() => _assignedRM = val),
+              child: Builder(
+                builder: (context) {
+                  final seenStaffIds = <String>{};
+                  final validStaff = _leadsController.staffList
+                      .where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id))
+                      .toList();
+                  final safeAssignedRM = (_assignedRM != null &&
+                          validStaff.any((s) => s.id == _assignedRM))
+                      ? _assignedRM
+                      : null;
+
+                  return DropdownButtonFormField<String?>(
+                    decoration: const InputDecoration(labelText: 'Default Owner / RM', border: OutlineInputBorder()),
+                    value: safeAssignedRM,
+                    hint: const Text('None'),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('None (Leave Unassigned)')),
+                      ...validStaff.map((s) {
+                        return DropdownMenuItem<String?>(
+                          value: s.id,
+                          child: Text(s.fullName),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) => setState(() => _assignedRM = val),
+                  );
+                },
               ),
             ),
           ],
@@ -782,20 +795,34 @@ class _ImportWizardState extends State<ImportWizard> {
                   Row(
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: const InputDecoration(labelText: 'Target Lead Pool', border: OutlineInputBorder()),
-                          value: _leadPools.any((p) => p['_id']?.toString() == _selectedLeadPoolId) ? _selectedLeadPoolId : null,
-                          hint: const Text('None'),
-                          items: [
-                            const DropdownMenuItem<String>(value: null, child: Text('None (Leave Unassigned)')),
-                            ..._leadPools.map((p) {
-                              return DropdownMenuItem<String>(
-                                value: p['_id'].toString(),
-                                child: Text(p['name'].toString()),
-                              );
-                            }),
-                          ],
-                          onChanged: (val) => setState(() => _selectedLeadPoolId = val),
+                        child: Builder(
+                          builder: (context) {
+                            final seenPoolIds = <String>{};
+                            final validPools = _leadPools.where((p) {
+                              final id = p['_id']?.toString();
+                              return id != null && id.isNotEmpty && seenPoolIds.add(id);
+                            }).toList();
+                            final safePoolId = (_selectedLeadPoolId != null &&
+                                    validPools.any((p) => p['_id']?.toString() == _selectedLeadPoolId))
+                                ? _selectedLeadPoolId
+                                : null;
+
+                            return DropdownButtonFormField<String?>(
+                              decoration: const InputDecoration(labelText: 'Target Lead Pool', border: OutlineInputBorder()),
+                              value: safePoolId,
+                              hint: const Text('None'),
+                              items: [
+                                const DropdownMenuItem<String?>(value: null, child: Text('None (Leave Unassigned)')),
+                                ...validPools.map((p) {
+                                  return DropdownMenuItem<String?>(
+                                    value: p['_id'].toString(),
+                                    child: Text(p['name'].toString()),
+                                  );
+                                }),
+                              ],
+                              onChanged: (val) => setState(() => _selectedLeadPoolId = val),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),

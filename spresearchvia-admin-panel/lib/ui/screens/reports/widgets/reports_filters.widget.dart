@@ -44,37 +44,52 @@ class ReportsFilters extends StatelessWidget {
                       border: Border.all(color: AppTheme.gray200),
                     ),
                     child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: controller.categoryFilter.value,
-                        isExpanded: true,
-                        icon: Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 20,
-                          color: AppTheme.textSecondary,
-                        ),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textPrimary,
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'All Categories',
-                            child: Text('All Categories'),
+                      child: Obx(() {
+                        final seenCatIds = <String>{};
+                        final validCats = controller.categories.where((cat) {
+                          final id = (cat['_id'] ?? cat['id'])?.toString();
+                          return id != null && id.isNotEmpty && seenCatIds.add(id);
+                        }).toList();
+
+                        final currentCat = controller.categoryFilter.value;
+                        final safeCatValue = (currentCat == 'All Categories' || validCats.any((cat) => (cat['_id'] ?? cat['id'])?.toString() == currentCat))
+                            ? currentCat
+                            : 'All Categories';
+
+                        return DropdownButton<String>(
+                          value: safeCatValue,
+                          isExpanded: true,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 20,
+                            color: AppTheme.textSecondary,
                           ),
-                          ...controller.categories.map((cat) {
-                            return DropdownMenuItem<String>(
-                              value: cat['_id'] as String,
-                              child: Text(
-                                cat['segmentName'] ?? cat['name'] ?? 'Unknown',
-                              ),
-                            );
-                          }),
-                        ],
-                        onChanged: (v) {
-                          controller.categoryFilter.value = v!;
-                          controller.applyFilters();
-                        },
-                      ),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textPrimary,
+                          ),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: 'All Categories',
+                              child: Text('All Categories'),
+                            ),
+                            ...validCats.map((cat) {
+                              final catId = (cat['_id'] ?? cat['id'])?.toString() ?? '';
+                              final catName = (cat['segmentName'] ?? cat['name'] ?? 'Unknown').toString();
+                              return DropdownMenuItem<String>(
+                                value: catId,
+                                child: Text(catName),
+                              );
+                            }),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              controller.categoryFilter.value = v;
+                              controller.applyFilters();
+                            }
+                          },
+                        );
+                      }),
                     ),
                   ),
                 ),
@@ -95,18 +110,29 @@ class ReportsFilters extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Obx(
-                  () => Container(
-                    height: 40,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.gray200),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: controller.planFilter.value,
+                Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.gray200),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: Obx(() {
+                      final seenPlanIds = <String>{};
+                      final validPlans = controller.allPlans.where((plan) {
+                        final id = (plan['id'] ?? plan['_id'])?.toString();
+                        return id != null && id.isNotEmpty && seenPlanIds.add(id);
+                      }).toList();
+
+                      final currentPlan = controller.planFilter.value;
+                      final safePlanValue = (currentPlan == 'All Plans' || validPlans.any((p) => (p['id'] ?? p['_id'])?.toString() == currentPlan))
+                          ? currentPlan
+                          : 'All Plans';
+
+                      return DropdownButton<String>(
+                        value: safePlanValue,
                         isExpanded: true,
                         icon: Icon(
                           Icons.keyboard_arrow_down,
@@ -118,29 +144,33 @@ class ReportsFilters extends StatelessWidget {
                           color: AppTheme.textPrimary,
                         ),
                         items: [
-                          DropdownMenuItem(
+                          const DropdownMenuItem<String>(
                             value: 'All Plans',
                             child: Text(
                               'All Plans',
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          ...controller.allPlans.map((plan) {
+                          ...validPlans.map((plan) {
+                            final planId = (plan['id'] ?? plan['_id'])?.toString() ?? '';
+                            final planName = (plan['name'] ?? 'Unknown').toString();
                             return DropdownMenuItem<String>(
-                              value: plan['id'] as String,
+                              value: planId,
                               child: Text(
-                                plan['name'] ?? 'Unknown',
+                                planName,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             );
                           }),
                         ],
                         onChanged: (v) {
-                          controller.planFilter.value = v!;
-                          controller.applyFilters();
+                          if (v != null) {
+                            controller.planFilter.value = v;
+                            controller.applyFilters();
+                          }
                         },
-                      ),
-                    ),
+                      );
+                    }),
                   ),
                 ),
               ],

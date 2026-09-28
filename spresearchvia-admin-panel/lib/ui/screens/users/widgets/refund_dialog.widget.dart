@@ -60,12 +60,15 @@ class _RefundDialogState extends State<RefundDialog> {
   void initState() {
     super.initState();
 
-    // Prepare selectable plans
     final rawList = widget.availableSubscriptions ?? [];
     if (rawList.isNotEmpty) {
       _selectablePlans = List<Map<String, dynamic>>.from(rawList);
     } else if (widget.payment != null) {
       _selectablePlans = [Map<String, dynamic>.from(widget.payment!)];
+    }
+    for (int i = 0; i < _selectablePlans.length; i++) {
+      _selectablePlans[i]['_uniquePlanKey'] =
+          'plan_${_selectablePlans[i]['_id'] ?? _selectablePlans[i]['planId'] ?? i}_$i';
     }
 
     // Determine initial plan
@@ -105,7 +108,7 @@ class _RefundDialogState extends State<RefundDialog> {
 
   String _getPlanKey(Map<String, dynamic>? plan) {
     if (plan == null) return 'none';
-    return (plan['_id'] ?? plan['planId'] ?? plan['packageName'] ?? plan['planName'] ?? UniqueKey().toString()).toString();
+    return (plan['_uniquePlanKey'] ?? plan['_id'] ?? plan['planId'] ?? plan['packageName'] ?? 'none').toString();
   }
 
   void _onSelectPlan(Map<String, dynamic> plan) {
@@ -647,7 +650,9 @@ class _RefundDialogState extends State<RefundDialog> {
 
           if (hasMultiplePlans) ...[
             DropdownButtonFormField<String>(
-              initialValue: _selectedPlanKey,
+              value: _selectablePlans.any((p) => _getPlanKey(p) == _selectedPlanKey)
+                  ? _selectedPlanKey
+                  : (_selectablePlans.isNotEmpty ? _getPlanKey(_selectablePlans.first) : null),
               isExpanded: true,
               decoration: InputDecoration(
                 filled: true,
@@ -1001,7 +1006,9 @@ class _RefundDialogState extends State<RefundDialog> {
 
   Widget _buildCategoryDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: _reasonCategory,
+      value: _categories.any((c) => c['value'] == _reasonCategory)
+          ? _reasonCategory
+          : (_categories.isNotEmpty ? _categories.first['value'] : null),
       decoration: InputDecoration(
         labelText: 'Refund Reason Category*',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),

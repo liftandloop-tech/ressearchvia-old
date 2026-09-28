@@ -1517,6 +1517,7 @@ class _MetricDataPopupState extends State<MetricDataPopup> {
                   scrollDirection: Axis.horizontal,
                   child: SizedBox(
                     width: tableWidth,
+                    height: constraints.maxHeight,
                     child: Column(
                       children: [
                         headerRow,
