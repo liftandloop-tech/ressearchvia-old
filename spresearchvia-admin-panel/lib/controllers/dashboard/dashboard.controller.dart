@@ -117,7 +117,7 @@ class DashboardController extends GetxController {
       if (name != null && name.isNotEmpty) {
         query['staffMember'] = name;
       }
-      final dept = (currentUser?.subscriptionPlan ?? '').trim();
+      final dept = (currentUser?.departmentName ?? '').trim();
       if (dept.isNotEmpty && dept != 'N/A') {
         query['department'] = dept;
       }
@@ -163,31 +163,43 @@ class DashboardController extends GetxController {
     }
 
     final myName = currentUser?.fullName.trim() ?? '';
-    final staff = _dashboardManagementController.staffList
-        .map((e) => e.name.trim())
-        .where((name) => name.isNotEmpty)
-        .toSet()
-        .toList();
-    staff.sort();
+    final staffNames = <String>{};
+    for (final s in _dashboardManagementController.staffList) {
+      final n = s.name.trim();
+      if (n.isNotEmpty) staffNames.add(n);
+    }
+    for (final p in _dashboardManagementController.staffPerformanceList) {
+      final n = (p['name'] ?? p['staffName'] ?? '').toString().trim();
+      if (n.isNotEmpty) staffNames.add(n);
+    }
+    final sortedStaff = staffNames.toList()..sort();
 
-    return {'All Staff', if (myName.isNotEmpty) myName, ...staff}.toList();
+    return {'All Staff', if (myName.isNotEmpty) myName, ...sortedStaff}.toList();
   }
 
   List<String> get departmentFilterItems {
     if (isSingleStaff) {
-      final dept = (currentUser?.subscriptionPlan ?? '').trim();
+      final dept = (currentUser?.departmentName ?? '').trim();
       if (dept.isNotEmpty && dept != 'N/A') {
         return [dept];
       }
       return ['Sales'];
     }
-    final depts = _dashboardManagementController.staffList
-        .map((e) => e.department.trim())
-        .where((d) => d.isNotEmpty)
-        .toSet()
-        .toList();
-    depts.sort();
-    return ['All Departments', ...depts];
+    final depts = <String>{};
+    for (final s in _dashboardManagementController.staffList) {
+      final d = s.department.trim();
+      if (d.isNotEmpty) depts.add(d);
+    }
+    for (final d in _dashboardManagementController.departmentSales) {
+      final name = (d['department'] ?? d['name'] ?? '').toString().trim();
+      if (name.isNotEmpty) depts.add(name);
+    }
+    for (final s in _dashboardManagementController.staffPerformanceList) {
+      final dept = (s['department'] ?? '').toString().trim();
+      if (dept.isNotEmpty) depts.add(dept);
+    }
+    final sortedDepts = depts.toList()..sort();
+    return ['All Departments', ...sortedDepts];
   }
 
   double get totalSalesAmount =>

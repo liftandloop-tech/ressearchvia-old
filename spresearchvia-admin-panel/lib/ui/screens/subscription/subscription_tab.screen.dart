@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription_navigation.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
@@ -21,6 +22,11 @@ class SubscriptionTab extends StatelessWidget {
     final navController = Get.isRegistered<SubscriptionNavigationController>()
         ? Get.find<SubscriptionNavigationController>()
         : Get.put(SubscriptionNavigationController(), permanent: true);
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canManageSegments = isAdmin || (currentUser?.has('subscriptions.manage_segments') ?? false);
+    final canCreatePlan = isAdmin || (currentUser?.has('subscriptions.edit_correction') ?? false) || (currentUser?.has('subscriptions.activate') ?? false);
 
     return Obx(() {
       return DashboardLayout(
@@ -55,20 +61,22 @@ class SubscriptionTab extends StatelessWidget {
                         const Spacer(),
                         Row(
                           children: [
-
-                            Button(
-                              title: AppStrings.createSegment,
-                              buttonType: ButtonType.green,
-                              icon: Icons.add,
-                              onTap: () => navController.showCreateSegment(),
-                            ),
-                            const SizedBox(width: 12),
-                            Button(
-                              title: AppStrings.createNewPlan,
-                              buttonType: ButtonType.green,
-                              icon: Icons.add,
-                              onTap: () => navController.showCreatePlan(),
-                            ),
+                            if (canManageSegments)
+                              Button(
+                                title: AppStrings.createSegment,
+                                buttonType: ButtonType.green,
+                                icon: Icons.add,
+                                onTap: () => navController.showCreateSegment(),
+                              ),
+                            if (canManageSegments && canCreatePlan)
+                              const SizedBox(width: 12),
+                            if (canCreatePlan)
+                              Button(
+                                title: AppStrings.createNewPlan,
+                                buttonType: ButtonType.green,
+                                icon: Icons.add,
+                                onTap: () => navController.showCreatePlan(),
+                              ),
                           ],
                         ),
                       ],

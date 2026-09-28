@@ -15,6 +15,7 @@ class AuthController extends GetxController {
   final StaffService _staffService = Get.put(StaffService());
 
   var user = Rxn<UserModel>();
+  UserModel? get currentUser => user.value;
   var isAuthenticated = false.obs;
   var isInitialized = false.obs;
   var authToken = ''.obs;

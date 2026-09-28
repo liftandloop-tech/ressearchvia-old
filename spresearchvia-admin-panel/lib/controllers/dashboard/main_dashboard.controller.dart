@@ -50,9 +50,13 @@ class MainDashboardController extends GetxController {
     bool isAllowed = true;
     if (currentRoute.startsWith('/manage-user')) {
       isAllowed = user.canAccessDepartmentPage('Users') &&
-          ((user.hasPermission('Subscriptions', 'view')) ||
-          (user.hasPermission('Subscriptions', 'activate')) ||
-          (user.hasPermission('Users', 'update')));
+          (user.has('subscriptions.view') ||
+              user.has('subscriptions.activate') ||
+              user.has('users.update') ||
+              user.has('users.manage') ||
+              user.hasPermission('Subscriptions', 'view') ||
+              user.hasPermission('Subscriptions', 'activate') ||
+              user.hasPermission('Users', 'update'));
     } else if (currentRoute.startsWith('/users') ||
         currentRoute.startsWith('/edit-user')) {
       isAllowed = user.canAccessDepartmentPage('Users') && user.hasPermission('Users', 'read');
@@ -79,7 +83,9 @@ class MainDashboardController extends GetxController {
       isAllowed = false;
     } else if (currentRoute.startsWith('/subscriptions')) {
       if (currentRoute.startsWith('/subscriptions/plans/create')) {
-        isAllowed = user.isAdmin;
+        isAllowed = user.isAdmin ||
+            user.has('subscriptions.edit_correction') ||
+            user.has('subscriptions.activate');
       } else {
         isAllowed = user.canAccessDepartmentPage('Subscriptions') && user.hasPermission('Subscriptions', 'read');
       }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../config/theme.config.dart';
 import '../../../config/app.config.dart';
+import '../../../controllers/auth/auth.controller.dart';
 import '../../../controllers/settings/settings.controller.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
@@ -79,6 +80,11 @@ class GeneralSettingsScreen extends StatelessWidget {
   }
 
   Widget _buildBankDetailsCard(SettingsController controller) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canUpdateSettings = isAdmin || (currentUser?.has('settings.update') ?? false);
+
     return Obx(() {
       final editing = controller.isEditing.value;
       return Container(
@@ -129,7 +135,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (!editing)
+                if (!editing && canUpdateSettings)
                   OutlinedButton.icon(
                     onPressed: controller.startEditing,
                     icon: const Icon(Icons.edit_outlined, size: 16),
@@ -252,6 +258,11 @@ class GeneralSettingsScreen extends StatelessWidget {
   }
 
   Widget _buildDefaultRMCard(SettingsController controller) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canUpdateSettings = isAdmin || (currentUser?.has('settings.update') ?? false);
+
     return Obx(() {
       final editing = controller.isEditingRM.value;
       return Container(
@@ -315,22 +326,25 @@ class GeneralSettingsScreen extends StatelessWidget {
                   ],
                 ),
                 if (!editing)
-                  OutlinedButton.icon(
-                    onPressed: controller.startEditingRM,
-                    icon: const Icon(Icons.edit_outlined, size: 15),
-                    label: const Text('Edit RM', style: TextStyle(fontSize: 13)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primaryBlue,
-                      side: BorderSide(color: AppTheme.primaryBlue),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
+                  if (canUpdateSettings)
+                    OutlinedButton.icon(
+                      onPressed: controller.startEditingRM,
+                      icon: const Icon(Icons.edit_outlined, size: 15),
+                      label: const Text('Edit RM', style: TextStyle(fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primaryBlue,
+                        side: BorderSide(color: AppTheme.primaryBlue),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  )
+                    )
+                  else
+                    const SizedBox.shrink()
                 else
                   Row(
                     children: [
@@ -697,6 +711,11 @@ class GeneralSettingsScreen extends StatelessWidget {
     SettingsController controller, {
     required bool editing,
   }) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canUploadPaymentQr = isAdmin || (currentUser?.has('settings.upload_payment_qr') ?? false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -823,7 +842,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                if (editing)
+                if (editing && canUploadPaymentQr)
                   TextButton.icon(
                     onPressed: controller.removeQR,
                     icon: const Icon(
@@ -841,7 +860,7 @@ class GeneralSettingsScreen extends StatelessWidget {
           }
 
           // No QR yet
-          if (!editing) {
+          if (!editing || !canUploadPaymentQr) {
             return Text(
               'No QR Code uploaded',
               style: TextStyle(fontSize: 13, color: AppTheme.gray400),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription_navigation.controller.dart';
 import 'package:spresearch_web/ui/screens/subscription/widgets/segment_header.widget.dart';
@@ -16,6 +17,11 @@ class SegmentsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canManageSegments = isAdmin || (currentUser?.has('subscriptions.manage_segments') ?? false);
+
     return Obx(() {
       if (controller.isLoadingSegments.value) {
         return const TableSkeleton(
@@ -83,9 +89,13 @@ class SegmentsTable extends StatelessWidget {
               statusColor: segment.formattedStatus == 'Active'
                   ? AppTheme.successGreen
                   : AppTheme.errorRed,
-              onEdit: () => Get.find<SubscriptionNavigationController>()
-                  .showCreateSegment(segmentToEdit: segment),
-              onDelete: () => _confirmDelete(context, controller, segment),
+              onEdit: canManageSegments
+                  ? () => Get.find<SubscriptionNavigationController>()
+                      .showCreateSegment(segmentToEdit: segment)
+                  : null,
+              onDelete: canManageSegments
+                  ? () => _confirmDelete(context, controller, segment)
+                  : null,
             );
           }),
         ],
@@ -98,6 +108,12 @@ class SegmentsTable extends StatelessWidget {
     SubscriptionController controller,
     SegmentModel segment,
   ) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canManageSegments = isAdmin || (currentUser?.has('subscriptions.manage_segments') ?? false);
+    if (!canManageSegments) return;
+
     Get.dialog(
       AlertDialog(
         title: const Text('Delete Segment'),

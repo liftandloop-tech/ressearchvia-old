@@ -50,6 +50,11 @@ class KYCDocuments extends StatelessWidget {
     required Function(String) onChanged,
   }) {
     final currentStatus = status?.toUpperCase() ?? 'PENDING';
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canUpdateGate = isAdmin || (currentUser?.has('kyc.update_gate_status') ?? false);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -82,7 +87,7 @@ class KYCDocuments extends StatelessWidget {
                       ].contains(currentStatus)
                       ? currentStatus
                       : 'PENDING',
-                  icon: (Get.find<AuthController>().user.value?.hasPermission('KYC', 'update') ?? false)
+                  icon: canUpdateGate
                       ? Icon(
                           Icons.arrow_drop_down,
                           color: Colors.grey.shade600,
@@ -123,7 +128,7 @@ class KYCDocuments extends StatelessWidget {
                       ),
                     ),
                   ],
-                  onChanged: (Get.find<AuthController>().user.value?.hasPermission('KYC', 'update') ?? false)
+                  onChanged: canUpdateGate
                       ? (val) {
                           if (val != null && val != currentStatus)
                             onChanged(val);
@@ -158,6 +163,10 @@ class KYCDocuments extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final authController = Get.find<AuthController>();
+      final currentUser = authController.user.value;
+      final isAdmin = currentUser?.isAdmin == true;
+      final canUpdateFile = isAdmin || (currentUser?.has('kyc.update_file') ?? false);
+      final canDownloadDoc = isAdmin || (currentUser?.has('kyc.download_document') ?? false);
       final userDetails = controller.userDetails.value;
       if (userDetails == null || userDetails.id.isEmpty) {
         return const Center(child: CircularProgressIndicator());
@@ -263,7 +272,7 @@ class KYCDocuments extends StatelessWidget {
                         label: "Front Side",
                         imageUrl: aadhaarFrontUrl,
                       ),
-                      if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
+                      if (canUpdateFile)
                         Positioned(
                           top: 4,
                           left: 4,
@@ -293,7 +302,7 @@ class KYCDocuments extends StatelessWidget {
                         label: "Back Side",
                         imageUrl: aadhaarBackUrl,
                       ),
-                      if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
+                      if (canUpdateFile)
                         Positioned(
                           top: 4,
                           left: 4,
@@ -341,7 +350,7 @@ class KYCDocuments extends StatelessWidget {
               child: Stack(
                 children: [
                   KycDocPlaceholder(label: "PAN Card", imageUrl: panUrl),
-                  if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
+                  if (canUpdateFile)
                     Positioned(
                       top: 4,
                       left: 4,
@@ -383,7 +392,7 @@ class KYCDocuments extends StatelessWidget {
                     color: Colors.grey.shade700,
                   ),
                 ),
-                if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
+                if (canUpdateFile)
                   TextButton.icon(
                     onPressed: () => controller.updateDocument('video'),
                     icon: const Icon(Icons.edit, size: 16),
@@ -628,7 +637,7 @@ class KYCDocuments extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       // 1. Upload Button
-                      if (authController.user.value?.hasPermission('KYC', 'update') ?? false)
+                      if (canUpdateFile)
                         ElevatedButton.icon(
                           onPressed: controller.isLoading.value
                               ? null
@@ -654,7 +663,7 @@ class KYCDocuments extends StatelessWidget {
                         ),
                       // 2. Preview Button
                       OutlinedButton.icon(
-                        onPressed: userDetails.hasSignedDocument
+                        onPressed: (canDownloadDoc && userDetails.hasSignedDocument)
                             ? () => controller.previewSignedDocument()
                             : null,
                         icon: const Icon(Icons.visibility_rounded, size: 16),
@@ -662,7 +671,7 @@ class KYCDocuments extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF163174),
                           side: BorderSide(
-                            color: userDetails.hasSignedDocument
+                            color: (canDownloadDoc && userDetails.hasSignedDocument)
                                 ? const Color(0xFF163174)
                                 : Colors.grey.shade300,
                           ),
@@ -677,7 +686,7 @@ class KYCDocuments extends StatelessWidget {
                       ),
                       // 3. View Button
                       OutlinedButton.icon(
-                        onPressed: userDetails.hasSignedDocument
+                        onPressed: (canDownloadDoc && userDetails.hasSignedDocument)
                             ? () => controller.viewSignedDocument()
                             : null,
                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
@@ -685,7 +694,7 @@ class KYCDocuments extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF0284C7),
                           side: BorderSide(
-                            color: userDetails.hasSignedDocument
+                            color: (canDownloadDoc && userDetails.hasSignedDocument)
                                 ? const Color(0xFF0284C7)
                                 : Colors.grey.shade300,
                           ),

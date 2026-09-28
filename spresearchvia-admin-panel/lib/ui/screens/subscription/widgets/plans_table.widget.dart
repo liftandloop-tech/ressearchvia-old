@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription.controller.dart';
 import 'package:spresearch_web/controllers/subscription/subscription_navigation.controller.dart';
 import 'package:spresearch_web/models/subscription_plan.model.dart';
@@ -15,6 +16,11 @@ class PlansTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<SubscriptionController>();
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canEditPlan = isAdmin || (currentUser?.has('subscriptions.edit_correction') ?? false) || (currentUser?.has('subscriptions.activate') ?? false);
+    final canDeletePlan = isAdmin || (currentUser?.has('subscriptions.edit_correction') ?? false);
     return Obx(() {
       if (controller.isLoadingPlans.value && controller.plans.isEmpty) {
         return const SizedBox(
@@ -96,10 +102,13 @@ class PlansTable extends StatelessWidget {
                     status: plan.planStatus,
                     createdDate:
                         '${plan.createdAt.year}-${plan.createdAt.month.toString().padLeft(2, '0')}-${plan.createdAt.day.toString().padLeft(2, '0')}',
-                    onEdit: () => Get.find<SubscriptionNavigationController>()
-                        .showCreatePlan(planToEdit: plan),
-                    onDelete: () =>
-                        _confirmDeletePlan(context, controller, plan),
+                    onEdit: canEditPlan
+                        ? () => Get.find<SubscriptionNavigationController>()
+                            .showCreatePlan(planToEdit: plan)
+                        : null,
+                    onDelete: canDeletePlan
+                        ? () => _confirmDeletePlan(context, controller, plan)
+                        : null,
                   );
                 }),
               ],
@@ -117,6 +126,12 @@ class PlansTable extends StatelessWidget {
     SubscriptionController controller,
     SubscriptionPlanModel plan,
   ) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canDeletePlan = isAdmin || (currentUser?.has('subscriptions.edit_correction') ?? false);
+    if (!canDeletePlan) return;
+
     Get.dialog(
       AlertDialog(
         title: const Text('Delete Plan'),

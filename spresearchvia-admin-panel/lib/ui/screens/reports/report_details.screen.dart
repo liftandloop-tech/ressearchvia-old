@@ -16,6 +16,14 @@ class ReportDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navController = Get.find<ReportsNavigationController>();
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canUpdateReport = isAdmin || (currentUser?.has('reports.update') ?? false);
+    final canChangePublicStatus = isAdmin || (currentUser?.has('reports.change_public_status') ?? false);
+    final canDeleteReport = isAdmin || (currentUser?.has('reports.delete') ?? false);
+    final hasAnyAction = canUpdateReport || canChangePublicStatus || canDeleteReport;
+
     return Container(
       color: AppTheme.gray50,
       child: SingleChildScrollView(
@@ -102,8 +110,7 @@ class ReportDetailsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      if ((Get.find<AuthController>().user.value?.isAdmin ?? false) ||
-                          (Get.find<AuthController>().user.value?.has('reports.update') ?? false))
+                      if (canUpdateReport)
                         ElevatedButton(
                           onPressed: () => navController.showUploadReport(
                             reportToEdit: report,
@@ -550,9 +557,8 @@ class ReportDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      if ((Get.find<AuthController>().user.value?.isAdmin ?? false) ||
-                          (Get.find<AuthController>().user.value?.has('reports.update') ?? false))
+                      if (hasAnyAction) ...[
+                        const SizedBox(height: 24),
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -571,123 +577,130 @@ class ReportDetailsScreen extends StatelessWidget {
                                   color: AppTheme.textPrimary,
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: () => navController.showUploadReport(
-                                  reportToEdit: report,
-                                ),
-                                icon: const Icon(Icons.edit, size: 18),
-                                label: const Text(
-                                  'Edit Report',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryBlue,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
+                              if (canUpdateReport) ...[
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: () => navController.showUploadReport(
+                                    reportToEdit: report,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
+                                  icon: const Icon(Icons.edit, size: 18),
+                                  label: const Text(
+                                    'Edit Report',
+                                    style: TextStyle(fontSize: 14),
                                   ),
-                                  elevation: 0,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  final controller =
-                                      Get.find<ReportController>();
-                                  await controller.togglePublishStatus(report);
-                                  navController.goBack();
-                                },
-                                icon: Icon(
-                                  report.status == 'Published'
-                                      ? Icons.unpublished
-                                      : Icons.publish,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  report.status == 'Published'
-                                      ? 'Unpublish'
-                                      : 'Publish',
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: report.status == 'Published'
-                                      ? AppTheme.statusErrorLight.withOpacity(
-                                          0.8,
-                                        )
-                                      : AppTheme.successGreen,
-                                  foregroundColor: report.status == 'Published'
-                                      ? AppTheme.errorRed
-                                      : Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  elevation: 0,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Get.dialog(
-                                    AlertDialog(
-                                      title: const Text('Delete Report'),
-                                      content: const Text(
-                                        'Are you sure you want to delete this report? This action cannot be undone.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Get.back(),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            if (Get.isSnackbarOpen) {
-                                              Get.closeAllSnackbars();
-                                            }
-                                            Get.back();
-                                            final controller =
-                                                Get.find<ReportController>();
-                                            final deleted = await controller
-                                                .deleteReport(report.id);
-                                            if (deleted) {
-                                              navController.goBack();
-                                            }
-                                          },
-                                          child: const Text(
-                                            'Delete',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryBlue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                  );
-                                },
-                                icon: const Icon(Icons.delete, size: 18),
-                                label: const Text(
-                                  'Delete Report',
-                                  style: TextStyle(fontSize: 14),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.errorRed,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    elevation: 0,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  elevation: 0,
                                 ),
-                              ),
+                              ],
+                              if (canChangePublicStatus) ...[
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final controller =
+                                        Get.find<ReportController>();
+                                    await controller.togglePublishStatus(report);
+                                    navController.goBack();
+                                  },
+                                  icon: Icon(
+                                    report.status == 'Published'
+                                        ? Icons.unpublished
+                                        : Icons.publish,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    report.status == 'Published'
+                                        ? 'Unpublish'
+                                        : 'Publish',
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: report.status == 'Published'
+                                        ? AppTheme.statusErrorLight.withOpacity(
+                                            0.8,
+                                          )
+                                        : AppTheme.successGreen,
+                                    foregroundColor: report.status == 'Published'
+                                        ? AppTheme.errorRed
+                                        : Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              ],
+                              if (canDeleteReport) ...[
+                                const SizedBox(height: 12),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Get.dialog(
+                                      AlertDialog(
+                                        title: const Text('Delete Report'),
+                                        content: const Text(
+                                          'Are you sure you want to delete this report? This action cannot be undone.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Get.back(),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              if (Get.isSnackbarOpen) {
+                                                Get.closeAllSnackbars();
+                                              }
+                                              Get.back();
+                                              final controller =
+                                                  Get.find<ReportController>();
+                                              final deleted = await controller
+                                                  .deleteReport(report.id);
+                                              if (deleted) {
+                                                navController.goBack();
+                                              }
+                                            },
+                                            child: const Text(
+                                              'Delete',
+                                              style: TextStyle(color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.delete, size: 18),
+                                  label: const Text(
+                                    'Delete Report',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.errorRed,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard_management.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 
 class RenewalRow extends StatelessWidget {
@@ -10,6 +11,13 @@ class RenewalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canAssign = isAdmin ||
+        (currentUser?.has('staff.assignment') ?? false) ||
+        (currentUser?.has('staff.update') ?? false) ||
+        (currentUser?.has('users.update') ?? false);
     final kycStatusColors = _getKycStatusColors(
       renewal['kycStatus'] ?? 'Pending',
     );
@@ -217,11 +225,13 @@ class RenewalRow extends StatelessWidget {
                         ),
                       );
                     }).toList(),
-                    onChanged: (v) {
-                      if (v != null) {
-                        dmController.assignManager(renewal['id'], v);
-                      }
-                    },
+                    onChanged: canAssign
+                        ? (v) {
+                            if (v != null) {
+                              dmController.assignManager(renewal['id'], v);
+                            }
+                          }
+                        : null,
                   );
                 }),
               ),

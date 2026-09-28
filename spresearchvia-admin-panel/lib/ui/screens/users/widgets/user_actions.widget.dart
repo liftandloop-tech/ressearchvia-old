@@ -16,19 +16,23 @@ class UserActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authController = Get.find<AuthController>();
-    final canManageSubscription = (authController.user.value?.isAdmin == true) ||
-        (authController.user.value?.has('subscriptions.activate') ?? false) ||
-        (authController.user.value?.has('subscriptions.revoke') ?? false) ||
-        (authController.user.value?.has('subscriptions.view') ?? false);
-    final canEditUser = (authController.user.value?.isAdmin == true) ||
-        (authController.user.value?.has('users.update') ?? false);
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canAssignEntitlements = isAdmin ||
+        (currentUser?.has('subscriptions.activate') ?? false);
+    final canManageSubscription = isAdmin ||
+        (currentUser?.has('subscriptions.activate') ?? false) ||
+        (currentUser?.has('subscriptions.revoke') ?? false) ||
+        (currentUser?.has('subscriptions.edit_correction') ?? false);
+    final canEditUser = isAdmin ||
+        (currentUser?.has('users.update') ?? false);
 
     return Expanded(
       flex: flex,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (canManageSubscription)
+          if (canAssignEntitlements)
             IconButton(
               icon: const Icon(
                 Icons.verified_user_outlined,

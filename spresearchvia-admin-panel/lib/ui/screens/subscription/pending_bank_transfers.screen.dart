@@ -1429,6 +1429,9 @@ class PendingBankTransfersScreen extends StatelessWidget {
     final bool isPartial = payment['isPartial'] == true;
     final String status = payment['status']?.toString() ?? 'PENDING';
     final bool canAct = controller.canTakePaymentActions;
+    final bool canApprove = controller.canApprovePayments;
+    final bool canReject = controller.canRejectPayments;
+    final bool canEditCorrection = controller.canEditCorrections;
 
     final Map<String, dynamic> plan = (payment['segmentPlanId'] is Map)
         ? Map<String, dynamic>.from(payment['segmentPlanId'])
@@ -1715,7 +1718,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       if (discount > 0)
                         Expanded(
                           child: InkWell(
-                            onTap: canAct
+                            onTap: canEditCorrection
                                 ? () => controller.showDiscountDialog(
                                       payment,
                                       onUpdated: onPaymentUpdated,
@@ -1779,7 +1782,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                     )
                   else
                     Table(
-                      columnWidths: canAct
+                      columnWidths: (canAct || canEditCorrection)
                           ? const {
                               0: FlexColumnWidth(1.5),
                               1: FlexColumnWidth(2.2),
@@ -1836,7 +1839,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                       fontWeight: FontWeight.bold,
                                       fontSize: 11)),
                             ),
-                            if (canAct)
+                            if (canAct || canEditCorrection)
                               const Padding(
                                 padding: EdgeInsets.all(8.0),
                                 child: Text('Actions',
@@ -1920,7 +1923,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                 child: _buildStatusChip(
                                     inst['status'] ?? 'PENDING'),
                               ),
-                              if (canAct)
+                              if (canAct || canEditCorrection)
                                 Padding(
                                   padding: const EdgeInsets.all(6.0),
                                   child: Wrap(
@@ -1929,14 +1932,15 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                     crossAxisAlignment:
                                         WrapCrossAlignment.center,
                                     children: [
-                                      _buildCorrectFinancialsButton(
-                                        onTap: () => controller.showCorrectionDialog(
-                                          payment,
-                                          installment: inst,
-                                          onPaymentUpdated: onPaymentUpdated,
+                                      if (canEditCorrection)
+                                        _buildCorrectFinancialsButton(
+                                          onTap: () => controller.showCorrectionDialog(
+                                            payment,
+                                            installment: inst,
+                                            onPaymentUpdated: onPaymentUpdated,
+                                          ),
                                         ),
-                                      ),
-                                      if (isInstPending) ...[
+                                      if (isInstPending && canApprove) ...[
                                         Button(
                                           title: "Approve",
                                           buttonType: ButtonType.green,
@@ -1953,6 +1957,8 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                             );
                                           },
                                         ),
+                                      ],
+                                      if (isInstPending && canReject) ...[
                                         Button(
                                           title: "Reject",
                                           buttonType: ButtonType.red,
@@ -1976,7 +1982,8 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                             );
                                           },
                                         ),
-                                      ] else if (isInstApproved) ...[
+                                      ],
+                                      if (isInstApproved && canReject) ...[
                                         Button(
                                           title: "Revert",
                                           buttonType: ButtonType.red,
@@ -2002,7 +2009,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                             );
                                           },
                                         ),
-                                      ] else if (isInstRejected) ...[
+                                      ] else if (isInstRejected && canApprove) ...[
                                         Button(
                                           title: "Restore",
                                           buttonType: ButtonType.green,
@@ -2029,7 +2036,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                             );
                                           },
                                         ),
-                                      ] else ...[
+                                      ] else if (!isInstPending) ...[
                                         const Icon(Icons.check,
                                             size: 16, color: Colors.green),
                                       ],
@@ -2154,44 +2161,49 @@ class PendingBankTransfersScreen extends StatelessWidget {
                             if (status != 'PAID' &&
                                 status != 'APPROVED' &&
                                 status != 'REJECTED') ...[
-                              if (canAct)
+                              if (canAct || canEditCorrection)
                                 Row(
                                   children: [
-                                    _buildCorrectFinancialsButton(
-                                      isSmall: false,
-                                      onTap: () => controller.showCorrectionDialog(
-                                        payment,
-                                        onPaymentUpdated: onPaymentUpdated,
+                                    if (canEditCorrection) ...[
+                                      _buildCorrectFinancialsButton(
+                                        isSmall: false,
+                                        onTap: () => controller.showCorrectionDialog(
+                                          payment,
+                                          onPaymentUpdated: onPaymentUpdated,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Button(
-                                        title: "Approve & Activate",
-                                        buttonType: ButtonType.green,
-                                        size: ButtonSize.medium,
-                                        onTap: () {
-                                          _showRemarkPopup(
-                                            intentId: intentId,
-                                            controller: controller,
-                                            isFullPayment: true,
-                                            payment: payment,
-                                            discount: discount,
-                                          );
-                                        },
+                                      const SizedBox(width: 10),
+                                    ],
+                                    if (canApprove)
+                                      Expanded(
+                                        child: Button(
+                                          title: "Approve & Activate",
+                                          buttonType: ButtonType.green,
+                                          size: ButtonSize.medium,
+                                          onTap: () {
+                                            _showRemarkPopup(
+                                              intentId: intentId,
+                                              controller: controller,
+                                              isFullPayment: true,
+                                              payment: payment,
+                                              discount: discount,
+                                            );
+                                          },
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Button(
-                                        title: "Reject",
-                                        buttonType: ButtonType.red,
-                                        size: ButtonSize.medium,
-                                        onTap: () {
-                                          controller.rejectTransfer(payment);
-                                        },
+                                    if (canApprove && canReject)
+                                      const SizedBox(width: 8),
+                                    if (canReject)
+                                      Expanded(
+                                        child: Button(
+                                          title: "Reject",
+                                          buttonType: ButtonType.red,
+                                          size: ButtonSize.medium,
+                                          onTap: () {
+                                            controller.rejectTransfer(payment);
+                                          },
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 )
                               else
@@ -2224,7 +2236,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                             ] else ...[
                               Row(
                                 children: [
-                                  if (canAct) ...[
+                                  if (canEditCorrection) ...[
                                     _buildCorrectFinancialsButton(
                                       isSmall: true,
                                       onTap: () => controller.showCorrectionDialog(
@@ -2282,47 +2294,46 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  if (canAct) ...[
+                                  if (canReject && (status == 'PAID' || status == 'APPROVED')) ...[
                                     const SizedBox(width: 12),
-                                    if (status == 'PAID' ||
-                                        status == 'APPROVED')
-                                      Button(
-                                        title: "REVERT APPROVAL",
-                                        buttonType: ButtonType.red,
-                                        size: ButtonSize.small,
-                                        onTap: () {
-                                          _showRevertConfirmation(
-                                            title: "Revert Approval?",
-                                            message:
-                                                "This will REJECT the payment and DELETE all created entitlements, invoices, and plan purchases.",
-                                            onConfirm: (reason) {
-                                              controller.revertApprovalAction(
-                                                  intentId,
-                                                  reason: reason);
-                                            },
-                                          );
-                                        },
-                                      )
-                                    else if (status == 'REJECTED')
-                                      Button(
-                                        title: "RESTORE & APPROVE",
-                                        buttonType: ButtonType.green,
-                                        size: ButtonSize.small,
-                                        onTap: () {
-                                          _showRevertConfirmation(
-                                            title: "Restore & Approve?",
-                                            message:
-                                                "This will RESTORE the payment to Approved state and RECREATE all entitlements and invoices.",
-                                            confirmColor: Colors.green,
-                                            onConfirm: (reason) {
-                                              controller.revertRejectionAction(
-                                                  intentId,
-                                                  historyId: null,
-                                                  reason: reason);
-                                            },
-                                          );
-                                        },
-                                      ),
+                                    Button(
+                                      title: "REVERT APPROVAL",
+                                      buttonType: ButtonType.red,
+                                      size: ButtonSize.small,
+                                      onTap: () {
+                                        _showRevertConfirmation(
+                                          title: "Revert Approval?",
+                                          message:
+                                              "This will REJECT the payment and DELETE all created entitlements, invoices, and plan purchases.",
+                                          onConfirm: (reason) {
+                                            controller.revertApprovalAction(
+                                                intentId,
+                                                reason: reason);
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ] else if (canApprove && status == 'REJECTED') ...[
+                                    const SizedBox(width: 12),
+                                    Button(
+                                      title: "RESTORE & APPROVE",
+                                      buttonType: ButtonType.green,
+                                      size: ButtonSize.small,
+                                      onTap: () {
+                                        _showRevertConfirmation(
+                                          title: "Restore & Approve?",
+                                          message:
+                                              "This will RESTORE the payment to Approved state and RECREATE all entitlements and invoices.",
+                                          confirmColor: Colors.green,
+                                          onConfirm: (reason) {
+                                            controller.revertRejectionAction(
+                                                intentId,
+                                                historyId: null,
+                                                reason: reason);
+                                          },
+                                        );
+                                      },
+                                    ),
                                   ],
                                 ],
                               ),
@@ -2335,7 +2346,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                 ],
 
                 // Admin Correction Buttons footer for this payment
-                if (canAct) ...[
+                if (canEditCorrection) ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1),
                   const SizedBox(height: 12),

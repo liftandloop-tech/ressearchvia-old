@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
@@ -17,6 +18,9 @@ class StaffScreen extends StatelessWidget {
     final controller = Get.isRegistered<StaffController>()
         ? Get.find<StaffController>()
         : Get.put(StaffController(), permanent: true);
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final canCreateStaff = currentUser?.isAdmin == true || (currentUser?.has('staff.create') ?? false);
 
     return DashboardLayout(
       child: Container(
@@ -65,15 +69,16 @@ class StaffScreen extends StatelessWidget {
                                 ),
                                 tooltip: 'Refresh Staff List',
                               ),
-                              Button(
-                                title: AppStrings.addNewStaff,
-                                buttonType: ButtonType.green,
-                                icon: Icons.add,
-                                onTap: () {
-                                  controller.resetForm();
-                                  Get.toNamed('/staff/create');
-                                },
-                              ),
+                              if (canCreateStaff)
+                                Button(
+                                  title: AppStrings.addNewStaff,
+                                  buttonType: ButtonType.green,
+                                  icon: Icons.add,
+                                  onTap: () {
+                                    controller.resetForm();
+                                    Get.toNamed('/staff/create');
+                                  },
+                                ),
                             ],
                           );
 

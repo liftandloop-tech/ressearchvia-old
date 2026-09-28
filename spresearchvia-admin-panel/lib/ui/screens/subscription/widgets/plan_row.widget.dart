@@ -88,23 +88,26 @@ class PlanRow extends TableRow {
              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
              child: Row(
                children: [
-                 IconButton(
-                   onPressed: onEdit,
-                   icon: Icon(
-                     Icons.edit,
-                     size: 18,
-                     color: AppTheme.primaryBlue,
+                 if (onEdit != null)
+                   IconButton(
+                     onPressed: onEdit,
+                     icon: Icon(
+                       Icons.edit,
+                       size: 18,
+                       color: AppTheme.primaryBlue,
+                     ),
+                     padding: EdgeInsets.zero,
+                     constraints: BoxConstraints(),
                    ),
-                   padding: EdgeInsets.zero,
-                   constraints: BoxConstraints(),
-                 ),
-                 const SizedBox(width: 8),
-                 IconButton(
-                   onPressed: onDelete,
-                   icon: Icon(Icons.delete, size: 18, color: AppTheme.errorRed),
-                   padding: EdgeInsets.zero,
-                   constraints: BoxConstraints(),
-                 ),
+                 if (onEdit != null && onDelete != null)
+                   const SizedBox(width: 8),
+                 if (onDelete != null)
+                   IconButton(
+                     onPressed: onDelete,
+                     icon: Icon(Icons.delete, size: 18, color: AppTheme.errorRed),
+                     padding: EdgeInsets.zero,
+                     constraints: BoxConstraints(),
+                   ),
                ],
              ),
            ),

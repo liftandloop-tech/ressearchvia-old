@@ -85,38 +85,52 @@ class DashboardManagementController extends GetxController {
       );
 
       if (staffList.isEmpty || query == null) {
-        final renewals = await _dashboardService.getRenewalsList();
-        renewalsList.value = renewals;
+        try {
+          final renewals = await _dashboardService.getRenewalsList();
+          renewalsList.value = renewals;
+        } catch (e) {
+          debugPrint('DashboardManagementController: Error fetching renewals: $e');
+        }
 
-        final payments = await _dashboardService.getRecentPayments();
-        recentPayments.value = payments;
+        try {
+          final payments = await _dashboardService.getRecentPayments();
+          recentPayments.value = payments;
+        } catch (e) {
+          debugPrint('DashboardManagementController: Error fetching recent payments: $e');
+        }
 
-        final staff = await _staffService.getStaffList();
-        if (Get.isRegistered<AuthController>()) {
-          final auth = Get.find<AuthController>();
-          final user = auth.user.value;
-          if (user != null && !user.isAdmin) {
-            if (staff.isNotEmpty) {
-              staffList.value = staff;
+        try {
+          final staff = await _staffService.getStaffList();
+          if (Get.isRegistered<AuthController>()) {
+            final auth = Get.find<AuthController>();
+            final user = auth.user.value;
+            if (user != null && !user.isAdmin) {
+              if (staff.isNotEmpty) {
+                staffList.value = staff;
+              } else {
+                staffList.value = [
+                  StaffModel(
+                    id: user.id,
+                    staffId: user.userId ?? user.id,
+                    name: user.fullName,
+                    email: user.email,
+                    mobile: user.mobile,
+                    role: user.roleName.isNotEmpty ? user.roleName : 'Staff',
+                    status: 'Active',
+                    department: user.departmentName.isNotEmpty
+                        ? user.departmentName
+                        : 'Sales',
+                  )
+                ];
+              }
             } else {
-              staffList.value = [
-                StaffModel(
-                  id: user.id,
-                  staffId: user.userId ?? user.id,
-                  name: user.fullName,
-                  email: user.email,
-                  mobile: user.mobile,
-                  role: user.subscriptionPlan,
-                  status: 'Active',
-                  department: user.subscriptionPlan,
-                )
-              ];
+              staffList.value = staff;
             }
           } else {
             staffList.value = staff;
           }
-        } else {
-          staffList.value = staff;
+        } catch (e) {
+          debugPrint('DashboardManagementController: Error fetching staff list: $e');
         }
       }
     } catch (e) {

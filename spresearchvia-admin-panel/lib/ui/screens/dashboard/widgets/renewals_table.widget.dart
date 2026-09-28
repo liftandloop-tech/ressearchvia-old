@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard_management.controller.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 
 class RenewalsTable extends StatelessWidget {
   const RenewalsTable({super.key});
@@ -281,6 +282,13 @@ class ClientListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canAssign = isAdmin ||
+        (currentUser?.has('staff.assignment') ?? false) ||
+        (currentUser?.has('staff.update') ?? false) ||
+        (currentUser?.has('users.update') ?? false);
     final kycStatusColors = _getKycStatusColors(item['kycStatus'] ?? 'Pending');
 
     return Container(
@@ -486,11 +494,13 @@ class ClientListTile extends StatelessWidget {
                         ),
                       );
                     }).toList(),
-                    onChanged: (v) {
-                      if (v != null) {
-                        dmController.assignManager(item['id'], v);
-                      }
-                    },
+                    onChanged: canAssign
+                        ? (v) {
+                            if (v != null) {
+                              dmController.assignManager(item['id'], v);
+                            }
+                          }
+                        : null,
                   );
                 }),
               ),

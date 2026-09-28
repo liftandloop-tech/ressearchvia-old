@@ -82,6 +82,14 @@ class PendingBankTransfersController extends GetxController {
   bool get canTakePaymentActions => (effectiveUser?.isAdmin ?? false) ||
       (effectiveUser?.has('payments.approve') ?? false) ||
       (effectiveUser?.has('payments.reject') ?? false);
+  bool get canApprovePayments => (effectiveUser?.isAdmin ?? false) ||
+      (effectiveUser?.has('payments.approve') ?? false);
+  bool get canRejectPayments => (effectiveUser?.isAdmin ?? false) ||
+      (effectiveUser?.has('payments.reject') ?? false);
+  bool get canEditCorrections => (effectiveUser?.isAdmin ?? false) ||
+      (effectiveUser?.has('subscriptions.edit_correction') ?? false);
+  bool get canExportPayments => (effectiveUser?.isAdmin ?? false) ||
+      (effectiveUser?.has('payments.export') ?? false);
 
   // Correction Engine Observables
   var segments = <Map<String, dynamic>>[].obs;

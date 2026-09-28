@@ -84,79 +84,66 @@ class FilterDropdownField extends StatelessWidget {
                   ),
                 ),
               )
-            : SizedBox(
-                height: height,
-                child: PopupMenuButton<String>(
-                  initialValue: effectiveValue,
-                  onSelected: onChanged,
-                  offset: Offset(0, height + 4),
-                  constraints: const BoxConstraints(
-                    minWidth: 140,
-                    maxHeight: 320,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  color: Colors.white,
-                  elevation: 4,
-                  itemBuilder: (context) => uniqueItems
-                      .map(
-                        (e) => PopupMenuItem<String>(
-                          value: e,
-                          height: 36,
-                          child: Text(
-                            e,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: e == effectiveValue
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: e == effectiveValue
-                                  ? AppTheme.primaryBlue
-                                  : AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(
-                        color: effectiveValue != null &&
-                                effectiveValue != 'All Staff' &&
-                                effectiveValue != 'All Departments' &&
-                                effectiveValue != 'All'
-                            ? AppTheme.primaryBlue.withOpacity(0.5)
-                            : AppTheme.gray300,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            effectiveValue ?? '',
-                            style: TextStyle(
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Icon(
-                          icon ?? Icons.keyboard_arrow_down_rounded,
-                          size: 16,
-                          color: AppTheme.gray500,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            : Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(
+              color: effectiveValue != null &&
+                      effectiveValue != 'All Staff' &&
+                      effectiveValue != 'All Departments' &&
+                      effectiveValue != 'All' &&
+                      effectiveValue != 'All Time'
+                  ? AppTheme.primaryBlue.withOpacity(0.5)
+                  : AppTheme.gray300,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: effectiveValue,
+              isExpanded: true,
+              isDense: true,
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              dropdownColor: Colors.white,
+              menuMaxHeight: 320,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              icon: Icon(
+                icon ?? Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: AppTheme.gray500,
               ),
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textPrimary,
+              ),
+              items: uniqueItems
+                  .map(
+                    (e) => DropdownMenuItem<String>(
+                      value: e,
+                      child: Text(
+                        e,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: e == effectiveValue
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: e == effectiveValue
+                              ? AppTheme.primaryBlue
+                              : AppTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: uniqueItems.isEmpty ? null : onChanged,
+            ),
+          ),
+        ),
       ],
     );
   }

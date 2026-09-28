@@ -13,7 +13,13 @@ class TableManagerDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userManagementController = Get.find<UserManagementController>();
-    // final controller = Get.find<UserController>(); // UserManagementController handles this now
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canAssign = isAdmin ||
+        (currentUser?.has('staff.assignment') ?? false) ||
+        (currentUser?.has('staff.update') ?? false) ||
+        (currentUser?.has('users.update') ?? false);
 
     return Obx(() {
       final rawManagers = userManagementController.managers;
@@ -140,7 +146,7 @@ class TableManagerDropdown extends StatelessWidget {
                 ),
               ),
             ],
-            onChanged: (Get.find<AuthController>().user.value?.hasPermission('Users', 'assignRM') ?? false)
+            onChanged: canAssign
                 ? (value) {
                     if (value != null && value != 'unassigned') {
                       userManagementController.assignManager(user.id, value);

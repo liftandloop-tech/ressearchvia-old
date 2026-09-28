@@ -222,7 +222,8 @@ class DashboardService extends ApiService {
       final response = await get('/user/purchase/recent-plan-payment-list');
 
       if (response.status.hasError) {
-        return await Future.error(response.statusText ?? 'Error fetching data');
+        debugPrint('Recent payments endpoint returned error: ${response.statusCode}');
+        return [];
       }
 
       final body = _parseBody(response.body);

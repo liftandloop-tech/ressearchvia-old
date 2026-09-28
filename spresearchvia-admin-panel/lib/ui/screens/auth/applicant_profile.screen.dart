@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/recruitment/applicant_profile.controller.dart';
 import 'package:spresearch_web/ui/widgets/button.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
@@ -45,6 +46,9 @@ class ApplicantProfileScreen extends StatelessWidget {
         }
 
         final isApproved = applicant.stage == 'Employee';
+        final authController = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+        final currentUser = authController?.user.value;
+        final canApproveApplicant = currentUser?.isAdmin == true || (currentUser?.has('staff.approve_applicant') ?? false);
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(32),
@@ -195,13 +199,14 @@ class ApplicantProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
 
-                    if (!isApproved)
-                      Button(
-                        title: 'Approve & Promote to Employee',
-                        buttonType: ButtonType.green,
-                        onTap: () => _showApproveDialog(context, controller, applicant),
-                      )
-                    else
+                    if (!isApproved) ...[
+                      if (canApproveApplicant)
+                        Button(
+                          title: 'Approve & Promote to Employee',
+                          buttonType: ButtonType.green,
+                          onTap: () => _showApproveDialog(context, controller, applicant),
+                        ),
+                    ] else
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -319,6 +324,11 @@ class ApplicantProfileScreen extends StatelessWidget {
   }
 
   void _showApproveDialog(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
+    final authController = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    final currentUser = authController?.user.value;
+    final canApproveApplicant = currentUser?.isAdmin == true || (currentUser?.has('staff.approve_applicant') ?? false);
+    if (!canApproveApplicant) return;
+
     controller.mpinController.clear();
     controller.selectedRoleId.value = null;
     controller.selectedRole.value = '';

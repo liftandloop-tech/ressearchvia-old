@@ -118,7 +118,8 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (controller.isAdmin &&
+                                    if ((controller.isAdmin ||
+                                            (Get.find<AuthController>().user.value?.has('subscriptions.edit_correction') ?? false)) &&
                                         (sub['paymentIntentId'] != null ||
                                             sub['_id'] != null)) ...[
                                       const SizedBox(width: 8),

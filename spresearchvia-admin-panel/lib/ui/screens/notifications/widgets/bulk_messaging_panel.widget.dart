@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/notifications/bulk_messaging.controller.dart';
 import '../../../widgets/button.widget.dart';
 import 'notification_dropdown.widget.dart';
@@ -12,6 +13,11 @@ class BulkMessagingPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(BulkMessagingController());
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canSendBulkEmail = isAdmin || (currentUser?.has('notifications.send_bulk_email') ?? false);
+    final canPreview = isAdmin || (currentUser?.has('notifications.preview') ?? false);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -181,22 +187,25 @@ class BulkMessagingPanel extends StatelessWidget {
             const SizedBox(height: 20),
             Row(
               children: [
-                Button(
-                  title: controller.isPreviewMode.value ? 'Edit' : 'Preview',
-                  buttonType: ButtonType.white,
-                  icon: controller.isPreviewMode.value
-                      ? Icons.edit
-                      : Icons.visibility,
-                  onTap: controller.togglePreview,
-                ),
-                const SizedBox(width: 16),
-                Button(
-                  title: 'Send Email',
-                  buttonType: ButtonType.green,
-                  icon: Icons.send,
-                  onTap: controller.sendMessage,
-                  showLoading: controller.isLoading.value,
-                ),
+                if (canPreview)
+                  Button(
+                    title: controller.isPreviewMode.value ? 'Edit' : 'Preview',
+                    buttonType: ButtonType.white,
+                    icon: controller.isPreviewMode.value
+                        ? Icons.edit
+                        : Icons.visibility,
+                    onTap: controller.togglePreview,
+                  ),
+                if (canPreview && canSendBulkEmail)
+                  const SizedBox(width: 16),
+                if (canSendBulkEmail)
+                  Button(
+                    title: 'Send Email',
+                    buttonType: ButtonType.green,
+                    icon: Icons.send,
+                    onTap: controller.sendMessage,
+                    showLoading: controller.isLoading.value,
+                  ),
               ],
             ),
 

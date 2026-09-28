@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/staff/staff_details.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
@@ -106,6 +107,10 @@ class StaffDetailsScreen extends StatelessWidget {
   // Top Header Area
   // ---------------------------------------------------------------------------
   Widget _buildHeader(BuildContext context, StaffModel staff) {
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final canUpdate = currentUser?.isAdmin == true || (currentUser?.has('staff.update') ?? false);
+
     return Row(
       children: [
         InkWell(
@@ -157,19 +162,21 @@ class StaffDetailsScreen extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
           ),
         ),
-        const SizedBox(width: 10),
-        ElevatedButton.icon(
-          onPressed: () => Get.toNamed('/staff/edit/${staff.id}'),
-          icon: const Icon(Icons.edit_outlined, size: 15),
-          label: const Text('Edit Staff', style: TextStyle(fontSize: 12.5)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryBlue,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+        if (canUpdate) ...[
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: () => Get.toNamed('/staff/edit/${staff.id}'),
+            icon: const Icon(Icons.edit_outlined, size: 15),
+            label: const Text('Edit Staff', style: TextStyle(fontSize: 12.5)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

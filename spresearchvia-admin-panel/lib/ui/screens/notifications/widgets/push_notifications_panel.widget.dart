@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/notifications/push_notifications.controller.dart';
 
 class PushNotificationsPanel extends StatelessWidget {
@@ -10,6 +11,11 @@ class PushNotificationsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(PushNotificationsController());
+    final authController = Get.find<AuthController>();
+    final currentUser = authController.user.value;
+    final isAdmin = currentUser?.isAdmin == true;
+    final canSend = isAdmin || (currentUser?.has('notifications.send') ?? false);
+    final canCancelScheduled = isAdmin || (currentUser?.has('notifications.cancel_scheduled') ?? false);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -576,42 +582,44 @@ class PushNotificationsPanel extends StatelessWidget {
                   style: const TextStyle(fontSize: 14),
                 ),
               ),
-              const SizedBox(width: 12),
-              Obx(
-                () => ElevatedButton.icon(
-                  onPressed: controller.isLoading.value
-                      ? null
-                      : controller.sendNotification,
-                  icon: controller.isLoading.value
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(Icons.send, size: 18),
-                  label: Text(
-                    controller.isLoading.value
-                        ? 'Sending...'
-                        : AppStrings.sendNotification,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.successGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+              if (canSend) ...[
+                const SizedBox(width: 12),
+                Obx(
+                  () => ElevatedButton.icon(
+                    onPressed: controller.isLoading.value
+                        ? null
+                        : controller.sendNotification,
+                    icon: controller.isLoading.value
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.send, size: 18),
+                    label: Text(
+                      controller.isLoading.value
+                          ? 'Sending...'
+                          : AppStrings.sendNotification,
+                      style: const TextStyle(fontSize: 14),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.successGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      elevation: 0,
                     ),
-                    elevation: 0,
                   ),
                 ),
-              ),
+              ],
             ],
           ),
 
@@ -686,7 +694,7 @@ class PushNotificationsPanel extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (status == 'pending')
+                      if (status == 'pending' && canCancelScheduled)
                         IconButton(
                           icon: const Icon(
                             Icons.delete_outline,
