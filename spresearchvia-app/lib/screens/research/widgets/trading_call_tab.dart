@@ -23,62 +23,88 @@ class TradingCallTab extends StatelessWidget {
       }
 
       if (reportController.tradingCalls.isEmpty) {
-        return Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryBlue.withOpacity(0.05),
-                    shape: BoxShape.circle,
+        if (!reportController.hasActiveSubscription.value) {
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withValues(alpha: 0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline,
+                      size: 72,
+                      color: AppTheme.primaryBlue,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.lock_outline,
-                    size: 72,
-                    color: AppTheme.primaryBlue,
+                  const SizedBox(height: 24),
+                  const Text(
+                    'No active Research plans',
+                    textAlign: TextAlign.center,
+                    style: AppStyles.heading2,
                   ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'No active Research plans',
-                  textAlign: TextAlign.center,
-                  style: AppStyles.heading2,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Trading calls Access requires an active Research plan.',
-                  textAlign: TextAlign.center,
-                  style: AppStyles.bodyMedium.copyWith(
-                    color: AppTheme.textGrey,
-                    height: 1.5,
+                  const SizedBox(height: 12),
+                  Text(
+                    'Trading calls Access requires an active Research plan.',
+                    textAlign: TextAlign.center,
+                    style: AppStyles.bodyMedium.copyWith(
+                      color: AppTheme.textGrey,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Get.toNamed('/quick-renewal');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      foregroundColor: AppTheme.backgroundWhite,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.toNamed('/quick-renewal');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: AppTheme.backgroundWhite,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Browse Plans',
+                        style: AppStyles.button,
                       ),
                     ),
-                    child: const Text(
-                      'Browse Plans',
-                      style: AppStyles.button,
-                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Center(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await reportController.fetchTradingCalls(refresh: true);
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(
+                    Icons.candlestick_chart_outlined,
+                    size: 80,
+                    color: AppTheme.iconGrey,
+                  ),
+                  SizedBox(height: 16),
+                  Text('No trading calls available', style: AppStyles.bodyLarge),
+                ],
+              ),
             ),
           ),
         );
@@ -87,7 +113,8 @@ class TradingCallTab extends StatelessWidget {
       return NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scrollInfo) {
           if (!reportController.isTradingCallsLoadingMore.value &&
-              scrollInfo.metrics.pixels == scrollInfo.metrics.maxScrollExtent) {
+              reportController.tradingCallsHasMore.value &&
+              scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
             reportController.loadMoreTradingCalls();
           }
           return false;

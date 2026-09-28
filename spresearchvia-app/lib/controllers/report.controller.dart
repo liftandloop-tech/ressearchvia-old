@@ -25,6 +25,9 @@ class ReportController extends GetxController {
   final tradingCallsPage = 1.obs;
   final tradingCallsHasMore = true.obs;
 
+  // Plan Subscription Status
+  final hasActiveSubscription = true.obs;
+
   final selectedTabIndex = 0.obs;
 
   // Filters
@@ -36,9 +39,7 @@ class ReportController extends GetxController {
   static const int _pageSize = 10;
   
   DateTime? _lastRefreshTime;
-  static const Duration _refreshThreshold = Duration(seconds: 60);
-
-
+  static const Duration _refreshThreshold = Duration(seconds: 30);
 
   Future<void> refreshData({bool force = false}) async {
     final now = DateTime.now();
@@ -49,23 +50,23 @@ class ReportController extends GetxController {
     }
     
     _lastRefreshTime = now;
-    fetchReportList(refresh: true);
-    fetchTradingCalls(refresh: true);
+    await Future.wait([
+      fetchTradingCalls(refresh: true),
+      fetchReportList(refresh: true),
+    ]);
   }
 
   // --- Research Reports Logic ---
 
   Future<void> fetchReportList({bool refresh = false}) async {
-    if (refresh) {
-      reportsPage.value = 1;
-      reportsHasMore.value = true;
-      reports.clear();
+    if (!refresh && (isReportsLoading.value || isReportsLoadingMore.value || !reportsHasMore.value)) {
+      return;
     }
 
-    if (!reportsHasMore.value && !refresh) return;
+    final targetPage = refresh ? 1 : reportsPage.value;
 
     try {
-      if (reportsPage.value == 1) {
+      if (targetPage == 1) {
         isReportsLoading.value = true;
       } else {
         isReportsLoadingMore.value = true;
@@ -77,9 +78,9 @@ class ReportController extends GetxController {
       final response = await _apiClient.get(
         ApiConfig.userReportList(
           userId,
-          reportType: 'Detailed Reports', // Explicitly targeting Research Reports
-          page: reportsPage.value,
-          pageSize: reportsPage.value == 1 ? _firstPageSize : _pageSize,
+          reportType: 'Detailed Reports',
+          page: targetPage,
+          pageSize: targetPage == 1 ? _firstPageSize : _pageSize,
           search: searchQuery.value,
           startDate: startDate.value,
           endDate: endDate.value,
@@ -87,43 +88,49 @@ class ReportController extends GetxController {
       );
 
       if (response.statusCode == 200) {
-        final data = response.data; // { status, message, data: { ... } }
+        final data = response.data;
         final innerData = data['data'];
 
-        // Handle various key possibilities from backend
-        final reportList = innerData?['report'] ?? 
-                           innerData?['reports'] ?? 
+        if (innerData is Map && innerData.containsKey('hasActiveSubscription')) {
+          hasActiveSubscription.value = innerData['hasActiveSubscription'] == true;
+        }
+
+        final reportList = innerData?['reports'] ?? 
+                           innerData?['report'] ?? 
                            innerData?['reportData'] ?? 
                            [];
-        
-        // Capture total count if available (for reportList)
- 
 
         if (reportList is List) {
           final newReports = reportList
               .map<ResearchReport>((json) => ResearchReport.fromJson(json))
               .toList();
 
-          final expectedSize = reportsPage.value == 1 ? _firstPageSize : _pageSize;
-          if (newReports.length < expectedSize) {
-            reportsHasMore.value = false;
+          final expectedSize = targetPage == 1 ? _firstPageSize : _pageSize;
+
+          if (innerData is Map && innerData.containsKey('hasMore')) {
+            reportsHasMore.value = innerData['hasMore'] == true;
+          } else {
+            reportsHasMore.value = newReports.length >= expectedSize;
           }
 
           if (refresh) {
             reports.assignAll(newReports);
+            reportsPage.value = 2;
           } else {
-            reports.addAll(newReports);
-          }
-
-          if (newReports.isNotEmpty) {
-            reportsPage.value++;
+            final existingIds = reports.map((r) => r.id).toSet();
+            final uniqueReports = newReports.where((r) => !existingIds.contains(r.id)).toList();
+            reports.addAll(uniqueReports);
+            if (newReports.isNotEmpty) {
+              reportsPage.value++;
+            }
           }
         }
       }
     } catch (e) {
       final error = ApiErrorHandler.handleError(e);
       if (error.data is Map && error.data['errorCode'] == 'NO_ACTIVE_PLAN') {
-         reports.clear();
+        hasActiveSubscription.value = false;
+        reports.clear();
       } else {
         SnackbarService.showError(error.message);
       }
@@ -143,32 +150,31 @@ class ReportController extends GetxController {
 
   void onSearchChanged(String query) {
     searchQuery.value = query;
+    fetchTradingCalls(refresh: true);
     fetchReportList(refresh: true);
   }
 
   void onDateFilterChanged(String? start, String? end) {
     startDate.value = start;
     endDate.value = end;
-    fetchReportList(refresh: true);
     fetchTradingCalls(refresh: true);
+    fetchReportList(refresh: true);
   }
 
   // --- Trading Calls Logic ---
 
   Future<void> fetchTradingCalls({bool refresh = false}) async {
-    if (refresh) {
-      tradingCallsPage.value = 1;
-      tradingCallsHasMore.value = true;
-      tradingCalls.clear();
+    if (!refresh && (isTradingCallsLoading.value || isTradingCallsLoadingMore.value || !tradingCallsHasMore.value)) {
+      return;
     }
 
-    if (!tradingCallsHasMore.value && !refresh) return;
+    final targetPage = refresh ? 1 : tradingCallsPage.value;
 
     try {
       final userId = await _secureStorage.getUserId();
       if (userId == null || userId.isEmpty) return;
 
-      if (tradingCallsPage.value == 1) {
+      if (targetPage == 1) {
         isTradingCallsLoading.value = true;
       } else {
         isTradingCallsLoadingMore.value = true;
@@ -178,8 +184,8 @@ class ReportController extends GetxController {
         ApiConfig.userReportList(
           userId,
           reportType: 'Trading calls',
-          page: tradingCallsPage.value,
-          pageSize: tradingCallsPage.value == 1 ? _firstPageSize : _pageSize,
+          page: targetPage,
+          pageSize: targetPage == 1 ? _firstPageSize : _pageSize,
           search: searchQuery.value,
           startDate: startDate.value,
           endDate: endDate.value,
@@ -189,9 +195,13 @@ class ReportController extends GetxController {
       if (response.statusCode == 200) {
         final data = response.data;
         final innerData = data['data'];
+
+        if (innerData is Map && innerData.containsKey('hasActiveSubscription')) {
+          hasActiveSubscription.value = innerData['hasActiveSubscription'] == true;
+        }
         
-        final reportList = innerData?['report'] ?? 
-                           innerData?['reports'] ?? 
+        final reportList = innerData?['reports'] ?? 
+                           innerData?['report'] ?? 
                            innerData?['reportData'] ?? 
                            [];
 
@@ -200,26 +210,32 @@ class ReportController extends GetxController {
               .map<ResearchReport>((json) => ResearchReport.fromJson(json))
               .toList();
 
-          final expectedSize = tradingCallsPage.value == 1 ? _firstPageSize : _pageSize;
-          if (newReports.length < expectedSize) {
-            tradingCallsHasMore.value = false;
+          final expectedSize = targetPage == 1 ? _firstPageSize : _pageSize;
+
+          if (innerData is Map && innerData.containsKey('hasMore')) {
+            tradingCallsHasMore.value = innerData['hasMore'] == true;
+          } else {
+            tradingCallsHasMore.value = newReports.length >= expectedSize;
           }
 
           if (refresh) {
             tradingCalls.assignAll(newReports);
+            tradingCallsPage.value = 2;
           } else {
-            tradingCalls.addAll(newReports);
-          }
-
-          if (newReports.isNotEmpty) {
-            tradingCallsPage.value++;
+            final existingIds = tradingCalls.map((r) => r.id).toSet();
+            final uniqueReports = newReports.where((r) => !existingIds.contains(r.id)).toList();
+            tradingCalls.addAll(uniqueReports);
+            if (newReports.isNotEmpty) {
+              tradingCallsPage.value++;
+            }
           }
         }
       }
     } catch (e) {
       final error = ApiErrorHandler.handleError(e);
       if (error.data is Map && error.data['errorCode'] == 'NO_ACTIVE_PLAN') {
-         tradingCalls.clear();
+        hasActiveSubscription.value = false;
+        tradingCalls.clear();
       } else {
         SnackbarService.showError(error.message);
       }

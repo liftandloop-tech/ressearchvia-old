@@ -297,13 +297,11 @@ const reportService = {
             let newEndDate = endDate ? new Date(endDate) : null;
 
             if (newStartDate && newEndDate == null) {
-                queryArg.createdAt = { ...queryArg.createdAt, $gte: newStartDate };
-            }
-            if (newEndDate && newStartDate == null) {
-                queryArg.createdAt = { ...queryArg.createdAt, $lte: newEndDate };
-            }
-            if (newStartDate && newEndDate) {
-                queryArg.createdAt = { $gte: newStartDate, $lte: newEndDate }
+                queryArg.published_at = { $gte: newStartDate };
+            } else if (newEndDate && newStartDate == null) {
+                queryArg.published_at = { $lte: newEndDate };
+            } else if (newStartDate && newEndDate) {
+                queryArg.published_at = { $gte: newStartDate, $lte: newEndDate };
             }
 
             // Search Support
@@ -450,7 +448,16 @@ const reportService = {
             }
 
             if (orConditions.length === 0) {
-                return { status: 200, message: "No active subscriptions found.", data: { reports: [] } };
+                return {
+                    status: 200,
+                    message: "No active subscriptions found.",
+                    data: {
+                        reports: [],
+                        totalReports: 0,
+                        hasMore: false,
+                        hasActiveSubscription: false
+                    }
+                };
             }
 
             // 3. Query Reports: Match specific allowed combinations
@@ -461,7 +468,7 @@ const reportService = {
                 $or: orConditions
             };
 
-            // Fetch ALL reports first (we'll paginate after filtering locked ones)
+            // Fetch ALL reports first
             const allReports = await reportModel.find(finalQuery)
                 .sort({ published_at: -1, createdAt: -1 })
                 .exec();
@@ -470,13 +477,30 @@ const reportService = {
             // Create a map of plan/segment start dates for quick lookup
             const planStartDates = new Map();
 
-            // Add entitlement start dates - USE SEGMENT IDs, not plan IDs
-            activeEntitlements.forEach(ent => {
-                const segmentId = ent.resourceId?.segmentsId?.toString();
+            // Check all user entitlements (active + expired) to find earliest start date for each segment
+            // This ensures renewing users do not have previously accessible historical reports locked
+            const allUserEntitlements = await Entitlement.find({
+                userId: id,
+                type: 'PLAN',
+                status: { $in: ['ACTIVE', 'EXPIRED'] }
+            }).select('segmentId startDate resourceId');
+
+            allUserEntitlements.forEach(ent => {
+                const segmentId = (ent.segmentId?._id || ent.segmentId || ent.resourceId?.segmentsId)?.toString();
                 if (segmentId && ent.startDate) {
-                    // Store by segment ID, keep earliest date if multiple plans in same segment
                     const existing = planStartDates.get(segmentId);
-                    if (!existing || ent.startDate < existing) {
+                    if (!existing || new Date(ent.startDate) < new Date(existing)) {
+                        planStartDates.set(segmentId, ent.startDate);
+                    }
+                }
+            });
+
+            // Active entitlements override / fallback
+            activeEntitlements.forEach(ent => {
+                const segmentId = (ent.segmentId?._id || ent.segmentId || ent.resourceId?.segmentsId)?.toString();
+                if (segmentId && ent.startDate) {
+                    const existing = planStartDates.get(segmentId);
+                    if (!existing || new Date(ent.startDate) < new Date(existing)) {
                         planStartDates.set(segmentId, ent.startDate);
                     }
                 }
@@ -486,24 +510,21 @@ const reportService = {
             activeSegments.forEach(seg => {
                 const segId = seg.segmentId?.toString();
                 if (segId && seg.purchaseDate) {
-                    planStartDates.set(segId, seg.purchaseDate);
+                    const existing = planStartDates.get(segId);
+                    if (!existing || new Date(seg.purchaseDate) < new Date(existing)) {
+                        planStartDates.set(segId, seg.purchaseDate);
+                    }
                 }
             });
 
-            console.log(`[DEBUG] Active Entitlements:`, activeEntitlements.map(e => ({ planId: e.resourceId?._id?.toString(), segmentId: e.resourceId?.segmentsId?.toString(), startDate: e.startDate })));
-            console.log(`[DEBUG] Active Segments:`, activeSegments.map(s => ({ segmentId: s.segmentId?.toString(), purchaseDate: s.purchaseDate })));
-            console.log(`[DEBUG] Plan Start Dates Map:`, Array.from(planStartDates.entries()).map(([id, date]) => ({ id, date: date?.toISOString ? date.toISOString() : date })));
-            console.log(`[DEBUG] Total reports found: ${allReports.length}`);
-
-            // Enhance ALL reports with access metadata
-            const enhancedReports = allReports.map(report => {
+            // 5. Enhance ALL reports with access metadata (DO NOT drop or truncate reports)
+            const allFilteredReports = allReports.map(report => {
                 const reportObj = report.toObject();
                 const reportPublishedDate = new Date(report.published_at || report.createdAt);
 
                 // Find the earliest segment start date that covers this report
                 let earliestPlanStart = null;
 
-                // Check against segment IDs (NOT plan IDs)
                 if (report.segment && report.segment.length > 0) {
                     report.segment.forEach(segId => {
                         const segStart = planStartDates.get(segId.toString());
@@ -513,19 +534,8 @@ const reportService = {
                     });
                 }
 
-                // Determine if report should be locked (blurred)
                 // Report is locked if published BEFORE user's plan started
-                const isLocked = earliestPlanStart && reportPublishedDate < new Date(earliestPlanStart);
-
-                // Debug logging for first few reports
-                if (allReports.indexOf(report) < 5) {
-                    console.log(`[DEBUG] Report "${report.title}":`);
-                    console.log(`  - Published: ${reportPublishedDate.toISOString()}`);
-                    console.log(`  - Plan Array:`, report.planArray?.map(p => p.toString()));
-                    console.log(`  - Segment Array:`, report.segment?.map(s => s.toString()));
-                    console.log(`  - Plan Start: ${earliestPlanStart ? new Date(earliestPlanStart).toISOString() : 'N/A'}`);
-                    console.log(`  - Is Locked: ${isLocked}`);
-                }
+                const isLocked = earliestPlanStart ? (reportPublishedDate < new Date(earliestPlanStart)) : false;
 
                 return {
                     ...reportObj,
@@ -537,47 +547,36 @@ const reportService = {
                 };
             });
 
-            // 5. Limit locked reports to maximum 10 GLOBALLY
-            const unlockedReports = enhancedReports.filter(r => !r.accessMetadata.isLocked);
-            const lockedReports = enhancedReports.filter(r => r.accessMetadata.isLocked);
+            // 6. Pagination offset calculation
+            // Handles both uniform pageSize and mobile variable pageSize (page 1: 20, page 2+: 10)
+            let startIndex;
+            if (query.skip !== undefined || query.offset !== undefined) {
+                startIndex = parseInt(query.skip || query.offset) || 0;
+            } else if (page === 1) {
+                startIndex = 0;
+            } else if (pageSize === 10) {
+                // Client requested page > 1 with default secondary page size 10 (first page was 20)
+                startIndex = 20 + (page - 2) * 10;
+            } else {
+                // Standard uniform pagination: (page - 1) * pageSize
+                startIndex = (page - 1) * pageSize;
+            }
 
-            console.log(`[DEBUG] Filtering Summary:`);
-            console.log(`  - Total enhanced reports: ${enhancedReports.length}`);
-            console.log(`  - Unlocked reports: ${unlockedReports.length}`);
-            console.log(`  - Locked reports: ${lockedReports.length}`);
-            console.log(`  - Locked reports (first 10 titles):`, lockedReports.slice(0, 10).map(r => r.title));
-
-            // Take only first 10 locked reports (they're already sorted newest first)
-            const limitedLockedReports = lockedReports.slice(0, 10);
-
-            console.log(`  - Limited locked reports: ${limitedLockedReports.length}`);
-
-            // Combine all unlocked + limited locked, maintain sort order
-            const allFilteredReports = [...unlockedReports, ...limitedLockedReports]
-                .sort((a, b) => {
-                    const dateA = a.accessMetadata.reportPublishedDate || a.createdAt;
-                    const dateB = b.accessMetadata.reportPublishedDate || b.createdAt;
-                    return new Date(dateB) - new Date(dateA); // Newest first
-                });
-
-            console.log(`  - Total filtered reports (before pagination): ${allFilteredReports.length}`);
-            console.log(`  - Filtered reports locked status:`, allFilteredReports.map(r => ({ title: r.title, locked: r.accessMetadata.isLocked })));
-
-            // 6. NOW apply pagination to the filtered list
-            const startIndex = (page - 1) * pageSize;
             const endIndex = startIndex + pageSize;
             const finalReports = allFilteredReports.slice(startIndex, endIndex);
 
-            // Should we return totalCount? Frontend handles simple list, but maybe not vital.
-            // Keeping response structure consistent with previous userReportList: returning { reports: [...] }
-            // Note: reportList returns { totalCount, reportData }
-            // userReportList usually returned just { reports } inside data.
-
-            if (finalReports && finalReports.length > 0) {
-                return { status: 200, message: "User Report List", data: { reports: finalReports } }
-            } else {
-                return { status: 200, message: "Report Not Found", data: { reports: [] } }
-            }
+            return {
+                status: 200,
+                message: finalReports.length > 0 ? "User Report List" : "No reports found",
+                data: {
+                    reports: finalReports,
+                    totalReports: allFilteredReports.length,
+                    hasMore: endIndex < allFilteredReports.length,
+                    hasActiveSubscription: true,
+                    page,
+                    pageSize
+                }
+            };
         } catch (error) {
             console.error("userReportList Error:", error);
             return { status: 400, message: error.message, data: {} }

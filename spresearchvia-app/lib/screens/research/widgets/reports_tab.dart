@@ -29,18 +29,29 @@ class ReportsTab extends StatelessWidget {
               final reports = reportController.reports;
 
               if (reports.isEmpty && !reportController.isReportsLoading.value) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 80,
-                        color: AppTheme.iconGrey,
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    await reportController.fetchReportList(refresh: true);
+                  },
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.description_outlined,
+                              size: 80,
+                              color: AppTheme.iconGrey,
+                            ),
+                            SizedBox(height: 16),
+                            Text('No reports available', style: AppStyles.bodyLarge),
+                          ],
+                        ),
                       ),
-                      SizedBox(height: 16),
-                      Text('No reports available', style: AppStyles.bodyLarge),
-                    ],
+                    ),
                   ),
                 );
               }
@@ -48,8 +59,9 @@ class ReportsTab extends StatelessWidget {
               return NotificationListener<ScrollNotification>(
                 onNotification: (ScrollNotification scrollInfo) {
                   if (!reportController.isReportsLoadingMore.value &&
-                      scrollInfo.metrics.pixels ==
-                          scrollInfo.metrics.maxScrollExtent) {
+                      reportController.reportsHasMore.value &&
+                      scrollInfo.metrics.pixels >=
+                          scrollInfo.metrics.maxScrollExtent - 200) {
                     reportController.loadMoreReports();
                   }
                   return false;
