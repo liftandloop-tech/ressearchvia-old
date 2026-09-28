@@ -31,6 +31,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.tune_outlined,
               onTap: () => Get.toNamed(AppRoutes.manageSegments),
             ),
+            /*
             const SizedBox(height: 10),
             SettingTile(
               title: 'Automated Trading',
@@ -52,6 +53,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.gpp_good_outlined,
               onTap: () => Get.toNamed(AppRoutes.consent),
             ),
+            */
           ],
         ),
       ),

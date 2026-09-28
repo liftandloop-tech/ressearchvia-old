@@ -41,7 +41,8 @@ class AppConfig {
       case AppMode.development:
         if (Platform.isAndroid) {
           // Use 10.0.2.2 for Android Emulator (Host Loopback)
-          return 'http://10.0.2.2:8080/api';
+          //return 'http://10.0.2.2:8080/api';
+          return 'https://test.researchvia.in/api';
         }
         // For iOS Physical Device: Use LAN IP (WiFi or USB Hotspot)
         // For iOS Simulator: Use localhost
@@ -52,7 +53,7 @@ class AppConfig {
         // For Simulator only: Use localhost
         // return 'http://localhost:8080/api';
       case AppMode.production:
-        return 'https://api.researchvia.in/api';
+        return 'https://test.researchvia.in/api';
         //return 'http://10.0.2.2:8080/api';
     }
   }

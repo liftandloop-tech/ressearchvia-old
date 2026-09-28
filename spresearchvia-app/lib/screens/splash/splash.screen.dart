@@ -9,6 +9,7 @@ import '../../controllers/auth.controller.dart';
 import '../../controllers/plan_purchase.controller.dart';
 import '../../services/secure_storage.service.dart';
 import '../../services/snackbar.service.dart';
+import '../../services/in_app_update.service.dart';
 
 
 class SplashScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    InAppUpdateService.checkForUpdate();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
