@@ -11,6 +11,7 @@ import roleService from "./roleService.js";
 import departmentModel from "../models/departmentModel.js";
 import generalSettingsModel from "../models/generalSettingsModel.js";
 import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
+import TokenBlacklist from "../models/tokenBlacklistModel.js";
 
 
 
@@ -279,7 +280,8 @@ const staffService = {
           userType: staff.deparment,
           isViewOnly: staff.isViewOnly || false
         },
-        process.env.JWT_TOKEN
+        process.env.JWT_TOKEN,
+        { expiresIn: '8h' }
       );
       return { status: 200, message: "Login successfully", data: { token, staff } }
     } catch (error) {
@@ -355,7 +357,8 @@ const staffService = {
           userType: staff.deparment,
           isViewOnly: staff.isViewOnly || false
         },
-        process.env.JWT_TOKEN
+        process.env.JWT_TOKEN,
+        { expiresIn: '8h' }
       );
       return { status: 200, message: "Login successfully", data: { token, staff } }
     } catch (error) {
@@ -1173,6 +1176,38 @@ const staffService = {
       };
     } catch (error) {
       return { status: 500, message: error.message, data: null };
+    }
+  },
+
+  logoutStaff: async ({ headers, user, token }) => {
+    try {
+      const rawHeader = headers?.authorization || headers?.Authorization;
+      const rawToken = token || (rawHeader?.startsWith('Bearer ') ? rawHeader.substring(7) : rawHeader);
+
+      if (rawToken) {
+        try {
+          const decoded = jwt.decode(rawToken);
+          const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 8 * 3600 * 1000);
+          await TokenBlacklist.findOneAndUpdate(
+            { token: rawToken },
+            {
+              $setOnInsert: {
+                token: rawToken,
+                userId: user?._id?.toString() || null,
+                userType: 'Staff',
+                expiresAt,
+                reason: 'STAFF_LOGOUT'
+              }
+            },
+            { upsert: true }
+          );
+        } catch (tokErr) {
+          console.error('[Staff Logout] Error blacklisting token:', tokErr.message);
+        }
+      }
+      return { status: 200, message: "Staff logged out successfully", data: {} };
+    } catch (error) {
+      return { status: 500, message: error.message, data: {} };
     }
   }
 

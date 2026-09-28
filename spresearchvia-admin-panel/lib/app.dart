@@ -4,6 +4,7 @@ import 'config/navigation.config.dart';
 import 'config/theme.config.dart';
 import 'config/app.config.dart';
 import 'initial_binding.dart';
+import 'services/inactivity.service.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -19,6 +20,22 @@ class App extends StatelessWidget {
       theme: AppTheme.lightTheme,
       defaultTransition: Transition.noTransition,
       transitionDuration: Duration.zero,
+      builder: (context, child) {
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) {
+            if (Get.isRegistered<InactivityService>()) {
+              InactivityService.to.recordActivity();
+            }
+          },
+          onPointerMove: (_) {
+            if (Get.isRegistered<InactivityService>()) {
+              InactivityService.to.recordActivity();
+            }
+          },
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

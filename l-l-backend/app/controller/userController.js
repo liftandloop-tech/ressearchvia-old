@@ -256,6 +256,17 @@ const usersController = {
 		} catch (error) {
 			res.status(400).send({ status: 400, message: error.message, data: {} });
 		}
+	},
+	adminChangePassword: async (req, res) => {
+		try {
+			const response = await userService.adminChangePassword({
+				user: req.user,
+				body: req.body
+			});
+			res.status(response.status).send(response);
+		} catch (error) {
+			res.status(500).send({ status: 500, message: error.message, data: {} });
+		}
 	}
 }
 export default usersController

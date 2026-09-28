@@ -142,5 +142,18 @@ const staffController = {
         }
     },
 
+    logoutStaff: async (req, res) => {
+        try {
+            const response = await staffService.logoutStaff({
+                headers: req.headers,
+                user: req.user,
+                token: req.token
+            });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
 }
 export default staffController;

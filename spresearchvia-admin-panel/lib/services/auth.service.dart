@@ -216,8 +216,18 @@ class AuthService extends ApiService {
   }
 
   Future<void> logout() async {
-    await _clearAuthData();
-    await Future.delayed(const Duration(milliseconds: 300));
+    try {
+      final token = await getToken();
+      if (token != null && token.isNotEmpty) {
+        await post('/user/logout', {}, headers: {
+          'Authorization': token,
+        });
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Server logout notification error: $e');
+    } finally {
+      await _clearAuthData();
+    }
   }
 
   // Staff (Manager) Login - Request OTP

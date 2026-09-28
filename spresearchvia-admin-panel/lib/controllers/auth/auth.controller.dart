@@ -6,6 +6,7 @@ import 'package:spresearch_web/models/user.model.dart';
 import 'package:spresearch_web/config/routes.config.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/services/api.service.dart';
+import 'package:spresearch_web/services/inactivity.service.dart';
 import '../users/user_management.controller.dart';
 import '../users/user.controller.dart';
 import '../dashboard/dashboard_management.controller.dart';
@@ -40,14 +41,42 @@ class AuthController extends GetxController {
       final token = await _authService.getToken();
       final storedUser = await _authService.getUser();
       final hasBackup = await _authService.hasAdminBackup();
-
       if (token != null && token.isNotEmpty && storedUser != null) {
+        // Check if session has expired from storage due to > 1 hour of inactivity
+        if (Get.isRegistered<InactivityService>()) {
+          final isExpired = await InactivityService.to.isSessionExpiredFromStorage();
+          if (isExpired) {
+            debugPrint('[AuthController] Session expired on app launch due to > 1 hr inactivity. Clearing auth.');
+            await _authService.logout();
+            await InactivityService.to.clearActivityRecord();
+            user.value = null;
+            authToken.value = '';
+            isAuthenticated.value = false;
+            isImpersonating.value = false;
+            impersonatedStaffName.value = '';
+            _clearSessionStateAndCache();
+            Get.snackbar(
+              'Session Expired',
+              'You have been logged out due to 1 hour of inactivity.',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: AppTheme.errorRed,
+              colorText: Colors.white,
+              duration: const Duration(seconds: 5),
+            );
+            return;
+          }
+        }
+
         authToken.value = token;
         user.value = storedUser;
         isAuthenticated.value = true;
         isImpersonating.value = hasBackup;
         if (hasBackup) {
           impersonatedStaffName.value = storedUser.fullName;
+        }
+
+        if (Get.isRegistered<InactivityService>()) {
+          InactivityService.to.resetTimer();
         }
 
         // Fresh profile sync: If staff member's role or permissions were updated by admin,
@@ -87,6 +116,9 @@ class AuthController extends GetxController {
         isImpersonating.value = false;
 
         _clearSessionStateAndCache();
+        if (Get.isRegistered<InactivityService>()) {
+          InactivityService.to.resetTimer();
+        }
         _navigateToInitialRoute(result.user!);
 
         return (success: true, error: null);
@@ -147,6 +179,9 @@ class AuthController extends GetxController {
         );
 
         _clearSessionStateAndCache();
+        if (Get.isRegistered<InactivityService>()) {
+          InactivityService.to.resetTimer();
+        }
         _navigateToInitialRoute(staffUser);
       } else {
         Get.snackbar(
@@ -228,12 +263,49 @@ class AuthController extends GetxController {
       return;
     }
 
+    if (Get.isRegistered<InactivityService>()) {
+      await InactivityService.to.clearActivityRecord();
+    }
+
     await _authService.logout();
     user.value = null;
+    authToken.value = '';
     isAuthenticated.value = false;
     isImpersonating.value = false;
     impersonatedStaffName.value = '';
     _clearSessionStateAndCache();
+    Get.offAllNamed(AppRoutes.login);
+  }
+
+  Future<void> handleInactivityLogout() async {
+    if (!isAuthenticated.value) return;
+
+    debugPrint('[AuthController] Executing inactivity auto-logout (1 hour timeout)...');
+    if (isImpersonating.value) {
+      await _authService.clearAdminBackup();
+    }
+
+    if (Get.isRegistered<InactivityService>()) {
+      await InactivityService.to.clearActivityRecord();
+    }
+
+    await _authService.logout();
+    user.value = null;
+    authToken.value = '';
+    isAuthenticated.value = false;
+    isImpersonating.value = false;
+    impersonatedStaffName.value = '';
+    _clearSessionStateAndCache();
+
+    Get.snackbar(
+      'Session Expired',
+      'You have been automatically logged out due to 1 hour of inactivity.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: AppTheme.errorRed,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 5),
+    );
+
     Get.offAllNamed(AppRoutes.login);
   }
 
@@ -261,6 +333,9 @@ class AuthController extends GetxController {
     isAuthenticated.value = true;
 
     _clearSessionStateAndCache();
+    if (Get.isRegistered<InactivityService>()) {
+      InactivityService.to.resetTimer();
+    }
     _navigateToInitialRoute(staffUser);
   }
 

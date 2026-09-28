@@ -18,6 +18,7 @@ import deviceModel from "../models/deviceModel.js";
 import userDocUploadModel from "../models/userDocUploadModel.js";
 import paymentIntentModel from "../models/paymentIntentModel.js";
 import { logUserLogin, logAppSessionStart, logUserLogout, logAdminProfileEdit, logKycStatusChange, logAccountSuspended, logTempPinGenerated, logAliasLogin, logAuditTrail } from "./activityLogService.js";
+import TokenBlacklist from "../models/tokenBlacklistModel.js";
 
 // Helper function for Canonical Onboarding Logic
 import { grantEntitlement } from "./entitlementService.js";
@@ -1042,6 +1043,7 @@ const userService = {
           userType: admin?.userType,
         },
         process.env.JWT_TOKEN,
+        { expiresIn: "8h" }
       );
 
       return { status: 200, message: "admin created", data: { admin, token } };
@@ -2337,8 +2339,33 @@ const userService = {
       return { status: 400, message: error.message, data: {} };
     }
   },
-  logOutUser: async ({ headers, query, user }) => {
+  logOutUser: async ({ headers, query, user, token }) => {
     try {
+      const rawHeader = headers?.authorization || headers?.Authorization;
+      const rawToken = token || (rawHeader?.startsWith('Bearer ') ? rawHeader.substring(7) : rawHeader);
+
+      if (rawToken) {
+        try {
+          const decoded = jwt.decode(rawToken);
+          const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 8 * 3600 * 1000);
+          await TokenBlacklist.findOneAndUpdate(
+            { token: rawToken },
+            {
+              $setOnInsert: {
+                token: rawToken,
+                userId: user?._id?.toString() || null,
+                userType: user?.userType || null,
+                expiresAt,
+                reason: 'USER_LOGOUT'
+              }
+            },
+            { upsert: true }
+          );
+        } catch (tokErr) {
+          console.error('[Logout] Error blacklisting token:', tokErr.message);
+        }
+      }
+
       // Clear Session Device ID
       if (user && user._id) {
         await userModel.findByIdAndUpdate(user._id, {
@@ -2349,6 +2376,38 @@ const userService = {
       return { status: 200, message: "Logged out successfully", data: {} };
     } catch (error) {
       return { status: 400, message: error.message, data: {} };
+    }
+  },
+  adminChangePassword: async ({ user, body }) => {
+    try {
+      if (user?.userType !== 'admin' && user?.userType !== 'super_admin') {
+        return { status: 403, message: "Access denied. Admin only.", data: {} };
+      }
+      const { oldPassword, newPassword } = body;
+      if (!oldPassword || !newPassword) {
+        return { status: 400, message: "Current password and new password are required.", data: {} };
+      }
+      if (newPassword.length < 6) {
+        return { status: 400, message: "New password must be at least 6 characters.", data: {} };
+      }
+
+      const admin = await userModel.findById(user._id);
+      if (!admin) {
+        return { status: 404, message: "Admin account not found.", data: {} };
+      }
+
+      if (admin.userObject?.password !== oldPassword) {
+        return { status: 400, message: "Current password is incorrect.", data: {} };
+      }
+
+      admin.userObject = admin.userObject || {};
+      admin.userObject.password = newPassword;
+      admin.markModified('userObject');
+      await admin.save();
+
+      return { status: 200, message: "Admin password updated successfully.", data: { success: true } };
+    } catch (error) {
+      return { status: 500, message: error.message, data: {} };
     }
   },
   userDetails: async ({ params, user: caller }) => {

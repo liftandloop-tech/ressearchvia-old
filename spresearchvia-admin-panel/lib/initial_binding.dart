@@ -30,10 +30,13 @@ import 'package:spresearch_web/services/api.service.dart';
 import 'package:spresearch_web/controllers/notifications/research_notification.controller.dart';
 import 'package:spresearch_web/controllers/dashboard/main_dashboard.controller.dart';
 
+import 'package:spresearch_web/services/inactivity.service.dart';
+
 class InitialBinding extends Bindings {
   @override
   void dependencies() {
     // Services
+    Get.put(InactivityService(), permanent: true);
     Get.put(ApiService(), permanent: true);
     Get.put(AuthService(), permanent: true);
     Get.put(UserService(), permanent: true);

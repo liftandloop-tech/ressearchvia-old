@@ -32,6 +32,8 @@ class FilterDropdownField extends StatelessWidget {
         ? value
         : (uniqueItems.isNotEmpty ? uniqueItems.first : null);
 
+    debugPrint('FilterDropdownField [$label]: value="$value", effectiveValue="$effectiveValue", items count=${uniqueItems.length}');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -118,8 +120,28 @@ class FilterDropdownField extends StatelessWidget {
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w500,
-                color: AppTheme.textPrimary,
+                color: const Color(0xFF111827),
               ),
+              selectedItemBuilder: (BuildContext context) {
+                return uniqueItems.map<Widget>((String item) {
+                  final isFiltered = item != 'All Staff' &&
+                      item != 'All Departments' &&
+                      item != 'All' &&
+                      item != 'All Time';
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      item,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w500,
+                        color: isFiltered ? AppTheme.primaryBlue : const Color(0xFF111827),
+                      ),
+                    ),
+                  );
+                }).toList();
+              },
               items: uniqueItems
                   .map(
                     (e) => DropdownMenuItem<String>(
@@ -131,10 +153,10 @@ class FilterDropdownField extends StatelessWidget {
                           fontSize: fontSize,
                           fontWeight: e == effectiveValue
                               ? FontWeight.w600
-                              : FontWeight.w500,
+                              : FontWeight.w400,
                           color: e == effectiveValue
                               ? AppTheme.primaryBlue
-                              : AppTheme.textPrimary,
+                              : const Color(0xFF111827),
                         ),
                       ),
                     ),
