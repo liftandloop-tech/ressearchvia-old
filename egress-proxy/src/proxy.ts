@@ -196,19 +196,15 @@ proxyServer.on('connect', (req, clientSocket, head) => {
   if (mapping.upstreamHost) {
     const upstreamPort = mapping.upstreamPort || 443;
     const upstreamAuth = mapping.upstreamUser && mapping.upstreamPass
-      ? `Proxy-Authorization: Basic ${Buffer.from(`${mapping.upstreamUser}:${mapping.upstreamPass}`).toString('base64')}
-`
+      ? `Proxy-Authorization: Basic ${Buffer.from(`${mapping.upstreamUser}:${mapping.upstreamPass}`).toString('base64')}\r\n`
       : '';
 
     const upstreamSocket = net.connect({ host: mapping.upstreamHost, port: upstreamPort }, () => {
       upstreamSocket.write(
-        `CONNECT ${targetHost}:${targetPort} HTTP/1.1
-` +
-        `Host: ${targetHost}:${targetPort}
-` +
+        `CONNECT ${targetHost}:${targetPort} HTTP/1.1\r\n` +
+        `Host: ${targetHost}:${targetPort}\r\n` +
         upstreamAuth +
-        '
-'
+        '\r\n'
       );
     });
 
@@ -218,18 +214,12 @@ proxyServer.on('connect', (req, clientSocket, head) => {
     upstreamSocket.on('data', (chunk) => {
       if (!isEstablished) {
         buffer += chunk.toString('latin1');
-        const headerEnd = buffer.indexOf('
-
-');
+        const headerEnd = buffer.indexOf('\r\n\r\n');
         if (headerEnd !== -1) {
-          const statusLine = buffer.substring(0, buffer.indexOf('
-'));
+          const statusLine = buffer.substring(0, buffer.indexOf('\r\n'));
           if (statusLine.includes('200')) {
             isEstablished = true;
-            clientSocket.write('HTTP/1.1 200 Connection Established
-Proxy-Agent: S8-Egress-Proxy-Chained
-
-');
+            clientSocket.write('HTTP/1.1 200 Connection Established\r\nProxy-Agent: S8-Egress-Proxy-Chained\r\n\r\n');
             const remaining = chunk.slice(Buffer.byteLength(buffer.substring(0, headerEnd + 4), 'latin1'));
             if (head && head.length > 0) upstreamSocket.write(head);
             if (remaining.length > 0) clientSocket.write(remaining);
@@ -237,9 +227,7 @@ Proxy-Agent: S8-Egress-Proxy-Chained
             clientSocket.pipe(upstreamSocket);
           } else {
             console.error(`[Egress Proxy] Upstream proxy rejected CONNECT: ${statusLine}`);
-            clientSocket.write('HTTP/1.1 502 Bad Gateway
-
-');
+            clientSocket.write('HTTP/1.1 502 Bad Gateway\r\n\r\n');
             clientSocket.end();
             upstreamSocket.end();
           }
@@ -249,9 +237,7 @@ Proxy-Agent: S8-Egress-Proxy-Chained
 
     upstreamSocket.on('error', (err) => {
       console.error(`[Egress Proxy] Upstream tunnel error: ${err.message}`);
-      clientSocket.write('HTTP/1.1 502 Bad Gateway
-
-');
+      clientSocket.write('HTTP/1.1 502 Bad Gateway\r\n\r\n');
       clientSocket.end();
     });
 
