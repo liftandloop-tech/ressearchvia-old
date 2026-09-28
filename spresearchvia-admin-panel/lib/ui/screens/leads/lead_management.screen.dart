@@ -1592,13 +1592,6 @@ class LeadManagementScreen extends StatelessWidget {
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.download_rounded, size: 20, color: Colors.green),
-                                      tooltip: 'Pull (${pool.pullSize}) Leads From ${pool.name}',
-                                      onPressed: () {
-                                        controller.pullLeadsFromSelectedPool(poolId: pool.id);
-                                      },
-                                    ),
                                     if (pool.canEdit)
                                       IconButton(
                                         icon: const Icon(Icons.tune_rounded, size: 20, color: AppTheme.primaryBlue),
