@@ -151,10 +151,12 @@ class AddStaffDialog extends StatelessWidget {
                         final roles = controller.availableRoles;
                         final currentRoleId = controller.selectedRoleId.value;
                         final currentRoleName = controller.selectedRole.value;
-                        final match = roles.firstWhereOrNull((r) =>
+                        final seenRoleIds = <String>{};
+                        final validRoles = roles.where((r) => r.id.isNotEmpty && seenRoleIds.add(r.id)).toList();
+                        final match = validRoles.firstWhereOrNull((r) =>
                             (currentRoleId != null && r.id == currentRoleId) ||
                             r.name.toLowerCase().trim() == currentRoleName.toLowerCase().trim());
-                        final safeValue = match?.id;
+                        final safeValue = (match != null && validRoles.any((r) => r.id == match.id)) ? match.id : null;
 
                         return DropdownButton<String>(
                           value: safeValue,
@@ -175,7 +177,7 @@ class AddStaffDialog extends StatelessWidget {
                             fontSize: 13,
                             color: Color(0xFF212529),
                           ),
-                          items: roles
+                          items: validRoles
                               .map(
                                 (r) {
                                   final deptName = r.departmentName;
@@ -313,9 +315,11 @@ class AddStaffDialog extends StatelessWidget {
                     } else {
                       // Admin or other role select
                       final directors = controller.availableDirectors;
+                      final seenIds = <String>{};
+                      final validDirectors = directors.where((d) => d.id.isNotEmpty && seenIds.add(d.id)).toList();
                       final selectedValue = controller.assignedDirector.value;
-                      final safeValue = (selectedValue != null &&
-                              directors.any((d) => d.id == selectedValue.id))
+                      final safeDirector = (selectedValue != null &&
+                              validDirectors.any((d) => d.id == selectedValue.id))
                           ? selectedValue
                           : null;
 
@@ -335,8 +339,8 @@ class AddStaffDialog extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: DropdownButtonHideUnderline(
-                              child: DropdownButton<StaffModel?>(
-                                value: safeValue,
+                              child: DropdownButton<String?>(
+                                value: safeDirector?.id,
                                 isExpanded: true,
                                 hint: const Text(
                                   'Select Director / Supervisor (Optional)',
@@ -355,7 +359,7 @@ class AddStaffDialog extends StatelessWidget {
                                   color: Color(0xFF212529),
                                 ),
                                 items: [
-                                  const DropdownMenuItem<StaffModel?>(
+                                  const DropdownMenuItem<String?>(
                                     value: null,
                                     child: Text(
                                       'None (Unassigned)',
@@ -366,9 +370,9 @@ class AddStaffDialog extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  ...directors.map(
-                                    (e) => DropdownMenuItem<StaffModel?>(
-                                      value: e,
+                                  ...validDirectors.map(
+                                    (e) => DropdownMenuItem<String?>(
+                                      value: e.id,
                                       child: Text(
                                         "${e.name} (${e.department.isNotEmpty ? e.department : e.role})",
                                         style: const TextStyle(
@@ -379,8 +383,13 @@ class AddStaffDialog extends StatelessWidget {
                                     ),
                                   ),
                                 ],
-                                onChanged: (v) {
-                                  controller.assignedDirector.value = v;
+                                onChanged: (selectedId) {
+                                  if (selectedId == null) {
+                                    controller.assignedDirector.value = null;
+                                  } else {
+                                    controller.assignedDirector.value =
+                                        validDirectors.firstWhereOrNull((d) => d.id == selectedId);
+                                  }
                                 },
                               ),
                             ),

@@ -4,6 +4,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
+import 'package:spresearch_web/models/role.model.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 
@@ -342,18 +343,16 @@ class AddStaffScreen extends StatelessWidget {
                   maxLength: 10,
                   required: true,
                 ),
-                right: Obx(() {
-                  return _buildInputField(
-                    label: '4-Digit Login MPIN (Optional)',
-                    controller: controller.mpinController,
-                    hint: 'e.g. 1234',
-                    prefixIcon: Icons.lock_outline,
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    obscureText: true,
-                    required: false,
-                  );
-                }),
+                right: _buildInputField(
+                  label: '4-Digit Login MPIN (Optional)',
+                  controller: controller.mpinController,
+                  hint: 'e.g. 1234',
+                  prefixIcon: Icons.lock_outline,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  obscureText: true,
+                  required: false,
+                ),
               ),
               const SizedBox(height: 16),
               _buildResponsiveRow(
@@ -374,18 +373,25 @@ class AddStaffScreen extends StatelessWidget {
                       child: DropdownButtonHideUnderline(
                         child: Obx(() {
                           final roles = controller.availableRoles;
+                          final uniqueRoles = <String, RoleModel>{};
+                          for (final r in roles) {
+                            if (r.id.isNotEmpty && !uniqueRoles.containsKey(r.id)) {
+                              uniqueRoles[r.id] = r;
+                            }
+                          }
+                          final validRoles = uniqueRoles.values.toList();
                           final currentRoleId = controller.selectedRoleId.value;
                           final currentRoleName = controller.selectedRole.value;
-                          final match = roles.firstWhereOrNull((r) =>
+                          final match = validRoles.firstWhereOrNull((r) =>
                               (currentRoleId != null && r.id == currentRoleId) ||
                               r.name.toLowerCase().trim() == currentRoleName.toLowerCase().trim());
-                          final safeVal = match?.id;
+                          final safeVal = (match != null && validRoles.any((r) => r.id == match.id)) ? match.id : null;
                           return DropdownButton<String>(
                             value: safeVal,
                             isExpanded: true,
                             hint: const Text('Select Role', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
                             icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
-                            items: roles.map((r) {
+                            items: validRoles.map((r) {
                               final deptName = r.departmentName;
                               return DropdownMenuItem<String>(
                                 value: r.id,
@@ -496,7 +502,16 @@ class AddStaffScreen extends StatelessWidget {
                   }
 
                   final directors = controller.availableDirectors;
+                  final uniqueDirectors = <String, StaffModel>{};
+                  for (final d in directors) {
+                    if (d.id.isNotEmpty && !uniqueDirectors.containsKey(d.id)) {
+                      uniqueDirectors[d.id] = d;
+                    }
+                  }
+                  final validDirectors = uniqueDirectors.values.toList();
                   final selectedValue = controller.assignedDirector.value;
+                  final safeDirector = validDirectors.firstWhereOrNull((d) => d.id == selectedValue?.id);
+
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -511,22 +526,28 @@ class AddStaffScreen extends StatelessWidget {
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: DropdownButtonHideUnderline(
-                          child: DropdownButton<StaffModel?>(
-                            value: directors.contains(selectedValue) ? selectedValue : null,
+                          child: DropdownButton<String?>(
+                            value: safeDirector?.id,
                             isExpanded: true,
                             hint: const Text('Unassigned / Direct', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
                             icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
                             items: [
-                              const DropdownMenuItem<StaffModel?>(
+                              const DropdownMenuItem<String?>(
                                 value: null,
                                 child: Text('Unassigned / Direct', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                               ),
-                              ...directors.map((d) => DropdownMenuItem<StaffModel?>(
-                                    value: d,
+                              ...validDirectors.map((d) => DropdownMenuItem<String?>(
+                                    value: d.id,
                                     child: Text('${d.name} (${d.department.isNotEmpty ? d.department : d.role})', style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
                                   )),
                             ],
-                            onChanged: (StaffModel? value) => controller.assignedDirector.value = value,
+                            onChanged: (String? value) {
+                              if (value == null) {
+                                controller.assignedDirector.value = null;
+                              } else {
+                                controller.assignedDirector.value = validDirectors.firstWhereOrNull((d) => d.id == value);
+                              }
+                            },
                           ),
                         ),
                       ),
