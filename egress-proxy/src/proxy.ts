@@ -11,6 +11,10 @@ export interface EgressMapping {
   username: string;
   tokenHash: string; // SHA-256 hex string
   publicIp: string;
+  upstreamHost?: string;
+  upstreamPort?: number;
+  upstreamUser?: string;
+  upstreamPass?: string;
   version: number;
   status: 'ACTIVE' | 'RELEASING' | 'EXPIRED';
 }
@@ -97,6 +101,41 @@ const proxyServer = http.createServer((req, res) => {
     return;
   }
 
+  if (mapping.upstreamHost) {
+    const upstreamPort = mapping.upstreamPort || 443;
+    const upstreamAuth = mapping.upstreamUser && mapping.upstreamPass
+      ? `Basic ${Buffer.from(`${mapping.upstreamUser}:${mapping.upstreamPass}`).toString('base64')}`
+      : undefined;
+
+    const forwardedHeaders = { ...req.headers };
+    delete forwardedHeaders['proxy-authorization'];
+    if (upstreamAuth) {
+      forwardedHeaders['proxy-authorization'] = upstreamAuth;
+    }
+
+    const outboundOptions: http.RequestOptions = {
+      hostname: mapping.upstreamHost,
+      port: upstreamPort,
+      path: req.url,
+      method: req.method,
+      headers: forwardedHeaders,
+    };
+
+    const proxyReq = http.request(outboundOptions, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+
+    proxyReq.on('error', (err: any) => {
+      console.error(`[Egress Proxy] Upstream HTTP error: ${err.message}`);
+      res.writeHead(502, { 'Content-Type': 'text/plain' });
+      res.end(`Bad Gateway: Upstream proxy failed (${err.message})`);
+    });
+
+    req.pipe(proxyReq, { end: true });
+    return;
+  }
+
   // Remove Proxy-Authorization header before forwarding upstream
   const forwardedHeaders = { ...req.headers };
   delete forwardedHeaders['proxy-authorization'];
@@ -153,6 +192,75 @@ proxyServer.on('connect', (req, clientSocket, head) => {
   const mapping = authResult.mapping;
   const [targetHost, targetPortStr] = (req.url || '').split(':');
   const targetPort = parseInt(targetPortStr || '443', 10);
+
+  if (mapping.upstreamHost) {
+    const upstreamPort = mapping.upstreamPort || 443;
+    const upstreamAuth = mapping.upstreamUser && mapping.upstreamPass
+      ? `Proxy-Authorization: Basic ${Buffer.from(`${mapping.upstreamUser}:${mapping.upstreamPass}`).toString('base64')}
+`
+      : '';
+
+    const upstreamSocket = net.connect({ host: mapping.upstreamHost, port: upstreamPort }, () => {
+      upstreamSocket.write(
+        `CONNECT ${targetHost}:${targetPort} HTTP/1.1
+` +
+        `Host: ${targetHost}:${targetPort}
+` +
+        upstreamAuth +
+        '
+'
+      );
+    });
+
+    let isEstablished = false;
+    let buffer = '';
+
+    upstreamSocket.on('data', (chunk) => {
+      if (!isEstablished) {
+        buffer += chunk.toString('latin1');
+        const headerEnd = buffer.indexOf('
+
+');
+        if (headerEnd !== -1) {
+          const statusLine = buffer.substring(0, buffer.indexOf('
+'));
+          if (statusLine.includes('200')) {
+            isEstablished = true;
+            clientSocket.write('HTTP/1.1 200 Connection Established
+Proxy-Agent: S8-Egress-Proxy-Chained
+
+');
+            const remaining = chunk.slice(Buffer.byteLength(buffer.substring(0, headerEnd + 4), 'latin1'));
+            if (head && head.length > 0) upstreamSocket.write(head);
+            if (remaining.length > 0) clientSocket.write(remaining);
+            upstreamSocket.pipe(clientSocket);
+            clientSocket.pipe(upstreamSocket);
+          } else {
+            console.error(`[Egress Proxy] Upstream proxy rejected CONNECT: ${statusLine}`);
+            clientSocket.write('HTTP/1.1 502 Bad Gateway
+
+');
+            clientSocket.end();
+            upstreamSocket.end();
+          }
+        }
+      }
+    });
+
+    upstreamSocket.on('error', (err) => {
+      console.error(`[Egress Proxy] Upstream tunnel error: ${err.message}`);
+      clientSocket.write('HTTP/1.1 502 Bad Gateway
+
+');
+      clientSocket.end();
+    });
+
+    clientSocket.on('error', () => {
+      upstreamSocket.destroy();
+    });
+
+    return;
+  }
 
   const connectOptions: net.TcpSocketConnectOpts = {
     host: targetHost,

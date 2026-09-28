@@ -26,6 +26,10 @@ async function pushMappingToProxy(mapping: {
   username: string;
   tokenHash: string;
   publicIp: string;
+  upstreamHost?: string;
+  upstreamPort?: number;
+  upstreamUser?: string;
+  upstreamPass?: string;
   version: number;
   status: 'ACTIVE' | 'RELEASING' | 'EXPIRED';
 }): Promise<{ status: string; egressId?: string; version?: number }> {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:spresearch_web/config/theme.config.dart';
 
 class FilterDropdownField extends StatelessWidget {
   final String label;
@@ -7,6 +8,9 @@ class FilterDropdownField extends StatelessWidget {
   final ValueChanged<String?> onChanged;
   final IconData? icon;
   final VoidCallback? onTap;
+  final double height;
+  final double fontSize;
+  final double labelFontSize;
 
   const FilterDropdownField({
     super.key,
@@ -16,74 +20,121 @@ class FilterDropdownField extends StatelessWidget {
     required this.onChanged,
     this.icon,
     this.onTap,
+    this.height = 36,
+    this.fontSize = 12,
+    this.labelFontSize = 11.5,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xff11416B),
-          ),
-        ),
-        const SizedBox(height: 5),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            height: 50,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: const Color(0xffE5E7EB)),
-              borderRadius: BorderRadius.circular(12),
+    final uniqueItems = items.toSet().toList();
+    final effectiveValue = uniqueItems.contains(value)
+        ? value
+        : (uniqueItems.isNotEmpty ? uniqueItems.first : null);
+
+    return SelectionContainer.disabled(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (label.isNotEmpty) ...[
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: labelFontSize,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textSecondary,
+              ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: onTap != null
-                      ? Text(
-                          value,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xff11416B),
-                          ),
-                        )
-                      : DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: value,
-                            isExpanded: true,
-                            isDense: true,
-                            icon: const SizedBox.shrink(),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xff11416B),
+            const SizedBox(height: 4),
+          ],
+          onTap != null
+              ? Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: height,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppTheme.gray300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              value,
+                              style: TextStyle(
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            items: items
-                                .map(
-                                  (e) => DropdownMenuItem(
-                                    value: e,
-                                    child: Text(e),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: onChanged,
                           ),
-                        ),
+                          Icon(
+                            icon ?? Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: AppTheme.gray500,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  height: height,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppTheme.gray300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: effectiveValue,
+                      isExpanded: true,
+                      isDense: true,
+                      elevation: 3,
+                      borderRadius: BorderRadius.circular(8),
+                      dropdownColor: Colors.white,
+                      menuMaxHeight: 320,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      icon: Icon(
+                        icon ?? Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppTheme.gray500,
+                      ),
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textPrimary,
+                      ),
+                      items: uniqueItems
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e,
+                              child: Text(
+                                e,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: fontSize,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: onChanged,
+                    ),
+                  ),
                 ),
-                Icon(
-                  icon ?? Icons.keyboard_arrow_down,
-                  color: const Color(0xff11416B),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
+

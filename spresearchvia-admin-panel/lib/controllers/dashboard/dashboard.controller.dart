@@ -105,7 +105,7 @@ class DashboardController extends GetxController {
     }
   }
 
-  void fetchFilteredData() {
+  void fetchFilteredData({bool force = false}) {
     final query = <String, dynamic>{};
     if (searchQuery.value.trim().isNotEmpty) {
       query['search'] = searchQuery.value.trim();
@@ -142,7 +142,7 @@ class DashboardController extends GetxController {
     }
 
     _dashboardManagementController.fetchDashboardData(
-      force: query.isNotEmpty,
+      force: force || query.isNotEmpty,
       query: query.isNotEmpty ? query : null,
     );
   }
@@ -415,14 +415,33 @@ class DashboardController extends GetxController {
   }
 
   void resetFilters() {
-    selectedRenewalStatus.value = 'All';
-    selectedDateFilter.value = 'All Time';
-    selectedCustomDate.value = null;
-    startDate.value = null;
-    endDate.value = null;
-    searchQuery.value = '';
-    _syncFilterDefaults();
-    fetchFilteredData();
+    _isFilterSyncing = true;
+    try {
+      selectedRenewalStatus.value = 'All';
+      selectedDateFilter.value = 'All Time';
+      selectedCustomDate.value = null;
+      startDate.value = null;
+      endDate.value = null;
+      searchQuery.value = '';
+      if (isSingleStaff) {
+        final myName = currentUser?.fullName.trim();
+        selectedManagerFilter.value =
+            (myName != null && myName.isNotEmpty) ? myName : 'My Profile';
+        final myDept = (currentUser?.departmentName ?? '').trim();
+        selectedDepartmentFilter.value = (myDept.isNotEmpty && myDept != 'N/A')
+            ? myDept
+            : (departmentFilterItems.length > 1
+                ? departmentFilterItems[1]
+                : 'All Departments');
+      } else {
+        selectedManagerFilter.value = 'All Staff';
+        selectedDepartmentFilter.value = 'All Departments';
+      }
+    } finally {
+      _isFilterSyncing = false;
+    }
+    update();
+    fetchFilteredData(force: true);
   }
 
   void refreshData() {

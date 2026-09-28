@@ -5,7 +5,6 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard.controller.dart';
 import '../../../widgets/button.widget.dart';
 import 'filter_dropdown_field.widget.dart';
-import 'filter_text_field.widget.dart';
 import 'sales_metrics_cards.widget.dart';
 import 'staff_orders_table.widget.dart';
 import 'staff_sales_leaderboard.widget.dart';
@@ -115,132 +114,153 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
     BuildContext context,
     DashboardController controller,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.gray200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.tune_rounded, size: 18, color: AppTheme.primaryBlue),
-              SizedBox(width: 8),
-              Text(
-                'Performance Filters & Controls',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.gray900,
+    return SelectionContainer.disabled(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.gray200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune_rounded, size: 15, color: AppTheme.primaryBlue),
+                const SizedBox(width: 6),
+                const Text(
+                  'Performance Filters & Controls',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.gray900,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.end,
-                children: [
-                  SizedBox(
-                    width: 260,
-                    child: FilterTextField(
-                      label: 'Search',
-                      hint: 'Staff, client, plan, order ID...',
-                      icon: Icons.search_rounded,
-                      onChanged: (v) => controller.searchQuery.value = v,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 170,
-                    child: Obx(
-                      () => FilterDropdownField(
-                        label: 'Staff Member',
-                        value: controller.selectedManagerFilter.value,
-                        items: controller.managerFilterItems,
-                        onChanged: (v) =>
-                            controller.selectedManagerFilter.value = v!,
+              ],
+            ),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 175,
+                      child: Obx(
+                        () => FilterDropdownField(
+                          label: 'Staff Member',
+                          value: controller.selectedManagerFilter.value,
+                          items: controller.managerFilterItems,
+                          onChanged: (v) =>
+                              controller.selectedManagerFilter.value = v!,
+                          height: 36,
+                          fontSize: 12,
+                          labelFontSize: 11.5,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: 170,
-                    child: Obx(
-                      () => FilterDropdownField(
-                        label: 'Department',
-                        value: controller.selectedDepartmentFilter.value,
-                        items: controller.departmentFilterItems,
-                        onChanged: (v) =>
-                            controller.selectedDepartmentFilter.value = v!,
+                    SizedBox(
+                      width: 160,
+                      child: Obx(
+                        () => FilterDropdownField(
+                          label: 'Department',
+                          value: controller.selectedDepartmentFilter.value,
+                          items: controller.departmentFilterItems,
+                          onChanged: (v) =>
+                              controller.selectedDepartmentFilter.value = v!,
+                          height: 36,
+                          fontSize: 12,
+                          labelFontSize: 11.5,
+                        ),
                       ),
                     ),
-                  ),
-                  SizedBox(
-                    width: 145,
-                    child: _buildDateField(
-                      context: context,
-                      label: 'From Date',
-                      placeholder: 'Start Date',
-                      selectedDate: controller.startDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 145,
-                    child: _buildDateField(
-                      context: context,
-                      label: 'To Date',
-                      placeholder: 'End Date',
-                      selectedDate: controller.endDate,
-                      firstDate: controller.startDate.value ?? DateTime(2020),
-                      lastDate: DateTime(2035),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 140,
-                    child: Obx(
-                      () => FilterDropdownField(
-                        label: 'Order Status',
-                        value: controller.selectedRenewalStatus.value,
-                        items: const [
-                          'All',
-                          'Active',
-                          'Paid',
-                          'Pending',
-                          'Expired',
-                        ],
-                        onChanged: (v) =>
-                            controller.selectedRenewalStatus.value = v!,
+                    SizedBox(
+                      width: 135,
+                      child: _buildDateField(
+                        context: context,
+                        label: 'From Date',
+                        placeholder: 'Start Date',
+                        selectedDate: controller.startDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2035),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Button(
-                      title: 'Reset',
-                      buttonType: ButtonType.grey,
-                      icon: Icons.restart_alt_rounded,
-                      onTap: controller.resetFilters,
+                    SizedBox(
+                      width: 135,
+                      child: _buildDateField(
+                        context: context,
+                        label: 'To Date',
+                        placeholder: 'End Date',
+                        selectedDate: controller.endDate,
+                        firstDate: controller.startDate.value ?? DateTime(2020),
+                        lastDate: DateTime(2035),
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+                    SizedBox(
+                      width: 130,
+                      child: Obx(
+                        () => FilterDropdownField(
+                          label: 'Order Status',
+                          value: controller.selectedRenewalStatus.value,
+                          items: const [
+                            'All',
+                            'Active',
+                            'Paid',
+                            'Pending',
+                            'Expired',
+                          ],
+                          onChanged: (v) =>
+                              controller.selectedRenewalStatus.value = v!,
+                          height: 36,
+                          fontSize: 12,
+                          labelFontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 36,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.gray700,
+                          side: const BorderSide(color: AppTheme.gray300),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          backgroundColor: Colors.white,
+                        ),
+                        icon: const Icon(
+                          Icons.restart_alt_rounded,
+                          size: 15,
+                          color: AppTheme.gray600,
+                        ),
+                        label: const Text(
+                          'Reset',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.gray700,
+                          ),
+                        ),
+                        onPressed: controller.resetFilters,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -260,63 +280,67 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 11.5,
               fontWeight: FontWeight.w500,
-              color: Color(0xff11416B),
+              color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 5),
-          GestureDetector(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: date ?? DateTime.now(),
-                firstDate: firstDate ?? DateTime(2020),
-                lastDate: lastDate ?? DateTime(2035),
-                builder: (context, child) {
-                  return Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: const ColorScheme.light(
-                        primary: AppTheme.primaryBlue,
-                        onPrimary: Colors.white,
-                        onSurface: AppTheme.gray900,
+          const SizedBox(height: 4),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: date ?? DateTime.now(),
+                  firstDate: firstDate ?? DateTime(2020),
+                  lastDate: lastDate ?? DateTime(2035),
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: AppTheme.primaryBlue,
+                          onPrimary: Colors.white,
+                          onSurface: AppTheme.gray900,
+                        ),
                       ),
-                    ),
-                    child: child!,
-                  );
-                },
-              );
-              if (picked != null) {
-                selectedDate.value = picked;
-              }
-            },
-            child: Container(
-              height: 50,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(
-                  color: date != null
-                      ? AppTheme.primaryBlue
-                      : const Color(0xffE5E7EB),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  selectedDate.value = picked;
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: date != null
+                        ? AppTheme.primaryBlue.withOpacity(0.6)
+                        : AppTheme.gray300,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                borderRadius: BorderRadius.circular(12),
-              ),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
                       displayDate,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight:
-                            date != null ? FontWeight.w600 : FontWeight.w400,
+                            date != null ? FontWeight.w500 : FontWeight.w400,
                         color: date != null
-                            ? const Color(0xff11416B)
+                            ? AppTheme.textPrimary
                             : AppTheme.gray400,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -326,23 +350,26 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
                     GestureDetector(
                       onTap: () => selectedDate.value = null,
                       child: const Padding(
-                        padding: EdgeInsets.only(right: 6),
+                        padding: EdgeInsets.only(right: 4),
                         child: Icon(
                           Icons.cancel_rounded,
-                          size: 16,
+                          size: 14,
                           color: AppTheme.gray400,
                         ),
                       ),
                     ),
-                  const Icon(
-                    Icons.calendar_month_rounded,
-                    size: 18,
-                    color: Color(0xff11416B),
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 14,
+                    color: date != null
+                        ? AppTheme.primaryBlue
+                        : AppTheme.gray500,
                   ),
                 ],
               ),
             ),
           ),
+        ),
         ],
       );
     });
