@@ -526,6 +526,12 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     if ((requiredKey === 'staff.read' || requiredKey === 'staff:read') &&
                         (perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
 
+                    if ((requiredKey === 'staff.login' || requiredKey === 'staff:login') &&
+                        (perm.actions.includes('staff.login') || perm.actions.includes('staff.update') || perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'users.manage' || requiredKey === 'users:manage') &&
+                        (perm.actions.includes('users.manage') || perm.actions.includes('users.update') || perm.actions.includes('subscriptions.manage') || perm.actions.includes('subscriptions.activate'))) return true;
+
                     if ((requiredKey === 'staff.view_applicants') &&
                         (perm.actions.includes('staff.view_applicants') || perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
 

@@ -450,6 +450,14 @@ class UserModel {
                   return true;
                 }
               }
+              if (requiredKey == 'users.manage') {
+                if (actList.contains('users.manage') ||
+                    actList.contains('users.update') ||
+                    actList.contains('subscriptions.manage') ||
+                    actList.contains('subscriptions.activate')) {
+                  return true;
+                }
+              }
             }
 
             // KYC
@@ -498,6 +506,12 @@ class UserModel {
                 if (actList.contains('staff.view') || actList.contains('staff.assignment') || actList.contains('staff.view_applicants') || actList.contains('read') || actList.contains('view')) {
                   return true;
                 }
+              }
+              if (requiredKey == 'staff.login') {
+                return true;
+              }
+              if (requiredKey == 'staff.update' || requiredKey == 'staff.edit') {
+                return true;
               }
               if (requiredKey == 'staff.reset' &&
                   (actList.contains('staff.reset_mpin') || actList.contains('staff.update') || actList.contains('staff.reset'))) {

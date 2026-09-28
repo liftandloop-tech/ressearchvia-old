@@ -2059,11 +2059,39 @@ const userService = {
             $or: [
               { "staffassigmentsData.staffName": null },
               { "staffassigmentsData.staffName": '' },
+              { "staffassigmentsData.staffId": null },
               { staffassigmentsData: { $exists: false } }
             ]
           });
         } else {
-          matchConditions.push({ "staffassigmentsData.staffName": manager });
+          const cleanManager = manager.trim();
+          const regexPattern = cleanManager.split(/\s+/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+          const flexibleNameRegex = new RegExp(`^${regexPattern}$`, 'i');
+
+          let staffIds = [];
+          try {
+            const matchingStaff = await staffModel.find({
+              $or: [
+                { fullName: { $regex: flexibleNameRegex } },
+                { staffId: cleanManager },
+                ...(mongoose.isValidObjectId(cleanManager) ? [{ _id: new mongoose.Types.ObjectId(cleanManager) }] : [])
+              ]
+            }).select('_id');
+            staffIds = matchingStaff.map(s => s._id);
+          } catch (e) {
+            console.error('Error finding staff for manager filter:', e);
+          }
+
+          matchConditions.push({
+            $or: [
+              ...(staffIds.length > 0 ? [
+                { "staffassigmentsData.staffId": { $in: staffIds } },
+                { "staffassigmentsData.staffId": { $in: staffIds.map(id => id.toString()) } }
+              ] : []),
+              { "staffassigmentsData.staffName": flexibleNameRegex },
+              { "staffassigmentsData.staffName": { $regex: new RegExp(`^${cleanManager}$`, 'i') } }
+            ]
+          });
         }
       }
 

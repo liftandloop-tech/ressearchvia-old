@@ -101,7 +101,7 @@ class DashboardController extends GetxController {
         }
       }
     } finally {
-      Future.microtask(() => _isFilterSyncing = false);
+      _isFilterSyncing = false;
     }
   }
 
@@ -423,6 +423,7 @@ class DashboardController extends GetxController {
       startDate.value = null;
       endDate.value = null;
       searchQuery.value = '';
+      activeTab.value = 0;
       if (isSingleStaff) {
         final myName = currentUser?.fullName.trim();
         selectedManagerFilter.value =
@@ -440,7 +441,7 @@ class DashboardController extends GetxController {
     } finally {
       _isFilterSyncing = false;
     }
-    update();
+    // Force a fresh data fetch with no filters applied
     fetchFilteredData(force: true);
   }
 

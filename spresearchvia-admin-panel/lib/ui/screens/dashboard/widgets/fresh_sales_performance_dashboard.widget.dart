@@ -114,153 +114,151 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
     BuildContext context,
     DashboardController controller,
   ) {
-    return SelectionContainer.disabled(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.gray200),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tune_rounded, size: 15, color: AppTheme.primaryBlue),
-                const SizedBox(width: 6),
-                const Text(
-                  'Performance Filters & Controls',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.gray900,
-                  ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune_rounded, size: 15, color: AppTheme.primaryBlue),
+              const SizedBox(width: 6),
+              const Text(
+                'Performance Filters & Controls',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.gray900,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  crossAxisAlignment: WrapCrossAlignment.end,
-                  children: [
-                    SizedBox(
-                      width: 175,
-                      child: Obx(
-                        () => FilterDropdownField(
-                          label: 'Staff Member',
-                          value: controller.selectedManagerFilter.value,
-                          items: controller.managerFilterItems,
-                          onChanged: (v) =>
-                              controller.selectedManagerFilter.value = v!,
-                          height: 36,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  SizedBox(
+                    width: 175,
+                    child: Obx(
+                      () => FilterDropdownField(
+                        label: 'Staff Member',
+                        value: controller.selectedManagerFilter.value,
+                        items: controller.managerFilterItems,
+                        onChanged: (v) =>
+                            controller.selectedManagerFilter.value = v!,
+                        height: 36,
+                        fontSize: 12,
+                        labelFontSize: 11.5,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: Obx(
+                      () => FilterDropdownField(
+                        label: 'Department',
+                        value: controller.selectedDepartmentFilter.value,
+                        items: controller.departmentFilterItems,
+                        onChanged: (v) =>
+                            controller.selectedDepartmentFilter.value = v!,
+                        height: 36,
+                        fontSize: 12,
+                        labelFontSize: 11.5,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 135,
+                    child: _buildDateField(
+                      context: context,
+                      label: 'From Date',
+                      placeholder: 'Start Date',
+                      selectedDate: controller.startDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2035),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 135,
+                    child: _buildDateField(
+                      context: context,
+                      label: 'To Date',
+                      placeholder: 'End Date',
+                      selectedDate: controller.endDate,
+                      firstDate: controller.startDate.value ?? DateTime(2020),
+                      lastDate: DateTime(2035),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 130,
+                    child: Obx(
+                      () => FilterDropdownField(
+                        label: 'Order Status',
+                        value: controller.selectedRenewalStatus.value,
+                        items: const [
+                          'All',
+                          'Active',
+                          'Paid',
+                          'Pending',
+                          'Expired',
+                        ],
+                        onChanged: (v) =>
+                            controller.selectedRenewalStatus.value = v!,
+                        height: 36,
+                        fontSize: 12,
+                        labelFontSize: 11.5,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 36,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.gray700,
+                        side: const BorderSide(color: AppTheme.gray300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        backgroundColor: Colors.white,
+                      ),
+                      icon: const Icon(
+                        Icons.restart_alt_rounded,
+                        size: 15,
+                        color: AppTheme.gray600,
+                      ),
+                      label: const Text(
+                        'Reset',
+                        style: TextStyle(
                           fontSize: 12,
-                          labelFontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.gray700,
                         ),
                       ),
+                      onPressed: controller.resetFilters,
                     ),
-                    SizedBox(
-                      width: 160,
-                      child: Obx(
-                        () => FilterDropdownField(
-                          label: 'Department',
-                          value: controller.selectedDepartmentFilter.value,
-                          items: controller.departmentFilterItems,
-                          onChanged: (v) =>
-                              controller.selectedDepartmentFilter.value = v!,
-                          height: 36,
-                          fontSize: 12,
-                          labelFontSize: 11.5,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 135,
-                      child: _buildDateField(
-                        context: context,
-                        label: 'From Date',
-                        placeholder: 'Start Date',
-                        selectedDate: controller.startDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2035),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 135,
-                      child: _buildDateField(
-                        context: context,
-                        label: 'To Date',
-                        placeholder: 'End Date',
-                        selectedDate: controller.endDate,
-                        firstDate: controller.startDate.value ?? DateTime(2020),
-                        lastDate: DateTime(2035),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 130,
-                      child: Obx(
-                        () => FilterDropdownField(
-                          label: 'Order Status',
-                          value: controller.selectedRenewalStatus.value,
-                          items: const [
-                            'All',
-                            'Active',
-                            'Paid',
-                            'Pending',
-                            'Expired',
-                          ],
-                          onChanged: (v) =>
-                              controller.selectedRenewalStatus.value = v!,
-                          height: 36,
-                          fontSize: 12,
-                          labelFontSize: 11.5,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 36,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.gray700,
-                          side: const BorderSide(color: AppTheme.gray300),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          backgroundColor: Colors.white,
-                        ),
-                        icon: const Icon(
-                          Icons.restart_alt_rounded,
-                          size: 15,
-                          color: AppTheme.gray600,
-                        ),
-                        label: const Text(
-                          'Reset',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppTheme.gray700,
-                          ),
-                        ),
-                        onPressed: controller.resetFilters,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }

@@ -24,8 +24,7 @@ const staffRoutes = () => {
     Router.get("/me", auth.tokenVerified, staffController.getStaffProfileMe)
     Router.put("/me", auth.tokenVerified, staffController.updateStaffProfileMe)
     Router.post("/me/change-mpin", auth.tokenVerified, staffController.changeStaffMpinMe)
-    Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
-    Router.post("/impersonate", auth.tokenVerified, adminStrictOnlyNoStaff, staffController.staffImpersonate)
+    Router.post("/impersonate", auth.tokenVerified, adminOnly, checkPermission('Staff', 'login'), staffController.staffImpersonate)
 
     // Public applicant routes
     Router.post("/applicant/register", applicantController.registerApplicant)

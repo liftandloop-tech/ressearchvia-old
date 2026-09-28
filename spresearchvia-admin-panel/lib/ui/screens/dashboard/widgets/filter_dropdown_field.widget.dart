@@ -32,109 +32,132 @@ class FilterDropdownField extends StatelessWidget {
         ? value
         : (uniqueItems.isNotEmpty ? uniqueItems.first : null);
 
-    return SelectionContainer.disabled(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (label.isNotEmpty) ...[
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: labelFontSize,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textSecondary,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (label.isNotEmpty) ...[
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: labelFontSize,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textSecondary,
             ),
-            const SizedBox(height: 4),
-          ],
-          onTap != null
-              ? Material(
-                  color: Colors.white,
+          ),
+          const SizedBox(height: 4),
+        ],
+        onTap != null
+            ? Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: onTap,
                   borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap: onTap,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      height: height,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.gray300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              value,
-                              style: TextStyle(
-                                fontSize: fontSize,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textPrimary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Icon(
-                            icon ?? Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                            color: AppTheme.gray500,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              : Container(
-                  height: height,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: AppTheme.gray300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: effectiveValue,
-                      isExpanded: true,
-                      isDense: true,
-                      elevation: 3,
+                  child: Container(
+                    height: height,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppTheme.gray300),
                       borderRadius: BorderRadius.circular(8),
-                      dropdownColor: Colors.white,
-                      menuMaxHeight: 320,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      icon: Icon(
-                        icon ?? Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: AppTheme.gray500,
-                      ),
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.textPrimary,
-                      ),
-                      items: uniqueItems
-                          .map(
-                            (e) => DropdownMenuItem(
-                              value: e,
-                              child: Text(
-                                e,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: fontSize,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            value,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textPrimary,
                             ),
-                          )
-                          .toList(),
-                      onChanged: onChanged,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Icon(
+                          icon ?? Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: AppTheme.gray500,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-        ],
-      ),
+              )
+            : SizedBox(
+                height: height,
+                child: PopupMenuButton<String>(
+                  initialValue: effectiveValue,
+                  onSelected: onChanged,
+                  offset: Offset(0, height + 4),
+                  constraints: const BoxConstraints(
+                    minWidth: 140,
+                    maxHeight: 320,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  color: Colors.white,
+                  elevation: 4,
+                  itemBuilder: (context) => uniqueItems
+                      .map(
+                        (e) => PopupMenuItem<String>(
+                          value: e,
+                          height: 36,
+                          child: Text(
+                            e,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: e == effectiveValue
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: e == effectiveValue
+                                  ? AppTheme.primaryBlue
+                                  : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: effectiveValue != null &&
+                                effectiveValue != 'All Staff' &&
+                                effectiveValue != 'All Departments' &&
+                                effectiveValue != 'All'
+                            ? AppTheme.primaryBlue.withOpacity(0.5)
+                            : AppTheme.gray300,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            effectiveValue ?? '',
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Icon(
+                          icon ?? Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: AppTheme.gray500,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ],
     );
   }
 }
-
