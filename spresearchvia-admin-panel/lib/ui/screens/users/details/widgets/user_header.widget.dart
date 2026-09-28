@@ -95,7 +95,10 @@ class UserHeader extends StatelessWidget {
                 color: AppTheme.successGreen,
                 icon: Icons.credit_card,
                 onPressed: () => Get.find<UsersNavigationController>()
-                    .showManageSubscription(userDetails.id),
+                    .showManageSubscription(
+                      userDetails.id,
+                      userModel: userDetails,
+                    ),
               ),
               SizedBox(width: AppTheme.spacing12),
             ],

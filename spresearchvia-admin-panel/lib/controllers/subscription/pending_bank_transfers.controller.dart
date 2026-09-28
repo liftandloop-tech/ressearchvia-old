@@ -8,6 +8,8 @@ import 'package:spresearch_web/services/segment.service.dart';
 import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/auth.service.dart';
 import 'package:spresearch_web/services/subscription.service.dart';
+import 'package:spresearch_web/services/user_details.service.dart';
+import 'package:spresearch_web/models/user_details.model.dart';
 import '../../models/user.model.dart';
 import '../auth/auth.controller.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1480,7 +1482,7 @@ class PendingBankTransfersController extends GetxController {
 
   Future<Map<String, dynamic>> fetchUserPaymentDossier(
     String userId, [
-    UserModel? fallbackUser,
+    dynamic fallbackUser,
   ]) async {
     try {
       final result = await _segmentService.getPendingBankTransfers(
@@ -1492,28 +1494,39 @@ class PendingBankTransfersController extends GetxController {
       if (rawUsers != null && (rawUsers as List).isNotEmpty) {
         final group = Map<String, dynamic>.from(rawUsers.first);
         if (group['user'] == null && fallbackUser != null) {
-          group['user'] = {
-            '_id': fallbackUser.id,
-            'fullName': fallbackUser.fullName,
-            'phone': fallbackUser.mobile,
-            'email': fallbackUser.email,
-            'kycStatus': fallbackUser.kycStatus,
-            'registrationType': fallbackUser.subscriptionPlan,
-          };
+          group['user'] = _extractUserData(fallbackUser, userId);
         }
         return group;
       }
     } catch (e) {
       debugPrint('Error fetching user payment dossier: $e');
     }
+
+    // Fallback: If result has no users or failed, extract from fallbackUser or fetch via UserDetailsService
+    Map<String, dynamic>? userMap;
+    if (fallbackUser != null) {
+      userMap = _extractUserData(fallbackUser, userId);
+    } else {
+      try {
+        if (Get.isRegistered<UserDetailsService>()) {
+          final details = await Get.find<UserDetailsService>().getUserDetails(userId);
+          if (details != null) {
+            userMap = _extractUserData(details, userId);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching fallback user details: $e');
+      }
+    }
+
     return {
-      'user': {
-        '_id': fallbackUser?.id ?? userId,
-        'fullName': fallbackUser?.fullName ?? 'Client',
-        'phone': fallbackUser?.mobile ?? '-',
-        'email': fallbackUser?.email ?? '-',
-        'kycStatus': fallbackUser?.kycStatus ?? 'PENDING',
-        'registrationType': fallbackUser?.subscriptionPlan ?? '',
+      'user': userMap ?? {
+        '_id': userId,
+        'fullName': 'Client',
+        'phone': '-',
+        'email': '-',
+        'kycStatus': 'PENDING',
+        'registrationType': '',
       },
       'payments': <Map<String, dynamic>>[],
       'totalPaid': 0.0,
@@ -1522,6 +1535,49 @@ class PendingBankTransfersController extends GetxController {
       'pendingCount': 0,
       'hasPending': false,
       'activePlansCount': 0,
+    };
+  }
+
+  Map<String, dynamic> _extractUserData(dynamic user, String userId) {
+    if (user is UserModel) {
+      return {
+        '_id': user.id.isNotEmpty ? user.id : userId,
+        'fullName': user.fullName.isNotEmpty ? user.fullName : 'Client',
+        'phone': user.mobile.isNotEmpty ? user.mobile : '-',
+        'email': user.email.isNotEmpty ? user.email : '-',
+        'kycStatus': user.kycStatus.isNotEmpty ? user.kycStatus : 'PENDING',
+        'registrationType': user.subscriptionPlan.isNotEmpty ? user.subscriptionPlan : '',
+      };
+    } else if (user is UserDetailsModel) {
+      final name = user.fullName.isNotEmpty
+          ? user.fullName
+          : (user.displayName.isNotEmpty ? user.displayName : 'Client');
+      return {
+        '_id': user.id.isNotEmpty ? user.id : userId,
+        'fullName': name,
+        'phone': user.phone.isNotEmpty ? user.phone : '-',
+        'email': user.email.isNotEmpty ? user.email : '-',
+        'kycStatus': user.kycStatus ?? 'PENDING',
+        'registrationType': user.registrationType ?? '',
+      };
+    } else if (user is Map) {
+      final m = Map<String, dynamic>.from(user);
+      return {
+        '_id': m['_id']?.toString() ?? m['id']?.toString() ?? userId,
+        'fullName': m['fullName'] ?? m['displayName'] ?? m['name'] ?? 'Client',
+        'phone': m['phone'] ?? m['mobile'] ?? '-',
+        'email': m['email'] ?? '-',
+        'kycStatus': m['kycStatus'] ?? 'PENDING',
+        'registrationType': m['registrationType'] ?? m['subscriptionPlan'] ?? '',
+      };
+    }
+    return {
+      '_id': userId,
+      'fullName': 'Client',
+      'phone': '-',
+      'email': '-',
+      'kycStatus': 'PENDING',
+      'registrationType': '',
     };
   }
 

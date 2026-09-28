@@ -930,29 +930,44 @@ const segmentsService = {
       pageSize = pageSize ? parseInt(pageSize) : 20;
       const skip = (page - 1) * pageSize;
 
-      const queryArgs = {
-        $or: [
+      const isSingleUserDossier = !!(userId && mongoose.Types.ObjectId.isValid(userId));
+
+      const queryArgs = {};
+      if (!isSingleUserDossier) {
+        queryArgs.$or = [
           { proofImage: { $ne: null, $exists: true } }, // Regular payment with proof (legacy)
           { 'proofImages.0': { $exists: true } }, // Regular payment with multiple proofs
           { 'partialPaymentsHistory.0': { $exists: true } }, // Partial payment with at least one history entry
           { purchaseType: 'REGISTRATION' },
           { paymentMethod: 'BANK_TRANSFER' }
-        ]
-      };
+        ];
 
-      if (status && status !== 'All') {
-        if (status === 'Approved') {
-          queryArgs.status = { $in: ['PAID', 'APPROVED', 'PARTIAL-PAID'] };
-        } else if (status === 'Partial') {
-          // We might still want to show partial payments in various states, usually VERIFICATION_PENDING or PENDING_BANK_TRANSFER or PAID
-          queryArgs.isPartial = true;
-        } else if (status === 'Rejected') {
-          queryArgs.status = 'REJECTED';
-        } else if (status === 'Pending') {
-          queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING'] };
+        if (status && status !== 'All') {
+          if (status === 'Approved') {
+            queryArgs.status = { $in: ['PAID', 'APPROVED', 'PARTIAL-PAID'] };
+          } else if (status === 'Partial') {
+            // We might still want to show partial payments in various states, usually VERIFICATION_PENDING or PENDING_BANK_TRANSFER or PAID
+            queryArgs.isPartial = true;
+          } else if (status === 'Rejected') {
+            queryArgs.status = 'REJECTED';
+          } else if (status === 'Pending') {
+            queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING'] };
+          }
+        } else {
+          queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
         }
       } else {
-        queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
+        if (status && status !== 'All') {
+          if (status === 'Approved') {
+            queryArgs.status = { $in: ['PAID', 'APPROVED', 'PARTIAL-PAID'] };
+          } else if (status === 'Partial') {
+            queryArgs.isPartial = true;
+          } else if (status === 'Rejected') {
+            queryArgs.status = 'REJECTED';
+          } else if (status === 'Pending') {
+            queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING'] };
+          }
+        }
       }
 
       // Restrict payments by staff/director/manager assignment hierarchy
@@ -1273,19 +1288,63 @@ const segmentsService = {
         const totalUsersCount = userAgg[0]?.metadata[0]?.total || 0;
         const pageUserIds = (userAgg[0]?.data || []).map(u => u._id).filter(Boolean);
 
+        if (isSingleUserDossier && pageUserIds.length === 0) {
+          const targetUser = await userModel.findById(query.userId).select('fullName phone email kycStatus registrationType gstin firmName panNumber userObject');
+          if (targetUser) {
+            return {
+              status: 200,
+              message: "Customer Payments Dossier",
+              data: {
+                totalCount: 1,
+                summaryStats: {
+                  totalCustomers: 1,
+                  totalVolume: 0,
+                  grossTurnover: 0,
+                  taxableTurnover: 0,
+                  totalTax: 0,
+                  cgst: 0,
+                  sgst: 0,
+                  igst: 0,
+                  b2bCount: 0,
+                  b2cCount: 0,
+                  b2bAmount: 0,
+                  b2cAmount: 0,
+                  actionRequiredCustomers: 0,
+                  totalPayments: 0,
+                  pendingPaymentsCount: 0
+                },
+                users: [{
+                  user: targetUser,
+                  payments: [],
+                  totalPaid: 0,
+                  totalAmount: 0,
+                  remainingBalance: 0,
+                  pendingCount: 0,
+                  hasPending: false,
+                  activePlansCount: 0,
+                  latestActivity: null
+                }],
+                pendingPayments: []
+              }
+            };
+          }
+        }
+
         // Fetch all customer payments so the customer dossier and cards reflect complete history
+        const intentFilter = { userId: { $in: pageUserIds } };
+        if (!isSingleUserDossier) {
+          intentFilter.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
+          intentFilter.$or = [
+            { proofImage: { $ne: null, $exists: true } },
+            { 'proofImages.0': { $exists: true } },
+            { 'partialPaymentsHistory.0': { $exists: true } },
+            { purchaseType: 'REGISTRATION' },
+            { paymentMethod: 'BANK_TRANSFER' }
+          ];
+        }
+
         const intents = await PaymentIntent
-          .find({
-            userId: { $in: pageUserIds },
-            status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] },
-            $or: [
-              { proofImage: { $ne: null, $exists: true } },
-              { 'proofImages.0': { $exists: true } },
-              { 'partialPaymentsHistory.0': { $exists: true } },
-              { purchaseType: 'REGISTRATION' },
-              { paymentMethod: 'BANK_TRANSFER' }
-            ]
-          })
+          .find(intentFilter)
           .populate({
             path: 'userId',
             select: 'fullName phone email kycStatus registrationType gstin firmName panNumber userObject'

@@ -998,7 +998,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
 
   static Future<void> showUserDossierDialogByUserId(
     String userId, {
-    UserModel? userModel,
+    dynamic userModel,
   }) async {
     final controller = Get.isRegistered<PendingBankTransfersController>()
         ? Get.find<PendingBankTransfersController>()
@@ -1298,6 +1298,43 @@ class PendingBankTransfersScreen extends StatelessWidget {
                         ),
 
                         const SizedBox(height: 14),
+
+                        // Empty State if no payments
+                        if (payments.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 40, horizontal: 24),
+                            decoration: BoxDecoration(
+                              color: AppTheme.gray50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.gray200),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long_outlined,
+                                    size: 48, color: Colors.grey[400]),
+                                const SizedBox(height: 12),
+                                Text(
+                                  "No purchases or subscriptions found",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "This client has not made any purchases or bank transfers yet.",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
                         // Render Plan Cards
                         ...payments.asMap().entries.map((entry) {
@@ -2720,6 +2757,14 @@ class PendingBankTransfersScreen extends StatelessWidget {
       case 'REJECTED':
         color = Colors.red;
         label = 'Rejected';
+        break;
+      case 'FAILED':
+        color = Colors.red;
+        label = 'Failed';
+        break;
+      case 'CANCELLED':
+        color = Colors.grey;
+        label = 'Cancelled';
         break;
       default:
         color = Colors.orange;
