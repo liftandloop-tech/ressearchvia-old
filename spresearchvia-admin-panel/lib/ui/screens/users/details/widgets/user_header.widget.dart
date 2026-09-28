@@ -84,6 +84,12 @@ class UserHeader extends StatelessWidget {
                     .showEditProfile(userDetails.id),
               ),
               SizedBox(width: AppTheme.spacing12),
+            ],
+            if ((authController.user.value?.isAdmin == true) ||
+                (authController.user.value?.has('subscriptions.manage') ?? false) ||
+                (authController.user.value?.has('subscriptions.activate') ?? false) ||
+                (authController.user.value?.has('subscriptions.revoke') ?? false) ||
+                (authController.user.value?.has('users.update') ?? false)) ...[
               UserHeaderButton(
                 title: 'Manage Subscription',
                 color: AppTheme.successGreen,

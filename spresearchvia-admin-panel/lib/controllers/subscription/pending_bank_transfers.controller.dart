@@ -1287,6 +1287,27 @@ class PendingBankTransfersController extends GetxController {
   var statusFilter = 'All'.obs; // 'All', 'Approved', 'Partial'
   var searchQuery = ''.obs;
 
+  // Payments Table Header Filters & Sorting
+  var sortColumn = ''.obs; // 'customer', 'totalPaid', 'state', 'latestActivity'
+  var sortAscending = true.obs;
+  var customerFilter = ''.obs;
+  var balanceStatusFilter = 'All'.obs; // 'All', 'Has Balance Due', 'Fully Paid'
+  var amountRangeFilter = 'All'.obs; // 'All', '> ₹10,000', '> ₹25,000', '> ₹50,000', '> ₹1,00,000'
+  var stateTypeFilter = 'All'.obs; // 'All', 'Intra-State: MP (9%+9%)', 'Inter-State: Outside MP (IGST)', 'Unspecified POS'
+  var stateNameFilter = 'All'.obs; // 'All' or specific state name
+  var activityFilter = 'All'.obs; // 'All', 'Has Pending Slip', 'New (< 48 hrs)', 'Last 7 Days', 'Last 30 Days'
+  var activityDateFilter = ''.obs; // 'DD/MM/YYYY' or ''
+
+  bool get hasActiveColumnFilters {
+    return customerFilter.value.trim().isNotEmpty ||
+        balanceStatusFilter.value != 'All' ||
+        amountRangeFilter.value != 'All' ||
+        stateTypeFilter.value != 'All' ||
+        stateNameFilter.value != 'All' ||
+        activityFilter.value != 'All' ||
+        activityDateFilter.value.trim().isNotEmpty;
+  }
+
   // Filters for Pending KYC
   final kycSearchController = TextEditingController();
   var kycStatusFilter = 'All'
@@ -2243,18 +2264,220 @@ class PendingBankTransfersController extends GetxController {
     }
   }
 
+  void toggleSort(String column) {
+    if (sortColumn.value == column) {
+      if (sortAscending.value) {
+        sortAscending.value = false;
+      } else {
+        sortColumn.value = '';
+        sortAscending.value = true;
+      }
+    } else {
+      sortColumn.value = column;
+      sortAscending.value = true;
+    }
+    applyFilters();
+  }
+
+  void resetColumnFilters() {
+    customerFilter.value = '';
+    balanceStatusFilter.value = 'All';
+    amountRangeFilter.value = 'All';
+    stateTypeFilter.value = 'All';
+    stateNameFilter.value = 'All';
+    activityFilter.value = 'All';
+    activityDateFilter.value = '';
+    sortColumn.value = '';
+    sortAscending.value = true;
+    applyFilters();
+  }
+
   void applyFilters() {
     filteredPayments.assignAll(pendingPayments.toList());
     if (consolidatedUsers.isEmpty && pendingPayments.isNotEmpty) {
       _buildClientSideConsolidatedUsers();
     }
-    filteredConsolidatedUsers.assignAll(consolidatedUsers.toList());
+
+    var list = consolidatedUsers.toList();
+
+    // 1. Customer Filter (matches name, email, or phone)
+    final q = customerFilter.value.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((u) {
+        final user = u['user'] is Map ? u['user'] as Map : {};
+        final name = (user['fullName'] ?? '').toString().toLowerCase();
+        final email = (user['email'] ?? '').toString().toLowerCase();
+        final phone = (user['phone'] ?? '').toString().toLowerCase();
+        return name.contains(q) || email.contains(q) || phone.contains(q);
+      }).toList();
+    }
+
+    // 2. Balance Status Filter
+    if (balanceStatusFilter.value == 'Has Balance Due') {
+      list = list.where((u) {
+        final rem = (u['remainingBalance'] is num)
+            ? (u['remainingBalance'] as num).toDouble()
+            : (double.tryParse(u['remainingBalance']?.toString() ?? '0') ?? 0);
+        return rem > 0;
+      }).toList();
+    } else if (balanceStatusFilter.value == 'Fully Paid') {
+      list = list.where((u) {
+        final rem = (u['remainingBalance'] is num)
+            ? (u['remainingBalance'] as num).toDouble()
+            : (double.tryParse(u['remainingBalance']?.toString() ?? '0') ?? 0);
+        return rem <= 0;
+      }).toList();
+    }
+
+    // 3. Amount Tier Filter
+    if (amountRangeFilter.value != 'All') {
+      list = list.where((u) {
+        final total = (u['totalPaid'] is num)
+            ? (u['totalPaid'] as num).toDouble()
+            : (double.tryParse(u['totalPaid']?.toString() ?? '0') ?? 0);
+        if (amountRangeFilter.value == '> ₹10,000') return total >= 10000;
+        if (amountRangeFilter.value == '> ₹25,000') return total >= 25000;
+        if (amountRangeFilter.value == '> ₹50,000') return total >= 50000;
+        if (amountRangeFilter.value == '> ₹1,00,000') return total >= 100000;
+        return true;
+      }).toList();
+    }
+
+    // 4. State Jurisdiction Filter
+    if (stateTypeFilter.value != 'All') {
+      list = list.where((u) {
+        final user = u['user'] is Map ? u['user'] as Map : {};
+        final payments = u['payments'] as List? ?? [];
+        final fallbackGstin = payments.isNotEmpty ? payments.first['gstin']?.toString() : null;
+        final stateInfo = resolveStateInfo(user, fallbackGstin: fallbackGstin);
+
+        if (stateTypeFilter.value == 'Intra-State: MP (9%+9%)' || stateTypeFilter.value == 'Intra-State (MP)') {
+          return stateInfo.isIntraState;
+        }
+        if (stateTypeFilter.value == 'Inter-State: Outside MP (IGST)' || stateTypeFilter.value == 'Inter-State (IGST)') {
+          return !stateInfo.isIntraState && stateInfo.name != 'Unspecified';
+        }
+        if (stateTypeFilter.value == 'Unspecified POS' || stateTypeFilter.value == 'Unspecified') {
+          return stateInfo.name == 'Unspecified';
+        }
+        return true;
+      }).toList();
+    }
+
+    // 5. Specific State Filter
+    if (stateNameFilter.value != 'All') {
+      final target = stateNameFilter.value.trim().toLowerCase();
+      list = list.where((u) {
+        final user = u['user'] is Map ? u['user'] as Map : {};
+        final payments = u['payments'] as List? ?? [];
+        final fallbackGstin = payments.isNotEmpty ? payments.first['gstin']?.toString() : null;
+        final stateInfo = resolveStateInfo(user, fallbackGstin: fallbackGstin);
+        return stateInfo.name.toLowerCase() == target || stateInfo.code.toLowerCase() == target;
+      }).toList();
+    }
+
+    // 6. Latest Activity Filter
+    if (activityFilter.value != 'All') {
+      final now = DateTime.now();
+      list = list.where((u) {
+        final pendingCount = (u['pendingCount'] is int)
+            ? u['pendingCount'] as int
+            : (int.tryParse(u['pendingCount']?.toString() ?? '0') ?? 0);
+        final hasPending = u['hasPending'] == true || pendingCount > 0;
+        DateTime? latestDate;
+        if (u['latestActivity'] != null) {
+          latestDate = DateTime.tryParse(u['latestActivity'].toString());
+        }
+
+        if (activityFilter.value == 'Has Pending Slip') {
+          return hasPending;
+        }
+        if (activityFilter.value == 'New (< 48 hrs)' || activityFilter.value == 'New (Last 48 hrs)') {
+          return hasPending && latestDate != null && now.difference(latestDate).inHours < 48;
+        }
+        if (activityFilter.value == 'Last 7 Days') {
+          return latestDate != null && now.difference(latestDate).inDays <= 7;
+        }
+        if (activityFilter.value == 'Last 30 Days') {
+          return latestDate != null && now.difference(latestDate).inDays <= 30;
+        }
+        return true;
+      }).toList();
+    }
+
+    // 7. Activity Date Filter (DD/MM/YYYY)
+    if (activityDateFilter.value.trim().isNotEmpty) {
+      final targetDateStr = activityDateFilter.value.trim();
+      list = list.where((u) {
+        if (u['latestActivity'] == null) return false;
+        final date = DateTime.tryParse(u['latestActivity'].toString());
+        if (date == null) return false;
+        final d = date.day.toString().padLeft(2, '0');
+        final m = date.month.toString().padLeft(2, '0');
+        final y = date.year.toString();
+        final formatted = '$d/$m/$y';
+        return formatted == targetDateStr;
+      }).toList();
+    }
+
+    // 8. Sorting
+    if (sortColumn.value.isNotEmpty) {
+      list.sort((a, b) {
+        int cmp = 0;
+        switch (sortColumn.value) {
+          case 'customer':
+            final nameA = (a['user']?['fullName'] ?? '').toString().toLowerCase();
+            final nameB = (b['user']?['fullName'] ?? '').toString().toLowerCase();
+            cmp = nameA.compareTo(nameB);
+            break;
+          case 'totalPaid':
+            final paidA = (a['totalPaid'] is num)
+                ? (a['totalPaid'] as num).toDouble()
+                : (double.tryParse(a['totalPaid']?.toString() ?? '0') ?? 0);
+            final paidB = (b['totalPaid'] is num)
+                ? (b['totalPaid'] as num).toDouble()
+                : (double.tryParse(b['totalPaid']?.toString() ?? '0') ?? 0);
+            cmp = paidA.compareTo(paidB);
+            break;
+          case 'state':
+            final userA = a['user'] is Map ? a['user'] as Map : {};
+            final paymentsA = a['payments'] as List? ?? [];
+            final gstinA = paymentsA.isNotEmpty ? paymentsA.first['gstin']?.toString() : null;
+            final stateA = resolveStateInfo(userA, fallbackGstin: gstinA).name;
+
+            final userB = b['user'] is Map ? b['user'] as Map : {};
+            final paymentsB = b['payments'] as List? ?? [];
+            final gstinB = paymentsB.isNotEmpty ? paymentsB.first['gstin']?.toString() : null;
+            final stateB = resolveStateInfo(userB, fallbackGstin: gstinB).name;
+
+            cmp = stateA.compareTo(stateB);
+            break;
+          case 'latestActivity':
+            final dateA = a['latestActivity'] != null ? DateTime.tryParse(a['latestActivity'].toString()) : null;
+            final dateB = b['latestActivity'] != null ? DateTime.tryParse(b['latestActivity'].toString()) : null;
+            if (dateA == null && dateB == null) {
+              cmp = 0;
+            } else if (dateA == null) {
+              cmp = -1;
+            } else if (dateB == null) {
+              cmp = 1;
+            } else {
+              cmp = dateA.compareTo(dateB);
+            }
+            break;
+        }
+        return sortAscending.value ? cmp : -cmp;
+      });
+    }
+
+    filteredConsolidatedUsers.assignAll(list);
   }
 
   void resetFilters() {
     statusFilter.value = 'All';
     searchQuery.value = '';
     searchController.clear();
+    resetColumnFilters();
     fetchPendingTransfers();
   }
 

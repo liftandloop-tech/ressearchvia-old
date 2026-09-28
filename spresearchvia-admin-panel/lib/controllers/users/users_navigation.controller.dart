@@ -18,8 +18,11 @@ class UsersNavigationController extends GetxController {
     Get.toNamed('/edit-user/$userId');
   }
 
-  void showManageSubscription(String userId) {
-    Get.toNamed('/manage-user/$userId');
+  void showManageSubscription(String userId, {dynamic userModel}) {
+    PendingBankTransfersScreen.showUserDossierDialogByUserId(
+      userId,
+      userModel: userModel,
+    );
   }
 
   void showCreateUser() {

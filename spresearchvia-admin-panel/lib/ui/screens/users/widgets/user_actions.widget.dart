@@ -52,6 +52,7 @@ class UserActions extends StatelessWidget {
                 // Manage Users / Subscriptions
                 Get.find<UsersNavigationController>().showManageSubscription(
                   user.id,
+                  userModel: user,
                 );
               },
               color: AppTheme.textSecondary,

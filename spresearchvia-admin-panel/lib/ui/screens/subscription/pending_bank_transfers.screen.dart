@@ -10,6 +10,8 @@ import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/utils/invoice_pdf_generator.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import '../../../models/user.model.dart';
+import 'widgets/payment_table_header_cell.widget.dart';
+import 'widgets/payment_column_filter.widget.dart';
 
 class PendingBankTransfersScreen extends StatelessWidget {
   final int? specificTab;
@@ -588,11 +590,11 @@ class PendingBankTransfersScreen extends StatelessWidget {
     PendingBankTransfersController controller,
   ) {
     return Obx(() {
-      if (controller.filteredConsolidatedUsers.isEmpty) {
+      if (controller.consolidatedUsers.isEmpty && !controller.isLoading.value) {
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(40.0),
-            child: Text("No customer payments match the selected filters."),
+            child: Text("No pending transfers found."),
           ),
         );
       }
@@ -619,14 +621,73 @@ class PendingBankTransfersScreen extends StatelessWidget {
                     columnSpacing: 24,
                     horizontalMargin: 16,
                     headingRowColor: MaterialStateProperty.all(AppTheme.gray50),
-                    columns: const [
-                      DataColumn(label: Text('Customer')),
-                      DataColumn(label: Text('Total Paid (LTV)')),
-                      DataColumn(label: Text('State (SGST Filing)')),
-                      DataColumn(label: Text('Latest Activity')),
-                      DataColumn(label: Text('Actions')),
+                    columns: [
+                      DataColumn(
+                        label: PaymentTableHeaderCell(
+                          title: 'Customer',
+                          sortKey: 'customer',
+                          filterWidget: PaymentCustomerFilter(controller: controller),
+                        ),
+                      ),
+                      DataColumn(
+                        label: PaymentTableHeaderCell(
+                          title: 'Total Paid (LTV)',
+                          sortKey: 'totalPaid',
+                          filterWidget: PaymentTotalPaidFilter(controller: controller),
+                        ),
+                      ),
+                      DataColumn(
+                        label: PaymentTableHeaderCell(
+                          title: 'State (SGST Filing)',
+                          sortKey: 'state',
+                          filterWidget: PaymentStateFilter(controller: controller),
+                        ),
+                      ),
+                      DataColumn(
+                        label: PaymentTableHeaderCell(
+                          title: 'Latest Activity',
+                          sortKey: 'latestActivity',
+                          filterWidget: PaymentActivityFilter(controller: controller),
+                        ),
+                      ),
+                      const DataColumn(
+                        label: PaymentTableHeaderCell(
+                          title: 'Actions',
+                        ),
+                      ),
                     ],
-                    rows: controller.filteredConsolidatedUsers.map((userGroup) {
+                    rows: controller.filteredConsolidatedUsers.isEmpty
+                        ? [
+                            DataRow(
+                              cells: [
+                                DataCell(
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.info_outline, size: 16, color: AppTheme.gray500),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'No customer payments match the selected filters.',
+                                          style: TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 13,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const DataCell(SizedBox.shrink()),
+                                const DataCell(SizedBox.shrink()),
+                                const DataCell(SizedBox.shrink()),
+                                const DataCell(SizedBox.shrink()),
+                              ],
+                            ),
+                          ]
+                        : controller.filteredConsolidatedUsers.map((userGroup) {
                       final user = userGroup['user'] is Map
                           ? Map<String, dynamic>.from(userGroup['user'])
                           : <String, dynamic>{};
@@ -879,9 +940,43 @@ class PendingBankTransfersScreen extends StatelessWidget {
         children: [
           tableCard,
           const SizedBox(height: 16),
-          Text(
-            "Showing ${controller.filteredConsolidatedUsers.length} of ${controller.totalPaymentsCount.value} customers",
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          Row(
+            children: [
+              Text(
+                "Showing ${controller.filteredConsolidatedUsers.length} of ${controller.totalPaymentsCount.value} customers",
+                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              if (controller.hasActiveColumnFilters) ...[
+                const SizedBox(width: 12),
+                InkWell(
+                  onTap: controller.resetColumnFilters,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.errorRed.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: AppTheme.errorRed.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.filter_alt_off_outlined, size: 13, color: AppTheme.errorRed),
+                        SizedBox(width: 4),
+                        Text(
+                          'Reset Column Filters',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.errorRed,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           if (controller.hasMorePages.value) ...[
             const SizedBox(height: 16),
