@@ -34,63 +34,61 @@ class ReportsFilters extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Obx(
-                  () => Container(
-                    height: 40,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.gray200),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: Obx(() {
-                        final seenCatIds = <String>{};
-                        final validCats = controller.categories.where((cat) {
-                          final id = (cat['_id'] ?? cat['id'])?.toString();
-                          return id != null && id.isNotEmpty && seenCatIds.add(id);
-                        }).toList();
+                Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.gray200),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: Obx(() {
+                      final seenCatIds = <String>{};
+                      final validCats = controller.categories.where((cat) {
+                        final id = (cat['_id'] ?? cat['id'])?.toString();
+                        return id != null && id.isNotEmpty && seenCatIds.add(id);
+                      }).toList();
 
-                        final currentCat = controller.categoryFilter.value;
-                        final safeCatValue = (currentCat == 'All Categories' || validCats.any((cat) => (cat['_id'] ?? cat['id'])?.toString() == currentCat))
-                            ? currentCat
-                            : 'All Categories';
+                      final currentCat = controller.categoryFilter.value;
+                      final safeCatValue = (currentCat == 'All Categories' || validCats.any((cat) => (cat['_id'] ?? cat['id'])?.toString() == currentCat))
+                          ? currentCat
+                          : 'All Categories';
 
-                        return DropdownButton<String>(
-                          value: safeCatValue,
-                          isExpanded: true,
-                          icon: Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 20,
-                            color: AppTheme.textSecondary,
+                      return DropdownButton<String>(
+                        value: safeCatValue,
+                        isExpanded: true,
+                        icon: Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 20,
+                          color: AppTheme.textSecondary,
+                        ),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textPrimary,
+                        ),
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: 'All Categories',
+                            child: Text('All Categories'),
                           ),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textPrimary,
-                          ),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: 'All Categories',
-                              child: Text('All Categories'),
-                            ),
-                            ...validCats.map((cat) {
-                              final catId = (cat['_id'] ?? cat['id'])?.toString() ?? '';
-                              final catName = (cat['segmentName'] ?? cat['name'] ?? 'Unknown').toString();
-                              return DropdownMenuItem<String>(
-                                value: catId,
-                                child: Text(catName),
-                              );
-                            }),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) {
-                              controller.categoryFilter.value = v;
-                              controller.applyFilters();
-                            }
-                          },
-                        );
-                      }),
-                    ),
+                          ...validCats.map((cat) {
+                            final catId = (cat['_id'] ?? cat['id'])?.toString() ?? '';
+                            final catName = (cat['segmentName'] ?? cat['name'] ?? 'Unknown').toString();
+                            return DropdownMenuItem<String>(
+                              value: catId,
+                              child: Text(catName),
+                            );
+                          }),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            controller.categoryFilter.value = v;
+                            controller.applyFilters();
+                          }
+                        },
+                      );
+                    }),
                   ),
                 ),
               ],
