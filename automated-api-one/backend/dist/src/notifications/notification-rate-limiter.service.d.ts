@@ -1,5 +1,5 @@
 import { RedisService } from '../infrastructure/redis/redis.service';
-import { NotificationChannel } from '@prisma/client';
+import { NotificationChannel } from "@prisma/client";
 export declare class NotificationRateLimiterService {
     private readonly redisService;
     private readonly logger;

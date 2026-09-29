@@ -64,7 +64,7 @@ exports.AppModule = AppModule = __decorate([
                         password: config.get('REDIS_PASSWORD'),
                     };
                     const username = config.get('REDIS_USERNAME');
-                    if (username) {
+                    if (username && username !== 'default' && username !== 'sp-redis') {
                         connectionOptions.username = username;
                     }
                     return { connection: connectionOptions };

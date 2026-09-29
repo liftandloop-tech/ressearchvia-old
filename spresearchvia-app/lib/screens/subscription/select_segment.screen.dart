@@ -241,8 +241,8 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
                           ),
                           onTap: () async {
                             segmentPlanController.selectPlan(plan.id);
-                            if (plan.isHni) {
-                              // Immediately open the GSTIN input field upon selection
+                            if (plan.isHni && (hniGstin.value == null || !ValidationService.validateGST(hniGstin.value!))) {
+                              // Immediately open the GSTIN input field upon selection if not already provided
                               final entered = await _promptForGstin(context);
                               if (entered != null && ValidationService.validateGST(entered)) {
                                 hniGstin.value = entered;
@@ -362,8 +362,7 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
               final isHniPlan = selectedPlan?.isHni ?? false;
               final hasValidGst = hniGstin.value != null && ValidationService.validateGST(hniGstin.value!);
 
-              // Without inputting a valid GST number or if user has active plan, button is disabled
-              final canContinue = !hasActivePlan && hasSelection && (!isHniPlan || hasValidGst);
+              final canTap = !hasActivePlan && hasSelection;
 
               String buttonTitle = 'Continue to Payment';
               if (hasActivePlan) {
@@ -374,8 +373,10 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
 
               return Button(
                 title: buttonTitle,
-                buttonType: hasActivePlan ? ButtonType.greyBorder : ButtonType.green,
-                onTap: canContinue
+                buttonType: hasActivePlan
+                    ? ButtonType.greyBorder
+                    : (isHniPlan && !hasValidGst ? ButtonType.blue : ButtonType.green),
+                onTap: canTap
                     ? () async {
                         // Block suspended users
                         final authController = Get.find<AuthController>();
@@ -396,6 +397,23 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
                           return;
                         }
 
+                        // If HNI plan and GSTIN is not yet provided, prompt for GSTIN first
+                        if (isHniPlan && !hasValidGst) {
+                          final entered = await _promptForGstin(context);
+                          if (entered != null && ValidationService.validateGST(entered)) {
+                            hniGstin.value = entered;
+                          } else {
+                            Get.snackbar(
+                              'GSTIN Required',
+                              'A valid 15-character GSTIN is strictly required for HNI plan before continuing to payment.',
+                              backgroundColor: Colors.amber.shade100,
+                              colorText: Colors.amber.shade900,
+                              duration: const Duration(seconds: 4),
+                            );
+                          }
+                          return;
+                        }
+
                         // Strictly validate exactly 1 segment selected
                         final segmentId = segmentPlanController.selectedSegmentId.value;
                         if (segmentId == null || segmentId.trim().isEmpty) {
@@ -409,18 +427,6 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
                           return;
                         }
 
-                        // Strictly validate plan is Spark or Splendid
-                        final pName = (selectedPlan?.name ?? '').toUpperCase();
-                        if (!pName.contains('SPARK') && !pName.contains('SPLENDID')) {
-                          Get.snackbar(
-                            'Invalid Plan',
-                            'Strict Policy: Only "SPARK" or "SPLENDID" plan is purchasable.',
-                            backgroundColor: Colors.red.shade100,
-                            colorText: Colors.red.shade900,
-                          );
-                          return;
-                        }
-
                         Get.toNamed(
                           AppRoutes.confirmPayment,
                           arguments: {
@@ -429,7 +435,7 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
                           },
                         );
                       }
-                    : null, // Strictly null makes the button untappable!
+                    : null,
               );
             }),
           ),

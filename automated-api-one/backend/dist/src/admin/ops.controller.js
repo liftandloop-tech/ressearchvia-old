@@ -156,6 +156,19 @@ let OpsController = class OpsController {
     async getUserLiveBrokerData(identifier) {
         return this.opsService.getUserLiveBrokerData(identifier);
     }
+    async getSystemStrategyConfig() {
+        return this.opsService.getSystemStrategyConfig();
+    }
+    async updateSystemStrategyConfig(req, body) {
+        const operatorId = req.user.userId;
+        return this.opsService.updateSystemStrategyConfig(operatorId, body);
+    }
+    async getUserStrategyView(userId) {
+        return this.opsService.getUserStrategyView(userId);
+    }
+    async getStrategyDashboardUsers(page, limit) {
+        return this.opsService.getStrategyDashboardUsers(page ? parseInt(page, 10) : 1, limit ? parseInt(limit, 10) : 50);
+    }
 };
 exports.OpsController = OpsController;
 __decorate([
@@ -479,6 +492,40 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], OpsController.prototype, "getUserLiveBrokerData", null);
+__decorate([
+    (0, common_1.Get)('strategy/config'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get system-wide automated trading strategy configuration' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], OpsController.prototype, "getSystemStrategyConfig", null);
+__decorate([
+    (0, common_1.Post)('strategy/config'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: 'Update system-wide strategy configuration (limits & toggles)' }),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], OpsController.prototype, "updateSystemStrategyConfig", null);
+__decorate([
+    (0, common_1.Get)('users/:userId/strategy'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get automated trading strategy details and history for a specific user' }),
+    __param(0, (0, common_1.Param)('userId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], OpsController.prototype, "getUserStrategyView", null);
+__decorate([
+    (0, common_1.Get)('strategy/dashboard'),
+    (0, swagger_1.ApiOperation)({ summary: 'Get active automated trading users with live strategy & streak metrics' }),
+    __param(0, (0, common_1.Query)('page')),
+    __param(1, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], OpsController.prototype, "getStrategyDashboardUsers", null);
 exports.OpsController = OpsController = __decorate([
     (0, swagger_1.ApiTags)('Operations (SRE)'),
     (0, swagger_1.ApiBearerAuth)(),

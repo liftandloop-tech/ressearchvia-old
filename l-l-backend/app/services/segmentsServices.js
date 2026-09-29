@@ -2309,10 +2309,10 @@ const segmentsService = {
       let { planName, segmentsId, duration, day, price, discription, planFeatures, planStatus } = body;
 
       const cleanName = (planName || '').trim().toUpperCase();
-      if (!['SPARK', 'SPLENDID'].includes(cleanName)) {
+      if (!cleanName) {
         return {
           status: 400,
-          message: 'Strict Policy: Plan name must be either "SPARK" or "SPLENDID".',
+          message: 'Plan name is required.',
           data: {}
         };
       }
@@ -2354,10 +2354,10 @@ const segmentsService = {
 
       if (planName) {
         const cleanName = planName.trim().toUpperCase();
-        if (!['SPARK', 'SPLENDID'].includes(cleanName)) {
+        if (!cleanName) {
           return {
             status: 400,
-            message: 'Strict Policy: Plan name must be either "SPARK" or "SPLENDID".',
+            message: 'Plan name cannot be empty.',
             data: {}
           };
         }

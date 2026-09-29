@@ -8,6 +8,7 @@ import { OrderPlacementService } from './services/order-placement.service';
 import { OrderMonitoringService } from './services/order-monitoring.service';
 import { PositionCacheService } from './services/position-cache.service';
 import { MultiplierService } from './services/multiplier.service';
+import { PositionSizingService } from './services/position-sizing.service';
 import { ExecutionRecoveryService } from './services/execution-recovery.service';
 
 import { SignalExecutionProcessor } from './processors/signal-execution.processor';
@@ -20,6 +21,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { BrokersModule } from '../brokers/brokers.module';
 import { AuditModule } from '../audit/audit.module';
 import { InfrastructureModule } from '../infrastructure/infrastructure.module';
+import { StrategyModule } from '../strategy/strategy.module';
 import { Queues } from '../infrastructure/queues/queue.constants';
 
 @Module({
@@ -36,6 +38,7 @@ import { Queues } from '../infrastructure/queues/queue.constants';
     BrokersModule,
     AuditModule,
     InfrastructureModule,
+    StrategyModule,
   ],
   providers: [
     TradingService,
@@ -45,12 +48,13 @@ import { Queues } from '../infrastructure/queues/queue.constants';
     OrderMonitoringService,
     PositionCacheService,
     MultiplierService,
+    PositionSizingService,
     ExecutionRecoveryService,
     // BullMQ workers
     SignalExecutionProcessor,
     OrderPlacementProcessor,
     OrderMonitoringProcessor,
   ],
-  exports: [TradingService, SignalOrchestratorService, PositionCacheService],
+  exports: [TradingService, SignalOrchestratorService, PositionCacheService, PositionSizingService],
 })
 export class TradingModule {}

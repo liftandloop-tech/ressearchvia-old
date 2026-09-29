@@ -90,10 +90,10 @@ class CreatePlanController extends GetxController {
     if (!formKey.currentState!.validate()) return;
 
     final planNameClean = planNameController.text.trim().toUpperCase();
-    if (planNameClean != 'SPARK' && planNameClean != 'SPLENDID') {
+    if (planNameClean.isEmpty) {
       Get.snackbar(
         'Validation Error',
-        'Strict Policy: Plan name must be either "SPARK" or "SPLENDID".',
+        'Plan name cannot be empty.',
         backgroundColor: Colors.red,
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,

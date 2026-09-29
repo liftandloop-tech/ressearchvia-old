@@ -4,12 +4,14 @@ import { QueueService } from '../../infrastructure/queues/queues.service';
 import { IdempotencyService } from '../../infrastructure/idempotency/idempotency.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { MultiplierService } from './multiplier.service';
+import { PositionSizingService } from './position-sizing.service';
 import { AuditService } from '../../audit/audit.service';
 import { AuditEventType } from '../../audit/enums/audit-event.enum';
 import { Queues } from '../../infrastructure/queues/queue.constants';
 import { UserExecutionSnapshot } from '../interfaces/user-execution-snapshot.interface';
 import { ExecutionContext } from '../interfaces/execution-context.interface';
-import { Signal, UserSegmentStatus, SubscriptionStatus, ConsentStatus, BrokerStatus, SignalState } from '@prisma/client';
+import type { Signal } from '@prisma/client';
+import { UserSegmentStatus, SubscriptionStatus, ConsentStatus, BrokerStatus, SignalState } from '@prisma/client';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
 import axios from 'axios';
@@ -27,6 +29,7 @@ export class SignalOrchestratorService {
     private readonly idempotencyService: IdempotencyService,
     private readonly redisService: RedisService,
     private readonly multiplierService: MultiplierService,
+    private readonly positionSizingService: PositionSizingService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -454,13 +457,15 @@ export class SignalOrchestratorService {
 
     // Deterministic job ID prevents duplicate worker processing
     const jobId = `job-${signal.id}-${subscriber.userId}`;
-    // Capture immutable snapshot at enqueue time
-    const multiplierState = await this.multiplierService.getState(
+    // Capture immutable snapshot at enqueue time via PositionSizingService
+    const sizing = await this.positionSizingService.calculatePositionSize(
       subscriber.userId,
       signal.segmentId,
+      subscriber.baseLot,
+      Number(signal.entryPrice),
     );
 
-    const multiplier = multiplierState.current;
+    const multiplier = sizing.multiplier;
     let effectiveLot: number;
 
     if (signal.segmentRelation?.name?.toUpperCase() === 'EQUITY CASH') {
@@ -473,7 +478,7 @@ export class SignalOrchestratorService {
         throw new Error('Calculated quantity is zero');
       }
     } else {
-      effectiveLot = subscriber.baseLot * multiplier;
+      effectiveLot = sizing.actualQuantity;
     }
 
     const snapshot: UserExecutionSnapshot = {
@@ -483,11 +488,18 @@ export class SignalOrchestratorService {
       brokerClientId: subscriber.brokerClientId,
       segmentId: signal.segmentId,
       subscriptionPlan: subscriber.plan,
-      multiplierIndex: multiplierState.index,
+      multiplierIndex: sizing.consecutiveLosses,
       multiplierValue: multiplier,
       capitalAllocated: subscriber.capital,
       baseLot: subscriber.baseLot,
       effectiveLot,
+      strategyType: sizing.strategyType,
+      strategyVersion: sizing.strategyVersion,
+      baseQuantity: sizing.baseQuantity,
+      actualQuantity: effectiveLot,
+      consecutiveLossesAtEntry: sizing.consecutiveLosses,
+      previousTradeResult: sizing.previousTradeResult,
+      agreementVersion: sizing.agreementVersion,
     };
 
     const ctx: ExecutionContext = {
@@ -509,7 +521,7 @@ export class SignalOrchestratorService {
 
     this.logger.debug(
       `[${correlationId}] Enqueued job ${jobId} for user ${subscriber.userId} ` +
-        `(lot=${snapshot.effectiveLot} multiplier=${multiplierState.current}x)`,
+        `(lot=${snapshot.effectiveLot} multiplier=${multiplier}x)`,
     );
 
     return true;

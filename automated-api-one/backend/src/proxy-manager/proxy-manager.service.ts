@@ -35,13 +35,9 @@ export class ProxyManagerService {
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
   ) {
-    this.partnerId = process.env.STATIC_IP_PARTNER_ID || '';
-    this.partnerPass = process.env.STATIC_IP_PARTNER_PASSWORD || '';
-    this.baseUrl = process.env.STATIC_IP_PARTNER_BASE_URL || 'https://partners.staticip.in';
-    
-    if (!this.partnerId || !this.partnerPass) {
-      this.logger.warn('STATIC_IP_PARTNER_ID or STATIC_IP_PARTNER_PASSWORD is not set in .env');
-    }
+    this.partnerId = process.env.STATIC_IP_PARTNER_ID || process.env.PROXY_PARTNER_USERID || 'SPResearchvia';
+    this.partnerPass = process.env.STATIC_IP_PARTNER_PASSWORD || process.env.PROXY_PARTNER_PASSWORD || 'tk29yom43u725g5u';
+    this.baseUrl = process.env.STATIC_IP_PARTNER_BASE_URL || process.env.PROXY_API_URL || 'https://partners-uat.staticip.in';
   }
 
   private getAuthBody() {

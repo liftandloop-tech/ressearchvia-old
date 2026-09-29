@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma.service';
-import { Position } from '@prisma/client';
+import { Position } from "@prisma/client";
 export declare class PositionsService {
     private readonly prisma;
     constructor(prisma: PrismaService);

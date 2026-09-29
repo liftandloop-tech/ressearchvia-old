@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { OrderType } from '@prisma/client';
 import { OrderPlacementService } from './order-placement.service';
 import { PrismaService } from '../../prisma.service';
 import { BrokerFactory } from '../../brokers/factory/broker.factory';
@@ -74,6 +75,7 @@ describe('OrderPlacementService', () => {
     symbol: 'NIFTY50',
     exchange: 'NSE',
     side: 'BUY',
+    orderType: OrderType.LIMIT,
     entryPrice: 22000,
     stopLoss: 21800,
     targetPrice: 22300,

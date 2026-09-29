@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { SignalsService } from './signals.service';
 import { PrismaService } from '../prisma.service';
 import { mockPrismaService } from '../../test/mocks/prisma.mock';
-import { Segment, Side } from '@prisma/client';
+import { Segment, Side, OrderType } from '@prisma/client';
 import { NotFoundException } from '@nestjs/common';
 import { QueueService } from '../infrastructure/queues/queues.service';
 import { Queues } from '../infrastructure/queues/queue.constants';
@@ -63,6 +63,7 @@ describe('SignalsService', () => {
       exchange: 'NFO',
       segment: Segment.FO,
       side: Side.BUY,
+      orderType: OrderType.LIMIT,
       entryPrice: 100,
       stopLoss: 80,
       targetPrice: 120,
@@ -88,7 +89,7 @@ describe('SignalsService', () => {
       expect(prismaMock.signal.create).toHaveBeenCalled();
       expect(queueServiceMock.addJob).toHaveBeenCalledWith(
         Queues.SIGNAL_PROCESSING,
-        'signal:signal-1',
+        'signal-signal-1',
         { signalId: 'signal-1' },
       );
     });

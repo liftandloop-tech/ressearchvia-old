@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma.service';
-import { Notification, NotificationType, NotificationEvent } from '@prisma/client';
+import { Notification, NotificationType, NotificationEvent } from "@prisma/client";
 import { NotificationRateLimiterService } from './notification-rate-limiter.service';
 import { NotificationDeduplicationService } from './notification-deduplication.service';
 import { NotificationTemplateService } from './notification-template.service';

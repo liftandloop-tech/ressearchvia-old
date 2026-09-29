@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:dio/dio.dart' as dio;
 import '../core/config/app.config.dart';
 import '../services/secure_storage.service.dart';
@@ -9,8 +10,17 @@ import 'segment_plan.controller.dart';
 
 class AutomatedTradingController extends GetxController {
   final SecureStorageService _storage = SecureStorageService();
+  final GetStorage _box = GetStorage();
   late final dio.Dio _dioClient;
   Timer? _statusPollTimer;
+
+  // Master Service Activation Agreement
+  final hasSignedAgreement = false.obs;
+  final isSigningAgreement = false.obs;
+
+  // Static IP Proxy States
+  final proxyInfo = Rxn<Map<String, dynamic>>();
+  final isProxyLoading = false.obs;
 
   // Connection & Consent States
   final isInitializing = false.obs;
@@ -36,6 +46,22 @@ class AutomatedTradingController extends GetxController {
   final pnlSummary = Rxn<Map<String, dynamic>>();
   final tradeHistory = <dynamic>[].obs;
   final isTradesLoading = false.obs;
+
+  // Trading Strategy States
+  final selectedStrategy = 'FIXED_1X'.obs; // FIXED_1X or LOSS_MULTIPLIER_2X
+  final isAgreementAccepted = true.obs;
+  final currentStrategyData = Rxn<Map<String, dynamic>>();
+  final strategyHistory = <dynamic>[].obs;
+  final isStrategyLoading = false.obs;
+
+  // Computed Service Status Helpers
+  bool get hasActiveProxy => proxyInfo.value?['hasProxy'] == true && proxyInfo.value?['status'] != 'expired';
+  String get staticIpAddress => proxyInfo.value?['ip']?.toString() ?? '';
+  bool get isBrokerConfigured => linkedBrokers.isNotEmpty;
+  bool get isBrokerSessionActive => isBrokerConfigured && linkedBrokers.first['isSessionActive'] == true;
+  bool get isLotConfigured => userSegments.isNotEmpty && (userSegments.first['baseLot'] ?? 0) > 0;
+  bool get isStrategyConfigured => currentStrategyData.value?['strategy'] != null;
+  bool get isDailyConsentActive => consentsStatus.value == 'ACTIVE';
 
   @override
   void onInit() {
@@ -96,8 +122,11 @@ class AutomatedTradingController extends GetxController {
         Get.put(SegmentPlanController());
       }
       await Future.wait([
+        checkAgreementStatus(),
+        fetchProxyInfo(),
         fetchConsentStatus(),
         fetchBrokerStatus(),
+        fetchUserStrategy(),
         fetchTradeSummary(),
         fetchTradeHistory(),
         fetchSegments(),
@@ -108,6 +137,62 @@ class AutomatedTradingController extends GetxController {
       debugPrint('Error refreshing automated trading data: $e');
     } finally {
       isInitializing.value = false;
+    }
+  }
+
+  // --- Master Service Agreement Flow ---
+  Future<void> checkAgreementStatus() async {
+    try {
+      final userId = await _storage.getUserId() ?? 'user';
+      final signed = _box.read('is_automated_agreement_signed_$userId') == true;
+      hasSignedAgreement.value = signed || (consentsStatus.value == 'ACTIVE') || linkedBrokers.isNotEmpty;
+    } catch (e) {
+      hasSignedAgreement.value = (consentsStatus.value == 'ACTIVE') || linkedBrokers.isNotEmpty;
+    }
+  }
+
+  Future<bool> signServiceAgreement() async {
+    isSigningAgreement.value = true;
+    try {
+      final userId = await _storage.getUserId() ?? 'user';
+      await _box.write('is_automated_agreement_signed_$userId', true);
+      hasSignedAgreement.value = true;
+      SnackbarService.showSuccess('Automated Trading Service Agreement signed.');
+      return true;
+    } catch (e) {
+      SnackbarService.showError('Failed to record signature. Please try again.');
+      return false;
+    } finally {
+      isSigningAgreement.value = false;
+    }
+  }
+
+  // --- Proxy / Static IP Flow ---
+  Future<void> fetchProxyInfo() async {
+    isProxyLoading.value = true;
+    try {
+      final token = await _storage.getAuthToken();
+      final llDio = dio.Dio(dio.BaseOptions(
+        baseUrl: AppConfig.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null && token.isNotEmpty)
+            'Authorization': 'Bearer ${token.replaceFirst("Bearer ", "")}',
+        },
+      ));
+      final response = await llDio.get('/user/proxy/info');
+      if (response.data != null && response.data['status'] == 'success') {
+        proxyInfo.value = response.data['data'];
+        if (hasActiveProxy) {
+          hasSignedAgreement.value = true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed fetching proxy info: $e');
+    } finally {
+      isProxyLoading.value = false;
     }
   }
 
@@ -198,19 +283,76 @@ class AutomatedTradingController extends GetxController {
     }
   }
 
-  Future<bool> grantConsent(String brokerId) async {
+  Future<bool> grantConsent(String brokerId, {String? strategy}) async {
     try {
-      final response = await _dioClient.post('/consents', data: {'brokerId': brokerId});
+      final chosenStrategy = strategy ?? selectedStrategy.value;
+      final response = await _dioClient.post('/consents', data: {
+        'brokerId': brokerId,
+        'strategy': chosenStrategy,
+        'baseMultiplier': 1,
+        'consentAccepted': true,
+        'agreementVersion': 'v1.0',
+      });
       if (response.statusCode == 200) {
         consentsStatus.value = response.data['status'] ?? 'ACTIVE';
         consentsDate.value = response.data['consentDate'] ?? '';
-        SnackbarService.showSuccess('Daily trading consent granted successfully.');
+        await fetchUserStrategy();
+        SnackbarService.showSuccess('Daily trading consent granted with $chosenStrategy.');
         return true;
       }
       return false;
     } catch (e) {
       SnackbarService.showError('Failed to grant consent. Please try again.');
       return false;
+    }
+  }
+
+  Future<void> fetchUserStrategy() async {
+    isStrategyLoading.value = true;
+    try {
+      final response = await _dioClient.get('/consents/strategy');
+      if (response.statusCode == 200 && response.data != null) {
+        currentStrategyData.value = response.data;
+        final strat = response.data['strategy'];
+        if (strat != null && strat['strategyType'] != null) {
+          selectedStrategy.value = strat['strategyType'];
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch user strategy: $e');
+    } finally {
+      isStrategyLoading.value = false;
+    }
+  }
+
+  Future<bool> changeStrategy(String newStrategy) async {
+    try {
+      final response = await _dioClient.post('/consents/strategy/change', data: {
+        'strategy': newStrategy,
+        'agreementVersion': 'v1.0',
+      });
+      if (response.statusCode == 200) {
+        selectedStrategy.value = newStrategy;
+        consentsStatus.value = 'NOT_GRANTED';
+        await fetchUserStrategy();
+        SnackbarService.showSuccess('Strategy updated to $newStrategy. Multiplier reset to 1x. Please grant daily consent.');
+        return true;
+      }
+      return false;
+    } catch (e) {
+      SnackbarService.showError('Failed to change strategy.');
+      return false;
+    }
+  }
+
+  Future<void> fetchStrategyHistory() async {
+    try {
+      final response = await _dioClient.get('/consents/strategy/history');
+      if (response.statusCode == 200 && response.data != null) {
+        strategyHistory.assignAll(response.data['history'] ?? []);
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch strategy history: $e');
     }
   }
 

@@ -1,5 +1,5 @@
 import { TradesService } from './trades.service';
-import { TradeStatus } from '@prisma/client';
+import { TradeStatus } from "@prisma/client";
 export declare class GetHistoryDto {
     status?: TradeStatus;
     limit?: number;

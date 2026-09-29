@@ -238,8 +238,9 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
   }
 
   Widget _buildSliderAndButton({required bool isRenewal}) {
-    const int minMonth = 3;
-    const double baseRatePerMonth = 1.0; // Testing rate
+    final brokerPricing = controller.pricingData.value?[selectedBrokerCode]?['ipv4'];
+    final int minMonth = brokerPricing?['min_month'] ?? (selectedBrokerCode.toLowerCase().contains('zebu') ? 2 : 1);
+    const double baseRatePerMonth = 500.0;
     const double gstRate = 0.18; // 18% GST
 
     if (validityMonths < minMonth) {
@@ -265,7 +266,7 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
             children: [
               const Text('Duration:', style: TextStyle(fontFamily: 'Poppins')),
               Text(
-                '${validityMonths.round()} Month${validityMonths.round() > 1 ? 's' : ''}',
+                '${validityMonths.round()} Month${validityMonths.round() > 1 ? 's' : ''} (Min $minMonth mo)',
                 style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
@@ -275,10 +276,10 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
             ],
           ),
           Slider(
-            value: validityMonths,
+            value: validityMonths < minMonth ? minMonth.toDouble() : validityMonths,
             min: minMonth.toDouble(),
             max: 12.0,
-            divisions: 9,
+            divisions: (12 - minMonth) > 0 ? (12 - minMonth) : 1,
             activeColor: AppTheme.primaryBlue,
             inactiveColor: AppTheme.borderGrey,
             onChanged: (val) {
@@ -288,8 +289,8 @@ class _ProxyPurchaseScreenState extends State<ProxyPurchaseScreen> {
             },
           ),
           const SizedBox(height: 12),
-          _buildDetailRow('Base Price', '₹1 / month'),
-          _buildDetailRow('GST (18%)', '₹0.18 / month'),
+          _buildDetailRow('Base Price', '₹500 / month'),
+          _buildDetailRow('GST (18%)', '₹90 / month'),
           _buildDetailRow('Subtotal (${validityMonths.round()} mo)', '₹${baseTotal.toStringAsFixed(2)}'),
           _buildDetailRow('GST Amount', '₹${gstTotal.toStringAsFixed(2)}'),
           const Divider(height: 16),

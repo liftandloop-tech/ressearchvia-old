@@ -31,11 +31,10 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.tune_outlined,
               onTap: () => Get.toNamed(AppRoutes.manageSegments),
             ),
-            /*
             const SizedBox(height: 10),
             SettingTile(
               title: 'Automated Trading',
-              subtitle: 'Link broker & authorize daily session',
+              subtitle: 'Activate service, link broker & live session',
               icon: Icons.auto_graph_outlined,
               onTap: () => Get.toNamed(AppRoutes.automatedTrading),
             ),
@@ -53,7 +52,6 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.gpp_good_outlined,
               onTap: () => Get.toNamed(AppRoutes.consent),
             ),
-            */
           ],
         ),
       ),

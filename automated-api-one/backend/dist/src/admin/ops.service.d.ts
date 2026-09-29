@@ -106,4 +106,30 @@ export declare class OpsService {
         orders: any[] | never[];
         trades: never[] | import("../brokers/interfaces/broker-client.interface").BrokerTrade[];
     }>;
+    getSystemStrategyConfig(): Promise<any>;
+    updateSystemStrategyConfig(operatorId: string, data: any): Promise<any>;
+    getUserStrategyView(userId: string): Promise<{
+        card: {
+            automatedTrading: string;
+            strategy: string;
+            strategyType: any;
+            baseMultiplier: string;
+            currentMultiplier: string;
+            lastTradeResult: any;
+            consecutiveLosses: any;
+            nextTradeMultiplier: string;
+            strategySelectedOn: any;
+            agreementVersion: any;
+            consentStatus: string;
+            status: any;
+            version: any;
+        };
+        history: any;
+    }>;
+    getStrategyDashboardUsers(page?: number, limit?: number): Promise<{
+        total: any;
+        page: number;
+        limit: number;
+        rows: any;
+    }>;
 }

@@ -1,5 +1,5 @@
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 export declare class PrismaService implements OnModuleInit, OnModuleDestroy {
     private readonly logger;
     private readonly _prisma;

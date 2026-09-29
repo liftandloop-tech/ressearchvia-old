@@ -1,5 +1,5 @@
 import { SignalOrchestratorService } from './services/signal-orchestrator.service';
-import { SignalState } from '@prisma/client';
+import { SignalState } from "@prisma/client";
 export declare class TradingService {
     private readonly orchestrator;
     private readonly logger;

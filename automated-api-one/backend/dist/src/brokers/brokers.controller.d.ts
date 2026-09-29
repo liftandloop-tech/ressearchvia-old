@@ -2,7 +2,7 @@ import { BrokerFactory } from './factory/broker.factory';
 import { BrokerSessionService } from './services/broker-session.service';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../infrastructure/redis/redis.service';
-import { BrokerCode } from '@prisma/client';
+import { BrokerCode } from "@prisma/client";
 export declare class LinkBrokerDto {
     brokerCode: BrokerCode;
     brokerClientId: string;

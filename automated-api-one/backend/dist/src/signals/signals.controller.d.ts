@@ -1,5 +1,5 @@
 import { SignalsService } from './signals.service';
-import { Segment, Side, OrderType } from '@prisma/client';
+import { Segment, Side, OrderType } from "@prisma/client";
 export declare class PublishSignalDto {
     segmentId: string;
     symbol: string;

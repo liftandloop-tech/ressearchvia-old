@@ -1,6 +1,6 @@
 import { PrismaService } from '../../prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { IdempotencyStatus } from '@prisma/client';
+import { IdempotencyStatus } from "@prisma/client";
 export declare class IdempotencyService {
     private readonly prisma;
     private readonly redisService;

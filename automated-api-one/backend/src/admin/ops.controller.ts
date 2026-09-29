@@ -331,5 +331,49 @@ export class OpsController {
   async getUserLiveBrokerData(@Param('identifier') identifier: string) {
     return this.opsService.getUserLiveBrokerData(identifier);
   }
+
+  @Get('strategy/config')
+  @ApiOperation({ summary: 'Get system-wide automated trading strategy configuration' })
+  async getSystemStrategyConfig() {
+    return this.opsService.getSystemStrategyConfig();
+  }
+
+  @Post('strategy/config')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update system-wide strategy configuration (limits & toggles)' })
+  async updateSystemStrategyConfig(
+    @Request() req,
+    @Body()
+    body: {
+      isFixed1xEnabled?: boolean;
+      isLossMultiplier2xEnabled?: boolean;
+      maxAllowedMultiplier?: number;
+      maxGlobalQuantity?: number;
+      maxGlobalExposureInr?: number;
+      maxDailyLossInr?: number;
+      maxConsecutiveLosses?: number;
+    },
+  ) {
+    const operatorId = req.user.userId;
+    return this.opsService.updateSystemStrategyConfig(operatorId, body);
+  }
+
+  @Get('users/:userId/strategy')
+  @ApiOperation({ summary: 'Get automated trading strategy details and history for a specific user' })
+  async getUserStrategyView(@Param('userId') userId: string) {
+    return this.opsService.getUserStrategyView(userId);
+  }
+
+  @Get('strategy/dashboard')
+  @ApiOperation({ summary: 'Get active automated trading users with live strategy & streak metrics' })
+  async getStrategyDashboardUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.opsService.getStrategyDashboardUsers(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+    );
+  }
 }
 

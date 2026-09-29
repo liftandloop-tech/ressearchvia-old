@@ -243,6 +243,14 @@ const userSchema = new mongoose.Schema({
     firmName: {
         type: String,
         default: null
+    },
+    proxy: {
+        type: Object,
+        default: null
+    },
+    proxies: {
+        type: Object,
+        default: {}
     }
 }, { timestamps: true, versionKey: false });
 const users = mongoose.model("users", userSchema);

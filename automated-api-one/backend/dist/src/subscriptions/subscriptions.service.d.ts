@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma.service';
-import { Subscription } from '@prisma/client';
+import { Subscription } from "@prisma/client";
 import { AuditService } from '../audit/audit.service';
 import { RedisService } from '../infrastructure/redis/redis.service';
 export declare class SubscriptionsService {

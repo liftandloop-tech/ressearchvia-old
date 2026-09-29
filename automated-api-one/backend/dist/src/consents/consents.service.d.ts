@@ -1,18 +1,74 @@
 import { PrismaService } from '../prisma.service';
-import { Consent } from '@prisma/client';
+import { Consent } from "@prisma/client";
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PositionSizingService } from '../trading/services/position-sizing.service';
+import { StrategyType } from "@prisma/client";
 export declare function getTodayISTString(date?: Date): string;
 export declare class ConsentsService {
     private readonly prisma;
     private readonly auditService;
     private readonly notificationsService;
     private readonly subscriptionsService;
+    private readonly positionSizingService;
     private readonly logger;
-    constructor(prisma: PrismaService, auditService: AuditService, notificationsService: NotificationsService, subscriptionsService: SubscriptionsService);
+    constructor(prisma: PrismaService, auditService: AuditService, notificationsService: NotificationsService, subscriptionsService: SubscriptionsService, positionSizingService: PositionSizingService);
     hasTodayConsent(userId: string): Promise<boolean>;
     grantConsent(userId: string, brokerId: string): Promise<Consent>;
+    grantConsentWithStrategy(userId: string, params: {
+        brokerId: string;
+        strategy?: StrategyType;
+        baseMultiplier?: number;
+        consentAccepted?: boolean;
+        agreementVersion?: string;
+        ipAddress?: string | null;
+        userAgent?: string | null;
+    }): Promise<Consent>;
+    getUserStrategyDetails(userId: string): Promise<{
+        strategy: {
+            id: string;
+            status: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            segmentId: string | null;
+            version: number;
+            currentMultiplier: number;
+            strategyType: import("@prisma/client").$Enums.StrategyType;
+            agreementVersion: string;
+            baseMultiplier: number;
+            consecutiveLosses: number;
+            lastTradeResult: string | null;
+            nextTradeMultiplier: number;
+            effectiveFrom: Date;
+            effectiveTo: Date | null;
+            consentAccepted: boolean;
+            strategySelectedAt: Date;
+        };
+        systemConfig: import("../trading/services/position-sizing.service").SystemConfigSnapshot;
+    }>;
+    changeUserStrategy(userId: string, newStrategy: StrategyType, agreementVersion: string, ipAddress?: string | null, userAgent?: string | null): Promise<{
+        id: string;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string;
+        segmentId: string | null;
+        version: number;
+        currentMultiplier: number;
+        strategyType: import("@prisma/client").$Enums.StrategyType;
+        agreementVersion: string;
+        baseMultiplier: number;
+        consecutiveLosses: number;
+        lastTradeResult: string | null;
+        nextTradeMultiplier: number;
+        effectiveFrom: Date;
+        effectiveTo: Date | null;
+        consentAccepted: boolean;
+        strategySelectedAt: Date;
+    }>;
+    getStrategyHistory(userId: string): Promise<any>;
     getConsentStatus(userId: string): Promise<{
         active: boolean;
         broker: string | null;

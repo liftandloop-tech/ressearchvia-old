@@ -114,15 +114,10 @@ class CreatePlanScreen extends StatelessWidget {
                             if (value == null || value.trim().isEmpty) {
                               return 'Please enter plan name';
                             }
-                            final val = value.trim().toUpperCase();
-                            if (val != 'SPARK' && val != 'SPLENDID') {
-                              return 'Strict Policy: Plan name must be either "SPARK" or "SPLENDID"';
-                            }
                             return null;
                           },
                           decoration: InputDecoration(
-                            hintText: 'Enter plan name (SPARK or SPLENDID)',
-                            helperText: 'Allowed values: SPARK or SPLENDID',
+                            hintText: 'Enter plan name (e.g. SPARK, SPLENDID, HNI)',
                             helperStyle: TextStyle(color: AppTheme.primaryBlue, fontSize: 11),
                             hintStyle: TextStyle(color: AppTheme.gray300),
                             border: OutlineInputBorder(

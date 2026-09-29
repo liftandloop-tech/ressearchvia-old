@@ -24,6 +24,7 @@ import '../ui/screens/subscription/pending_bank_transfers.screen.dart';
 import '../ui/screens/settings/general_settings.screen.dart';
 import '../ui/screens/settings/roles_permissions.screen.dart';
 import '../ui/screens/dashboard/automated_trading_dashboard.screen.dart';
+import '../ui/screens/dashboard/strategy_config.screen.dart';
 import '../ui/screens/leads/lead_management.screen.dart';
 import '../ui/screens/attendance/attendance_monitoring.screen.dart';
 import '../ui/screens/auth/applicant_registration.screen.dart';
@@ -128,6 +129,10 @@ final appPages = [
   GetPage(
     name: AppRoutes.automatedTrading,
     page: () => const AutomatedTradingDashboardScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.strategyConfig,
+    page: () => const StrategyConfigScreen(),
   ),
   GetPage(
     name: AppRoutes.leads,

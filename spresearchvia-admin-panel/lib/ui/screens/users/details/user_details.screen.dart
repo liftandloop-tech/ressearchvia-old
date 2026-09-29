@@ -9,6 +9,8 @@ import 'widgets/activity_log.widget.dart';
 import 'widgets/personal_info.widget.dart';
 import 'widgets/contact_info.widget.dart';
 
+import 'widgets/user_strategy_details.widget.dart';
+
 class UserDetailsScreen extends StatelessWidget {
   final String? userId;
   const UserDetailsScreen({super.key, this.userId});
@@ -23,7 +25,6 @@ class UserDetailsScreen extends StatelessWidget {
         controller.fetchUserDetails(userId!);
       });
     }
-
 
     return Scaffold(
       backgroundColor: AppTheme.gray50,
@@ -76,6 +77,7 @@ class UserDetailsScreen extends StatelessWidget {
 
               final currentUser = Get.find<AuthController>().user.value;
               final canViewKyc = currentUser?.has('kyc.view') ?? false;
+              final effectiveUserId = userId ?? controller.userDetails.value?.id ?? '';
 
               return Column(
                 children: [
@@ -94,6 +96,10 @@ class UserDetailsScreen extends StatelessWidget {
                   if (canViewKyc) ...[
                     SizedBox(height: AppTheme.spacing24),
                     KYCDocuments(controller: controller),
+                  ],
+                  if (effectiveUserId.isNotEmpty) ...[
+                    SizedBox(height: AppTheme.spacing24),
+                    UserStrategyDetailsWidget(userId: effectiveUserId),
                   ],
                   const SizedBox(height: AppTheme.spacing20),
                   ActivityLog(userId: userId),

@@ -22,6 +22,7 @@ class AppRoutes {
   static const String userKyc = '/registered-clients';
   static const String registeredClients = '/registered-clients';
   static const String automatedTrading = '/automated-trading';
+  static const String strategyConfig = '/automated-trading/strategy-config';
   static const String leads = '/leads';
   static const String attendance = '/attendance';
   static const String profile = '/profile';

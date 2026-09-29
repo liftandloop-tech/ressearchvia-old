@@ -8,6 +8,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PositionSizingService } from '../trading/services/position-sizing.service';
+import { StrategyType, StrategyChangeSource } from '@prisma/client';
 
 export function getTodayISTString(date: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -27,6 +29,7 @@ export class ConsentsService {
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly positionSizingService: PositionSizingService,
   ) {}
 
   async hasTodayConsent(userId: string): Promise<boolean> {
@@ -142,6 +145,120 @@ export class ConsentsService {
     );
 
     return consent;
+  }
+
+  async grantConsentWithStrategy(
+    userId: string,
+    params: {
+      brokerId: string;
+      strategy?: StrategyType;
+      baseMultiplier?: number;
+      consentAccepted?: boolean;
+      agreementVersion?: string;
+      ipAddress?: string | null;
+      userAgent?: string | null;
+    },
+  ): Promise<Consent> {
+    const consent = await this.grantConsent(userId, params.brokerId);
+
+    if (params.strategy) {
+      // 1. Log statutory consent in TradingStrategyConsent
+      const stratConsent = await (this.prisma as any).tradingStrategyConsent.create({
+        data: {
+          userId,
+          brokerId: consent.brokerId,
+          strategyType: params.strategy,
+          baseMultiplier: params.baseMultiplier ?? 1,
+          agreementVersion: params.agreementVersion ?? 'v1.0',
+          consentVersion: 'v1.0',
+          ipAddress: params.ipAddress,
+          userAgent: params.userAgent,
+          status: 'ACCEPTED',
+          acceptedAt: new Date(),
+        },
+      });
+
+      // 2. Check current strategy
+      const currentStrategy = await this.positionSizingService.getUserStrategy(userId);
+      if (currentStrategy.strategyType !== params.strategy) {
+        // Strategy changed -> switch to new with fresh 1x cycle
+        await this.positionSizingService.switchStrategy(
+          userId,
+          null,
+          params.strategy,
+          params.agreementVersion ?? 'v1.0',
+          'USER',
+          StrategyChangeSource.USER_CONSENT,
+          stratConsent.id,
+        );
+      } else {
+        // Same strategy, ensure agreementVersion & consentAccepted are marked
+        await (this.prisma as any).userTradingStrategy.updateMany({
+          where: { userId },
+          data: {
+            consentAccepted: true,
+            agreementVersion: params.agreementVersion ?? 'v1.0',
+            strategySelectedAt: new Date(),
+          },
+        });
+      }
+    }
+
+    return consent;
+  }
+
+  async getUserStrategyDetails(userId: string) {
+    const [strategy, systemConfig] = await Promise.all([
+      this.positionSizingService.getUserStrategy(userId),
+      this.positionSizingService.getSystemConfig(),
+    ]);
+
+    return {
+      strategy,
+      systemConfig,
+    };
+  }
+
+  async changeUserStrategy(
+    userId: string,
+    newStrategy: StrategyType,
+    agreementVersion: string,
+    ipAddress?: string | null,
+    userAgent?: string | null,
+  ) {
+    // Statutory consent record
+    const consent = await (this.prisma as any).tradingStrategyConsent.create({
+      data: {
+        userId,
+        strategyType: newStrategy,
+        agreementVersion,
+        consentVersion: 'v1.0',
+        ipAddress,
+        userAgent,
+        status: 'ACCEPTED',
+        acceptedAt: new Date(),
+      },
+    });
+
+    const updated = await this.positionSizingService.switchStrategy(
+      userId,
+      null,
+      newStrategy,
+      agreementVersion,
+      'USER',
+      StrategyChangeSource.USER_SETTINGS_CHANGE,
+      consent.id,
+    );
+
+    return updated;
+  }
+
+  async getStrategyHistory(userId: string) {
+    return (this.prisma as any).strategyChangeHistory.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 
   async getConsentStatus(userId: string): Promise<{

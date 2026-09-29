@@ -84,4 +84,38 @@ export declare class OpsController {
         orders: any[] | never[];
         trades: never[] | import("../brokers/interfaces/broker-client.interface").BrokerTrade[];
     }>;
+    getSystemStrategyConfig(): Promise<any>;
+    updateSystemStrategyConfig(req: any, body: {
+        isFixed1xEnabled?: boolean;
+        isLossMultiplier2xEnabled?: boolean;
+        maxAllowedMultiplier?: number;
+        maxGlobalQuantity?: number;
+        maxGlobalExposureInr?: number;
+        maxDailyLossInr?: number;
+        maxConsecutiveLosses?: number;
+    }): Promise<any>;
+    getUserStrategyView(userId: string): Promise<{
+        card: {
+            automatedTrading: string;
+            strategy: string;
+            strategyType: any;
+            baseMultiplier: string;
+            currentMultiplier: string;
+            lastTradeResult: any;
+            consecutiveLosses: any;
+            nextTradeMultiplier: string;
+            strategySelectedOn: any;
+            agreementVersion: any;
+            consentStatus: string;
+            status: any;
+            version: any;
+        };
+        history: any;
+    }>;
+    getStrategyDashboardUsers(page?: string, limit?: string): Promise<{
+        total: any;
+        page: number;
+        limit: number;
+        rows: any;
+    }>;
 }

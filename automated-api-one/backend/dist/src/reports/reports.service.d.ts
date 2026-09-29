@@ -3,7 +3,7 @@ import { RedisService } from '../infrastructure/redis/redis.service';
 import { QueueService } from '../infrastructure/queues/queues.service';
 import { MetricsService } from '../infrastructure/metrics/metrics.service';
 import { OutboxService } from '../infrastructure/outbox/outbox.service';
-import { AnalyticsSnapshot } from '@prisma/client';
+import { AnalyticsSnapshot } from "@prisma/client";
 export declare class ReportsService {
     private readonly prisma;
     private readonly redisService;

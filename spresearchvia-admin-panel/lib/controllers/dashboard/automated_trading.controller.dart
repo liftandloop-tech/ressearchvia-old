@@ -15,6 +15,12 @@ class AdminAutomatedTradingController extends GetxController {
   var segments = <dynamic>[].obs;
   var isPublishing = false.obs;
 
+  // Live Strategy Monitoring & Config
+  var strategyUsers = <dynamic>[].obs;
+  var systemConfig = <String, dynamic>{}.obs;
+  var isStrategyUsersLoading = false.obs;
+  var isConfigSaving = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -48,6 +54,8 @@ class AdminAutomatedTradingController extends GetxController {
         fetchReconciliationIssues(),
         fetchDlqMetrics(),
         fetchSegments(),
+        fetchStrategyDashboardUsers(),
+        fetchSystemStrategyConfig(),
       ]);
     } catch (e) {
       debugPrint('Error fetching SRE admin data: $e');
@@ -267,6 +275,58 @@ class AdminAutomatedTradingController extends GetxController {
       Get.snackbar('Error', 'Failed to fetch user broker data: $e');
     } finally {
       isUserBrokerLoading.value = false;
+    }
+  }
+
+  // ==========================================
+  // Automated Trading Strategy Controls & Data
+  // ==========================================
+
+  Future<void> fetchStrategyDashboardUsers() async {
+    isStrategyUsersLoading.value = true;
+    try {
+      final response = await _client.get('/ops/strategy/dashboard');
+      if (response.statusCode == 200 && response.body != null) {
+        final rows = response.body['rows'];
+        if (rows is List) {
+          strategyUsers.assignAll(rows);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch strategy dashboard users: $e');
+    } finally {
+      isStrategyUsersLoading.value = false;
+    }
+  }
+
+  Future<void> fetchSystemStrategyConfig() async {
+    try {
+      final response = await _client.get('/ops/strategy/config');
+      if (response.statusCode == 200 && response.body != null) {
+        systemConfig.value = Map<String, dynamic>.from(response.body);
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch system strategy config: $e');
+    }
+  }
+
+  Future<bool> saveSystemStrategyConfig(Map<String, dynamic> data) async {
+    isConfigSaving.value = true;
+    try {
+      final response = await _client.post('/ops/strategy/config', data);
+      if (response.statusCode == 200) {
+        systemConfig.value = Map<String, dynamic>.from(response.body);
+        Get.snackbar('Success', 'Strategy configuration updated successfully.');
+        return true;
+      } else {
+        Get.snackbar('Error', 'Failed to update strategy configuration.');
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Error updating configuration: $e');
+      return false;
+    } finally {
+      isConfigSaving.value = false;
     }
   }
 }

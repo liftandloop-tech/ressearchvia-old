@@ -14,6 +14,7 @@ class SegmentPlanCard extends StatelessWidget {
     required this.isSelected,
     this.badge,
     this.isPopular = false,
+    this.isHni = false,
     this.onTap,
   });
 
@@ -23,12 +24,13 @@ class SegmentPlanCard extends StatelessWidget {
   final bool isSelected;
   final String? badge;
   final bool isPopular;
+  final bool isHni;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final responsive = Responsive.of(context);
-    final isHNI = name == 'HNI Custom Plan';
+    final isHNI = isHni || name.toUpperCase().contains('HNI');
 
     return InkWell(
       onTap: onTap,

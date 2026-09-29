@@ -13,4 +13,6 @@ export declare const RedisKeys: {
     position: (userId: string, segmentId: string) => string;
     userEgress: (userId: string) => string;
     userEgressLock: (userId: string) => string;
+    strategy: (userId: string, segmentId?: string) => string;
+    systemStrategyConfig: () => string;
 };

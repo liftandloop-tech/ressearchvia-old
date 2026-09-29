@@ -12,6 +12,7 @@ import '../../controllers/user.controller.dart';
 import '../../controllers/auth.controller.dart';
 import '../../core/routes/app_routes.dart';
 import '../../controllers/segment_plan.controller.dart';
+import '../../services/validation.service.dart';
 import '../../widgets/terms_section.dart';
 import 'widgets/detail_row.dart';
 import 'widgets/breakdown_row.dart';
@@ -217,11 +218,12 @@ class _ConfirmPaymentScreenState extends State<ConfirmPaymentScreen> {
       return;
     }
 
-    // Strictly validate plan is Spark or Splendid
-    final pName = selectedPlan!.name.toUpperCase();
-    if (!pName.contains('SPARK') && !pName.contains('SPLENDID')) {
-      SnackbarService.showError('Strict Policy: Only "SPARK" or "SPLENDID" plan is purchasable.');
-      return;
+    // Enforce GSTIN for HNI plan
+    if (selectedPlan!.isHni) {
+      if (gstin == null || !ValidationService.validateGST(gstin!)) {
+        SnackbarService.showError('Strict Policy: A valid 15-character GSTIN is required for HNI plan.');
+        return;
+      }
     }
 
     // Strictly validate segment is selected

@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma.service';
-import { AuditLog } from '@prisma/client';
+import { AuditLog } from "@prisma/client";
 import { AuditQueryDto } from './dto/audit-query.dto';
 import { AuditEventType } from './enums/audit-event.enum';
 export declare class AuditService {

@@ -20,6 +20,7 @@ const queues_service_1 = require("../../infrastructure/queues/queues.service");
 const idempotency_service_1 = require("../../infrastructure/idempotency/idempotency.service");
 const redis_service_1 = require("../../infrastructure/redis/redis.service");
 const multiplier_service_1 = require("./multiplier.service");
+const position_sizing_service_1 = require("./position-sizing.service");
 const audit_service_1 = require("../../audit/audit.service");
 const queue_constants_1 = require("../../infrastructure/queues/queue.constants");
 const client_1 = require("@prisma/client");
@@ -33,14 +34,16 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
     idempotencyService;
     redisService;
     multiplierService;
+    positionSizingService;
     auditService;
     logger = new common_1.Logger(SignalOrchestratorService_1.name);
-    constructor(prisma, queueService, idempotencyService, redisService, multiplierService, auditService) {
+    constructor(prisma, queueService, idempotencyService, redisService, multiplierService, positionSizingService, auditService) {
         this.prisma = prisma;
         this.queueService = queueService;
         this.idempotencyService = idempotencyService;
         this.redisService = redisService;
         this.multiplierService = multiplierService;
+        this.positionSizingService = positionSizingService;
         this.auditService = auditService;
     }
     validateTransition(current, next) {
@@ -324,8 +327,8 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
             }
         }
         const jobId = `job-${signal.id}-${subscriber.userId}`;
-        const multiplierState = await this.multiplierService.getState(subscriber.userId, signal.segmentId);
-        const multiplier = multiplierState.current;
+        const sizing = await this.positionSizingService.calculatePositionSize(subscriber.userId, signal.segmentId, subscriber.baseLot, Number(signal.entryPrice));
+        const multiplier = sizing.multiplier;
         let effectiveLot;
         if (signal.segmentRelation?.name?.toUpperCase() === 'EQUITY CASH') {
             const entryPrice = Number(signal.entryPrice);
@@ -338,7 +341,7 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
             }
         }
         else {
-            effectiveLot = subscriber.baseLot * multiplier;
+            effectiveLot = sizing.actualQuantity;
         }
         const snapshot = {
             userId: subscriber.userId,
@@ -347,11 +350,18 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
             brokerClientId: subscriber.brokerClientId,
             segmentId: signal.segmentId,
             subscriptionPlan: subscriber.plan,
-            multiplierIndex: multiplierState.index,
+            multiplierIndex: sizing.consecutiveLosses,
             multiplierValue: multiplier,
             capitalAllocated: subscriber.capital,
             baseLot: subscriber.baseLot,
             effectiveLot,
+            strategyType: sizing.strategyType,
+            strategyVersion: sizing.strategyVersion,
+            baseQuantity: sizing.baseQuantity,
+            actualQuantity: effectiveLot,
+            consecutiveLossesAtEntry: sizing.consecutiveLosses,
+            previousTradeResult: sizing.previousTradeResult,
+            agreementVersion: sizing.agreementVersion,
         };
         const ctx = {
             correlationId,
@@ -369,7 +379,7 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
         };
         await this.queueService.addJob(queue_constants_1.Queues.ORDER_PLACEMENT, jobId, ctx);
         this.logger.debug(`[${correlationId}] Enqueued job ${jobId} for user ${subscriber.userId} ` +
-            `(lot=${snapshot.effectiveLot} multiplier=${multiplierState.current}x)`);
+            `(lot=${snapshot.effectiveLot} multiplier=${multiplier}x)`);
         return true;
     }
     resolvePlan(planId) {
@@ -384,6 +394,7 @@ exports.SignalOrchestratorService = SignalOrchestratorService = SignalOrchestrat
         idempotency_service_1.IdempotencyService,
         redis_service_1.RedisService,
         multiplier_service_1.MultiplierService,
+        position_sizing_service_1.PositionSizingService,
         audit_service_1.AuditService])
 ], SignalOrchestratorService);
 //# sourceMappingURL=signal-orchestrator.service.js.map

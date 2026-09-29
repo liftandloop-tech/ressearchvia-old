@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma.service';
-import { RiskEvent } from '@prisma/client';
+import { RiskEvent } from "@prisma/client";
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { ConsentsService } from '../consents/consents.service';
 import { BrokerSessionService } from '../brokers/services/broker-session.service';

@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma.service';
-import { Trade, TradeStatus, Report } from '@prisma/client';
+import { Trade, TradeStatus, Report } from "@prisma/client";
 export declare class TradesService {
     private readonly prisma;
     constructor(prisma: PrismaService);

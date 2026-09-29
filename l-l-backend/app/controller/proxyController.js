@@ -1,5 +1,6 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import mongoose from "mongoose";
 import proxyService from "../services/proxyService.js";
 import userModel from "../models/userModel.js";
 import { prisma, toUuid } from "../config/prismaClient.js";
@@ -85,13 +86,55 @@ const proxyController = {
     try {
       const rawUserId = req.user?._id || req.user?.id;
       const uuidUserId = toUuid(rawUserId);
+      const user = await userModel.findById(rawUserId);
+      const requestedBroker = req.query?.brokerCode?.toString().toLowerCase();
+
+      let effectiveUserId = uuidUserId;
+      try {
+        const pgUser = await ensurePostgresUser(uuidUserId, user);
+        if (pgUser?.id) {
+          effectiveUserId = pgUser.id;
+        }
+      } catch (err) {
+        console.warn("[ProxyController] ensurePostgresUser error in getProxyInfo:", err.message);
+      }
 
       let userBroker = null;
       try {
-        if (uuidUserId) {
+        if (requestedBroker) {
+          const targetEnum = normalizeBrokerEnum(requestedBroker);
           userBroker = await prisma.userBroker.findFirst({
             where: {
-              userId: uuidUserId,
+              userId: { in: [effectiveUserId, uuidUserId].filter(Boolean) },
+              broker: {
+                code: targetEnum,
+              },
+              status: "ACTIVE",
+            },
+            include: {
+              broker: true,
+            },
+          });
+        }
+
+        if (!userBroker) {
+          userBroker = await prisma.userBroker.findFirst({
+            where: {
+              userId: { in: [effectiveUserId, uuidUserId].filter(Boolean) },
+              status: "ACTIVE",
+              proxyIp: { not: null },
+            },
+            include: {
+              broker: true,
+            },
+            orderBy: { updatedAt: "desc" },
+          });
+        }
+
+        if (!userBroker) {
+          userBroker = await prisma.userBroker.findFirst({
+            where: {
+              userId: { in: [effectiveUserId, uuidUserId].filter(Boolean) },
               status: "ACTIVE",
             },
             include: {
@@ -103,46 +146,77 @@ const proxyController = {
         console.warn("[ProxyController] userBroker DB query fallback:", dbErr.message);
       }
 
-      if (!userBroker) {
+      // Check if proxy details are present in user.proxies, user.proxy, or userBroker
+      let mongoProxy = null;
+      if (requestedBroker && user?.proxies?.[requestedBroker]) {
+        mongoProxy = user.proxies[requestedBroker];
+      } else if (user?.proxy) {
+        if (!requestedBroker || user.proxy.brokerCode?.toLowerCase() === requestedBroker) {
+          mongoProxy = user.proxy;
+        } else if (user?.proxies?.[requestedBroker]) {
+          mongoProxy = user.proxies[requestedBroker];
+        } else {
+          mongoProxy = user.proxy;
+        }
+      } else if (user?.assignedProxy) {
+        mongoProxy = user.assignedProxy;
+      }
+
+      const allProxies = user?.proxies || (mongoProxy ? { [mongoProxy.brokerCode || 'angel']: mongoProxy } : {});
+
+      if (!userBroker && !mongoProxy) {
         return res.status(200).send({
           status: "success",
           remark: "No linked broker profile found yet.",
           data: {
-            brokerCode: 'angel',
-            brokerName: 'Angel One',
+            brokerCode: requestedBroker || 'angel',
+            brokerName: requestedBroker === 'zebu' ? 'Mynt by Zebu' : 'Angel One',
             hasProxy: false,
             availableBrokers,
+            proxies: allProxies,
           },
         });
       }
 
-      if (!userBroker.proxyIp) {
+      const proxyIp = mongoProxy?.ip || userBroker?.proxyIp;
+      const proxyPort = mongoProxy?.port || userBroker?.proxyPort || 443;
+      const proxyHostname = mongoProxy?.hostname || userBroker?.proxyHostname;
+      const proxyUsername = mongoProxy?.ipUserid || userBroker?.proxyUsername;
+      const proxyExpiry = mongoProxy?.expiry || userBroker?.proxyExpiry;
+      const brokerCode = mongoProxy?.brokerCode || (userBroker?.broker?.code?.toLowerCase()?.includes('zebu') ? 'zebu' : 'angel') || requestedBroker || 'angel';
+      const brokerName = mongoProxy?.brokerName || (brokerCode === 'zebu' ? 'Mynt by Zebu' : 'Angel One');
+
+      if (!proxyIp) {
         return res.status(200).send({
           status: "success",
           remark: "No proxy IP assigned yet.",
           data: {
-            brokerCode: userBroker.broker.code,
-            brokerName: userBroker.broker.name,
+            brokerCode,
+            brokerName,
             hasProxy: false,
             availableBrokers,
+            proxies: allProxies,
           },
         });
       }
+
+      const isExpired = proxyExpiry ? new Date(proxyExpiry) <= new Date() : false;
 
       res.status(200).send({
         status: "success",
         remark: "",
         data: {
-          brokerCode: userBroker.broker.code,
-          brokerName: userBroker.broker.name,
+          brokerCode,
+          brokerName,
           hasProxy: true,
-          ip: userBroker.proxyIp,
-          port: userBroker.proxyPort,
-          hostname: userBroker.proxyHostname,
-          ipUserid: userBroker.proxyUsername,
-          expiry: userBroker.proxyExpiry,
-          status: new Date(userBroker.proxyExpiry) > new Date() ? "active" : "expired",
+          ip: proxyIp,
+          port: proxyPort,
+          hostname: proxyHostname,
+          ipUserid: proxyUsername,
+          expiry: proxyExpiry,
+          status: isExpired ? "expired" : "active",
           availableBrokers,
+          proxies: allProxies,
         },
       });
     } catch (error) {
@@ -172,15 +246,20 @@ const proxyController = {
         result = { status: "success", brokers: {} };
       }
 
-      // Override pricing with fixed ₹1 + 18% GST (Test Mode), min duration 3 months
-      const fixedPricing = {
-        min_month: 3,
-        base_price: 1,
-        gst_percent: 18,
-        monthly_total: 1.18,
-        price_tiers: [
-          { min_month: 3, price: 1 }
-        ]
+      // Set pricing to ₹500/mo + 18% GST (total ₹590/mo), with broker-specific minimum duration
+      const getPricingForBroker = (brokerKey, rawBrokerData) => {
+        const isAngel = brokerKey.toLowerCase().includes('angel');
+        const apiMin = rawBrokerData?.ipv4?.min_month;
+        const minMonth = apiMin ? Number(apiMin) : (isAngel ? 3 : 1);
+        return {
+          min_month: minMonth,
+          base_price: 500,
+          gst_percent: 18,
+          monthly_total: 590,
+          price_tiers: [
+            { min_month: minMonth, price: 500 }
+          ]
+        };
       };
 
       if (!result.brokers) {
@@ -191,14 +270,14 @@ const proxyController = {
       const brokerKeys = Object.keys(result.brokers);
       if (brokerKeys.length === 0) {
         result.brokers = {
-          angel: { ipv4: fixedPricing },
-          zebu: { ipv4: fixedPricing }
+          angel: { ipv4: getPricingForBroker('angel', null) },
+          zebu: { ipv4: getPricingForBroker('zebu', null) }
         };
       } else {
         for (const key of brokerKeys) {
           result.brokers[key] = {
             ...(result.brokers[key] || {}),
-            ipv4: fixedPricing
+            ipv4: getPricingForBroker(key, result.brokers[key])
           };
         }
       }
@@ -219,31 +298,31 @@ const proxyController = {
       const { validity, brokerCode } = req.body;
       const uuidUserId = toUuid(rawUserId);
 
-      if (!validity || typeof validity !== "number" || validity < 3) {
-        return res.status(400).send({ status: "failed", remark: "Validity duration must be at least 3 months." });
-      }
+      const targetBrokerCode = (brokerCode || 'angel').toString().toLowerCase();
+      const isAngel = targetBrokerCode.includes('angel');
+      let minMonth = isAngel ? 3 : 1;
 
-      let userBroker = null;
       try {
-        if (uuidUserId) {
-          userBroker = await prisma.userBroker.findFirst({
-            where: {
-              userId: uuidUserId,
-              status: "ACTIVE",
-            },
-            include: {
-              broker: true,
-            },
-          });
+        const brokerInfo = await proxyService.getBrokerInfo();
+        const partnerKey = isAngel ? 'angel' : 'zebu';
+        const partnerBroker = brokerInfo?.brokers?.[partnerKey];
+        if (partnerBroker?.ipv4?.min_month) {
+          minMonth = Number(partnerBroker.ipv4.min_month);
         }
-      } catch (dbErr) {
-        console.warn("[ProxyController] createProxyOrder userBroker DB query fallback:", dbErr.message);
+      } catch (infoErr) {
+        console.warn("[ProxyController] Failed to fetch live min_month from broker_info:", infoErr.message);
       }
 
-      const targetBrokerCode = userBroker?.broker?.code || brokerCode || 'angel';
+      if (!validity || typeof validity !== "number" || validity < minMonth) {
+        return res.status(400).send({
+          status: "failed",
+          remark: `Validity duration must be at least ${minMonth} month(s) for ${isAngel ? 'Angel One' : 'Zebu'}.`
+        });
+      }
 
-      // Calculate total: ₹1 base * 1.18 GST = ₹1.18 per month (Testing Mode)
-      const baseAmount = 1 * validity;
+      // Calculate total: ₹500 base * 1.18 GST = ₹590 per month
+      const basePrice = 500;
+      const baseAmount = basePrice * validity;
       const gstAmount = Number((baseAmount * 0.18).toFixed(2));
       const totalAmountRupees = Number((baseAmount + gstAmount).toFixed(2));
       const amountInPaise = Math.round(totalAmountRupees * 100);
@@ -326,32 +405,23 @@ const proxyController = {
         return res.status(404).send({ status: "failed", remark: "User account not found." });
       }
 
-      let userBroker = null;
+      let effectiveUserId = uuidUserId;
       try {
-        if (uuidUserId) {
-          userBroker = await prisma.userBroker.findFirst({
-            where: {
-              userId: uuidUserId,
-              status: "ACTIVE",
-            },
-            include: {
-              broker: true,
-            },
-          });
+        const pgUser = await ensurePostgresUser(uuidUserId, user);
+        if (pgUser?.id) {
+          effectiveUserId = pgUser.id;
         }
-      } catch (dbErr) {
-        console.warn("[ProxyController] verifyProxyPayment DB query fallback:", dbErr.message);
+      } catch (pgErr) {
+        console.warn("[ProxyController] ensurePostgresUser warning in verifyProxyPayment:", pgErr.message);
       }
 
-      const targetBrokerEnum = normalizeBrokerEnum(userBroker?.broker?.code || brokerCode);
+      const targetBrokerEnum = normalizeBrokerEnum(brokerCode);
       const partnerBrokerName = targetBrokerEnum === 'ZEBU' ? 'zebu' : 'angel';
 
-      // If user has no userBroker record yet, create a pending linking profile for this broker
-      if (!userBroker) {
-        let dbBroker = await prisma.broker.findFirst({
-          where: {
-            code: targetBrokerEnum
-          }
+      let dbBroker = null;
+      try {
+        dbBroker = await prisma.broker.findFirst({
+          where: { code: targetBrokerEnum }
         });
 
         if (!dbBroker) {
@@ -363,49 +433,89 @@ const proxyController = {
             }
           });
         }
+      } catch (brokerDbErr) {
+        console.warn("[ProxyController] broker query warning:", brokerDbErr.message);
+      }
 
-        const pgUser = await ensurePostgresUser(uuidUserId, user);
-        const actualUserId = pgUser?.id || uuidUserId;
+      let userBroker = null;
+      try {
+        if (dbBroker) {
+          userBroker = await prisma.userBroker.findUnique({
+            where: {
+              userId_brokerId: {
+                userId: effectiveUserId,
+                brokerId: dbBroker.id,
+              }
+            },
+            include: { broker: true }
+          });
 
-        userBroker = await prisma.userBroker.create({
-          data: {
-            userId: actualUserId,
-            brokerId: dbBroker.id,
-            brokerClientId: "PENDING_LINKING",
-            status: "ACTIVE"
-          },
-          include: {
-            broker: true
+          if (!userBroker) {
+            userBroker = await prisma.userBroker.create({
+              data: {
+                userId: effectiveUserId,
+                brokerId: dbBroker.id,
+                brokerClientId: "PENDING_LINKING",
+                status: "ACTIVE"
+              },
+              include: { broker: true }
+            });
           }
-        });
+        }
+      } catch (ubErr) {
+        console.warn("[ProxyController] userBroker query/create warning:", ubErr.message);
+        if (dbBroker && !userBroker) {
+          try {
+            userBroker = await prisma.userBroker.findFirst({
+              where: {
+                userId: effectiveUserId,
+                brokerId: dbBroker.id,
+              },
+              include: { broker: true }
+            });
+          } catch (e2) {
+            console.warn("[ProxyController] userBroker fallback query error:", e2.message);
+          }
+        }
       }
 
       let result;
-
-      const mobileNumber = user.phone || user.userObject?.APP_MOB_NO?.toString() || "9999999999";
+      const rawMobile = (user.phone || user.userObject?.APP_MOB_NO?.toString() || "9999999999").replace(/\D/g, "");
+      const mobileNumber = rawMobile.slice(-10);
       const emailAddress = user.email || user.userObject?.APP_EMAIL || "user@example.com";
 
-      const isFakeProxy = userBroker.proxyUsername && userBroker.proxyUsername.startsWith('usr_');
+      const currentProxyUsername = userBroker?.proxyUsername || user?.proxy?.ipUserid;
+      const isFakeProxy = currentProxyUsername && currentProxyUsername.startsWith('usr_');
 
-      if (isRenewal && userBroker.proxyUsername && !isFakeProxy) {
+      if (isRenewal && currentProxyUsername && !isFakeProxy) {
         // Request partner renewal (only for real partner-issued IPs)
         try {
           result = await proxyService.renewIp({
             validity,
-            oldIpUserid: userBroker.proxyUsername,
+            oldIpUserid: currentProxyUsername,
+            brokername: partnerBrokerName,
           });
         } catch (renewErr) {
-          const errBody = renewErr.response?.data;
-          console.error("[ProxyController] renewIp failed:", errBody || renewErr.message);
+          console.error("[ProxyController] renewIp failed:", renewErr.message);
           return res.status(502).send({
             status: "failed",
-            remark: errBody?.detail?.[0]?.msg || errBody?.detail || "Failed to renew proxy IP with partner. Please contact support.",
+            remark: "Failed to renew proxy IP with partner. Please contact support.",
           });
         }
       } else {
         // Issue new IP (either fresh purchase or renewal of a fake/invalid proxy)
         try {
-          const partnerValidity = Math.max(validity, 3);
+          let brokerMin = 1;
+          try {
+            const brokerInfo = await proxyService.getBrokerInfo();
+            const partnerBroker = brokerInfo?.brokers?.[partnerBrokerName];
+            if (partnerBroker?.ipv4?.min_month) {
+              brokerMin = partnerBroker.ipv4.min_month;
+            }
+          } catch (e) {
+            brokerMin = partnerBrokerName === 'zebu' ? 1 : 3;
+          }
+          const partnerValidity = Math.max(validity, brokerMin);
           result = await proxyService.issueIp({
             brokername: partnerBrokerName,
             validity: partnerValidity,
@@ -414,16 +524,15 @@ const proxyController = {
             email: emailAddress,
           });
         } catch (issueErr) {
-          const errBody = issueErr.response?.data;
-          console.error("[ProxyController] issueIp failed:", errBody || issueErr.message);
+          console.error("[ProxyController] issueIp failed:", issueErr.message);
           return res.status(502).send({
             status: "failed",
-            remark: errBody?.detail?.[0]?.msg || errBody?.detail || "Failed to issue proxy IP with partner. Please try again later.",
+            remark: "Failed to issue proxy IP with partner. Please try again later.",
           });
         }
       }
 
-      console.log("[ProxyController] verifyProxyPayment result:", result);
+      console.log("[ProxyController] verifyProxyPayment Partner result:", result);
 
       if (!result || result.status !== "success" || !result.ip_details) {
         console.error("[ProxyController] Partner returned failure:", result);
@@ -433,42 +542,85 @@ const proxyController = {
         });
       }
 
-      // Update Postgres UserBroker profile with Proxy details
-      let expiryDate;
-      if (isRenewal && result.ip_details.updated_validity) {
-        const expiryParts = result.ip_details.updated_validity.split("-");
-        expiryDate = new Date(`${expiryParts[2]}-${expiryParts[1]}-${expiryParts[0]}T23:59:59.000Z`);
+      // Parse Expiry Date from DD-MM-YYYY
+      const dateStr = result.ip_details.validity || result.ip_details.updated_validity;
+      let expiryDate = new Date();
+      if (dateStr) {
+        const parts = dateStr.split("-");
+        if (parts.length === 3) {
+          expiryDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T23:59:59.000Z`);
+        }
+      }
 
-        await prisma.userBroker.update({
-          where: { id: userBroker.id },
-          data: {
-            proxyExpiry: expiryDate,
-          },
-        });
-      } else if (result.ip_details) {
-        const expiryParts = result.ip_details.validity.split("-");
-        expiryDate = new Date(`${expiryParts[2]}-${expiryParts[1]}-${expiryParts[0]}T23:59:59.000Z`);
+      // Update Postgres UserBroker profile with Proxy details if available
+      try {
+        if (userBroker?.id) {
+          await prisma.userBroker.update({
+            where: { id: userBroker.id },
+            data: {
+              proxyIp: result.ip_details.ip,
+              proxyPort: result.ip_details.port || 443,
+              proxyHostname: result.ip_details.hostname,
+              proxyUsername: result.ip_details.ip_userid || userBroker.proxyUsername,
+              proxyPassword: result.ip_details.ip_password || userBroker.proxyPassword,
+              proxyExpiry: expiryDate,
+            },
+          });
+        }
+      } catch (pgUpdateErr) {
+        console.warn("[ProxyController] Postgres UserBroker update warning:", pgUpdateErr.message);
+      }
 
-        await prisma.userBroker.update({
-          where: { id: userBroker.id },
-          data: {
-            proxyIp: result.ip_details.ip,
-            proxyPort: result.ip_details.port,
-            proxyHostname: result.ip_details.hostname,
-            proxyUsername: result.ip_details.ip_userid,
-            proxyPassword: result.ip_details.ip_password,
-            proxyExpiry: expiryDate,
-          },
-        });
+      // Update MongoDB User with proxy details as fallback
+      try {
+        await userModel.collection.updateOne(
+          { _id: new mongoose.Types.ObjectId(rawUserId.toString()) },
+          {
+            $set: {
+              proxy: {
+                ip: result.ip_details.ip,
+                port: result.ip_details.port || 443,
+                hostname: result.ip_details.hostname,
+                ipUserid: result.ip_details.ip_userid,
+                ipPassword: result.ip_details.ip_password,
+                expiry: expiryDate,
+                brokerCode: partnerBrokerName,
+                brokerName: targetBrokerEnum === 'ZEBU' ? 'Mynt by Zebu' : 'Angel One',
+                orderId: result.order_id,
+                razorpayOrderId,
+                razorpayPaymentId,
+                purchasedAt: new Date(),
+              },
+              [`proxies.${partnerBrokerName}`]: {
+                ip: result.ip_details.ip,
+                port: result.ip_details.port || 443,
+                hostname: result.ip_details.hostname,
+                ipUserid: result.ip_details.ip_userid,
+                ipPassword: result.ip_details.ip_password,
+                expiry: expiryDate,
+                brokerCode: partnerBrokerName,
+                brokerName: targetBrokerEnum === 'ZEBU' ? 'Mynt by Zebu' : 'Angel One',
+                orderId: result.order_id,
+                razorpayOrderId,
+                razorpayPaymentId,
+                purchasedAt: new Date(),
+              }
+            }
+          }
+        );
+      } catch (mongoUpdateErr) {
+        console.warn("[ProxyController] MongoDB user proxy update warning:", mongoUpdateErr.message);
       }
 
       res.status(200).send({
         status: "success",
         remark: isRenewal ? "Proxy IP successfully renewed." : "Proxy IP successfully issued and assigned.",
         data: {
-          ip: result.ip_details.ip || userBroker.proxyIp,
-          port: result.ip_details.port || userBroker.proxyPort,
-          expiry: result.ip_details.validity || result.ip_details.updated_validity,
+          ip: result.ip_details.ip,
+          port: result.ip_details.port || 443,
+          expiry: dateStr,
+          status: "active",
+          brokerCode: partnerBrokerName,
         },
       });
     } catch (error) {

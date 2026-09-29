@@ -1,7 +1,7 @@
 import { Queue, FlowProducer } from 'bullmq';
 import { PrismaService } from '../../prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { QueueJobStatus } from '@prisma/client';
+import { QueueJobStatus } from "@prisma/client";
 export declare class QueueService {
     private readonly prisma;
     private readonly redisService;

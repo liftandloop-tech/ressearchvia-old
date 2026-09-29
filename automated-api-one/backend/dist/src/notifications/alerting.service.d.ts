@@ -1,7 +1,7 @@
 import { PrismaService } from '../prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { MetricsService } from '../infrastructure/metrics/metrics.service';
-import { NotificationEvent, AlertSeverity } from '@prisma/client';
+import { NotificationEvent, AlertSeverity } from "@prisma/client";
 import { CircuitBreakerService } from '../infrastructure/circuit-breaker/circuit-breaker.service';
 export declare class AlertingService {
     private readonly prisma;

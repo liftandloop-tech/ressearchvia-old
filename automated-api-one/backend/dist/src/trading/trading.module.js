@@ -16,6 +16,7 @@ const order_placement_service_1 = require("./services/order-placement.service");
 const order_monitoring_service_1 = require("./services/order-monitoring.service");
 const position_cache_service_1 = require("./services/position-cache.service");
 const multiplier_service_1 = require("./services/multiplier.service");
+const position_sizing_service_1 = require("./services/position-sizing.service");
 const execution_recovery_service_1 = require("./services/execution-recovery.service");
 const signal_execution_processor_1 = require("./processors/signal-execution.processor");
 const order_placement_processor_1 = require("./processors/order-placement.processor");
@@ -26,6 +27,7 @@ const subscriptions_module_1 = require("../subscriptions/subscriptions.module");
 const brokers_module_1 = require("../brokers/brokers.module");
 const audit_module_1 = require("../audit/audit.module");
 const infrastructure_module_1 = require("../infrastructure/infrastructure.module");
+const strategy_module_1 = require("../strategy/strategy.module");
 const queue_constants_1 = require("../infrastructure/queues/queue.constants");
 let TradingModule = class TradingModule {
 };
@@ -41,6 +43,7 @@ exports.TradingModule = TradingModule = __decorate([
             brokers_module_1.BrokersModule,
             audit_module_1.AuditModule,
             infrastructure_module_1.InfrastructureModule,
+            strategy_module_1.StrategyModule,
         ],
         providers: [
             trading_service_1.TradingService,
@@ -49,12 +52,13 @@ exports.TradingModule = TradingModule = __decorate([
             order_monitoring_service_1.OrderMonitoringService,
             position_cache_service_1.PositionCacheService,
             multiplier_service_1.MultiplierService,
+            position_sizing_service_1.PositionSizingService,
             execution_recovery_service_1.ExecutionRecoveryService,
             signal_execution_processor_1.SignalExecutionProcessor,
             order_placement_processor_1.OrderPlacementProcessor,
             order_monitoring_processor_1.OrderMonitoringProcessor,
         ],
-        exports: [trading_service_1.TradingService, signal_orchestrator_service_1.SignalOrchestratorService, position_cache_service_1.PositionCacheService],
+        exports: [trading_service_1.TradingService, signal_orchestrator_service_1.SignalOrchestratorService, position_cache_service_1.PositionCacheService, position_sizing_service_1.PositionSizingService],
     })
 ], TradingModule);
 //# sourceMappingURL=trading.module.js.map

@@ -1,5 +1,5 @@
 import { NotificationsService } from './notifications.service';
-import { NotificationType, NotificationEvent, NotificationChannel } from '@prisma/client';
+import { NotificationType, NotificationEvent, NotificationChannel } from "@prisma/client";
 export declare class GetNotificationsDto {
     limit?: number;
     offset?: number;

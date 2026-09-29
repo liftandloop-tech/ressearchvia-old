@@ -691,9 +691,6 @@ class ManageSubscriptionController extends GetxController {
       if (p.planStatus.toLowerCase() != 'active') return false;
 
       final planNameNormalized = p.planName.trim().toUpperCase();
-      if (!planNameNormalized.contains('SPARK') && !planNameNormalized.contains('SPLENDID')) {
-        return false;
-      }
       final isExcluded = activeSubscriptionNames.contains(planNameNormalized.toLowerCase());
 
       return !isExcluded;

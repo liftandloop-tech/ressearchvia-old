@@ -131,6 +131,13 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
                         multiplier: snapshot.multiplierValue,
                         entryPrice,
                         status: client_1.TradeStatus.OPEN,
+                        strategyType: snapshot.strategyType,
+                        strategyVersion: snapshot.strategyVersion,
+                        baseQuantity: snapshot.baseQuantity,
+                        actualQuantity: snapshot.actualQuantity ?? effectiveLot,
+                        consecutiveLossesAtEntry: snapshot.consecutiveLossesAtEntry,
+                        previousTradeResult: snapshot.previousTradeResult,
+                        agreementVersion: snapshot.agreementVersion,
                     },
                 });
                 const order = await tx.order.create({

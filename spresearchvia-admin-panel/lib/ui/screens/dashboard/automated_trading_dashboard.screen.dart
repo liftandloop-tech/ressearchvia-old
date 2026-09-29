@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../controllers/dashboard/automated_trading.controller.dart';
 import '../../../config/theme.config.dart';
+import '../../../config/routes.config.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
 
@@ -50,9 +51,25 @@ class AutomatedTradingDashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: AppTheme.primaryBlue),
-                      onPressed: () => controller.refreshAdminData(),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => Get.toNamed(AppRoutes.strategyConfig),
+                          icon: const Icon(Icons.tune_rounded, size: 16),
+                          label: const Text('Strategy Configuration'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryBlue,
+                            side: const BorderSide(color: AppTheme.primaryBlue),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: AppTheme.primaryBlue),
+                          onPressed: () => controller.refreshAdminData(),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -60,6 +77,10 @@ class AutomatedTradingDashboardScreen extends StatelessWidget {
 
                 // EMERGENCY KILL SWITCH CARD
                 _buildEmergencyLockCard(context, controller, reasonController),
+                const SizedBox(height: 24),
+
+                // LIVE USER STRATEGY & MULTIPLIER MONITORING
+                _buildActiveUserStrategyMonitoringSection(controller),
                 const SizedBox(height: 24),
 
                 // PUBLISH TRADING CALL FORM
@@ -182,6 +203,196 @@ class AutomatedTradingDashboardScreen extends StatelessWidget {
               }
             },
           )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveUserStrategyMonitoringSection(AdminAutomatedTradingController controller) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryBlue.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.stacked_line_chart, color: AppTheme.primaryBlue, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Live Automated Clients & Sizing Multipliers',
+                        style: AppTheme.h5Style.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Real-time overview of client loss streaks, position multipliers, and calculated capital exposures.',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              OutlinedButton.icon(
+                onPressed: () => controller.fetchStrategyDashboardUsers(),
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('Refresh Multipliers'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Obx(() {
+            if (controller.isStrategyUsersLoading.value && controller.strategyUsers.isEmpty) {
+              return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+            }
+
+            if (controller.strategyUsers.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.gray50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.gray200),
+                ),
+                child: const Center(
+                  child: Text(
+                    'No active automated trading clients with position allocations found.',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                ),
+              );
+            }
+
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(const Color(0xffF8FAFC)),
+                  headingTextStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xff475569)),
+                  dataTextStyle: const TextStyle(fontSize: 12.5, color: Colors.black87),
+                  columnSpacing: 28,
+                  columns: const [
+                    DataColumn(label: Text('Client / User')),
+                    DataColumn(label: Text('Broker / ID')),
+                    DataColumn(label: Text('Strategy')),
+                    DataColumn(label: Text('Current Multiplier')),
+                    DataColumn(label: Text('Consecutive Losses')),
+                    DataColumn(label: Text('Next Multiplier')),
+                    DataColumn(label: Text('Calculated Exposure')),
+                    DataColumn(label: Text('Risk Status')),
+                    DataColumn(label: Text('Action')),
+                  ],
+                  rows: controller.strategyUsers.map((u) {
+                    final is2x = u['strategyType'] == 'LOSS_MULTIPLIER_2X';
+                    final losses = u['consecutiveLosses'] ?? 0;
+                    final exposure = u['exposure'] != null ? '₹${u["exposure"]}' : '—';
+                    final mult = u['currentMultiplier'] ?? '1×';
+                    final isHighRisk = losses >= 3;
+
+                    return DataRow(cells: [
+                      DataCell(Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(u['name'] ?? '—', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(u['mobile'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                        ],
+                      )),
+                      DataCell(Text('${u["brokerCode"]} (${u["clientId"]})')),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: is2x ? const Color(0xffEFF6FF) : const Color(0xffF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          is2x ? '2× Loss Multiplier' : 'Fixed 1×',
+                          style: TextStyle(
+                            color: is2x ? const Color(0xff1D4ED8) : const Color(0xff475569),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      )),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isHighRisk ? Colors.red.shade700 : (is2x && mult != '1×' ? const Color(0xff312E81) : Colors.grey.shade100),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          mult,
+                          style: TextStyle(
+                            color: (isHighRisk || (is2x && mult != '1×')) ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )),
+                      DataCell(Row(
+                        children: [
+                          if (losses > 0)
+                            Icon(Icons.warning_amber_rounded, size: 14, color: isHighRisk ? Colors.red : Colors.orange),
+                          const SizedBox(width: 4),
+                          Text('$losses', style: TextStyle(fontWeight: losses > 0 ? FontWeight.w700 : FontWeight.w500)),
+                        ],
+                      )),
+                      DataCell(Text(
+                        u['nextMultiplier'] ?? '1×',
+                        style: const TextStyle(color: Color(0xff4F46E5), fontWeight: FontWeight.w700),
+                      )),
+                      DataCell(Text(exposure, style: const TextStyle(fontWeight: FontWeight.w600))),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isHighRisk ? const Color(0xffFEF2F2) : const Color(0xffECFDF5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isHighRisk ? 'High Escalation Alert' : 'Healthy',
+                          style: TextStyle(
+                            color: isHighRisk ? const Color(0xffDC2626) : const Color(0xff059669),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      )),
+                      DataCell(IconButton(
+                        icon: const Icon(Icons.open_in_new, size: 16, color: AppTheme.primaryBlue),
+                        onPressed: () => Get.toNamed('/users/${u["userId"]}'),
+                        tooltip: 'View User Strategy Details',
+                      )),
+                    ]);
+                  }).toList(),
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );

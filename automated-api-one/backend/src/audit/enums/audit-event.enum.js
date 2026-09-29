@@ -1,0 +1,42 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AuditEventType = void 0;
+var AuditEventType;
+(function (AuditEventType) {
+    // Auth
+    AuditEventType["LOGIN"] = "LOGIN";
+    AuditEventType["MPIN_LOGIN"] = "MPIN_LOGIN";
+    AuditEventType["OTP_VERIFIED"] = "OTP_VERIFIED";
+    // Broker Session
+    AuditEventType["BROKER_CONNECTED"] = "BROKER_CONNECTED";
+    AuditEventType["BROKER_DISCONNECTED"] = "BROKER_DISCONNECTED";
+    AuditEventType["BROKER_SESSION_REFRESHED"] = "BROKER_SESSION_REFRESHED";
+    AuditEventType["BROKER_SESSION_FAILED"] = "BROKER_SESSION_FAILED";
+    AuditEventType["BROKER_SESSION_EXPIRED"] = "BROKER_SESSION_EXPIRED";
+    // Segment
+    AuditEventType["SEGMENT_ACTIVATED"] = "SEGMENT_ACTIVATED";
+    AuditEventType["SEGMENT_PAUSED"] = "SEGMENT_PAUSED";
+    // Request logs
+    AuditEventType["API_REQUEST"] = "API_REQUEST";
+    // Future-proof
+    AuditEventType["SUBSCRIPTION_ACTIVATED"] = "SUBSCRIPTION_ACTIVATED";
+    AuditEventType["SUBSCRIPTION_RENEWED"] = "SUBSCRIPTION_RENEWED";
+    AuditEventType["SUBSCRIPTION_CANCELLED"] = "SUBSCRIPTION_CANCELLED";
+    AuditEventType["CONSENT_GRANTED"] = "CONSENT_GRANTED";
+    AuditEventType["CONSENT_REVOKED"] = "CONSENT_REVOKED";
+    AuditEventType["ORDER_PLACED"] = "ORDER_PLACED";
+    AuditEventType["TARGET_HIT"] = "TARGET_HIT";
+    AuditEventType["STOPLOSS_HIT"] = "STOPLOSS_HIT";
+    // Risk Engine Events
+    AuditEventType["RISK_APPROVED"] = "RISK_APPROVED";
+    AuditEventType["RISK_REJECTED"] = "RISK_REJECTED";
+    AuditEventType["SEGMENT_RISK_LOCKED"] = "SEGMENT_RISK_LOCKED";
+    AuditEventType["SEGMENT_RISK_UNLOCKED"] = "SEGMENT_RISK_UNLOCKED";
+    // Trading Engine Events
+    AuditEventType["TRADE_OPENED"] = "TRADE_OPENED";
+    AuditEventType["TRADE_CLOSED"] = "TRADE_CLOSED";
+    AuditEventType["ORDER_FILLED"] = "ORDER_FILLED";
+    AuditEventType["ORDER_CANCELLED"] = "ORDER_CANCELLED";
+    AuditEventType["ORDER_REJECTED"] = "ORDER_REJECTED";
+    AuditEventType["SIGNAL_PROCESSED"] = "SIGNAL_PROCESSED";
+})(AuditEventType || (exports.AuditEventType = AuditEventType = {}));

@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma.service';
-import { OutboxEvent } from '@prisma/client';
+import { OutboxEvent } from "@prisma/client";
 import { QueueService } from '../queues/queues.service';
 import { MetricsService } from '../metrics/metrics.service';
 export declare class OutboxService {

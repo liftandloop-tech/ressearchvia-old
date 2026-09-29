@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/client/runtime/client").DynamicClientExtensionThis<import("@prisma/client").Prisma.TypeMap<import("@prisma/client/runtime/client").InternalArgs & {
     result: {};
     model: {
@@ -423,6 +423,51 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
                 totalPages: number;
             }>;
         };
+        userTradingStrategy: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        tradingStrategyConsent: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        strategyChangeHistory: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
         broker: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
@@ -814,6 +859,21 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
             }>;
         };
         proxyCredential: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        systemStrategyConfig: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
                 limit?: number;
@@ -1255,6 +1315,51 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
                 totalPages: number;
             }>;
         };
+        userTradingStrategy: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        tradingStrategyConsent: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        strategyChangeHistory: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
         broker: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
@@ -1646,6 +1751,21 @@ export declare const prismaExtension: (prisma: PrismaClient) => import("@prisma/
             }>;
         };
         proxyCredential: {
+            paginate: () => <T, A>(this: T, args?: {
+                page?: number;
+                limit?: number;
+                where?: any;
+                orderBy?: any;
+                include?: any;
+            }) => Promise<{
+                data: any;
+                total: any;
+                page: number;
+                limit: number;
+                totalPages: number;
+            }>;
+        };
+        systemStrategyConfig: {
             paginate: () => <T, A>(this: T, args?: {
                 page?: number;
                 limit?: number;

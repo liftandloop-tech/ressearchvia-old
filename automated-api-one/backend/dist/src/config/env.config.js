@@ -8,7 +8,7 @@ exports.envSchema = zod_1.z.object({
         .enum(['development', 'production', 'test'])
         .default('development'),
     PORT: zod_1.z.coerce.number().default(3000),
-    DATABASE_URL: zod_1.z.string().url(),
+    DATABASE_URL: zod_1.z.string().min(1),
     REDIS_HOST: zod_1.z.string().default('localhost'),
     REDIS_PORT: zod_1.z.coerce.number().default(6379),
     REDIS_USERNAME: zod_1.z.string().optional(),
@@ -43,7 +43,7 @@ exports.envSchema = zod_1.z.object({
     CIRCUIT_BREAKER_FAILURE_THRESHOLD: zod_1.z.coerce.number().default(3),
     CIRCUIT_BREAKER_RESET_TIMEOUT_MS: zod_1.z.coerce.number().default(60000),
     AUTOMATED_API_KEY: zod_1.z.string().default('default_secret_key'),
-    LL_BACKEND_URL: zod_1.z.string().url().default('http://localhost:8080'),
+    LL_BACKEND_URL: zod_1.z.string().min(1).default('http://ll-backend:8080'),
     RISK_DEFAULT_MODE: zod_1.z.enum(['BLOCK', 'ALLOW']).default('ALLOW'),
     EGRESS_MANAGER_URL: zod_1.z.string().default('http://localhost:8080'),
     EGRESS_PROXY_HOST: zod_1.z.string().default('localhost'),

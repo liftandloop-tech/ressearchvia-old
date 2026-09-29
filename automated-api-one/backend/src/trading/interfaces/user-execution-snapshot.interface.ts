@@ -1,3 +1,5 @@
+import { StrategyType } from '@prisma/client';
+
 /**
  * Immutable snapshot of user execution parameters captured at signal queue time.
  * This prevents race conditions caused by user settings changing between enqueue
@@ -15,4 +17,13 @@ export interface UserExecutionSnapshot {
   capitalAllocated: number;
   baseLot: number;
   effectiveLot: number;
+
+  // Strategy Snapshot Fields
+  strategyType?: StrategyType;
+  strategyVersion?: number;
+  baseQuantity?: number;
+  actualQuantity?: number;
+  consecutiveLossesAtEntry?: number;
+  previousTradeResult?: string | null;
+  agreementVersion?: string;
 }

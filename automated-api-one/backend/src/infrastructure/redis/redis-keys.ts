@@ -40,4 +40,10 @@ export const RedisKeys = {
 
   userEgressLock: (userId: string) =>
     `lock:egress:${userId}`,
+
+  strategy: (userId: string, segmentId?: string) =>
+    segmentId ? `strategy:${userId}:${segmentId}` : `strategy:${userId}:default`,
+
+  systemStrategyConfig: () =>
+    `system:strategy:config`,
 };

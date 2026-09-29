@@ -1,6 +1,6 @@
 import { OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { UserSegment } from '@prisma/client';
+import { UserSegment } from "@prisma/client";
 import { AuditService } from '../audit/audit.service';
 export declare class SegmentsService implements OnModuleInit {
     private readonly prisma;

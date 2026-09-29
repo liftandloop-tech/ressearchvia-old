@@ -252,11 +252,6 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
     const plan = await SegmentsPlan.findById(planId);
     if (!plan) throw new Error("Plan not found");
 
-    // Strictly validate plan name: ONLY SPARK or SPLENDID
-    const planName = (plan.planName || '').trim().toUpperCase();
-    if (!['SPARK', 'SPLENDID'].includes(planName)) {
-        throw new Error(`Strict Policy: Users can only purchase "SPARK" or "SPLENDID" plan.`);
-    }
 
     // Strictly enforce exactly 1 segment selected at plan purchase
     let finalSegmentId = segmentId;
@@ -311,7 +306,7 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
         if (activeEntitlement) {
             const currentPlanName = activeEntitlement.resourceId?.planName || 'Plan';
             throw new Error(
-                `Strict Policy: A user can only hold one plan ('Spark' or 'Splendid') at a time. You already have an active subscription for "${currentPlanName}". You can add additional segments in Settings.`
+                `Strict Policy: A user can only hold one plan at a time. You already have an active subscription for "${currentPlanName}". You can add additional segments in Settings.`
             );
         }
 
@@ -1518,15 +1513,11 @@ export const onboardOfflineUser = async (adminId, userData, entitlements) => {
     // 3. Grant Plans
     if (entitlements.plans && entitlements.plans.length > 0) {
         if (entitlements.plans.length > 1) {
-            throw new Error("Strict Policy: A user can only be assigned 1 plan ('SPARK' or 'SPLENDID'). Additional segments can be allocated later.");
+            throw new Error("Strict Policy: A user can only be assigned 1 plan. Additional segments can be allocated later.");
         }
         for (const planId of entitlements.plans) {
             const plan = await SegmentsPlan.findById(planId);
             if (!plan) continue;
-            const planName = (plan.planName || '').trim().toUpperCase();
-            if (!['SPARK', 'SPLENDID'].includes(planName)) {
-                throw new Error("Strict Policy: A user can only be assigned 1 plan: 'SPARK' or 'SPLENDID'.");
-            }
             const days = plan.day ? parseInt(plan.day) : 30;
 
             await grantEntitlement({

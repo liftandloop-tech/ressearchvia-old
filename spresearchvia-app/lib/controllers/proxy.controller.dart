@@ -87,6 +87,7 @@ class ProxyController extends GetxController {
     int validityMonths, {
     required bool isRenewal,
     String? brokerCode,
+    VoidCallback? onPaymentSuccess,
   }) async {
     isLoading.value = true;
     try {
@@ -133,15 +134,19 @@ class ProxyController extends GetxController {
       _razorpayHandler.initiatePayment(
         options: options,
         callbacks: PaymentCallbacks(
-          onSuccess: (paymentId, orderId, signature) async {
-            await verifyPaymentAndAssignProxy(
-              razorpayOrderId: orderId.isNotEmpty ? orderId : orderData['razorpayOrderId'],
+          onSuccess: (paymentId, razorOrderId, signature) async {
+            final effectiveOrderId = razorOrderId.isNotEmpty ? razorOrderId : orderId;
+            final isAssigned = await verifyPaymentAndAssignProxy(
+              razorpayOrderId: effectiveOrderId,
               razorpayPaymentId: paymentId,
               razorpaySignature: signature,
               validity: validityMonths,
               isRenewal: isRenewal,
               brokerCode: brokerCode ?? 'angel',
             );
+            if (isAssigned) {
+              onPaymentSuccess?.call();
+            }
           },
           onError: (errorMessage) {
             SnackbarService.showError(
@@ -161,7 +166,7 @@ class ProxyController extends GetxController {
   }
 
   /// Verifies Payment Signature on backend and assigns/renews Proxy IP
-  Future<void> verifyPaymentAndAssignProxy({
+  Future<bool> verifyPaymentAndAssignProxy({
     required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpaySignature,
@@ -190,18 +195,21 @@ class ProxyController extends GetxController {
               : 'Static Proxy IP assigned successfully!',
           title: 'Success',
         );
-        fetchProxyInfo();
+        await fetchProxyInfo();
+        return true;
       } else {
         SnackbarService.showError(
           response.data?['remark'] ?? 'Payment verification failed.',
           title: 'Verification Failed',
         );
+        return false;
       }
     } catch (e) {
       SnackbarService.showError(
         'Failed to verify payment with server.',
         title: 'Error',
       );
+      return false;
     } finally {
       isLoading.value = false;
     }

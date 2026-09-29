@@ -49,6 +49,9 @@ model User {
   kyc                     UserKyc?
   userPerformance         UserPerformance?
   segments                UserSegment[]
+  tradingStrategies       UserTradingStrategy[]
+  tradingStrategyConsents TradingStrategyConsent[]
+  strategyChangeHistories StrategyChangeHistory[]
 
   @@index([status])
   @@index([deletedAt])
@@ -229,8 +232,15 @@ model Trade {
   exitPrice     Decimal?    @map("exit_price") @db.Decimal(15, 2)
   pnl           Decimal?    @db.Decimal(15, 2)
   status        TradeStatus @default(OPEN)
-  brokerTradeId String?     @map("broker_trade_id") @db.VarChar(100)
-  createdAt     DateTime    @default(now()) @map("created_at")
+  brokerTradeId            String?       @map("broker_trade_id") @db.VarChar(100)
+  strategyType             StrategyType? @map("strategy_type")
+  strategyVersion          Int?          @map("strategy_version")
+  baseQuantity             Int?          @map("base_quantity")
+  actualQuantity           Int?          @map("actual_quantity")
+  consecutiveLossesAtEntry Int?          @map("consecutive_losses_at_entry")
+  previousTradeResult      String?       @map("previous_trade_result") @db.VarChar(20)
+  agreementVersion         String?       @map("agreement_version") @db.VarChar(20)
+  createdAt                DateTime      @default(now()) @map("created_at")
   orders        Order[]
   position      Position?
   signal        Signal      @relation(fields: [signalId], references: [id], onDelete: Cascade)
@@ -1194,4 +1204,97 @@ enum EquityCurveSourceType {
   INTRADAY
   HOURLY
   DAILY
+}
+
+enum StrategyType {
+  FIXED_1X
+  LOSS_MULTIPLIER_2X
+}
+
+enum StrategyChangeSource {
+  USER_CONSENT
+  USER_SETTINGS_CHANGE
+  ADMIN_COMPLIANCE_RESET
+}
+
+model UserTradingStrategy {
+  id                    String       @id @default(uuid()) @db.Uuid
+  userId                String       @map("user_id") @db.Uuid
+  segmentId             String?      @map("segment_id") @db.Uuid
+  strategyType          StrategyType @default(FIXED_1X) @map("strategy_type")
+  baseMultiplier        Int          @default(1) @map("base_multiplier")
+  currentMultiplier     Int          @default(1) @map("current_multiplier")
+  consecutiveLosses     Int          @default(0) @map("consecutive_losses")
+  lastTradeResult       String?      @map("last_trade_result") @db.VarChar(20)
+  nextTradeMultiplier   Int          @default(1) @map("next_trade_multiplier")
+  status                String       @default("ACTIVE") @db.VarChar(20)
+  effectiveFrom         DateTime     @default(now()) @map("effective_from")
+  effectiveTo           DateTime?    @map("effective_to")
+  version               Int          @default(1)
+  agreementVersion      String       @default("v1.0") @map("agreement_version") @db.VarChar(20)
+  consentAccepted       Boolean      @default(false) @map("consent_accepted")
+  strategySelectedAt    DateTime     @default(now()) @map("strategy_selected_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, segmentId])
+  @@index([userId])
+  @@map("user_trading_strategies")
+}
+
+model TradingStrategyConsent {
+  id               String       @id @default(uuid()) @db.Uuid
+  userId           String       @map("user_id") @db.Uuid
+  brokerId         String?      @map("broker_id") @db.Uuid
+  strategyType     StrategyType @map("strategy_type")
+  baseMultiplier   Int          @default(1) @map("base_multiplier")
+  agreementVersion String       @map("agreement_version") @db.VarChar(20)
+  consentVersion   String       @default("v1.0") @map("consent_version") @db.VarChar(20)
+  ipAddress        String?      @map("ip_address") @db.VarChar(45)
+  deviceId         String?      @map("device_id") @db.VarChar(100)
+  userAgent        String?      @map("user_agent")
+  signatureRef     String?      @map("signature_ref") @db.VarChar(100)
+  status           String       @default("ACCEPTED") @db.VarChar(20)
+  acceptedAt       DateTime     @default(now()) @map("accepted_at")
+  revokedAt        DateTime?    @map("revoked_at")
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, acceptedAt])
+  @@map("trading_strategy_consents")
+}
+
+model StrategyChangeHistory {
+  id                 String               @id @default(uuid()) @db.Uuid
+  userId             String               @map("user_id") @db.Uuid
+  previousStrategy   StrategyType?        @map("previous_strategy")
+  newStrategy        StrategyType         @map("new_strategy")
+  previousMultiplier Int                  @default(1) @map("previous_multiplier")
+  newMultiplier      Int                  @default(1) @map("new_multiplier")
+  previousVersion    Int                  @map("previous_version")
+  newVersion         Int                  @map("new_version")
+  changedBy          String               @map("changed_by") @db.VarChar(50)
+  changeSource       StrategyChangeSource @map("change_source")
+  consentId          String?              @map("consent_id") @db.Uuid
+  agreementVersion   String               @map("agreement_version") @db.VarChar(20)
+  createdAt          DateTime             @default(now()) @map("created_at")
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("strategy_change_history")
+}
+
+model SystemStrategyConfig {
+  id                        String   @id @default(uuid()) @db.Uuid
+  isFixed1xEnabled          Boolean  @default(true) @map("is_fixed_1x_enabled")
+  isLossMultiplier2xEnabled Boolean  @default(true) @map("is_loss_multiplier_2x_enabled")
+  maxAllowedMultiplier      Int      @default(16) @map("max_allowed_multiplier")
+  maxGlobalQuantity         Int?     @map("max_global_quantity")
+  maxGlobalExposureInr      Decimal? @map("max_global_exposure_inr") @db.Decimal(15, 2)
+  maxDailyLossInr           Decimal? @map("max_daily_loss_inr") @db.Decimal(15, 2)
+  maxConsecutiveLosses      Int      @default(5) @map("max_consecutive_losses")
+  updatedByAdminId          String?  @map("updated_by_admin_id") @db.Uuid
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  @@map("system_strategy_configs")
 }

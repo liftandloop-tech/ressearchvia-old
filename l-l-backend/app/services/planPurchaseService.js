@@ -597,22 +597,13 @@ const planPurchaseService = {
           const currentPlanName = existingActivePlan.resourceId?.planName || 'Plan';
           return {
             status: 400,
-            message: `Strict Policy: User already has an active subscription for "${currentPlanName}". A user can only hold one plan ("SPARK" or "SPLENDID") at a time. Please revoke the existing plan first or manage segments.`,
+            message: `Strict Policy: User already has an active subscription for "${currentPlanName}". A user can only hold one plan at a time. Please revoke the existing plan first or manage segments.`,
             data: {}
           };
         }
       }
 
       if (!isRegistration) {
-        const planDoc = resourceId ? await segmentsPlanModel.findById(resourceId) : null;
-        const targetPlanName = (planDoc?.planName || packageName || '').trim().toUpperCase();
-        if (!['SPARK', 'SPLENDID'].includes(targetPlanName)) {
-          return {
-            status: 400,
-            message: `Strict Policy: Invalid plan "${targetPlanName}". A user can only purchase/hold 1 plan: "SPARK" or "SPLENDID".`,
-            data: {}
-          };
-        }
 
         const segmentsToGrant = segmentIds && Array.isArray(segmentIds) && segmentIds.length > 0
           ? segmentIds

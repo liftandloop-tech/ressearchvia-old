@@ -166,6 +166,13 @@ export class OrderPlacementService {
             multiplier: snapshot.multiplierValue,
             entryPrice,
             status: TradeStatus.OPEN,
+            strategyType: snapshot.strategyType,
+            strategyVersion: snapshot.strategyVersion,
+            baseQuantity: snapshot.baseQuantity,
+            actualQuantity: snapshot.actualQuantity ?? effectiveLot,
+            consecutiveLossesAtEntry: snapshot.consecutiveLossesAtEntry,
+            previousTradeResult: snapshot.previousTradeResult,
+            agreementVersion: snapshot.agreementVersion,
           },
         });
 

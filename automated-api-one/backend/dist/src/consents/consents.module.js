@@ -14,12 +14,13 @@ const prisma_service_1 = require("../prisma.service");
 const audit_module_1 = require("../audit/audit.module");
 const notifications_module_1 = require("../notifications/notifications.module");
 const subscriptions_module_1 = require("../subscriptions/subscriptions.module");
+const strategy_module_1 = require("../strategy/strategy.module");
 let ConsentsModule = class ConsentsModule {
 };
 exports.ConsentsModule = ConsentsModule;
 exports.ConsentsModule = ConsentsModule = __decorate([
     (0, common_1.Module)({
-        imports: [audit_module_1.AuditModule, notifications_module_1.NotificationsModule, subscriptions_module_1.SubscriptionsModule],
+        imports: [audit_module_1.AuditModule, notifications_module_1.NotificationsModule, subscriptions_module_1.SubscriptionsModule, strategy_module_1.StrategyModule],
         controllers: [consents_controller_1.ConsentsController],
         providers: [consents_service_1.ConsentsService, prisma_service_1.PrismaService],
         exports: [consents_service_1.ConsentsService],

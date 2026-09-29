@@ -739,6 +739,184 @@ let OpsService = OpsService_1 = class OpsService {
             trades,
         };
     }
+    async getSystemStrategyConfig() {
+        const config = await this.prisma.systemStrategyConfig.findFirst({
+            orderBy: { updatedAt: 'desc' },
+        });
+        if (!config) {
+            return {
+                isFixed1xEnabled: true,
+                isLossMultiplier2xEnabled: true,
+                maxAllowedMultiplier: 16,
+                maxGlobalQuantity: null,
+                maxGlobalExposureInr: null,
+                maxDailyLossInr: null,
+                maxConsecutiveLosses: 5,
+            };
+        }
+        return config;
+    }
+    async updateSystemStrategyConfig(operatorId, data) {
+        const existing = await this.prisma.systemStrategyConfig.findFirst({
+            orderBy: { updatedAt: 'desc' },
+        });
+        let config;
+        if (existing) {
+            config = await this.prisma.systemStrategyConfig.update({
+                where: { id: existing.id },
+                data: {
+                    isFixed1xEnabled: data.isFixed1xEnabled ?? existing.isFixed1xEnabled,
+                    isLossMultiplier2xEnabled: data.isLossMultiplier2xEnabled ?? existing.isLossMultiplier2xEnabled,
+                    maxAllowedMultiplier: data.maxAllowedMultiplier ?? existing.maxAllowedMultiplier,
+                    maxGlobalQuantity: data.maxGlobalQuantity !== undefined ? data.maxGlobalQuantity : existing.maxGlobalQuantity,
+                    maxGlobalExposureInr: data.maxGlobalExposureInr !== undefined ? data.maxGlobalExposureInr : existing.maxGlobalExposureInr,
+                    maxDailyLossInr: data.maxDailyLossInr !== undefined ? data.maxDailyLossInr : existing.maxDailyLossInr,
+                    maxConsecutiveLosses: data.maxConsecutiveLosses ?? existing.maxConsecutiveLosses,
+                    updatedByAdminId: operatorId,
+                },
+            });
+        }
+        else {
+            config = await this.prisma.systemStrategyConfig.create({
+                data: {
+                    isFixed1xEnabled: data.isFixed1xEnabled ?? true,
+                    isLossMultiplier2xEnabled: data.isLossMultiplier2xEnabled ?? true,
+                    maxAllowedMultiplier: data.maxAllowedMultiplier ?? 16,
+                    maxGlobalQuantity: data.maxGlobalQuantity ?? null,
+                    maxGlobalExposureInr: data.maxGlobalExposureInr ?? null,
+                    maxDailyLossInr: data.maxDailyLossInr ?? null,
+                    maxConsecutiveLosses: data.maxConsecutiveLosses ?? 5,
+                    updatedByAdminId: operatorId,
+                },
+            });
+        }
+        if (this.redisService.isHealthy()) {
+            try {
+                await this.redisService.getClient().del('system:strategy:config');
+            }
+            catch (err) {
+                this.logger.warn(`Failed to invalidate system strategy cache: ${err.message}`);
+            }
+        }
+        return config;
+    }
+    async getUserStrategyView(userId) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                tradingStrategies: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                },
+                strategyChangeHistories: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 20,
+                },
+                consents: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 1,
+                },
+                segments: {
+                    where: { status: 'ACTIVE' },
+                },
+            },
+        });
+        if (!user) {
+            throw new common_1.NotFoundException(`User ${userId} not found`);
+        }
+        const currentStrategy = user.tradingStrategies[0];
+        const latestConsent = user.consents[0];
+        const isTradingActive = user.segments.length > 0 && latestConsent?.status === 'ACTIVE';
+        const card = {
+            automatedTrading: isTradingActive ? 'Active' : 'Inactive',
+            strategy: currentStrategy ? (currentStrategy.strategyType === 'LOSS_MULTIPLIER_2X' ? '2× Loss Multiplier' : 'Fixed 1×') : 'Fixed 1×',
+            strategyType: currentStrategy?.strategyType ?? 'FIXED_1X',
+            baseMultiplier: `${currentStrategy?.baseMultiplier ?? 1}×`,
+            currentMultiplier: `${currentStrategy?.currentMultiplier ?? 1}×`,
+            lastTradeResult: currentStrategy?.lastTradeResult ?? 'None',
+            consecutiveLosses: currentStrategy?.consecutiveLosses ?? 0,
+            nextTradeMultiplier: `${currentStrategy?.nextTradeMultiplier ?? 1}×`,
+            strategySelectedOn: currentStrategy?.strategySelectedAt ?? currentStrategy?.createdAt ?? null,
+            agreementVersion: currentStrategy?.agreementVersion ?? 'v1.0',
+            consentStatus: latestConsent?.status === 'ACTIVE' ? 'Accepted' : 'Pending',
+            status: currentStrategy?.status ?? 'ACTIVE',
+            version: currentStrategy?.version ?? 1,
+        };
+        const history = user.strategyChangeHistories.map((h) => ({
+            id: h.id,
+            dateTime: h.createdAt,
+            previous: h.previousStrategy ? (h.previousStrategy === 'LOSS_MULTIPLIER_2X' ? '2×' : '1×') : '—',
+            new: h.newStrategy === 'LOSS_MULTIPLIER_2X' ? '2×' : '1×',
+            previousMultiplier: `${h.previousMultiplier}×`,
+            newMultiplier: `${h.newMultiplier}×`,
+            previousVersion: h.previousVersion,
+            newVersion: h.newVersion,
+            changedBy: h.changedBy,
+            agreement: h.agreementVersion,
+            status: 'Accepted',
+        }));
+        return {
+            card,
+            history,
+        };
+    }
+    async getStrategyDashboardUsers(page = 1, limit = 50) {
+        const skip = (page - 1) * limit;
+        const [total, users] = await Promise.all([
+            this.prisma.user.count({
+                where: {
+                    segments: { some: { status: 'ACTIVE' } },
+                },
+            }),
+            this.prisma.user.findMany({
+                where: {
+                    segments: { some: { status: 'ACTIVE' } },
+                },
+                skip,
+                take: limit,
+                include: {
+                    tradingStrategies: {
+                        orderBy: { createdAt: 'desc' },
+                        take: 1,
+                    },
+                    userBrokers: {
+                        where: { status: 'ACTIVE' },
+                        include: { broker: true },
+                        take: 1,
+                    },
+                    segments: {
+                        where: { status: 'ACTIVE' },
+                    },
+                },
+            }),
+        ]);
+        const rows = users.map((u) => {
+            const strat = u.tradingStrategies[0];
+            const broker = u.userBrokers[0];
+            const capital = u.segments.reduce((acc, s) => acc + (s.capitalAllocated ? Number(s.capitalAllocated) : 0), 0);
+            const mult = strat?.currentMultiplier ?? 1;
+            return {
+                userId: u.id,
+                name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.mobile,
+                mobile: u.mobile,
+                clientId: broker?.brokerClientId ?? '—',
+                brokerCode: broker?.broker?.code ?? '—',
+                strategy: strat?.strategyType === 'LOSS_MULTIPLIER_2X' ? '2× Loss Multiplier' : 'Fixed 1×',
+                strategyType: strat?.strategyType ?? 'FIXED_1X',
+                currentMultiplier: `${mult}×`,
+                consecutiveLosses: strat?.consecutiveLosses ?? 0,
+                nextMultiplier: `${strat?.nextTradeMultiplier ?? 1}×`,
+                exposure: capital * mult,
+                status: 'Active',
+            };
+        });
+        return {
+            total,
+            page,
+            limit,
+            rows,
+        };
+    }
 };
 exports.OpsService = OpsService;
 __decorate([

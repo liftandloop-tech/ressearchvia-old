@@ -37,8 +37,6 @@ let RedisService = RedisService_1 = class RedisService {
     mode = PlatformMode.NORMAL;
     constructor(configService) {
         this.configService = configService;
-    }
-    onModuleInit() {
         const host = this.configService.get('REDIS_HOST', 'localhost');
         const port = this.configService.get('REDIS_PORT', 6379);
         const username = this.configService.get('REDIS_USERNAME');
@@ -47,12 +45,12 @@ let RedisService = RedisService_1 = class RedisService {
         const redisOptions = {
             host,
             port,
-            password,
+            password: password || undefined,
             maxRetriesPerRequest: null,
             enableReadyCheck: true,
             reconnectOnError: () => true,
         };
-        if (username) {
+        if (username && username !== 'default' && username !== 'sp-redis') {
             redisOptions.username = username;
         }
         this.client = new ioredis_1.default(redisOptions);
@@ -82,6 +80,11 @@ let RedisService = RedisService_1 = class RedisService {
             this.mode = PlatformMode.REDIS_DEGRADED;
             this.logger.warn('Redis connection ended. Platform mode: REDIS_DEGRADED');
         });
+    }
+    onModuleInit() {
+        if (this.isConnected) {
+            return Promise.resolve();
+        }
         return new Promise((resolve) => {
             const timeout = setTimeout(() => {
                 this.logger.warn('Redis connection startup timeout reached (2s). Bootstrapping anyway.');

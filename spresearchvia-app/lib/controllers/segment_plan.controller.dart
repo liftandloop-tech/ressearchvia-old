@@ -71,7 +71,7 @@ class SegmentPlan {
                 []),
       badge: json['badge']?.toString(),
       isPopular: json['isPopular'] ?? json['popular'] ?? false,
-      isHni: json['isHni'] ?? false,
+      isHni: json['isHni'] == true || json['isHni'] == 'true' || json['isHni'] == 1,
     );
   }
 
@@ -208,10 +208,6 @@ class SegmentPlanController extends GetxController {
         final List<dynamic> plansData = data['data']['data'] ?? [];
         availablePlans.value = plansData
             .map((json) => SegmentPlan.fromJson(json))
-            .where((p) {
-              final name = p.name.trim().toUpperCase();
-              return name.contains('SPARK') || name.contains('SPLENDID');
-            })
             .toList();
 
         // Auto-select first or popular plan
@@ -305,14 +301,6 @@ class SegmentPlanController extends GetxController {
       if (categoryId.trim().isEmpty) {
         SnackbarService.showError('Please select 1 segment for your plan.');
         return null;
-      }
-      final plan = availablePlans.firstWhereOrNull((p) => p.id == planId);
-      if (plan != null) {
-        final planName = plan.name.toUpperCase();
-        if (!planName.contains('SPARK') && !planName.contains('SPLENDID')) {
-          SnackbarService.showError('Users can only purchase "SPARK" or "SPLENDID" plan.');
-          return null;
-        }
       }
 
       isLoading.value = true;
