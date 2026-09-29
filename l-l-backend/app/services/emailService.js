@@ -1,12 +1,18 @@
 import nodemailer from 'nodemailer';
 
+const emailUser = (process.env.EMAIL_USER || 'info@researchvia.in').replace(/^["']|["']$/g, '');
+const emailPass = (process.env.EMAIL_PASS || 'RVIAdewas#1122').replace(/^["']|["']$/g, '');
+
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+    port: Number(process.env.SMTP_PORT) || 465,
+    secure: process.env.SMTP_SECURE === 'false' ? false : true, // true for 465, false for other ports
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: emailUser,
+        pass: emailPass
     }
 });
 
@@ -44,7 +50,7 @@ const emailService = {
     sendEmail: async ({ to, subject, htmlContent, attachments = [] }) => {
         try {
             const mailOptions = {
-                from: process.env.EMAIL_USER,
+                from: `"ResearchVia" <${emailUser}>`,
                 to: to, // Can be array of strings
                 subject: subject,
                 html: htmlTemplate(htmlContent),

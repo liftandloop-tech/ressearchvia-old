@@ -82,6 +82,18 @@ services:
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
       - TWILIO_SERVICE_SID=${TWILIO_SERVICE_SID:-}
+      # Hostinger SMTP
+      - SMTP_HOST=${SMTP_HOST:-smtp.hostinger.com}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_SECURE=${SMTP_SECURE:-true}
+      - EMAIL_USER=${EMAIL_USER:-info@researchvia.in}
+      - EMAIL_PASS=${EMAIL_PASS:-RVIAdewas#1122}
+      # ShortMsgService SMS Gateway
+      - SMS_SHORT_SERVICE_USER=${SMS_SHORT_SERVICE_USER:-ResearchVia}
+      - SMS_SHORT_SERVICE_API_KEY=${SMS_SHORT_SERVICE_API_KEY:-DA15E-A0C79}
+      - SMS_SHORT_SERVICE_SENDER=${SMS_SHORT_SERVICE_SENDER:-REGISR}
+      - SMS_SHORT_SERVICE_TEMPLATEID=${SMS_SHORT_SERVICE_TEMPLATEID:-1607100000000327862}
+      - SMS_SHORT_SERVICE_URL=${SMS_SHORT_SERVICE_URL:-http://sms.shortmsgservice.com/sms-panel/api/http/index.php?}
     volumes:
       - ${UPLOADS_PATH:-/data/coolify/applications/q0oos0gsok8ogkkok8ooksgc}:/usr/src/app/app/uploads
     depends_on:

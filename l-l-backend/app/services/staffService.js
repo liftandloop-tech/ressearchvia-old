@@ -191,11 +191,11 @@ const staffService = {
     try {
       let { phone } = body
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const username = process.env.SMS_SHORT_SERVICE_USER;;
-      const apikey = process.env.SMS_SHORT_SERVICE_API_KEY;
-      const sender = process.env.SMS_SHORT_SERVICE_SENDER;
-      const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID;
-      const url = process.env.SMS_SHORT_SERVICE_URL
+      const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
+      const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
+      const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
+      const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
+      const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
       const cleanPhone = phone ? phone.toString().replace(/[^0-9]/g, '') : '';
       const last10 = cleanPhone.slice(-10);
 
@@ -219,7 +219,7 @@ const staffService = {
       const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
       const messageText = defaultTemplate.replaceAll('{OTP}', otp);
       const message = encodeURIComponent(messageText);
-      const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${phone}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
+      const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=91${last10}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
       const response = await axios.get(smsUrl);
       if (response.status == 200) {
         staff.otp = otp;

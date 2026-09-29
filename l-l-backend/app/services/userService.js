@@ -51,17 +51,17 @@ const findUserByPhone = async (phone) => {
  * Send SMS via Gateway
  */
 const sendSms = async (phone, messageText) => {
-  const username = process.env.SMS_SHORT_SERVICE_USER;
-  const apikey = process.env.SMS_SHORT_SERVICE_API_KEY;
-  const sender = process.env.SMS_SHORT_SERVICE_SENDER;
-  const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID;
-  const url = process.env.SMS_SHORT_SERVICE_URL;
+  const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
+  const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
+  const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
+  const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
+  const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
 
   // Clean phone number: remove any non-digits and keep last 10
   const cleanPhone = phone.toString().replace(/\D/g, "").slice(-10);
 
   const message = encodeURIComponent(messageText);
-  const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${cleanPhone}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
+  const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=91${cleanPhone}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
 
   return await axios.get(smsUrl);
 };

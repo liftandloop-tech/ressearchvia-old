@@ -8,23 +8,28 @@ const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 
 const sendMobileOtp = async (phone, otp) => {
     try {
-        const username = process.env.SMS_SHORT_SERVICE_USER;
-        const apikey = process.env.SMS_SHORT_SERVICE_API_KEY;
-        const sender = process.env.SMS_SHORT_SERVICE_SENDER;
-        const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID;
-        const url = process.env.SMS_SHORT_SERVICE_URL;
+        const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
+        const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
+        const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
+        const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
+        const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
 
-        if (!url || !username || !apikey) {
-            console.log(`[SMS MOCK] To: ${phone}, OTP: ${otp}`);
+        const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
+
+        if (!url || !username || !apikey || !cleanPhone) {
+            console.log(`[SMS MOCK] To: ${cleanPhone || phone}, OTP: ${otp}`);
             return true;
         }
 
         const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
         const messageText = defaultTemplate.replaceAll('{OTP}', otp);
         const message = encodeURIComponent(messageText);
-        const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${phone}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
-        
-        const response = await axios.get(smsUrl);
+        const mobileTarget = `91${cleanPhone}`;
+        const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${mobileTarget}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
+
+        console.log(`[SMS Gateway] Sending mobile OTP to ${mobileTarget}`);
+        const response = await axios.get(smsUrl, { timeout: 10000 });
+        console.log(`[SMS Gateway] Response for ${mobileTarget}:`, response.data);
         return response.status === 200;
     } catch (e) {
         console.error('Error sending mobile SMS:', e.message);
@@ -34,8 +39,12 @@ const sendMobileOtp = async (phone, otp) => {
 
 const sendEmailOtp = async (email, otp) => {
     try {
+        const cleanEmail = email ? email.trim() : '';
+        if (!cleanEmail) return false;
+
+        console.log(`[Email Gateway] Sending applicant OTP to ${cleanEmail}`);
         const result = await emailService.sendEmail({
-            to: email,
+            to: cleanEmail,
             subject: "ResearchVia Applicant Verification OTP",
             htmlContent: `
                 <h2>Verification Code</h2>
@@ -46,6 +55,7 @@ const sendEmailOtp = async (email, otp) => {
                 <p>Regards,<br/>ResearchVia HR Team</p>
             `
         });
+        console.log(`[Email Gateway] Response for ${cleanEmail}:`, result);
         return result.success;
     } catch (e) {
         console.error('Error sending email OTP:', e.message);
@@ -62,6 +72,10 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Full Name, Mobile, and Email are required", data: {} });
             }
 
+            const cleanPhone = mobileNumber ? mobileNumber.toString().replace(/\D/g, '').slice(-10) : '';
+            const phoneNum = parseInt(cleanPhone) || Number(mobileNumber);
+            const cleanEmail = emailAddress ? emailAddress.trim().toLowerCase() : '';
+
             let roleDoc = null;
             if (appliedRoleId) {
                 roleDoc = await roleModel.findById(appliedRoleId);
@@ -71,8 +85,9 @@ const applicantController = {
 
             let applicant = await staffModel.findOne({
                 $or: [
-                    { mobileNumber: Number(mobileNumber) },
-                    { emailAddress: emailAddress.trim() }
+                    { mobileNumber: phoneNum },
+                    { mobileNumber: cleanPhone },
+                    { emailAddress: { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
                 ]
             });
 
@@ -86,8 +101,8 @@ const applicantController = {
                 }
                 // Update existing applicant details & reset verification
                 applicant.fullName = fullName;
-                applicant.mobileNumber = Number(mobileNumber);
-                applicant.emailAddress = emailAddress.trim();
+                applicant.mobileNumber = phoneNum;
+                applicant.emailAddress = cleanEmail;
                 applicant.dob = dob ? new Date(dob) : null;
                 applicant.gender = gender;
                 applicant.currentAddress = currentAddress;
@@ -111,6 +126,7 @@ const applicantController = {
                 applicant.emailOtpExpires = expiry;
                 applicant.isMobileVerified = false;
                 applicant.isEmailVerified = false;
+                applicant.stage = 'Applicant';
                 applicant.onboardingStatus = 'PENDING';
                 await applicant.save();
             } else {
@@ -122,8 +138,8 @@ const applicantController = {
                 applicant = await staffModel.create({
                     staffId,
                     fullName,
-                    mobileNumber: Number(mobileNumber),
-                    emailAddress: emailAddress.trim(),
+                    mobileNumber: phoneNum,
+                    emailAddress: cleanEmail,
                     dob: dob ? new Date(dob) : null,
                     gender,
                     currentAddress,
@@ -145,8 +161,8 @@ const applicantController = {
             }
 
             // Send out OTPs
-            await sendMobileOtp(mobileNumber, mobileOtp);
-            await sendEmailOtp(emailAddress.trim(), emailOtp);
+            await sendMobileOtp(cleanPhone, mobileOtp);
+            await sendEmailOtp(cleanEmail, emailOtp);
 
             res.status(200).send({
                 status: 200,
@@ -404,25 +420,30 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Email or Mobile Number is required", data: {} });
             }
 
-            const cleanId = identifier.trim().replace(/[^0-9a-zA-Z@.]/g, '');
-            const isEmail = cleanId.includes('@');
-            let query = { stage: 'Applicant' };
+            const cleanInput = identifier.trim();
+            const isEmail = cleanInput.includes('@');
+            let query = { stage: { $ne: 'Employee' } };
 
             if (isEmail) {
-                query.emailAddress = { $regex: new RegExp(`^${cleanId}$`, 'i') };
+                const cleanEmail = cleanInput.toLowerCase();
+                query.emailAddress = { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') };
             } else {
-                const numericId = parseInt(cleanId);
-                const last10 = parseInt(cleanId.slice(-10));
+                const cleanDigits = cleanInput.replace(/\D/g, '');
+                const last10 = cleanDigits.slice(-10);
+                const last10Num = parseInt(last10);
+                const with91Num = parseInt("91" + last10);
                 query.$or = [
-                    { mobileNumber: numericId },
+                    { mobileNumber: last10Num },
+                    { mobileNumber: with91Num },
                     { mobileNumber: last10 },
-                    { mobileNumber: parseInt("91" + last10) }
+                    { mobileNumber: "91" + last10 },
+                    { mobileNumber: "+91" + last10 }
                 ];
             }
 
             const applicant = await staffModel.findOne(query);
             if (!applicant) {
-                return res.status(400).send({ status: 400, message: "No such applicant found", data: {} });
+                return res.status(400).send({ status: 400, message: "No such applicant found with this " + (isEmail ? "email" : "mobile number"), data: {} });
             }
 
             const otp = generateOtp().toString();
@@ -458,19 +479,24 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "All fields are required", data: {} });
             }
 
-            const cleanId = identifier.trim().replace(/[^0-9a-zA-Z@.]/g, '');
-            const isEmail = cleanId.includes('@');
-            let query = { stage: 'Applicant' };
+            const cleanInput = identifier.trim();
+            const isEmail = cleanInput.includes('@');
+            let query = { stage: { $ne: 'Employee' } };
 
             if (isEmail) {
-                query.emailAddress = { $regex: new RegExp(`^${cleanId}$`, 'i') };
+                const cleanEmail = cleanInput.toLowerCase();
+                query.emailAddress = { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') };
             } else {
-                const numericId = parseInt(cleanId);
-                const last10 = parseInt(cleanId.slice(-10));
+                const cleanDigits = cleanInput.replace(/\D/g, '');
+                const last10 = cleanDigits.slice(-10);
+                const last10Num = parseInt(last10);
+                const with91Num = parseInt("91" + last10);
                 query.$or = [
-                    { mobileNumber: numericId },
+                    { mobileNumber: last10Num },
+                    { mobileNumber: with91Num },
                     { mobileNumber: last10 },
-                    { mobileNumber: parseInt("91" + last10) }
+                    { mobileNumber: "91" + last10 },
+                    { mobileNumber: "+91" + last10 }
                 ];
             }
 
@@ -479,14 +505,15 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Applicant not found", data: {} });
             }
 
+            const submittedOtp = String(otp).trim();
             if (otpType === 'email') {
-                if (applicant.emailOtp !== parseInt(otp) || applicant.emailOtpExpires < Date.now()) {
+                if (String(applicant.emailOtp).trim() !== submittedOtp || applicant.emailOtpExpires < Date.now()) {
                     return res.status(400).send({ status: 400, message: "Invalid or expired email OTP", data: {} });
                 }
                 applicant.isEmailVerified = true;
                 applicant.emailOtp = undefined;
             } else {
-                if (applicant.mobileOtp !== parseInt(otp) || applicant.mobileOtpExpires < Date.now()) {
+                if (String(applicant.mobileOtp).trim() !== submittedOtp || applicant.mobileOtpExpires < Date.now()) {
                     return res.status(400).send({ status: 400, message: "Invalid or expired mobile OTP", data: {} });
                 }
                 applicant.isMobileVerified = true;
