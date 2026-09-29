@@ -4,6 +4,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
 import 'package:spresearch_web/config/routes.config.dart';
 import 'package:spresearch_web/controllers/auth/login.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import '../../widgets/custom_text_field.widget.dart';
 import '../../widgets/login_password_field.widget.dart';
 
@@ -14,6 +15,21 @@ class Login extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Get.isRegistered<AuthController>()) {
+      final auth = Get.find<AuthController>();
+      if (auth.isAuthenticated.value && auth.user.value != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          auth.navigateToAuthorizedRoute();
+        });
+        return Scaffold(
+          backgroundColor: AppTheme.loginBackground,
+          body: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+    }
+
     if (Get.isRegistered<LoginController>()) {
       Get.delete<LoginController>();
     }

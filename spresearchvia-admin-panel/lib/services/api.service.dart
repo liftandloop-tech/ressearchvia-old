@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app.config.dart';
 import '../config/routes.config.dart';
+import 'inactivity.service.dart';
 
 class ApiService extends GetConnect {
   static final Map<String, Future<dynamic>> _inflightRequests = {};
@@ -232,6 +233,7 @@ class ApiService extends GetConnect {
   void _initializeModifiers() {
     // Add auth headers
     httpClient.addRequestModifier<dynamic>((request) async {
+      InactivityService.recordIfRegistered();
       try {
         final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('auth_token');

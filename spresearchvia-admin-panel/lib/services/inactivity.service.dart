@@ -1,11 +1,18 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../controllers/auth/auth.controller.dart';
 
 class InactivityService extends GetxService {
   static InactivityService get to => Get.find<InactivityService>();
+
+  static void recordIfRegistered({bool forcePersist = false}) {
+    if (Get.isRegistered<InactivityService>()) {
+      Get.find<InactivityService>().recordActivity(forcePersist: forcePersist);
+    }
+  }
 
   static const String _lastActivityKey = 'last_activity_timestamp';
   static const Duration inactivityTimeout = Duration(hours: 1);
@@ -15,14 +22,21 @@ class InactivityService extends GetxService {
   Timer? _inactivityCheckTimer;
   bool _isHandlingTimeout = false;
 
+  bool _keyHandler(KeyEvent event) {
+    recordActivity();
+    return false;
+  }
+
   @override
   void onInit() {
     super.onInit();
     _startTimer();
+    HardwareKeyboard.instance.addHandler(_keyHandler);
   }
 
   @override
   void onClose() {
+    HardwareKeyboard.instance.removeHandler(_keyHandler);
     _inactivityCheckTimer?.cancel();
     super.onClose();
   }
@@ -36,11 +50,11 @@ class InactivityService extends GetxService {
   }
 
   /// Call whenever user interacts with the app (click, mouse move, scroll, key press)
-  void recordActivity() {
+  void recordActivity({bool forcePersist = false}) {
     _lastActivityTime = DateTime.now();
 
-    // Throttle writing to SharedPreferences: at most once every 15 seconds
-    if (_lastActivityTime.difference(_lastPersistedTime).inSeconds >= 15) {
+    // Persist immediately if forced or at least 15 seconds have passed
+    if (forcePersist || _lastActivityTime.difference(_lastPersistedTime).inSeconds >= 15) {
       _lastPersistedTime = _lastActivityTime;
       _persistLastActivity(_lastActivityTime);
     }

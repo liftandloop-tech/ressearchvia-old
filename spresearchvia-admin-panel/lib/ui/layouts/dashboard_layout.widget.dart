@@ -15,7 +15,8 @@ class DashboardLayout extends StatelessWidget {
     final controller = Get.find<MainDashboardController>();
     final authController = Get.find<AuthController>();
 
-    return Scaffold(
+    return SelectionArea(
+      child: Scaffold(
         backgroundColor: AppTheme.gray50,
         body: Row(
           children: [
@@ -93,6 +94,7 @@ class DashboardLayout extends StatelessWidget {
             ),
           ],
         ),
-      );
+      ),
+    );
   }
 }

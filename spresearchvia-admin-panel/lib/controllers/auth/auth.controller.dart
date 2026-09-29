@@ -93,12 +93,31 @@ class AuthController extends GetxController {
             debugPrint('Failed to sync latest staff profile: $e');
           });
         }
+
+        // Auto-redirect authenticated user away from login screen if restoring session
+        final currentRoute = Get.currentRoute;
+        final isPublic = AppRoutes.isPublicRoute(currentRoute);
+        if (!isPublic && (currentRoute == AppRoutes.login || currentRoute == '/' || currentRoute.isEmpty)) {
+          debugPrint('[AuthController] Authenticated session restored on login route ($currentRoute). Navigating to initial route.');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _navigateToInitialRoute(storedUser);
+          });
+        }
       }
     } finally {
       isInitialized.value = true;
       print(
         'Auth Initialization Complete. Authenticated: ${isAuthenticated.value}, Impersonating: ${isImpersonating.value}',
       );
+    }
+  }
+
+  void navigateToAuthorizedRoute() {
+    final currentUser = user.value;
+    if (currentUser != null) {
+      _navigateToInitialRoute(currentUser);
+    } else {
+      Get.offAllNamed(AppRoutes.login);
     }
   }
 

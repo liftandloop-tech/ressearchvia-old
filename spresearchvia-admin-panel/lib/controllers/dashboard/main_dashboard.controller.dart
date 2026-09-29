@@ -48,6 +48,12 @@ class MainDashboardController extends GetxController {
       return;
     }
 
+    if (currentRoute == AppRoutes.login || currentRoute == '/') {
+      print('Authenticated user detected on login route. Redirecting to authorized route.');
+      Future.microtask(() => authController.navigateToAuthorizedRoute());
+      return;
+    }
+
     if (user.isAdmin) return;
     if (currentRoute == AppRoutes.dashboard ||
         currentRoute == AppRoutes.profile ||

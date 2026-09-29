@@ -260,15 +260,41 @@ const applicantController = {
     approveApplicant: async (req, res) => {
         try {
             const { id } = req.params;
-            const { roleId, role, deparment, mpin, joiningDate, isViewOnly, assignedDirector } = req.body;
+            const {
+                roleId,
+                role,
+                deparment,
+                mpin,
+                joiningDate,
+                isViewOnly,
+                assignedDirector,
+                assignedDirectorName,
+                supervisorId,
+                supervisorName,
+                reportingTo
+            } = req.body;
+
+            const effectiveSupervisorId = assignedDirector || supervisorId || reportingTo;
+            const effectiveSupervisorName = assignedDirectorName || supervisorName;
 
             if ((!roleId && !role && !deparment) || !mpin) {
                 return res.status(400).send({ status: 400, message: "Role and MPIN are required to approve staff", data: {} });
             }
 
+            if (!effectiveSupervisorId && !effectiveSupervisorName) {
+                return res.status(400).send({ status: 400, message: "Reporting authority (Supervisor or Direct Admin) is required to approve staff", data: {} });
+            }
+
             const applicant = await staffModel.findById(id);
             if (!applicant || applicant.stage !== 'Applicant') {
-                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+                return res.status(404).send({ status: 404, message: "Applicant not found or already promoted", data: {} });
+            }
+
+            // Ensure unique staffId exists
+            if (!applicant.staffId) {
+                const count = await staffModel.countDocuments();
+                const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+                applicant.staffId = `STF${String(count + 1).padStart(3, '0')}${randomSuffix}`;
             }
 
             const resolved = await resolveRoleAndDepartment({
@@ -289,16 +315,46 @@ const applicantController = {
             } else if (deparment) {
                 applicant.deparment = deparment;
             }
-            applicant.mpin = mpin.toString();
+            applicant.mpin = mpin.toString().trim();
             applicant.joiningDate = joiningDate ? new Date(joiningDate) : new Date();
             applicant.status = 'Active';
             applicant.isViewOnly = isViewOnly === true || isViewOnly === 'true';
-            if (assignedDirector) {
-                applicant.assignedDirector = assignedDirector;
+
+            // Resolve and assign Reporting Authority dynamically
+            const isDirectAdmin = effectiveSupervisorId === 'admin' || effectiveSupervisorName === 'Admin';
+            if (isDirectAdmin) {
+                applicant.assignedDirector = null;
+                applicant.assignedDirectorName = 'Admin';
+            } else if (effectiveSupervisorId && effectiveSupervisorId !== 'unassigned') {
+                applicant.assignedDirector = effectiveSupervisorId;
+                if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
+                    applicant.assignedDirectorName = effectiveSupervisorName.trim();
+                } else {
+                    const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName');
+                    applicant.assignedDirectorName = supervisor ? supervisor.fullName : null;
+                }
+            } else {
+                applicant.assignedDirector = null;
+                applicant.assignedDirectorName = null;
             }
 
             await applicant.save();
-            res.status(200).send({ status: 200, message: "Applicant approved and promoted to Employee", data: { staff: applicant } });
+
+            const updatedStaff = await staffModel.findById(applicant._id)
+                .populate('departmentId')
+                .populate({
+                    path: 'roleId',
+                    populate: [
+                        { path: 'permissionGroups' },
+                        { path: 'departmentId' }
+                    ]
+                });
+
+            res.status(200).send({
+                status: 200,
+                message: "Applicant approved and promoted to Employee",
+                data: { staff: updatedStaff || applicant }
+            });
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }

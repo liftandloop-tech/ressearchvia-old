@@ -16,8 +16,9 @@ class ApplicantProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(ApplicantProfileController());
 
-    return Scaffold(
-      backgroundColor: AppTheme.gray50,
+    return SelectionArea(
+      child: Scaffold(
+        backgroundColor: AppTheme.gray50,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -234,6 +235,7 @@ class ApplicantProfileScreen extends StatelessWidget {
           ),
         );
       }),
+      ),
     );
   }
 
@@ -333,6 +335,8 @@ class ApplicantProfileScreen extends StatelessWidget {
     controller.selectedRoleId.value = null;
     controller.selectedRole.value = '';
     controller.selectedDepartment.value = '';
+    controller.selectedSupervisorId.value = null;
+    controller.selectedSupervisorName.value = null;
     controller.isViewOnly.value = false;
     controller.joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -381,6 +385,31 @@ class ApplicantProfileScreen extends StatelessWidget {
                   ),
                 );
               }),
+              const SizedBox(height: 16),
+              // Reporting To (Supervisor) Selector
+              Obx(() => DropdownButtonFormField<String>(
+                    value: controller.selectedSupervisorId.value,
+                    decoration: const InputDecoration(
+                      labelText: 'Reporting To (Supervisor) *',
+                      border: OutlineInputBorder(),
+                    ),
+                    hint: const Text('Select Reporting Supervisor'),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: 'admin',
+                        child: Text('Direct to Admin'),
+                      ),
+                      ...controller.availableSupervisors.map((s) => DropdownMenuItem<String>(
+                            value: s.id,
+                            child: Text(
+                              s.department.isNotEmpty
+                                  ? '${s.name} (${s.department})'
+                                  : s.name,
+                            ),
+                          )),
+                    ],
+                    onChanged: (val) => controller.updateSupervisor(val),
+                  )),
               const SizedBox(height: 16),
               // MPIN Input
               TextField(

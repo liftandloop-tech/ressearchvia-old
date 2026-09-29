@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/applicant.service.dart';
+import '../../services/staff.service.dart';
+import '../../services/role_permission.service.dart';
 import '../../models/staff.model.dart';
 import '../../models/role.model.dart';
 import '../staff/staff.controller.dart';
@@ -9,6 +11,8 @@ import '../staff/staff_management.controller.dart';
 
 class ApplicantProfileController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
+  final StaffService _staffService = Get.put(StaffService());
+  final RolePermissionService _rolePermissionService = Get.put(RolePermissionService());
 
   var isLoading = false.obs;
   var applicantId = ''.obs;
@@ -18,12 +22,39 @@ class ApplicantProfileController extends GetxController {
   final mobileOtpController = TextEditingController();
   final emailOtpController = TextEditingController();
 
+  // Roles & Supervisors lists
+  var rolesList = <RoleModel>[].obs;
+  var supervisorsList = <StaffModel>[].obs;
+
   @override
   void onInit() {
     super.onInit();
     applicantId.value = Get.parameters['id'] ?? '';
     if (applicantId.value.isNotEmpty) {
       fetchDetails();
+    }
+    fetchRolesAndSupervisors();
+  }
+
+  Future<void> fetchRolesAndSupervisors() async {
+    try {
+      final roleRes = await _rolePermissionService.getRoles();
+      if (!roleRes.status.hasError && roleRes.body != null) {
+        final list = (roleRes.body['data'] as List? ?? [])
+            .map((item) => RoleModel.fromJson(item))
+            .toList();
+        rolesList.assignAll(list);
+      }
+
+      final staffList = await _staffService.getStaffList();
+      if (staffList.isNotEmpty) {
+        final list = staffList
+            .where((s) => s.status.toLowerCase() == 'active' && s.id != applicantId.value)
+            .toList();
+        supervisorsList.assignAll(list);
+      }
+    } catch (e) {
+      debugPrint('Error fetching roles and supervisors in applicant profile: $e');
     }
   }
 
@@ -97,13 +128,25 @@ class ApplicantProfileController extends GetxController {
   final selectedRoleId = RxnString();
   final selectedRole = ''.obs;
   final selectedDepartment = ''.obs;
+  final selectedSupervisorId = RxnString();
+  final selectedSupervisorName = RxnString();
   final mpinController = TextEditingController();
   final joiningDateController = TextEditingController();
   var isViewOnly = false.obs;
 
   List<RoleModel> get availableRoles {
+    if (rolesList.isNotEmpty) return rolesList;
     if (Get.isRegistered<StaffController>()) {
       return Get.find<StaffController>().availableRoles;
+    }
+    return [];
+  }
+
+  List<StaffModel> get availableSupervisors {
+    final list = supervisorsList.where((s) => s.id != applicantId.value).toList();
+    if (list.isNotEmpty) return list;
+    if (Get.isRegistered<StaffController>()) {
+      return Get.find<StaffController>().staffList.where((s) => s.status.toLowerCase() == 'active' && s.id != applicantId.value).toList();
     }
     return [];
   }
@@ -117,23 +160,53 @@ class ApplicantProfileController extends GetxController {
     }
   }
 
+  void updateSupervisor(String? supervisorId) {
+    if (supervisorId == null) {
+      selectedSupervisorId.value = null;
+      selectedSupervisorName.value = null;
+      return;
+    }
+    selectedSupervisorId.value = supervisorId;
+    if (supervisorId == 'admin') {
+      selectedSupervisorName.value = 'Admin';
+    } else {
+      final match = availableSupervisors.firstWhereOrNull((s) => s.id == supervisorId);
+      selectedSupervisorName.value = match?.name;
+    }
+  }
+
   Future<bool> approveApplicant() async {
     final hasRole = (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty) ||
         selectedRole.value.isNotEmpty;
-    if (!hasRole || mpinController.text.trim().isEmpty) {
-      Get.snackbar('Alert', 'Please select a role and enter an MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
+    if (!hasRole) {
+      Get.snackbar('Validation Alert', 'Please select a Role for the new staff member', backgroundColor: Colors.orange.withOpacity(0.1));
+      return false;
+    }
+
+    final hasSupervisor = selectedSupervisorId.value != null && selectedSupervisorId.value!.isNotEmpty;
+    if (!hasSupervisor) {
+      Get.snackbar('Validation Alert', 'Please select who this staff member will report to', backgroundColor: Colors.orange.withOpacity(0.1));
+      return false;
+    }
+
+    final mpin = mpinController.text.trim();
+    if (mpin.isEmpty || mpin.length != 4) {
+      Get.snackbar('Validation Alert', 'Please enter a valid 4-digit MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
       return false;
     }
 
     isLoading.value = true;
     try {
+      final isDirectAdmin = selectedSupervisorId.value == 'admin';
       final data = {
         if (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty)
           'roleId': selectedRoleId.value,
         'role': selectedRole.value,
         if (selectedDepartment.value.isNotEmpty)
           'deparment': selectedDepartment.value,
-        'mpin': mpinController.text.trim(),
+        'mpin': mpin,
+        'assignedDirector': isDirectAdmin ? 'admin' : selectedSupervisorId.value,
+        'assignedDirectorName': isDirectAdmin ? 'Admin' : selectedSupervisorName.value,
         'isViewOnly': isViewOnly.value,
         'joiningDate': joiningDateController.text.trim().isEmpty ? null : joiningDateController.text.trim(),
       };
@@ -158,3 +231,4 @@ class ApplicantProfileController extends GetxController {
     }
   }
 }
+
