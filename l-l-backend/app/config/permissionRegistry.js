@@ -7,7 +7,8 @@ export const PERMISSION_REGISTRY = {
     'leads.bulk_upload': { feature: 'Leads', action: 'bulk_upload', label: 'Bulk Upload Leads', description: 'Import leads from CSV/Excel' },
     'leads.bulk_assign': { feature: 'Leads', action: 'bulk_assign', label: 'Bulk Assign Leads', description: 'Assign multiple leads to RM' },
     'leads.pull': { feature: 'Leads', action: 'pull', label: 'Pull Fresh Leads', description: 'Pull fresh leads from lead pool' },
-    'leads.view_pools': { feature: 'Leads', action: 'view_pools', label: 'Manage Lead Pools', description: 'View and create lead distribution pools' },
+    'leads.view_pools': { feature: 'Leads', action: 'view_pools', label: 'View Lead Pools', description: 'View lead distribution pools and assigned RM counts' },
+    'leads.manage_pools': { feature: 'Leads', action: 'manage_pools', label: 'Create & Edit Lead Pools', description: 'Configure automated lead pooling, distributions, and member caps' },
 
     // Module 2: Users & Clients
     'users.view': { feature: 'Users', action: 'view', label: 'View Clients', description: 'View client list and client profiles' },
@@ -24,6 +25,7 @@ export const PERMISSION_REGISTRY = {
     'subscriptions.suspend': { feature: 'Subscriptions', action: 'suspend', label: 'Suspend Subscription', description: 'Suspend active client subscription' },
     'subscriptions.revoke': { feature: 'Subscriptions', action: 'revoke', label: 'Revoke Subscription', description: 'Revoke client active subscription' },
     'subscriptions.manage_segments': { feature: 'Subscriptions', action: 'manage_segments', label: 'Manage Segments', description: 'Customize segments for client plan' },
+    'subscriptions.manage_plans': { feature: 'Subscriptions', action: 'manage_plans', label: 'Manage Plan Catalog', description: 'Create, modify, and delete plans and pricing offerings' },
     'subscriptions.edit_correction': { feature: 'Subscriptions', action: 'edit_correction', label: 'Edit Plan / Dates / Amount', description: 'Correct subscription plan, dates, or price' },
     'subscriptions.refund': { feature: 'Subscriptions', action: 'refund', label: 'Process Refund', description: 'Calculate and issue subscription refund' },
 
@@ -31,6 +33,8 @@ export const PERMISSION_REGISTRY = {
     'payments.view_pending': { feature: 'Payments', action: 'view_pending', label: 'View Payments & Receipts', description: 'View pending bank transfers queue and payment receipts' },
     'payments.approve': { feature: 'Payments', action: 'approve', label: 'Approve Payment', description: 'Approve bank transfer payment' },
     'payments.reject': { feature: 'Payments', action: 'reject', label: 'Reject Payment', description: 'Reject pending bank transfer payment' },
+    'payments.restore': { feature: 'Payments', action: 'restore', label: 'Restore Rejected Payment', description: 'Restore previously rejected payment slip and review for activation' },
+    'payments.revert': { feature: 'Payments', action: 'revert', label: 'Revert Approved Payment', description: 'Revert an approved transaction, rollback invoices, and revoke plan' },
     'payments.export': { feature: 'Payments', action: 'export', label: 'Export Payment Records', description: 'Export payment records to Excel' },
 
     // Module 5: KYC Verification
@@ -69,7 +73,8 @@ export const PERMISSION_REGISTRY = {
     // Module 9: System Settings
     'settings.view': { feature: 'Settings', action: 'view', label: 'View System Settings', description: 'View company settings and policies' },
     'settings.update': { feature: 'Settings', action: 'update', label: 'Update System Settings', description: 'Modify and save system configurations' },
-    'settings.upload_payment_qr': { feature: 'Settings', action: 'upload_payment_qr', label: 'Upload Payment QR Code', description: 'Update official payment QR code image' }
+    'settings.upload_payment_qr': { feature: 'Settings', action: 'upload_payment_qr', label: 'Upload Payment QR Code', description: 'Update official payment QR code image' },
+    'settings.manage_roles': { feature: 'Settings', action: 'manage_roles', label: 'Manage Roles & Permissions', description: 'Create, update, and delete staff roles and permission groups' }
 };
 
 export const isValidPermissionKey = (key) => Object.prototype.hasOwnProperty.call(PERMISSION_REGISTRY, key);

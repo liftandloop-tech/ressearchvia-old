@@ -41,6 +41,7 @@ class RolePermissionController extends GetxController {
           'leads.bulk_assign',
           'leads.pull',
           'leads.view_pools',
+          'leads.manage_pools',
         ];
       case 'Users':
         return [
@@ -59,6 +60,7 @@ class RolePermissionController extends GetxController {
           'subscriptions.suspend',
           'subscriptions.revoke',
           'subscriptions.manage_segments',
+          'subscriptions.manage_plans',
           'subscriptions.edit_correction',
           'subscriptions.refund',
         ];
@@ -67,6 +69,8 @@ class RolePermissionController extends GetxController {
           'payments.view_pending',
           'payments.approve',
           'payments.reject',
+          'payments.restore',
+          'payments.revert',
           'payments.export',
         ];
       case 'KYC':
@@ -111,6 +115,7 @@ class RolePermissionController extends GetxController {
           'settings.view',
           'settings.update',
           'settings.upload_payment_qr',
+          'settings.manage_roles',
         ];
       default:
         return [];
@@ -128,6 +133,7 @@ class RolePermissionController extends GetxController {
       'leads.bulk_assign': 'Bulk Assign',
       'leads.pull': 'Pull Fresh Leads',
       'leads.view_pools': 'Lead Pools',
+      'leads.manage_pools': 'Manage Pools',
 
       // Users
       'users.view': 'View Clients',
@@ -144,6 +150,7 @@ class RolePermissionController extends GetxController {
       'subscriptions.suspend': 'Suspend Subscription',
       'subscriptions.revoke': 'Revoke Subscription',
       'subscriptions.manage_segments': 'Manage Segments',
+      'subscriptions.manage_plans': 'Manage Plan Catalog',
       'subscriptions.edit_correction': 'Edit Plan/Dates',
       'subscriptions.refund': 'Process Refund',
 
@@ -151,6 +158,8 @@ class RolePermissionController extends GetxController {
       'payments.view_pending': 'View Payments',
       'payments.approve': 'Approve Payment',
       'payments.reject': 'Reject Payment',
+      'payments.restore': 'Restore Rejected Payment',
+      'payments.revert': 'Revert Approved Payment',
       'payments.export': 'Export Excel',
 
       // KYC
@@ -190,6 +199,7 @@ class RolePermissionController extends GetxController {
       'settings.view': 'View Settings',
       'settings.update': 'Update Settings',
       'settings.upload_payment_qr': 'Upload Payment QR',
+      'settings.manage_roles': 'Manage Roles & Permissions',
     };
 
     if (labels.containsKey(action)) return labels[action]!;
@@ -209,7 +219,8 @@ class RolePermissionController extends GetxController {
       'leads.bulk_upload': 'Allows staff to import large lead batches via CSV or Excel.',
       'leads.bulk_assign': 'Allows staff to distribute and reassign leads across team members.',
       'leads.pull': 'Allows staff to pull fresh unassigned leads from the lead pool.',
-      'leads.view_pools': 'Allows staff to create and manage lead distribution pools.',
+      'leads.view_pools': 'Allows staff to view lead distribution pools and assigned RM counts.',
+      'leads.manage_pools': 'Allows staff to configure automated lead pooling, distributions, and member caps.',
 
       // Users
       'users.view': 'Allows staff to view registered clients and their profile details.',
@@ -226,6 +237,7 @@ class RolePermissionController extends GetxController {
       'subscriptions.suspend': 'Allows staff to suspend an active client subscription.',
       'subscriptions.revoke': 'Allows staff to prematurely revoke an active client subscription.',
       'subscriptions.manage_segments': 'Allows staff to allocate or customize segments for client plans.',
+      'subscriptions.manage_plans': 'Allows staff to create, modify, and delete subscription plans and pricing offerings.',
       'subscriptions.edit_correction': 'Allows staff to correct plan pricing, start/expiry dates, or details.',
       'subscriptions.refund': 'Allows staff to calculate and issue subscription refunds.',
 
@@ -233,6 +245,8 @@ class RolePermissionController extends GetxController {
       'payments.view_pending': 'Allows staff to inspect pending bank transfer receipts and records.',
       'payments.approve': 'Allows staff to verify and approve bank transfer payments.',
       'payments.reject': 'Allows staff to reject invalid or unverified bank transfer payments.',
+      'payments.restore': 'Allows staff to restore previously rejected payment slips and review for activation.',
+      'payments.revert': 'Allows staff to revert an approved transaction, rollback invoices, and revoke plan.',
       'payments.export': 'Allows staff to export payment ledgers and receipts to Excel.',
 
       // KYC
@@ -272,24 +286,22 @@ class RolePermissionController extends GetxController {
       'settings.view': 'Allows staff to view company settings and system policies.',
       'settings.update': 'Allows staff to modify and save system configurations.',
       'settings.upload_payment_qr': 'Allows staff to upload and crop official company payment QR codes.',
+      'settings.manage_roles': 'Allows staff to create, update, and delete staff roles and permission groups.',
     };
 
     if (descriptions.containsKey(action)) return descriptions[action]!;
     return 'Enables the ${formatActionLabel(action)} permission for this role.';
   }
 
-  /// Returns only the features available for the selected department.
-  /// If no department is selected, returns an empty list to prompt selection.
-  /// If the department is Global, returns all features.
+  /// Returns the features available for the selected department.
+  /// If no department is selected or if Global, returns all features.
   List<String> getFeaturesForDepartment(String? departmentId) {
-    if (departmentId == null || departmentId.isEmpty) {
-      return [];
+    if (departmentId == null || departmentId.isEmpty || departmentId == 'GLOBAL') {
+      return List<String>.from(availableFeatures);
     }
 
     final dept = departments.firstWhereOrNull((d) => d.id == departmentId);
-    if (dept == null) return [];
-
-    if (dept.isGlobal) {
+    if (dept == null || dept.isGlobal) {
       return List<String>.from(availableFeatures);
     }
 
@@ -388,11 +400,11 @@ class RolePermissionController extends GetxController {
 
       if (response.status.hasError) {
         final msg = response.body?['message'] ?? 'Error saving department';
-        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.1));
         return false;
       }
 
-      Get.snackbar('Success', 'Department saved successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.1));
+      Get.snackbar('Success', 'Department saved successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withValues(alpha: 0.1));
       await fetchDepartments();
       return true;
     } finally {
@@ -407,9 +419,9 @@ class RolePermissionController extends GetxController {
       final response = await _service.deleteDepartment(id);
       if (response.status.hasError) {
         final msg = response.body?['message'] ?? 'Error deleting department';
-        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Success', 'Department deleted successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.1));
+        Get.snackbar('Success', 'Department deleted successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withValues(alpha: 0.1));
         await fetchDepartments();
       }
     } finally {
@@ -450,11 +462,11 @@ class RolePermissionController extends GetxController {
 
       if (response.status.hasError) {
         final msg = response.body?['message'] ?? 'Error saving role';
-        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.1));
         return false;
       }
 
-      Get.snackbar('Success', 'Role saved successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.1));
+      Get.snackbar('Success', 'Role saved successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withValues(alpha: 0.1));
       await fetchRoles();
       return true;
     } finally {
@@ -469,9 +481,9 @@ class RolePermissionController extends GetxController {
       final response = await _service.deleteRole(id);
       if (response.status.hasError) {
         final msg = response.body?['message'] ?? 'Error deleting role';
-        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Success', 'Role deleted successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.1));
+        Get.snackbar('Success', 'Role deleted successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withValues(alpha: 0.1));
         await fetchRoles();
       }
     } finally {
@@ -508,11 +520,11 @@ class RolePermissionController extends GetxController {
 
       if (response.status.hasError) {
         final msg = response.body?['message'] ?? 'Error saving permission group';
-        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.1));
         return false;
       }
 
-      Get.snackbar('Success', 'Permission group saved successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.1));
+      Get.snackbar('Success', 'Permission group saved successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withValues(alpha: 0.1));
       await fetchPermissionGroups();
       return true;
     } finally {
@@ -527,9 +539,9 @@ class RolePermissionController extends GetxController {
       final response = await _service.deletePermissionGroup(id);
       if (response.status.hasError) {
         final msg = response.body?['message'] ?? 'Error deleting group';
-        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Success', 'Permission group deleted successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.1));
+        Get.snackbar('Success', 'Permission group deleted successfully', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withValues(alpha: 0.1));
         await fetchPermissionGroups();
       }
     } finally {

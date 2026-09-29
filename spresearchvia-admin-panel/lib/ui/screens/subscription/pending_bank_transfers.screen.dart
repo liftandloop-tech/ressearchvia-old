@@ -9,9 +9,9 @@ import 'package:intl/intl.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/utils/invoice_pdf_generator.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
-import '../../../models/user.model.dart';
 import 'widgets/payment_table_header_cell.widget.dart';
 import 'widgets/payment_column_filter.widget.dart';
+import 'package:spresearch_web/ui/widgets/compact_date_range_picker.widget.dart';
 
 class PendingBankTransfersScreen extends StatelessWidget {
   final int? specificTab;
@@ -265,7 +265,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                 onChanged: (val) async {
                   if (val == null) return;
                   if (val == 'Custom') {
-                    final picked = await showDateRangePicker(
+                    final picked = await showCompactDateRangePicker(
                       context: context,
                       firstDate: DateTime(2020),
                       lastDate: DateTime.now().add(const Duration(days: 365)),
@@ -299,7 +299,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
               ),
               onPressed: () async {
-                final picked = await showDateRangePicker(
+                final picked = await showCompactDateRangePicker(
                   context: context,
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now().add(const Duration(days: 365)),

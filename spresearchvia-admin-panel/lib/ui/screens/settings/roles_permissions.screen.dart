@@ -951,25 +951,33 @@ class RolesPermissionsScreen extends StatelessWidget {
                     child: Obx(() {
                       return DropdownButtonFormField<String>(
                         key: ValueKey(selectedDeptId.value),
-                        initialValue: selectedDeptId.value,
+                        initialValue: selectedDeptId.value ?? '',
                         decoration: const InputDecoration(
-                          labelText: 'Assigned Department *',
+                          labelText: 'Assigned Department',
                           border: OutlineInputBorder(),
-                          helperText: 'Restricts permissions to this department',
+                          helperText: 'Select a department or keep Global for all features',
                         ),
-                        hint: const Text('Select Department'),
-                        items: controller.departments.map((dept) {
-                          return DropdownMenuItem<String>(
-                            value: dept.id,
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: '',
                             child: Text(
-                              '${dept.name} (${dept.assignedPages.length} pages)',
-                              style: const TextStyle(fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
+                              'All Departments (Global / Cross-Department)',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryBlue),
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          ...controller.departments.map((dept) {
+                            return DropdownMenuItem<String>(
+                              value: dept.id,
+                              child: Text(
+                                '${dept.name} (${dept.assignedPages.length} pages)',
+                                style: const TextStyle(fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }),
+                        ],
                         onChanged: (val) {
-                          selectedDeptId.value = val;
+                          selectedDeptId.value = (val != null && val.isNotEmpty) ? val : null;
                         },
                       );
                     }),
@@ -997,7 +1005,7 @@ class RolesPermissionsScreen extends StatelessWidget {
                       'Configure Feature Permissions:',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
                     ),
-                    if (dept != null)
+                    if (dept != null && !dept.isGlobal)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -1015,6 +1023,25 @@ class RolesPermissionsScreen extends StatelessWidget {
                             ),
                           ],
                         ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.successGreen.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.successGreen.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.public, size: 13, color: AppTheme.successGreen),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Global Scope (${visibleFeatures.length} all features available)',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.successGreen),
+                            ),
+                          ],
+                        ),
                       ),
                   ],
                 );
@@ -1025,35 +1052,6 @@ class RolesPermissionsScreen extends StatelessWidget {
               Expanded(
                 child: Obx(() {
                   final currentDeptId = selectedDeptId.value;
-                  if (currentDeptId == null || currentDeptId.isEmpty) {
-                    return Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: AppTheme.gray50,
-                        border: Border.all(color: AppTheme.gray200),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.apartment_rounded, size: 48, color: AppTheme.gray400),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Please select a Department above',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            'Permissions will be automatically restricted to only the pages assigned to that department.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: AppTheme.gray500),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
                   final visibleFeatures = controller.getFeaturesForDepartment(currentDeptId);
                   if (visibleFeatures.isEmpty) {
                     return Container(
@@ -1221,12 +1219,7 @@ class RolesPermissionsScreen extends StatelessWidget {
                         Get.snackbar('Alert', 'Please enter a group name', backgroundColor: Colors.orange.withValues(alpha: 0.1));
                         return;
                       }
-                      if (selectedDeptId.value == null || selectedDeptId.value!.isEmpty) {
-                        Get.snackbar('Alert', 'Please select a department for this permission group', backgroundColor: Colors.orange.withValues(alpha: 0.1));
-                        return;
-                      }
-
-                      // Build permissions list for saving only from visible features
+                      // Build permissions list for saving from visible features
                       final visibleFeatures = controller.getFeaturesForDepartment(selectedDeptId.value);
                       final List<PermissionItem> saveList = [];
                       for (final feat in visibleFeatures) {
@@ -1236,11 +1229,15 @@ class RolesPermissionsScreen extends StatelessWidget {
                         }
                       }
 
+                      final deptIdToSave = (selectedDeptId.value != null && selectedDeptId.value!.isNotEmpty)
+                          ? selectedDeptId.value
+                          : null;
+
                       final success = await controller.savePermissionGroup(
                         id: group?.id,
                         name: nameCtrl.text.trim(),
                         description: descCtrl.text.trim(),
-                        departmentId: selectedDeptId.value,
+                        departmentId: deptIdToSave,
                         permissions: saveList,
                       );
                       if (success && context.mounted) Navigator.pop(context);

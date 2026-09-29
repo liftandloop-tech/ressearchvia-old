@@ -96,7 +96,7 @@ class FilterDropdownField extends StatelessWidget {
                       effectiveValue != 'All Departments' &&
                       effectiveValue != 'All' &&
                       effectiveValue != 'All Time'
-                  ? AppTheme.primaryBlue.withOpacity(0.5)
+                  ? AppTheme.primaryBlue.withValues(alpha: 0.5)
                   : AppTheme.gray300,
             ),
             borderRadius: BorderRadius.circular(8),
