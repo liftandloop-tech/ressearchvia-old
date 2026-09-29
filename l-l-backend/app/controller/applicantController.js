@@ -6,6 +6,39 @@ import roleModel from "../models/roleModel.js";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 
+/**
+ * Normalizes a phone number to 91XXXXXXXXXX (12 digits, prefixed with 91).
+ * Validates that the input is either 10 digits or 12 digits containing 91.
+ * Returns { valid: boolean, normalized12: string, numeric12: number, last10: string }
+ */
+const normalizeIndianMobile = (phone) => {
+    if (!phone) return { valid: false, normalized12: '', numeric12: 0, last10: '' };
+    const digits = phone.toString().replace(/\D/g, '');
+
+    let last10 = '';
+    let normalized12 = '';
+
+    if (digits.length === 10) {
+        last10 = digits;
+        normalized12 = `91${digits}`;
+    } else if (digits.length === 12 && digits.startsWith('91')) {
+        last10 = digits.slice(-10);
+        normalized12 = digits;
+    } else if (digits.length > 10 && digits.slice(-12).startsWith('91')) {
+        last10 = digits.slice(-10);
+        normalized12 = digits.slice(-12);
+    } else if (digits.length > 10) {
+        last10 = digits.slice(-10);
+        normalized12 = `91${last10}`;
+    } else {
+        return { valid: false, normalized12: '', numeric12: 0, last10: '' };
+    }
+
+    const numeric12 = parseInt(normalized12);
+    const valid = normalized12.length === 12 && normalized12.startsWith('91') && !isNaN(numeric12);
+    return { valid, normalized12, numeric12, last10 };
+};
+
 const sendMobileOtp = async (phone, otp) => {
     try {
         const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
@@ -14,22 +47,20 @@ const sendMobileOtp = async (phone, otp) => {
         const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
         const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
 
-        const cleanPhone = phone ? phone.toString().replace(/\D/g, '').slice(-10) : '';
-
-        if (!url || !username || !apikey || !cleanPhone) {
-            console.log(`[SMS MOCK] To: ${cleanPhone || phone}, OTP: ${otp}`);
-            return true;
+        const { valid, normalized12 } = normalizeIndianMobile(phone);
+        if (!valid) {
+            console.error(`[SMS Gateway] Invalid phone number provided for OTP (must be 10 or 12 digits containing 91): ${phone}`);
+            return false;
         }
 
         const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
         const messageText = defaultTemplate.replaceAll('{OTP}', otp);
         const message = encodeURIComponent(messageText);
-        const mobileTarget = `91${cleanPhone}`;
-        const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${mobileTarget}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
+        const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${normalized12}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
 
-        console.log(`[SMS Gateway] Sending mobile OTP to ${mobileTarget}`);
+        console.log(`[SMS Gateway] Sending mobile OTP to ${normalized12}`);
         const response = await axios.get(smsUrl, { timeout: 10000 });
-        console.log(`[SMS Gateway] Response for ${mobileTarget}:`, response.data);
+        console.log(`[SMS Gateway] Response for ${normalized12}:`, response.data);
         return response.status === 200;
     } catch (e) {
         console.error('Error sending mobile SMS:', e.message);
@@ -72,8 +103,17 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Full Name, Mobile, and Email are required", data: {} });
             }
 
-            const cleanPhone = mobileNumber ? mobileNumber.toString().replace(/\D/g, '').slice(-10) : '';
-            const phoneNum = parseInt(cleanPhone) || Number(mobileNumber);
+            const phoneInfo = normalizeIndianMobile(mobileNumber);
+            if (!phoneInfo.valid) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "Please enter a valid 10-digit mobile number or 12-digit number with 91 prefix",
+                    data: {}
+                });
+            }
+
+            const normalizedPhone = phoneInfo.numeric12; // 91XXXXXXXXXX as Number
+            const last10 = phoneInfo.last10;
             const cleanEmail = emailAddress ? emailAddress.trim().toLowerCase() : '';
 
             let roleDoc = null;
@@ -85,8 +125,11 @@ const applicantController = {
 
             let applicant = await staffModel.findOne({
                 $or: [
-                    { mobileNumber: phoneNum },
-                    { mobileNumber: cleanPhone },
+                    { mobileNumber: normalizedPhone },
+                    { mobileNumber: phoneInfo.normalized12 },
+                    { mobileNumber: parseInt(last10) },
+                    { mobileNumber: last10 },
+                    { mobileNumber: `+91${last10}` },
                     { emailAddress: { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
                 ]
             });
@@ -101,7 +144,7 @@ const applicantController = {
                 }
                 // Update existing applicant details & reset verification
                 applicant.fullName = fullName;
-                applicant.mobileNumber = phoneNum;
+                applicant.mobileNumber = normalizedPhone;
                 applicant.emailAddress = cleanEmail;
                 applicant.dob = dob ? new Date(dob) : null;
                 applicant.gender = gender;
@@ -138,7 +181,7 @@ const applicantController = {
                 applicant = await staffModel.create({
                     staffId,
                     fullName,
-                    mobileNumber: phoneNum,
+                    mobileNumber: normalizedPhone,
                     emailAddress: cleanEmail,
                     dob: dob ? new Date(dob) : null,
                     gender,
@@ -161,7 +204,7 @@ const applicantController = {
             }
 
             // Send out OTPs
-            await sendMobileOtp(cleanPhone, mobileOtp);
+            await sendMobileOtp(phoneInfo.normalized12, mobileOtp);
             await sendEmailOtp(cleanEmail, emailOtp);
 
             res.status(200).send({

@@ -1257,19 +1257,19 @@ class LeadManagementScreen extends StatelessWidget {
       final allStaff = controller.staffList;
 
       filteredDirectors.value = allStaff
-          .where((s) => s.role.toLowerCase() == 'director' && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
+          .where((s) => (s.role.toLowerCase().contains('director') || s.department.toLowerCase().contains('director')) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
           .toList();
 
       filteredManagers.value = allStaff
-          .where((s) => s.role.toLowerCase() == 'manager' && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
+          .where((s) => !s.role.toLowerCase().contains('director') && (s.role.toLowerCase().contains('manager') || s.role.toLowerCase().contains('lead') || s.department.toLowerCase().contains('manager')) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
           .toList();
 
       filteredStaff.value = allStaff
-          .where((s) => (s.role.toLowerCase() == 'staff' || s.role.toLowerCase() == 'rm' || s.role.toLowerCase() == 'relationship manager') && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
+          .where((s) => !s.role.toLowerCase().contains('director') && !s.role.toLowerCase().contains('manager') && !s.role.toLowerCase().contains('lead') && (s.role.toLowerCase().contains('staff') || s.role.toLowerCase().contains('rm') || s.role.toLowerCase().contains('relationship') || s.role.toLowerCase().contains('executive') || s.role.toLowerCase().contains('caller')) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
           .toList();
 
       filteredOthers.value = allStaff
-          .where((s) => s.role.toLowerCase() != 'director' && s.role.toLowerCase() != 'manager' && s.role.toLowerCase() != 'staff' && s.role.toLowerCase() != 'rm' && s.role.toLowerCase() != 'relationship manager' && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
+          .where((s) => !filteredDirectors.contains(s) && !filteredManagers.contains(s) && !filteredStaff.contains(s) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))
           .toList();
     }
 

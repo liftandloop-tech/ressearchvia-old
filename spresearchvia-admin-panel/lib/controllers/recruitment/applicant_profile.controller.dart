@@ -135,20 +135,29 @@ class ApplicantProfileController extends GetxController {
   var isViewOnly = false.obs;
 
   List<RoleModel> get availableRoles {
-    if (rolesList.isNotEmpty) return rolesList;
-    if (Get.isRegistered<StaffController>()) {
-      return Get.find<StaffController>().availableRoles;
-    }
-    return [];
+    final rawList = rolesList.isNotEmpty
+        ? rolesList
+        : (Get.isRegistered<StaffController>()
+            ? Get.find<StaffController>().availableRoles
+            : <RoleModel>[]);
+    final seen = <String>{};
+    return rawList.where((r) => r.id.isNotEmpty && seen.add(r.id)).toList();
   }
 
   List<StaffModel> get availableSupervisors {
-    final list = supervisorsList.where((s) => s.id != applicantId.value).toList();
-    if (list.isNotEmpty) return list;
-    if (Get.isRegistered<StaffController>()) {
-      return Get.find<StaffController>().staffList.where((s) => s.status.toLowerCase() == 'active' && s.id != applicantId.value).toList();
-    }
-    return [];
+    final rawList = supervisorsList.isNotEmpty
+        ? supervisorsList
+        : (Get.isRegistered<StaffController>()
+            ? Get.find<StaffController>().staffList
+            : <StaffModel>[]);
+    final seen = <String>{};
+    return rawList
+        .where((s) =>
+            s.status.toLowerCase() == 'active' &&
+            s.id != applicantId.value &&
+            s.id.isNotEmpty &&
+            seen.add(s.id))
+        .toList();
   }
 
   void updateRole(String roleId) {

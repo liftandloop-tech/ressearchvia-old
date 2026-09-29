@@ -104,6 +104,16 @@ class DashboardNavBar extends StatelessWidget {
                 if (user?.canAccessDepartmentPage('Attendance') != true) return null;
                 return (user?.has('attendance.view') ?? user?.hasPermission('Attendance', 'read') ?? false) ? item : null;
               }
+              if (title == 'Job Applicants') {
+                if (user?.canAccessDepartmentPage('Staff') != true) return null;
+                return (user?.has('staff.view_applicants') ?? user?.has('staff.view') ?? false) ? item : null;
+              }
+              if (title == 'Automated Trading') {
+                final canAccessReports = user?.canAccessDepartmentPage('Reports') ?? false;
+                final canAccessDashboard = user?.canAccessDepartmentPage('Dashboard') ?? false;
+                if (!canAccessReports && !canAccessDashboard) return null;
+                return (user?.has('reports.view') ?? user?.has('reports.create') ?? user?.has('reports.trading_call_popup') ?? false) ? item : null;
+              }
 
               return null;
             })

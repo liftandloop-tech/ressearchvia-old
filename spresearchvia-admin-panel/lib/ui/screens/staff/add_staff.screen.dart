@@ -450,37 +450,11 @@ class AddStaffScreen extends StatelessWidget {
                   ],
                 ),
                 right: Obx(() {
-                  final role = controller.selectedRole.value.toLowerCase().trim().isNotEmpty
-                      ? controller.selectedRole.value.toLowerCase().trim()
-                      : controller.selectedDepartment.value.toLowerCase().trim();
-                  if (role == 'director') {
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.shield_outlined, size: 16, color: Color(0xFF10B981)),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Directors operate with top-level executive authority (no supervisor required).',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF475569)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
                   if (!controller.isAdminLoggedIn) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildFieldLabel('Assigned Supervisor / Director'),
+                        _buildFieldLabel('Reporting Authority (Supervisor)'),
                         const SizedBox(height: 6),
                         Container(
                           width: double.infinity,
@@ -493,7 +467,7 @@ class AddStaffScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            controller.currentDirectorName.isNotEmpty ? controller.currentDirectorName : 'Assigned to Director',
+                            controller.currentDirectorName.isNotEmpty ? controller.currentDirectorName : 'Assigned to Supervisor',
                             style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
                           ),
                         ),
@@ -515,7 +489,7 @@ class AddStaffScreen extends StatelessWidget {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildFieldLabel('Assigned Supervisor / Director'),
+                      _buildFieldLabel('Reporting Authority (Supervisor)'),
                       const SizedBox(height: 6),
                       Container(
                         height: 42,
@@ -529,12 +503,12 @@ class AddStaffScreen extends StatelessWidget {
                           child: DropdownButton<String?>(
                             value: safeDirector?.id,
                             isExpanded: true,
-                            hint: const Text('Unassigned / Direct', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                            hint: const Text('Direct to Admin', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
                             icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF64748B)),
                             items: [
                               const DropdownMenuItem<String?>(
                                 value: null,
-                                child: Text('Unassigned / Direct', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                                child: Text('Direct to Admin', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                               ),
                               ...validDirectors.map((d) => DropdownMenuItem<String?>(
                                     value: d.id,

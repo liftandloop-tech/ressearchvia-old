@@ -358,19 +358,13 @@ class StaffController extends GetxController {
   }
 
   String _normalizeDepartment(String department) {
-    // Normalize department to match our standard format
-    final normalized = department.toLowerCase().trim();
-    if (normalized == 'researcher') return 'Researcher';
-    if (normalized == 'director') return 'Director';
-    if (normalized == 'manager') return 'Manager';
-    if (normalized == 'executive') return 'Executive';
-    // Map old 'other staff' / 'other' to 'Manager' for backward compatibility
-    if (normalized == 'other staff' || normalized == 'other') {
-      return 'Manager';
-    }
-    // Fallback: default to 'Researcher' to keep the dropdown value valid.
-    // Any unknown DB value would otherwise crash the DropdownButton assertion.
-    return 'Researcher';
+    final trimmed = department.trim();
+    if (trimmed.isEmpty) return '';
+    final match = departmentsList.firstWhereOrNull(
+      (d) => d.name.toLowerCase().trim() == trimmed.toLowerCase(),
+    );
+    if (match != null) return match.name;
+    return trimmed;
   }
 
   void populateForEdit(StaffModel staff) {

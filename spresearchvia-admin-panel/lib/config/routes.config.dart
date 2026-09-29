@@ -54,10 +54,13 @@ class AppRoutes {
         path == resetPassword ||
         path == apply ||
         path.startsWith('/apply/') ||
+        path.startsWith('/apply') ||
         path == continueApplication ||
         path.startsWith('/continue-application') ||
-        path.startsWith('/verify/') ||
-        path == '/verify') {
+        path == '/continue' ||
+        path.startsWith('/continue/') ||
+        path == '/verify' ||
+        path.startsWith('/verify/')) {
       return true;
     }
     return false;
