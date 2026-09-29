@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app.config.dart';
+import '../config/routes.config.dart';
 
 class ApiService extends GetConnect {
   static final Map<String, Future<dynamic>> _inflightRequests = {};
@@ -299,8 +300,8 @@ class ApiService extends GetConnect {
             await prefs.remove('user_data');
             clearCache();
 
-            // Redirect to login if not already there to prevent loops if login API itself returns 400
-            if (Get.currentRoute != '/') {
+            // Redirect to login if not already there and not on a public page
+            if (Get.currentRoute != '/' && !AppRoutes.isPublicRoute(Get.currentRoute)) {
               Get.offAllNamed('/');
             }
           } catch (e) {

@@ -101,7 +101,7 @@ class ResearchReportDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ...report.updates.map((update) => ReportUpdateCard(update: update)),
+                    ...report.updates.reversed.map((update) => ReportUpdateCard(update: update)),
                   ],
                 ),
               ),

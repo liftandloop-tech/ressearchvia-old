@@ -24,9 +24,15 @@ class MainDashboardController extends GetxController {
   }
 
   void _checkRedirect() {
+    final currentRoute = Get.currentRoute;
+
+    // Public routes (/apply, /continue-application, /verify, etc.) are always allowed
+    if (AppRoutes.isPublicRoute(currentRoute)) {
+      return;
+    }
+
     final authController = Get.find<AuthController>();
     final user = authController.user.value;
-    final currentRoute = Get.currentRoute;
 
     if (!authController.isInitialized.value || user == null) return;
 
@@ -35,7 +41,7 @@ class MainDashboardController extends GetxController {
     );
 
     if (!authController.isAuthenticated.value) {
-      if (currentRoute != AppRoutes.login) {
+      if (currentRoute != AppRoutes.login && !AppRoutes.isPublicRoute(currentRoute)) {
         print('Not authenticated. Redirecting to login.');
         Future.microtask(() => Get.offAllNamed(AppRoutes.login));
       }

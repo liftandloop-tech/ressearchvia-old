@@ -60,86 +60,104 @@ class ReportUpdateCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       margin: margin ?? EdgeInsets.only(bottom: compact ? 8 : 12),
-      padding: EdgeInsets.all(compact ? 10 : 14),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(compact ? 8 : 12),
         border: Border.all(color: borderColor, width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
+            color: badgeColor.withValues(alpha: 0.06),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 6 : 8,
-                  vertical: compact ? 2 : 3,
-                ),
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left color accent bar
+            Container(
+              width: compact ? 4 : 5,
+              color: badgeColor,
+            ),
+            // Card Content
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(compact ? 10 : 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(icon, size: compact ? 11 : 13, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: compact ? 10 : 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: compact ? 7 : 9,
+                            vertical: compact ? 2.5 : 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icon, size: compact ? 11 : 13, color: Colors.white),
+                              const SizedBox(width: 4),
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: compact ? 10 : 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: compact ? 11 : 13,
+                              color: const Color(0xFF6B7280),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              formattedTime,
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: compact ? 10 : 11,
+                                color: const Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
+                    if (update.text.isNotEmpty) ...[
+                      SizedBox(height: compact ? 6 : 8),
+                      Text(
+                        update.text,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: compact ? 12 : 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1F2937),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    size: compact ? 11 : 13,
-                    color: const Color(0xFF6B7280),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    formattedTime,
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: compact ? 10 : 11,
-                      color: const Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          if (update.text.isNotEmpty) ...[
-            SizedBox(height: compact ? 6 : 8),
-            Text(
-              update.text,
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: compact ? 12 : 13.5,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF1F2937),
-                height: 1.4,
-              ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }

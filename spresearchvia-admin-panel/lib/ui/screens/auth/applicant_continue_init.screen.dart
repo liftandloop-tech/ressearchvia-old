@@ -94,6 +94,28 @@ class ApplicantContinueInitScreen extends StatelessWidget {
                         }
                       },
                     ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'New applicant? ',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      ),
+                      InkWell(
+                        onTap: () => Get.toNamed('/apply'),
+                        child: const Text(
+                          'Submit Walk-In Application',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2563EB),
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               );
             }),

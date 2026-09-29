@@ -15,6 +15,24 @@ import devices from "../models/deviceModel.js";
 import PaymentIntent from "../models/paymentIntentModel.js";
 import { logCallAssignment } from "./activityLogService.js";
 
+const detectUpdateStatus = (text, explicitStatus) => {
+    if (explicitStatus && explicitStatus !== 'null' && explicitStatus !== 'undefined' && explicitStatus.trim() !== '') {
+        return explicitStatus.trim();
+    }
+    if (!text) return 'general';
+    const t = text.toLowerCase();
+    if (t.includes('sl triggered') || t.includes('sl hit') || t.includes('stoploss') || t.includes('stop loss') || t.includes('exit sl') || t.includes('kindly exit') || t.includes('exit in') || t.includes('sl tirgger') || t.includes('sl ttigger') || t.includes('stoploss triggered')) {
+        return 'stoploss_hit';
+    }
+    if (t.includes('partial profit') || t.includes('part profit') || t.includes('partial') || t.includes('book partial') || t.includes('parital profit')) {
+        return 'partial_profit';
+    }
+    if (t.includes('target achieved') || t.includes('target hit') || t.includes('tgt achieved') || t.includes('tgt hit') || t.includes('target') || t.includes('tgt') || t.includes('trgt') || t.includes('full profit') || t.includes('book full profit') || t.includes('porfit') || t.includes('book profit')) {
+        return 'target_achieved';
+    }
+    return 'general';
+};
+
 const sendReportNotification = async (report, isUpdate = false) => {
     try {
         if (report.publishedStatus !== 'published') return;
@@ -110,9 +128,10 @@ const sendReportNotification = async (report, isUpdate = false) => {
 
             let updatePrefix = '';
             if (latestUpdate) {
-                if (latestUpdate.status === 'target_achieved') updatePrefix = '🎯 Target Achieved: ';
-                else if (latestUpdate.status === 'stoploss_hit') updatePrefix = '🛑 Stoploss Hit: ';
-                else if (latestUpdate.status === 'partial_profit') updatePrefix = '💰 Partial Profit: ';
+                const normStatus = detectUpdateStatus(latestUpdate.text, latestUpdate.status);
+                if (normStatus === 'target_achieved') updatePrefix = '🎯 Target Achieved: ';
+                else if (normStatus === 'stoploss_hit') updatePrefix = '🛑 Stoploss Hit: ';
+                else if (normStatus === 'partial_profit') updatePrefix = '💰 Partial Profit: ';
             }
 
             title = isUpdate ? `🚨 Updated ${type} Call` : `🚨 New ${type} Call`;
@@ -204,7 +223,7 @@ const reportService = {
             console.log("DEBUG: Created report with youtubeUrl:", report.youtubeUrl);
             console.log("DEBUG: All body keys received:", Object.keys(body));
             if (body.newUpdate && body.newUpdate.trim() !== '') {
-                const updateStatus = body.newUpdateStatus || body.updateStatus || null;
+                const updateStatus = detectUpdateStatus(body.newUpdate, body.newUpdateStatus || body.updateStatus);
                 report.updates = [{
                     text: body.newUpdate.trim(),
                     status: updateStatus,
@@ -764,7 +783,7 @@ const reportService = {
             if (body.newUpdate && body.newUpdate.trim() !== '') {
                 console.log("DEBUG: Pushing new update to report");
                 if (!report.updates) report.updates = [];
-                const updateStatus = body.newUpdateStatus || body.updateStatus || null;
+                const updateStatus = detectUpdateStatus(body.newUpdate, body.newUpdateStatus || body.updateStatus);
                 report.updates.push({
                     text: body.newUpdate.trim(),
                     status: updateStatus,
@@ -891,7 +910,7 @@ const reportService = {
                 const existingReport = await reportModel.findOne({ automatedSignalId: rawSignalId });
                 if (existingReport) {
                     const text = updateText || `Trade Applied: ${side} ${symbol} call has been executed.`;
-                    const updateStatus = body.newUpdateStatus || body.updateStatus || body.status || null;
+                    const updateStatus = detectUpdateStatus(text, body.newUpdateStatus || body.updateStatus || body.status);
                     existingReport.updates.push({ text, status: updateStatus, timestamp: new Date() });
                     existingReport.markModified('updates');
                     await existingReport.save();

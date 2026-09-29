@@ -216,7 +216,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              ...widget.report.updates.map((update) => ReportUpdateCard(update: update)),
+              ...widget.report.updates.reversed.map((update) => ReportUpdateCard(update: update)),
               const SizedBox(height: 24),
             ],
             

@@ -138,7 +138,41 @@ class Login extends StatelessWidget {
                       : _buildStaffLogin(controller),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    InkWell(
+                      onTap: () => Get.toNamed('/apply'),
+                      child: Text(
+                        'Apply for Staff Roles',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primaryBlue,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('•', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ),
+                    InkWell(
+                      onTap: () => Get.toNamed('/continue-application'),
+                      child: Text(
+                        'Continue Application',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Text(
                   AppStrings.copyrightText,
                   style: TextStyle(

@@ -26,4 +26,40 @@ class AppRoutes {
   static const String leads = '/leads';
   static const String attendance = '/attendance';
   static const String profile = '/profile';
+  static const String apply = '/apply';
+  static const String applyContinue = '/apply/continue';
+  static const String applyContinueWithId = '/apply/continue/:id';
+  static const String continueApplication = '/continue-application';
+  static const String continueApplicationWithId = '/continue-application/:id';
+  static const String verifyStaffWithId = '/verify/staff/:id';
+  static const String verifyWithId = '/verify/:id';
+
+  /// Returns true if the given [route] is a public page that does not require authentication.
+  static bool isPublicRoute(String? route) {
+    if (route == null || route.isEmpty) return false;
+    // Strip query parameters and hashes for comparison
+    var path = route;
+    if (path.contains('#')) {
+      path = path.split('#').last;
+    }
+    if (path.contains('?')) {
+      path = path.split('?').first;
+    }
+    if (!path.startsWith('/')) {
+      path = '/$path';
+    }
+
+    if (path == login ||
+        path == forgotPassword ||
+        path == resetPassword ||
+        path == apply ||
+        path.startsWith('/apply/') ||
+        path == continueApplication ||
+        path.startsWith('/continue-application') ||
+        path.startsWith('/verify/') ||
+        path == '/verify') {
+      return true;
+    }
+    return false;
+  }
 }

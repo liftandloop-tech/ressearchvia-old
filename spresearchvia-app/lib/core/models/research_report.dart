@@ -81,9 +81,16 @@ class ResearchReport {
           ? DateTime.tryParse(json['accessMetadata']['reportPublishedDate'])
           : null,
       youtubeUrl: json['youtubeUrl']?.toString(),
-      updates: (json['updates'] as List<dynamic>?)
-          ?.map((e) => ReportUpdate.fromJson(e as Map<String, dynamic>))
-          .toList() ?? [],
+      updates: (json['updates'] is List)
+          ? (json['updates'] as List)
+              .where((e) => e != null && e is Map)
+              .map((e) => ReportUpdate.fromJson(
+                    e is Map<String, dynamic>
+                        ? e
+                        : Map<String, dynamic>.from(e as Map),
+                  ))
+              .toList()
+          : [],
     );
   }
 
@@ -119,38 +126,94 @@ class ReportUpdate {
   /// Normalizes status to 'stoploss_hit', 'target_achieved', 'partial_profit', or 'general'
   String get normalizedStatus {
     final s = (status ?? '').toLowerCase().trim();
-    if (s == 'stoploss_hit' || s == 'stoploss' || s == 'sl_hit' || s == 'stop loss hit') {
+    if (s == 'stoploss_hit' ||
+        s == 'stoploss' ||
+        s == 'stop_loss' ||
+        s == 'sl_hit' ||
+        s == 'stop loss hit' ||
+        s == 'stoploss hit' ||
+        s == 'sl' ||
+        s == 'sl triggered' ||
+        s == 'sl trigger') {
       return 'stoploss_hit';
     }
-    if (s == 'target_achieved' || s == 'target' || s == 'target_hit') {
+    if (s == 'target_achieved' ||
+        s == 'target' ||
+        s == 'target_hit' ||
+        s == 'target achieved' ||
+        s == 'tgt_achieved' ||
+        s == 'tgt achieved' ||
+        s == 'tgt hit' ||
+        s == 'tgt' ||
+        s == 'full_profit' ||
+        s == 'full profit') {
       return 'target_achieved';
     }
-    if (s == 'partial_profit' || s == 'partial' || s == 'profit') {
+    if (s == 'partial_profit' ||
+        s == 'partial' ||
+        s == 'profit' ||
+        s == 'partial profit' ||
+        s == 'part_profit' ||
+        s == 'part profit') {
       return 'partial_profit';
     }
 
     // Keyword detection fallback from text
     final t = text.toLowerCase();
-    if (t.contains('stoploss') || t.contains('stop loss') || t.contains('sl hit')) {
+    if (t.contains('sl triggered') ||
+        t.contains('sl trigger') ||
+        t.contains('sl hit') ||
+        t.contains('stoploss') ||
+        t.contains('stop loss') ||
+        t.contains('exit sl') ||
+        t.contains('exit, sl') ||
+        t.contains('kindly exit') ||
+        t.contains('exit in') ||
+        t.contains('hit sl') ||
+        t.contains('sl tirgger') ||
+        t.contains('sl ttigger') ||
+        t.contains('stoploss triggered')) {
       return 'stoploss_hit';
     }
-    if (t.contains('target achieved') || t.contains('target hit') || t.contains('target')) {
-      return 'target_achieved';
-    }
-    if (t.contains('partial profit') || t.contains('partial')) {
+    if (t.contains('partial profit') ||
+        t.contains('part profit') ||
+        t.contains('partial') ||
+        t.contains('book partial') ||
+        t.contains('parital profit')) {
       return 'partial_profit';
+    }
+    if (t.contains('target achieved') ||
+        t.contains('target hit') ||
+        t.contains('tgt achieved') ||
+        t.contains('tgt hit') ||
+        t.contains('target') ||
+        t.contains('tgt') ||
+        t.contains('trgt') ||
+        t.contains('full profit') ||
+        t.contains('book full profit') ||
+        t.contains('porfit') ||
+        t.contains('book profit') ||
+        t.contains('all targets') ||
+        t.contains('target met')) {
+      return 'target_achieved';
     }
 
     return 'general';
   }
 
   factory ReportUpdate.fromJson(Map<String, dynamic> json) {
+    DateTime parsedTime = DateTime.now();
+    if (json['timestamp'] != null) {
+      if (json['timestamp'] is String) {
+        parsedTime = DateTime.tryParse(json['timestamp'])?.toLocal() ?? DateTime.now();
+      } else if (json['timestamp'] is Map && json['timestamp']['\$date'] != null) {
+        parsedTime = DateTime.tryParse(json['timestamp']['\$date'].toString())?.toLocal() ?? DateTime.now();
+      }
+    }
     return ReportUpdate(
       text: json['text']?.toString() ?? '',
       status: json['status']?.toString(),
-      timestamp: json['timestamp'] != null
-          ? DateTime.tryParse(json['timestamp'])?.toLocal() ?? DateTime.now()
-          : DateTime.now(),
+      timestamp: parsedTime,
     );
   }
 

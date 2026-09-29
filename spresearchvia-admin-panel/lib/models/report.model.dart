@@ -121,20 +121,43 @@ class ReportModel {
         if (update is Map) {
           String rawTs = extractTs(update['timestamp']);
           String status = update['status']?.toString() ?? '';
-          if (status.isEmpty) {
+          if (status.isEmpty || status == 'null' || status == 'general') {
             final textLower = (update['text']?.toString() ?? '').toLowerCase();
-            if (textLower.contains('stoploss') ||
+            if (textLower.contains('sl triggered') ||
+                textLower.contains('sl trigger') ||
+                textLower.contains('sl hit') ||
+                textLower.contains('stoploss') ||
                 textLower.contains('stop loss') ||
-                textLower.contains('sl hit')) {
+                textLower.contains('exit sl') ||
+                textLower.contains('exit, sl') ||
+                textLower.contains('kindly exit') ||
+                textLower.contains('exit in') ||
+                textLower.contains('hit sl') ||
+                textLower.contains('sl tirgger') ||
+                textLower.contains('sl ttigger') ||
+                textLower.contains('stoploss triggered')) {
               status = 'stoploss_hit';
+            } else if (textLower.contains('partial profit') ||
+                textLower.contains('part profit') ||
+                textLower.contains('partial') ||
+                textLower.contains('book partial') ||
+                textLower.contains('parital profit')) {
+              status = 'partial_profit';
             } else if (textLower.contains('target achieved') ||
                 textLower.contains('target hit') ||
-                textLower.contains('target')) {
+                textLower.contains('tgt achieved') ||
+                textLower.contains('tgt hit') ||
+                textLower.contains('target') ||
+                textLower.contains('tgt') ||
+                textLower.contains('trgt') ||
+                textLower.contains('full profit') ||
+                textLower.contains('book full profit') ||
+                textLower.contains('porfit') ||
+                textLower.contains('book profit') ||
+                textLower.contains('all targets') ||
+                textLower.contains('target met')) {
               status = 'target_achieved';
-            } else if (textLower.contains('partial profit') ||
-                textLower.contains('partial')) {
-              status = 'partial_profit';
-            } else {
+            } else if (status.isEmpty || status == 'null') {
               status = 'general';
             }
           }

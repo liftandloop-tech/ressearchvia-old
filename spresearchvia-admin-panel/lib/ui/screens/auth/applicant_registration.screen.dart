@@ -70,6 +70,38 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
           textAlign: TextAlign.center,
         ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.info_outline, size: 16, color: Color(0xFF16A34A)),
+              const SizedBox(width: 8),
+              const Text(
+                'Already submitted initial application? ',
+                style: TextStyle(fontSize: 13, color: Color(0xFF166534)),
+              ),
+              InkWell(
+                onTap: () => Get.toNamed('/continue-application'),
+                child: const Text(
+                  'Click here to Continue Application',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF15803D),
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         const Divider(height: 36, color: Color(0xFFF1F5F9)),
 
         // 1. Applied Position & Personal Details

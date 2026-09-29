@@ -143,8 +143,32 @@ final appPages = [
     page: () => const AttendanceMonitoringScreen(),
   ),
   GetPage(
-    name: '/apply',
+    name: AppRoutes.apply,
     page: () => const ApplicantRegistrationScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.applyContinue,
+    page: () => const ApplicantContinueInitScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.applyContinueWithId,
+    page: () => const ApplicantOnboardScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.continueApplication,
+    page: () => const ApplicantContinueInitScreen(),
+  ),
+  GetPage(
+    name: AppRoutes.continueApplicationWithId,
+    page: () => const ApplicantOnboardScreen(),
+  ),
+  GetPage(
+    name: '/continue',
+    page: () => const ApplicantContinueInitScreen(),
+  ),
+  GetPage(
+    name: '/continue/:id',
+    page: () => const ApplicantOnboardScreen(),
   ),
   GetPage(
     name: '/applicants',
@@ -159,23 +183,19 @@ final appPages = [
     page: () => DashboardLayout(child: const ApplicantProfileScreen()),
   ),
   GetPage(
-    name: '/apply/continue/:id',
-    page: () => const ApplicantOnboardScreen(),
-  ),
-  GetPage(
-    name: '/apply/continue',
-    page: () => const ApplicantContinueInitScreen(),
-  ),
-  GetPage(
     name: AppRoutes.profile,
     page: () => const StaffProfileScreen(),
   ),
   GetPage(
-    name: '/verify/staff/:id',
+    name: AppRoutes.verifyStaffWithId,
     page: () => const PublicStaffVerificationScreen(),
   ),
   GetPage(
-    name: '/verify/:id',
+    name: AppRoutes.verifyWithId,
+    page: () => const PublicStaffVerificationScreen(),
+  ),
+  GetPage(
+    name: '/verify',
     page: () => const PublicStaffVerificationScreen(),
   ),
 ];

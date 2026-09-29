@@ -917,7 +917,7 @@ class UploadReportScreen extends StatelessWidget {
                         ),
 
                         Obx(() {
-                          final isTradingCall = controller.selectedReportType.value == 'Trading calls';
+                          final isTradingCall = controller.selectedReportType.value.toLowerCase().contains('trading');
                           if (!controller.isEditMode.value && !isTradingCall) {
                             return const SizedBox.shrink();
                           }
