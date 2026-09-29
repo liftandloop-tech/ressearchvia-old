@@ -6,7 +6,6 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'dart:io';
-import 'package:intl/intl.dart';
 
 import '../../core/models/research_report.dart';
 import '../../core/theme/app_theme.dart';
@@ -16,6 +15,7 @@ import '../../core/config/app.config.dart';
 import '../../core/config/api.config.dart';
 import '../../services/secure_storage.service.dart';
 import 'widgets/youtube_video_player.dart';
+import 'widgets/report_update_card.dart';
 
 class ReportDetailScreen extends StatefulWidget {
   final ResearchReport report;
@@ -216,43 +216,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              ...widget.report.updates.map((update) => Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xffFFFBEB), // light amber background
-                  border: Border.all(color: const Color(0xffFDE68A)), // amber-200 border
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      update.text,
-                      style: AppStyles.bodyMedium.copyWith(height: 1.5, color: const Color(0xff1F2937)),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(Icons.access_time_rounded, size: 14, color: Color(0xff6B7280)),
-                        const SizedBox(width: 4),
-                        Text(
-                          DateFormat('dd/MM/yyyy hh:mm a').format(update.timestamp),
-                          style: AppStyles.bodySmall.copyWith(color: const Color(0xff6B7280)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              )),
+              ...widget.report.updates.map((update) => ReportUpdateCard(update: update)),
               const SizedBox(height: 24),
             ],
             

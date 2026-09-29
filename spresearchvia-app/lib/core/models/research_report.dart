@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 class ResearchReport {
@@ -108,13 +107,47 @@ class ResearchReport {
 
 class ReportUpdate {
   final String text;
+  final String? status;
   final DateTime timestamp;
 
-  ReportUpdate({required this.text, required this.timestamp});
+  ReportUpdate({
+    required this.text,
+    this.status,
+    required this.timestamp,
+  });
+
+  /// Normalizes status to 'stoploss_hit', 'target_achieved', 'partial_profit', or 'general'
+  String get normalizedStatus {
+    final s = (status ?? '').toLowerCase().trim();
+    if (s == 'stoploss_hit' || s == 'stoploss' || s == 'sl_hit' || s == 'stop loss hit') {
+      return 'stoploss_hit';
+    }
+    if (s == 'target_achieved' || s == 'target' || s == 'target_hit') {
+      return 'target_achieved';
+    }
+    if (s == 'partial_profit' || s == 'partial' || s == 'profit') {
+      return 'partial_profit';
+    }
+
+    // Keyword detection fallback from text
+    final t = text.toLowerCase();
+    if (t.contains('stoploss') || t.contains('stop loss') || t.contains('sl hit')) {
+      return 'stoploss_hit';
+    }
+    if (t.contains('target achieved') || t.contains('target hit') || t.contains('target')) {
+      return 'target_achieved';
+    }
+    if (t.contains('partial profit') || t.contains('partial')) {
+      return 'partial_profit';
+    }
+
+    return 'general';
+  }
 
   factory ReportUpdate.fromJson(Map<String, dynamic> json) {
     return ReportUpdate(
       text: json['text']?.toString() ?? '',
+      status: json['status']?.toString(),
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'])?.toLocal() ?? DateTime.now()
           : DateTime.now(),
@@ -124,6 +157,7 @@ class ReportUpdate {
   Map<String, dynamic> toJson() {
     return {
       'text': text,
+      'status': status,
       'timestamp': timestamp.toIso8601String(),
     };
   }

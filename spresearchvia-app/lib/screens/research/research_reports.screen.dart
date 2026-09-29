@@ -118,7 +118,7 @@ class _ResearchReportsScreenState extends State<ResearchReportsScreen> with Sing
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.lock_person_rounded, size: 80, color: AppTheme.error.withOpacity(0.5)),
+                    Icon(Icons.lock_person_rounded, size: 80, color: AppTheme.error.withValues(alpha: 0.5)),
                     SizedBox(height: 24),
                     Text(
                       'Access Restricted',

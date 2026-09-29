@@ -390,62 +390,107 @@ class ReportDetailsScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 20),
-                              ...report.updates.map(
-                                (update) => Container(
+                              ...report.updates.map((update) {
+                                final status = update['status'] ?? 'general';
+
+                                Color cardBg;
+                                Color cardBorder;
+                                Color badgeColor;
+                                String badgeLabel;
+                                IconData badgeIcon;
+
+                                if (status == 'stoploss_hit') {
+                                  cardBg = const Color(0xFFFEF2F2);
+                                  cardBorder = const Color(0xFFFCA5A5);
+                                  badgeColor = const Color(0xFFDC2626);
+                                  badgeLabel = 'Stoploss Hit';
+                                  badgeIcon = Icons.cancel_outlined;
+                                } else if (status == 'target_achieved') {
+                                  cardBg = const Color(0xFFF0FDF4);
+                                  cardBorder = const Color(0xFF86EFAC);
+                                  badgeColor = const Color(0xFF16A34A);
+                                  badgeLabel = 'Target Achieved';
+                                  badgeIcon = Icons.check_circle_outline;
+                                } else if (status == 'partial_profit') {
+                                  cardBg = const Color(0xFFFFF7ED);
+                                  cardBorder = const Color(0xFFFDBA74);
+                                  badgeColor = const Color(0xFFEA580C);
+                                  badgeLabel = 'Partial Profit';
+                                  badgeIcon = Icons.monetization_on_outlined;
+                                } else {
+                                  cardBg = AppTheme.gray50;
+                                  cardBorder = AppTheme.primaryBlue.withValues(alpha: 0.15);
+                                  badgeColor = AppTheme.primaryBlue;
+                                  badgeLabel = 'Update';
+                                  badgeIcon = Icons.info_outline;
+                                }
+
+                                return Container(
                                   margin: const EdgeInsets.only(bottom: 16),
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.gray50,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: AppTheme.primaryBlue.withOpacity(
-                                        0.1,
-                                      ),
-                                    ),
+                                    color: cardBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: cardBorder, width: 1.2),
                                   ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 5),
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryBlue,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              update['text'] ?? '',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: AppTheme.textPrimary,
-                                                height: 1.5,
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: badgeColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: badgeColor.withValues(alpha: 0.3),
                                               ),
                                             ),
-                                            if (update['timestamp'] != null &&
-                                                update['timestamp']!.isNotEmpty)
-                                              Text(
-                                                update['timestamp']!,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppTheme.textSecondary,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(badgeIcon, size: 14, color: badgeColor),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  badgeLabel,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: badgeColor,
+                                                  ),
                                                 ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (update['timestamp'] != null &&
+                                              update['timestamp']!.isNotEmpty)
+                                            Text(
+                                              update['timestamp']!,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.textSecondary,
                                               ),
-                                          ],
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        update['text'] ?? '',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: AppTheme.textPrimary,
+                                          height: 1.5,
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ),
+                                );
+                              }),
                             ],
                           ),
                         ),

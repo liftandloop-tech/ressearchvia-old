@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../core/models/research_report.dart';
 import 'widgets/report_header_card.dart';
 import 'widgets/key_highlight_item.dart';
 import 'widgets/subscriber_badge.dart';
 import '../../widgets/button.dart';
 import 'widgets/youtube_video_player.dart';
+import 'widgets/report_update_card.dart';
 
 class ResearchReportDetailScreen extends StatelessWidget {
   const ResearchReportDetailScreen({super.key, required this.report});
@@ -101,47 +101,7 @@ class ResearchReportDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ...report.updates.map((update) => Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffFFFBEB),
-                            border: Border.all(color: const Color(0xffFDE68A)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                update.text,
-                                style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14,
-                                  color: Color(0xff1F2937),
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  const Icon(Icons.access_time_rounded,
-                                      size: 14, color: Color(0xff6B7280)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    DateFormat('dd/MM/yyyy hh:mm a')
-                                        .format(update.timestamp),
-                                    style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 12,
-                                      color: Color(0xff6B7280),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        )),
+                    ...report.updates.map((update) => ReportUpdateCard(update: update)),
                   ],
                 ),
               ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/models/research_report.dart';
+import 'report_update_card.dart';
 
 class ReportCard extends StatelessWidget {
   const ReportCard({
@@ -9,6 +11,7 @@ class ReportCard extends StatelessWidget {
     required this.description,
     required this.onTap,
     required this.onView,
+    this.updates = const [],
     this.isLocked = false,
   });
 
@@ -18,6 +21,7 @@ class ReportCard extends StatelessWidget {
   final String description;
   final VoidCallback onTap;
   final VoidCallback onView;
+  final List<ReportUpdate> updates;
   final bool isLocked;
 
   @override
@@ -89,6 +93,16 @@ class ReportCard extends StatelessWidget {
                 height: 1.5,
               ),
             ),
+            if (updates.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              ...updates.map(
+                (update) => ReportUpdateCard(
+                  update: update,
+                  compact: true,
+                  margin: const EdgeInsets.only(top: 8),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -102,7 +116,7 @@ class ReportCard extends StatelessWidget {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -112,7 +126,7 @@ class ReportCard extends StatelessWidget {
                     Icon(
                       Icons.lock_outline,
                       size: 40,
-                      color: Color(0xff163174).withOpacity(0.6),
+                      color: const Color(0xff163174).withValues(alpha: 0.6),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -122,7 +136,7 @@ class ReportCard extends StatelessWidget {
                         fontFamily: 'Poppins',
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xff163174).withOpacity(0.6),
+                        color: const Color(0xff163174).withValues(alpha: 0.6),
                       ),
                     ),
                   ],

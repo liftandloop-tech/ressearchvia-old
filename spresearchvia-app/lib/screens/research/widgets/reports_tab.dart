@@ -93,6 +93,7 @@ class ReportsTab extends StatelessWidget {
                         date: report.formattedDateTime,
                         description: report.description,
                         isLocked: report.isLocked,
+                        updates: report.updates,
                         onTap: () {
                           Get.to(() => ReportDetailScreen(report: report));
                         },

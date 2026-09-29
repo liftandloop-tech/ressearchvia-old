@@ -46,6 +46,10 @@ const reportsSchema = new mongoose.Schema({
     },
     updates: [{
         text: String,
+        status: {
+            type: String,
+            default: null
+        },
         timestamp: {
             type: Date,
             default: Date.now

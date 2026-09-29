@@ -120,8 +120,27 @@ class ReportModel {
       for (var update in json['updates']) {
         if (update is Map) {
           String rawTs = extractTs(update['timestamp']);
+          String status = update['status']?.toString() ?? '';
+          if (status.isEmpty) {
+            final textLower = (update['text']?.toString() ?? '').toLowerCase();
+            if (textLower.contains('stoploss') ||
+                textLower.contains('stop loss') ||
+                textLower.contains('sl hit')) {
+              status = 'stoploss_hit';
+            } else if (textLower.contains('target achieved') ||
+                textLower.contains('target hit') ||
+                textLower.contains('target')) {
+              status = 'target_achieved';
+            } else if (textLower.contains('partial profit') ||
+                textLower.contains('partial')) {
+              status = 'partial_profit';
+            } else {
+              status = 'general';
+            }
+          }
           parsedUpdates.add({
             'text': update['text']?.toString() ?? '',
+            'status': status,
             'timestamp': formatDate(rawTs),
             'rawTimestamp': rawTs,
           });

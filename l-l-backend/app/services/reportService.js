@@ -104,8 +104,21 @@ const sendReportNotification = async (report, isUpdate = false) => {
             const type = report.title.toLowerCase().includes('buy') ? 'BUY' :
                 report.title.toLowerCase().includes('sell') ? 'SELL' : 'TRADE';
 
+            const latestUpdate = (isUpdate && report.updates && report.updates.length > 0)
+                ? report.updates[report.updates.length - 1]
+                : null;
+
+            let updatePrefix = '';
+            if (latestUpdate) {
+                if (latestUpdate.status === 'target_achieved') updatePrefix = '🎯 Target Achieved: ';
+                else if (latestUpdate.status === 'stoploss_hit') updatePrefix = '🛑 Stoploss Hit: ';
+                else if (latestUpdate.status === 'partial_profit') updatePrefix = '💰 Partial Profit: ';
+            }
+
             title = isUpdate ? `🚨 Updated ${type} Call` : `🚨 New ${type} Call`;
-            body = isUpdate ? `Update: ${report.title}` : report.title; // Assuming title contains the stock info "NIFTY..."
+            body = isUpdate
+                ? (latestUpdate ? `${updatePrefix}${latestUpdate.text}` : `Update: ${report.title}`)
+                : report.title;
             priority = 'high';
             channelId = 'high_importance_channel';
             data = { type: 'TRADING_CALL', reportId: report._id.toString() };
@@ -190,11 +203,14 @@ const reportService = {
             })
             console.log("DEBUG: Created report with youtubeUrl:", report.youtubeUrl);
             console.log("DEBUG: All body keys received:", Object.keys(body));
-            console.log("DEBUG: Final report object before save:", {
-                id: report._id,
-                title: report.title,
-                youtubeUrl: report.youtubeUrl
-            });
+            if (body.newUpdate && body.newUpdate.trim() !== '') {
+                const updateStatus = body.newUpdateStatus || body.updateStatus || null;
+                report.updates = [{
+                    text: body.newUpdate.trim(),
+                    status: updateStatus,
+                    timestamp: new Date()
+                }];
+            }
             await report.save()
 
             // Trigger Notification
@@ -748,7 +764,12 @@ const reportService = {
             if (body.newUpdate && body.newUpdate.trim() !== '') {
                 console.log("DEBUG: Pushing new update to report");
                 if (!report.updates) report.updates = [];
-                report.updates.push({ text: body.newUpdate.trim(), timestamp: new Date() });
+                const updateStatus = body.newUpdateStatus || body.updateStatus || null;
+                report.updates.push({
+                    text: body.newUpdate.trim(),
+                    status: updateStatus,
+                    timestamp: new Date()
+                });
                 report.markModified('updates');
                 console.log("DEBUG: Updates array length:", report.updates.length);
             } else {
@@ -870,7 +891,8 @@ const reportService = {
                 const existingReport = await reportModel.findOne({ automatedSignalId: rawSignalId });
                 if (existingReport) {
                     const text = updateText || `Trade Applied: ${side} ${symbol} call has been executed.`;
-                    existingReport.updates.push({ text, timestamp: new Date() });
+                    const updateStatus = body.newUpdateStatus || body.updateStatus || body.status || null;
+                    existingReport.updates.push({ text, status: updateStatus, timestamp: new Date() });
                     existingReport.markModified('updates');
                     await existingReport.save();
 

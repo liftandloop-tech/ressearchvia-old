@@ -78,6 +78,8 @@ class ReportService extends ApiService {
     required List<String> planIds,
     required String reportType,
     required String description,
+    String? newUpdate,
+    String? newUpdateStatus,
     String? youtubeUrl,
     Uint8List? fileBytes,
     String? fileName,
@@ -88,6 +90,12 @@ class ReportService extends ApiService {
       formData.fields.add(MapEntry('segment', categoryId));
       formData.fields.add(MapEntry('reportType', reportType));
       formData.fields.add(MapEntry('description', description));
+      if (newUpdate != null && newUpdate.isNotEmpty) {
+        formData.fields.add(MapEntry('newUpdate', newUpdate));
+      }
+      if (newUpdateStatus != null && newUpdateStatus.isNotEmpty) {
+        formData.fields.add(MapEntry('newUpdateStatus', newUpdateStatus));
+      }
       formData.fields.add(MapEntry('youtubeUrl', youtubeUrl ?? ""));
 
       debugPrint('=== CREATE REPORT SENDING ===');
@@ -128,6 +136,7 @@ class ReportService extends ApiService {
     required String reportType,
     required String description,
     String? newUpdate,
+    String? newUpdateStatus,
     String? youtubeUrl,
     Uint8List? fileBytes,
     String? fileName,
@@ -141,6 +150,9 @@ class ReportService extends ApiService {
       formData.fields.add(MapEntry('description', description));
       if (newUpdate != null && newUpdate.isNotEmpty) {
         formData.fields.add(MapEntry('newUpdate', newUpdate));
+      }
+      if (newUpdateStatus != null && newUpdateStatus.isNotEmpty) {
+        formData.fields.add(MapEntry('newUpdateStatus', newUpdateStatus));
       }
       formData.fields.add(MapEntry('youtubeUrl', youtubeUrl ?? ""));
       formData.fields.add(MapEntry('removeFile', removeFile.toString()));

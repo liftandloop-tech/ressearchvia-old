@@ -917,25 +917,27 @@ class UploadReportScreen extends StatelessWidget {
                         ),
 
                         Obx(() {
-                          if (!controller.isEditMode.value)
+                          final isTradingCall = controller.selectedReportType.value == 'Trading calls';
+                          if (!controller.isEditMode.value && !isTradingCall) {
                             return const SizedBox.shrink();
+                          }
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 24),
-                              Text(
-                                'Update History',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               if (controller.existingUpdates.isNotEmpty) ...[
+                                Text(
+                                  'Update History',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
                                 Container(
                                   constraints: const BoxConstraints(
-                                    maxHeight: 200,
+                                    maxHeight: 220,
                                   ),
                                   decoration: BoxDecoration(
                                     border: Border.all(color: AppTheme.gray200),
@@ -945,41 +947,97 @@ class UploadReportScreen extends StatelessWidget {
                                   child: ListView.separated(
                                     shrinkWrap: true,
                                     padding: const EdgeInsets.all(12),
-                                    itemCount:
-                                        controller.existingUpdates.length,
+                                    itemCount: controller.existingUpdates.length,
                                     separatorBuilder: (context, index) =>
                                         const SizedBox(height: 8),
                                     itemBuilder: (context, index) {
-                                      final update =
-                                          controller.existingUpdates[index];
+                                      final update = controller.existingUpdates[index];
+                                      final status = update['status'] ?? 'general';
+
+                                      Color cardBg;
+                                      Color cardBorder;
+                                      Color badgeColor;
+                                      String badgeLabel;
+                                      IconData badgeIcon;
+
+                                      if (status == 'stoploss_hit') {
+                                        cardBg = const Color(0xFFFEF2F2);
+                                        cardBorder = const Color(0xFFFCA5A5);
+                                        badgeColor = const Color(0xFFDC2626);
+                                        badgeLabel = 'Stoploss Hit';
+                                        badgeIcon = Icons.cancel_outlined;
+                                      } else if (status == 'target_achieved') {
+                                        cardBg = const Color(0xFFF0FDF4);
+                                        cardBorder = const Color(0xFF86EFAC);
+                                        badgeColor = const Color(0xFF16A34A);
+                                        badgeLabel = 'Target Achieved';
+                                        badgeIcon = Icons.check_circle_outline;
+                                      } else if (status == 'partial_profit') {
+                                        cardBg = const Color(0xFFFFF7ED);
+                                        cardBorder = const Color(0xFFFDBA74);
+                                        badgeColor = const Color(0xFFEA580C);
+                                        badgeLabel = 'Partial Profit';
+                                        badgeIcon = Icons.monetization_on_outlined;
+                                      } else {
+                                        cardBg = Colors.white;
+                                        cardBorder = AppTheme.gray200;
+                                        badgeColor = AppTheme.primaryBlue;
+                                        badgeLabel = 'Update';
+                                        badgeIcon = Icons.info_outline;
+                                      }
+
                                       return Container(
-                                        padding: const EdgeInsets.all(10),
+                                        padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: AppTheme.gray200,
-                                          ),
+                                          color: cardBg,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: cardBorder),
                                         ),
                                         child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: badgeColor.withValues(alpha: 0.12),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(badgeIcon, size: 12, color: badgeColor),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        badgeLabel,
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: badgeColor,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Text(
+                                                  update['timestamp'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.black45,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
                                             Text(
                                               update['text'] ?? '',
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: AppTheme.textPrimary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              update['timestamp'] ?? '',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.black45,
+                                                height: 1.4,
                                               ),
                                             ),
                                           ],
@@ -999,13 +1057,53 @@ class UploadReportScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 8),
+                              // Radio button options for update status
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 8,
+                                children: [
+                                  _buildUpdateStatusRadio(
+                                    controller: controller,
+                                    label: 'Stoploss Hit',
+                                    value: 'stoploss_hit',
+                                    color: const Color(0xFFDC2626),
+                                    bgColor: const Color(0xFFFEF2F2),
+                                    icon: Icons.cancel_outlined,
+                                  ),
+                                  _buildUpdateStatusRadio(
+                                    controller: controller,
+                                    label: 'Target Achieved',
+                                    value: 'target_achieved',
+                                    color: const Color(0xFF16A34A),
+                                    bgColor: const Color(0xFFF0FDF4),
+                                    icon: Icons.check_circle_outline,
+                                  ),
+                                  _buildUpdateStatusRadio(
+                                    controller: controller,
+                                    label: 'Partial Profit',
+                                    value: 'partial_profit',
+                                    color: const Color(0xFFEA580C),
+                                    bgColor: const Color(0xFFFFF7ED),
+                                    icon: Icons.monetization_on_outlined,
+                                  ),
+                                  _buildUpdateStatusRadio(
+                                    controller: controller,
+                                    label: 'General Update',
+                                    value: 'general',
+                                    color: AppTheme.primaryBlue,
+                                    bgColor: AppTheme.gray50,
+                                    icon: Icons.edit_note,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
                               SizedBox(
                                 child: TextField(
                                   controller: controller.newUpdateController,
                                   maxLines: 3,
                                   decoration: InputDecoration(
                                     hintText:
-                                        'Enter new latest update message...',
+                                        'Enter update message...',
                                     hintStyle: TextStyle(
                                       color: AppTheme.gray300,
                                     ),
@@ -1124,5 +1222,56 @@ class UploadReportScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildUpdateStatusRadio({
+    required UploadReportController controller,
+    required String label,
+    required String value,
+    required Color color,
+    required Color bgColor,
+    required IconData icon,
+  }) {
+    return Obx(() {
+      final isSelected = controller.selectedUpdateStatus.value == value;
+      return InkWell(
+        onTap: () => controller.selectUpdateStatus(value),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? bgColor : Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? color : AppTheme.gray200,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                size: 16,
+                color: isSelected ? color : AppTheme.gray300,
+              ),
+              const SizedBox(width: 6),
+              Icon(icon, size: 14, color: isSelected ? color : AppTheme.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? color : AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 }

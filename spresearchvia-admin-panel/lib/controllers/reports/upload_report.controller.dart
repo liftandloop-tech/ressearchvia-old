@@ -41,7 +41,25 @@ class UploadReportController extends GetxController {
   var isFileRemoved =
       false.obs; // Track if user explicitly removed the existing file
   var existingUpdates = <Map<String, String>>[].obs;
+  var selectedUpdateStatus = ''.obs; // 'stoploss_hit', 'target_achieved', 'partial_profit', 'general'
   String? reportId;
+
+  void selectUpdateStatus(String status) {
+    if (selectedUpdateStatus.value == status) {
+      selectedUpdateStatus.value = '';
+    } else {
+      selectedUpdateStatus.value = status;
+      if (newUpdateController.text.trim().isEmpty) {
+        if (status == 'stoploss_hit') {
+          newUpdateController.text = 'Stoploss Hit';
+        } else if (status == 'target_achieved') {
+          newUpdateController.text = 'Target Achieved';
+        } else if (status == 'partial_profit') {
+          newUpdateController.text = 'Partial Profit';
+        }
+      }
+    }
+  }
 
   @override
   void onInit() {
@@ -55,6 +73,7 @@ class UploadReportController extends GetxController {
     titleController.text = report.title;
     descriptionController.text = report.description;
     newUpdateController.clear();
+    selectedUpdateStatus.value = '';
     youtubeUrlController.text = report.youtubeUrl ?? "";
     selectedReportType.value = report.reportType;
     existingUpdates.assignAll(report.updates);
@@ -180,6 +199,7 @@ class UploadReportController extends GetxController {
     filteredPlans.clear();
     selectedReportType.value = 'Trading calls';
     existingUpdates.clear();
+    selectedUpdateStatus.value = '';
     uploadedFileName.value = '';
     uploadedFileBytes.value = null;
     isFileRemoved.value = false;
@@ -442,6 +462,7 @@ class UploadReportController extends GetxController {
         reportType: selectedReportType.value,
         description: descriptionController.text,
         newUpdate: newUpdateController.text.trim(),
+        newUpdateStatus: selectedUpdateStatus.value,
         youtubeUrl: youtubeUrlController.text.trim(),
         fileBytes: uploadedFileBytes.value, // Can be null
         fileName:
@@ -459,6 +480,8 @@ class UploadReportController extends GetxController {
         planIds: planArray,
         reportType: selectedReportType.value,
         description: descriptionController.text,
+        newUpdate: newUpdateController.text.trim(),
+        newUpdateStatus: selectedUpdateStatus.value,
         youtubeUrl: youtubeUrlController.text.trim(),
         fileBytes: uploadedFileBytes.value,
         fileName: uploadedFileName.value,

@@ -77,19 +77,61 @@ class ReportRow extends TableRow {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  ...report.updates.map(
-                    (update) => Padding(
+                  ...report.updates.map((update) {
+                    final status = update['status'] ?? 'general';
+                    Color badgeColor;
+                    String badgeLabel;
+                    IconData badgeIcon;
+
+                    if (status == 'stoploss_hit') {
+                      badgeColor = const Color(0xFFDC2626);
+                      badgeLabel = 'Stoploss Hit';
+                      badgeIcon = Icons.cancel_outlined;
+                    } else if (status == 'target_achieved') {
+                      badgeColor = const Color(0xFF16A34A);
+                      badgeLabel = 'Target Achieved';
+                      badgeIcon = Icons.check_circle_outline;
+                    } else if (status == 'partial_profit') {
+                      badgeColor = const Color(0xFFEA580C);
+                      badgeLabel = 'Partial Profit';
+                      badgeIcon = Icons.monetization_on_outlined;
+                    } else {
+                      badgeColor = AppTheme.primaryBlue;
+                      badgeLabel = 'Update';
+                      badgeIcon = Icons.info_outline;
+                    }
+
+                    return Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            margin: const EdgeInsets.only(top: 5),
-                            width: 4,
-                            height: 4,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryBlue,
-                              shape: BoxShape.circle,
+                              color: badgeColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: badgeColor.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(badgeIcon, size: 10, color: badgeColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  badgeLabel,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: badgeColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -101,7 +143,7 @@ class ReportRow extends TableRow {
                                   update['text'] ?? '',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: AppTheme.textSecondary,
+                                    color: AppTheme.textPrimary,
                                     height: 1.4,
                                   ),
                                 ),
@@ -111,8 +153,8 @@ class ReportRow extends TableRow {
                                     update['timestamp']!,
                                     style: TextStyle(
                                       fontSize: 9,
-                                      color: AppTheme.textSecondary.withOpacity(
-                                        0.6,
+                                      color: AppTheme.textSecondary.withValues(
+                                        alpha: 0.6,
                                       ),
                                     ),
                                   ),
@@ -121,8 +163,8 @@ class ReportRow extends TableRow {
                           ),
                         ],
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ],
             ),
