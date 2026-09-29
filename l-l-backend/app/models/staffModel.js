@@ -36,19 +36,19 @@ const staffSchema = new mongoose.Schema({
         default: 'Applicant'
     },
     emailOtp: {
-        type: Number,
+        type: mongoose.Schema.Types.Mixed,
         default: null
     },
     emailOtpExpires: {
-        type: Date,
+        type: mongoose.Schema.Types.Mixed,
         default: null
     },
     mobileOtp: {
-        type: Number,
+        type: mongoose.Schema.Types.Mixed,
         default: null
     },
     mobileOtpExpires: {
-        type: Date,
+        type: mongoose.Schema.Types.Mixed,
         default: null
     },
     isEmailVerified: {
@@ -135,30 +135,7 @@ const staffSchema = new mongoose.Schema({
     otpExpires: {
         type: Number
     },
-    mobileOtp: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null
-    },
-    mobileOtpExpires: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null
-    },
-    emailOtp: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null
-    },
-    emailOtpExpires: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null
-    },
-    isMobileVerified: {
-        type: Boolean,
-        default: false
-    },
-    isEmailVerified: {
-        type: Boolean,
-        default: false
-    },
+
     mpin: {
         type: String,
         default: null

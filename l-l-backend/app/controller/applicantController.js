@@ -7,8 +7,8 @@ import roleModel from "../models/roleModel.js";
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 
 /**
- * Normalizes a phone number to 91XXXXXXXXXX (12 digits, prefixed with 91).
- * Validates that the input is either 10 digits or 12 digits containing 91.
+ * Normalizes a mobile number to 91XXXXXXXXXX (12 digits, prefixed with 91).
+ * Validates that the input is either 10 digits or 12 digits containing/starting with 91.
  * Returns { valid: boolean, normalized12: string, numeric12: number, last10: string }
  */
 const normalizeIndianMobile = (phone) => {
@@ -24,18 +24,18 @@ const normalizeIndianMobile = (phone) => {
     } else if (digits.length === 12 && digits.startsWith('91')) {
         last10 = digits.slice(-10);
         normalized12 = digits;
-    } else if (digits.length > 10 && digits.slice(-12).startsWith('91')) {
-        last10 = digits.slice(-10);
-        normalized12 = digits.slice(-12);
-    } else if (digits.length > 10) {
+    } else if (digits.length === 11 && digits.startsWith('0')) {
+        last10 = digits.slice(1);
+        normalized12 = `91${last10}`;
+    } else if (digits.length > 12 && digits.startsWith('91')) {
         last10 = digits.slice(-10);
         normalized12 = `91${last10}`;
     } else {
         return { valid: false, normalized12: '', numeric12: 0, last10: '' };
     }
 
-    const numeric12 = parseInt(normalized12);
-    const valid = normalized12.length === 12 && normalized12.startsWith('91') && !isNaN(numeric12);
+    const numeric12 = parseInt(normalized12, 10);
+    const valid = normalized12.length === 12 && normalized12.startsWith('91') && last10.length === 10 && !isNaN(numeric12);
     return { valid, normalized12, numeric12, last10 };
 };
 
@@ -48,8 +48,8 @@ const sendMobileOtp = async (phone, otp) => {
         const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
 
         const { valid, normalized12 } = normalizeIndianMobile(phone);
-        if (!valid) {
-            console.error(`[SMS Gateway] Invalid phone number provided for OTP (must be 10 or 12 digits containing 91): ${phone}`);
+        if (!valid || normalized12.length !== 12 || !normalized12.startsWith('91')) {
+            console.error(`[SMS Gateway] Invalid phone number provided for OTP (must be 10 digits or 12 digits containing 91): ${phone}`);
             return false;
         }
 
@@ -116,6 +116,19 @@ const applicantController = {
             const last10 = phoneInfo.last10;
             const cleanEmail = emailAddress ? emailAddress.trim().toLowerCase() : '';
 
+            // Update walkInForm mobileNumber to normalized 91XXXXXXXXXX as well
+            if (req.body.walkInForm) {
+                req.body.walkInForm.mobileNumber = phoneInfo.normalized12;
+            }
+
+            // Normalize emergency contact phone if present
+            if (emergencyContact && emergencyContact.phone) {
+                const emgInfo = normalizeIndianMobile(emergencyContact.phone);
+                if (emgInfo.valid) {
+                    emergencyContact.phone = emgInfo.normalized12;
+                }
+            }
+
             let roleDoc = null;
             if (appliedRoleId) {
                 roleDoc = await roleModel.findById(appliedRoleId);
@@ -127,7 +140,7 @@ const applicantController = {
                 $or: [
                     { mobileNumber: normalizedPhone },
                     { mobileNumber: phoneInfo.normalized12 },
-                    { mobileNumber: parseInt(last10) },
+                    { mobileNumber: parseInt(last10, 10) },
                     { mobileNumber: last10 },
                     { mobileNumber: `+91${last10}` },
                     { emailAddress: { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
@@ -229,12 +242,14 @@ const applicantController = {
                 return res.status(404).send({ status: 404, message: "Applicant profile not found", data: {} });
             }
 
-            const now = new Date();
-            if (applicant.mobileOtp !== Number(mobileOtp) || applicant.mobileOtpExpires < now) {
+            const now = Date.now();
+            const mobileExpired = !applicant.mobileOtpExpires || new Date(applicant.mobileOtpExpires).getTime() < now;
+            if (String(applicant.mobileOtp).trim() !== String(mobileOtp).trim() || mobileExpired) {
                 return res.status(400).send({ status: 400, message: "Invalid or expired Mobile OTP", data: {} });
             }
 
-            if (applicant.emailOtp !== Number(emailOtp) || applicant.emailOtpExpires < now) {
+            const emailExpired = !applicant.emailOtpExpires || new Date(applicant.emailOtpExpires).getTime() < now;
+            if (String(applicant.emailOtp).trim() !== String(emailOtp).trim() || emailExpired) {
                 return res.status(400).send({ status: 400, message: "Invalid or expired Email OTP", data: {} });
             }
 
@@ -466,21 +481,30 @@ const applicantController = {
             const cleanInput = identifier.trim();
             const isEmail = cleanInput.includes('@');
             let query = { stage: { $ne: 'Employee' } };
+            let targetMobile = '';
 
             if (isEmail) {
                 const cleanEmail = cleanInput.toLowerCase();
                 query.emailAddress = { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') };
             } else {
-                const cleanDigits = cleanInput.replace(/\D/g, '');
-                const last10 = cleanDigits.slice(-10);
-                const last10Num = parseInt(last10);
-                const with91Num = parseInt("91" + last10);
+                const phoneInfo = normalizeIndianMobile(cleanInput);
+                if (!phoneInfo.valid) {
+                    return res.status(400).send({
+                        status: 400,
+                        message: "Please enter a valid 10-digit mobile number or 12-digit number with 91 prefix",
+                        data: {}
+                    });
+                }
+                targetMobile = phoneInfo.normalized12;
+                const last10 = phoneInfo.last10;
+                const last10Num = parseInt(last10, 10);
+                const with91Num = phoneInfo.numeric12;
                 query.$or = [
-                    { mobileNumber: last10Num },
                     { mobileNumber: with91Num },
+                    { mobileNumber: phoneInfo.normalized12 },
+                    { mobileNumber: last10Num },
                     { mobileNumber: last10 },
-                    { mobileNumber: "91" + last10 },
-                    { mobileNumber: "+91" + last10 }
+                    { mobileNumber: `+91${last10}` }
                 ];
             }
 
@@ -489,8 +513,17 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "No such applicant found with this " + (isEmail ? "email" : "mobile number"), data: {} });
             }
 
+            // If existing applicant's mobile number is not normalized to 91XXXXXXXXXX, normalize it in DB
+            if (applicant.mobileNumber) {
+                const existingPhoneInfo = normalizeIndianMobile(applicant.mobileNumber);
+                if (existingPhoneInfo.valid) {
+                    applicant.mobileNumber = existingPhoneInfo.numeric12;
+                    targetMobile = existingPhoneInfo.normalized12;
+                }
+            }
+
             const otp = generateOtp().toString();
-            const expires = Date.now() + 10 * 60 * 1000;
+            const expires = new Date(Date.now() + 10 * 60 * 1000);
 
             if (isEmail) {
                 applicant.emailOtp = otp;
@@ -501,8 +534,9 @@ const applicantController = {
                 applicant.mobileOtp = otp;
                 applicant.mobileOtpExpires = expires;
                 await applicant.save();
-                await sendMobileOtp(applicant.mobileNumber.toString(), otp);
-                console.log(`[SMS OTP] Sent to ${applicant.mobileNumber}: ${otp}`);
+                const sendTo = targetMobile || (applicant.mobileNumber ? applicant.mobileNumber.toString() : cleanInput);
+                await sendMobileOtp(sendTo, otp);
+                console.log(`[SMS OTP] Sent to ${sendTo}: ${otp}`);
             }
 
             res.status(200).send({
@@ -530,16 +564,16 @@ const applicantController = {
                 const cleanEmail = cleanInput.toLowerCase();
                 query.emailAddress = { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') };
             } else {
-                const cleanDigits = cleanInput.replace(/\D/g, '');
-                const last10 = cleanDigits.slice(-10);
-                const last10Num = parseInt(last10);
-                const with91Num = parseInt("91" + last10);
+                const phoneInfo = normalizeIndianMobile(cleanInput);
+                const last10 = phoneInfo.valid ? phoneInfo.last10 : cleanInput.replace(/\D/g, '').slice(-10);
+                const last10Num = parseInt(last10, 10);
+                const with91Num = phoneInfo.valid ? phoneInfo.numeric12 : parseInt(`91${last10}`, 10);
                 query.$or = [
-                    { mobileNumber: last10Num },
                     { mobileNumber: with91Num },
+                    { mobileNumber: `91${last10}` },
+                    { mobileNumber: last10Num },
                     { mobileNumber: last10 },
-                    { mobileNumber: "91" + last10 },
-                    { mobileNumber: "+91" + last10 }
+                    { mobileNumber: `+91${last10}` }
                 ];
             }
 
@@ -549,18 +583,29 @@ const applicantController = {
             }
 
             const submittedOtp = String(otp).trim();
+            const now = Date.now();
             if (otpType === 'email') {
-                if (String(applicant.emailOtp).trim() !== submittedOtp || applicant.emailOtpExpires < Date.now()) {
+                const isExpired = !applicant.emailOtpExpires || new Date(applicant.emailOtpExpires).getTime() < now;
+                if (String(applicant.emailOtp).trim() !== submittedOtp || isExpired) {
                     return res.status(400).send({ status: 400, message: "Invalid or expired email OTP", data: {} });
                 }
                 applicant.isEmailVerified = true;
-                applicant.emailOtp = undefined;
+                applicant.emailOtp = null;
             } else {
-                if (String(applicant.mobileOtp).trim() !== submittedOtp || applicant.mobileOtpExpires < Date.now()) {
+                const isExpired = !applicant.mobileOtpExpires || new Date(applicant.mobileOtpExpires).getTime() < now;
+                if (String(applicant.mobileOtp).trim() !== submittedOtp || isExpired) {
                     return res.status(400).send({ status: 400, message: "Invalid or expired mobile OTP", data: {} });
                 }
                 applicant.isMobileVerified = true;
-                applicant.mobileOtp = undefined;
+                applicant.mobileOtp = null;
+            }
+
+            // Normalize mobileNumber in DB as 91XXXXXXXXXX
+            if (applicant.mobileNumber) {
+                const pInfo = normalizeIndianMobile(applicant.mobileNumber);
+                if (pInfo.valid) {
+                    applicant.mobileNumber = pInfo.numeric12;
+                }
             }
 
             await applicant.save();
