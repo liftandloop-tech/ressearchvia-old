@@ -34,8 +34,9 @@ class DashboardNavBar extends StatelessWidget {
         {'title': 'Settings', 'index': 6},
         {'title': 'Automated Trading', 'index': 9},
         {'title': 'Leads', 'index': 10},
-        // {'title': 'Attendance & Monitoring', 'index': 11},
-        // {'title': 'Job Applicants', 'index': 12},
+        {'title': 'Job Applicants', 'index': 11},
+         //{'title': 'Attendance & Monitoring', 'index': 12},
+        
       ];
 
       // RBAC: Roles determine visible items
