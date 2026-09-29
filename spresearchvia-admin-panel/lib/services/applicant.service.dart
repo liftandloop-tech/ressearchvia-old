@@ -144,4 +144,20 @@ class ApplicantService extends ApiService {
       return (applicantId: null, error: e.toString());
     }
   }
+
+  Future<List<Map<String, dynamic>>> getPublicRoles() async {
+    try {
+      final response = await get('/staff/applicant/roles', forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body['data'];
+        if (data is List) {
+          return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting public roles: $e');
+      return [];
+    }
+  }
 }

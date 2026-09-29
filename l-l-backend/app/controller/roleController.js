@@ -40,6 +40,14 @@ const roleController = {
         } catch (error) {
             res.status(400).send({ status: 400, message: error.message, data: {} });
         }
+    },
+    getPublicRoles: async (req, res) => {
+        try {
+            const response = await roleService.getPublicRoles();
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: [] });
+        }
     }
 };
 

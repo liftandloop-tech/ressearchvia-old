@@ -275,6 +275,7 @@ class UserModel {
 
   String? _getDepartmentPageForFeature(String feature) {
     final f = feature.toLowerCase().trim();
+    if (f == 'dashboard') return 'Dashboard';
     if (f == 'leads' || f == 'lead') return 'Leads';
     if (f == 'users' || f == 'user' || f == 'client' || f == 'clients') return 'Users';
     if (f == 'kyc') return 'KYC';

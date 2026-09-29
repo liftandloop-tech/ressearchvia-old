@@ -8,6 +8,7 @@ const Router = express.Router();
 
 const roleRoutes = () => {
     Router.post("/", auth.tokenVerified, checkPermission('Settings', 'create'), roleController.createRole);
+    Router.get("/public", roleController.getPublicRoles);
     Router.get("/", auth.tokenVerified, roleController.getRoles);
     Router.get("/:id", auth.tokenVerified, roleController.getRoleById);
     Router.put("/:id", auth.tokenVerified, checkPermission('Settings', 'update'), roleController.updateRole);

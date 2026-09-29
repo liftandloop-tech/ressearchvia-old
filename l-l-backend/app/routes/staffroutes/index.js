@@ -6,6 +6,7 @@ import staffDocController from "../../controller/staffDocController.js";
 import staffAttendanceController from "../../controller/staffAttendanceController.js";
 import applicantController from "../../controller/applicantController.js";
 import usersController from "../../controller/userController.js";
+import roleController from "../../controller/roleController.js";
 import { checkPermission, adminOnly, adminStrictOnlyNoStaff } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
@@ -28,6 +29,7 @@ const staffRoutes = () => {
     Router.post("/impersonate", auth.tokenVerified, adminOnly, checkPermission('Staff', 'login'), staffController.staffImpersonate)
 
     // Public applicant routes
+    Router.get("/applicant/roles", roleController.getPublicRoles)
     Router.post("/applicant/register", applicantController.registerApplicant)
     Router.post("/applicant/verify", applicantController.verifyOtp)
     Router.post("/applicant/upload-doc/:id", (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), applicantController.uploadApplicantDoc)

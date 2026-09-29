@@ -55,8 +55,15 @@ class MainDashboardController extends GetxController {
     }
 
     if (user.isAdmin) return;
-    if (currentRoute == AppRoutes.dashboard ||
-        currentRoute == AppRoutes.profile ||
+    if (currentRoute == AppRoutes.dashboard) {
+      if (!user.canAccessDepartmentPage('Dashboard')) {
+        print('User department does not have access to Dashboard. Redirecting to authorized route.');
+        Future.microtask(() => authController.navigateToAuthorizedRoute());
+        return;
+      }
+      return;
+    }
+    if (currentRoute == AppRoutes.profile ||
         currentRoute.startsWith('/profile')) return;
 
     bool isAllowed = true;

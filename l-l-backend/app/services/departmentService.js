@@ -24,7 +24,7 @@ const DEFAULT_DEPARTMENTS = [
         code: 'SALES',
         description: 'Lead generation, sales caller pools, client follow-ups, and engagement broadcasts.',
         isGlobal: false,
-        assignedPages: ['Leads', 'Users', 'Notifications']
+        assignedPages: ['Dashboard', 'Leads', 'Users', 'Notifications']
     },
     {
         name: 'Operations & Compliance',

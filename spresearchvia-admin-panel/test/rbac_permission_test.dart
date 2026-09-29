@@ -167,5 +167,65 @@ void main() {
       expect(hr.hasPermission('Leads', 'read'), isFalse);
       expect(hr.hasPermission('Settings', 'read'), isFalse);
     });
+
+    test('5. Department assignedPages Dashboard gating: Sales can view Dashboard, Research & Operations cannot', () {
+      // Sales user with Dashboard assigned
+      final salesUser = UserModel.fromJson({
+        '_id': 'sales1',
+        'fullName': 'Sales User',
+        'role': 'Sales Executive',
+        'isAdmin': false,
+        'departmentId': {
+          '_id': 'dept_sales',
+          'name': 'Sales & Relationship Management',
+          'code': 'SALES',
+          'isGlobal': false,
+          'assignedPages': ['Dashboard', 'Leads', 'Users', 'Notifications'],
+        }
+      });
+
+      // Research user without Dashboard assigned
+      final researchUser = UserModel.fromJson({
+        '_id': 'research1',
+        'fullName': 'Research User',
+        'role': 'Research Analyst',
+        'isAdmin': false,
+        'departmentId': {
+          '_id': 'dept_research',
+          'name': 'Research & Advisory',
+          'code': 'RESEARCH',
+          'isGlobal': false,
+          'assignedPages': ['Reports', 'Subscriptions'],
+        }
+      });
+
+      // Operations user without Dashboard assigned
+      final opsUser = UserModel.fromJson({
+        '_id': 'ops1',
+        'fullName': 'Operations User',
+        'role': 'Compliance Officer',
+        'isAdmin': false,
+        'departmentId': {
+          '_id': 'dept_ops',
+          'name': 'Operations & Compliance',
+          'code': 'OPERATIONS',
+          'isGlobal': false,
+          'assignedPages': ['Users', 'KYC', 'Payments'],
+        }
+      });
+
+      // Admin user
+      final adminUser = UserModel.fromJson({
+        '_id': 'admin1',
+        'fullName': 'Admin User',
+        'role': 'Admin',
+        'isAdmin': true,
+      });
+
+      expect(salesUser.canAccessDepartmentPage('Dashboard'), isTrue, reason: 'Sales department should have access to Dashboard');
+      expect(researchUser.canAccessDepartmentPage('Dashboard'), isFalse, reason: 'Research department should NOT have access to Dashboard');
+      expect(opsUser.canAccessDepartmentPage('Dashboard'), isFalse, reason: 'Operations department should NOT have access to Dashboard');
+      expect(adminUser.canAccessDepartmentPage('Dashboard'), isTrue, reason: 'Admin user should always have access to Dashboard');
+    });
   });
 }

@@ -107,11 +107,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         // 1. Applied Position & Personal Details
         _buildSectionTitle('1. Position & Personal Information'),
         const SizedBox(height: 14),
-        _buildTextField(
-          controller: controller.appliedPositionController,
-          label: 'Position Applied For *',
-          hint: 'e.g. Equity Research Analyst, Relationship Manager, Sales Executive',
-        ),
+        _buildRoleSelectorField(context, controller),
         const SizedBox(height: 14),
         Row(
           children: [
@@ -761,6 +757,382 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         border: const OutlineInputBorder(),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       ),
+    );
+  }
+
+  Widget _buildRoleSelectorField(BuildContext context, ApplicantRegistrationController controller) {
+    return Obx(() {
+      final isCustom = controller.isCustomRole.value;
+      final selectedRole = controller.selectedRole.value;
+      final isLoading = controller.isLoadingRoles.value;
+
+      if (isCustom) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: controller.appliedPositionController,
+                    label: 'Position Applied For *',
+                    hint: 'e.g. Senior Equity Research Analyst',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () => controller.setCustomRoleMode(false),
+                  icon: const Icon(Icons.list_alt, size: 16),
+                  label: const Text('Choose from openings', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ],
+        );
+      }
+
+      return InkWell(
+        onTap: () => _showRoleSelectionDialog(context, controller),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selectedRole != null ? const Color(0xFF1E3A5F) : const Color(0xFFCBD5E1),
+              width: selectedRole != null ? 1.5 : 1.0,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            color: selectedRole != null ? const Color(0xFFF8FAFC) : Colors.white,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.work_outline_rounded,
+                size: 20,
+                color: selectedRole != null ? const Color(0xFF1E3A5F) : const Color(0xFF94A3B8),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: selectedRole != null
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Position Applied For *',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  selectedRole['name']?.toString() ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (selectedRole['departmentName'] != null &&
+                              selectedRole['departmentName'].toString().isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE0E7FF),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.business_rounded, size: 12, color: Color(0xFF3730A3)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    selectedRole['departmentName'].toString(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF3730A3),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Position Applied For *',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isLoading ? 'Loading open roles from database...' : 'Select or search open position...',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isLoading ? Colors.grey : const Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              if (isLoading)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(
+                  Icons.arrow_drop_down_rounded,
+                  color: selectedRole != null ? const Color(0xFF1E3A5F) : const Color(0xFF64748B),
+                ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  void _showRoleSelectionDialog(BuildContext context, ApplicantRegistrationController controller) {
+    final searchCtrl = TextEditingController();
+    final searchQuery = ''.obs;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: Container(
+            width: 540,
+            constraints: const BoxConstraints(maxHeight: 580),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.work_outline_rounded, color: Color(0xFF2563EB), size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Select Open Role',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'Filter by role title or department',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: searchCtrl,
+                  onChanged: (val) => searchQuery.value = val.trim().toLowerCase(),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search roles (e.g. Sales, Research, Analyst)...',
+                    prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
+                    suffixIcon: Obx(() => searchQuery.value.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 16),
+                            onPressed: () {
+                              searchCtrl.clear();
+                              searchQuery.value = '';
+                            },
+                          )
+                        : const SizedBox.shrink()),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: Obx(() {
+                    if (controller.isLoadingRoles.value) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final query = searchQuery.value;
+                    final filtered = controller.openRoles.where((r) {
+                      if (query.isEmpty) return true;
+                      final name = (r['name'] ?? '').toString().toLowerCase();
+                      final dept = (r['departmentName'] ?? '').toString().toLowerCase();
+                      final code = (r['code'] ?? '').toString().toLowerCase();
+                      final desc = (r['description'] ?? '').toString().toLowerCase();
+                      return name.contains(query) || dept.contains(query) || code.contains(query) || desc.contains(query);
+                    }).toList();
+
+                    if (filtered.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.search_off_rounded, size: 40, color: Color(0xFF94A3B8)),
+                              const SizedBox(height: 8),
+                              Text(
+                                query.isEmpty ? 'No open roles available currently' : 'No roles matching "$query"',
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.of(dialogCtx).pop();
+                                  controller.setCustomRoleMode(true);
+                                  if (query.isNotEmpty) {
+                                    controller.appliedPositionController.text = searchCtrl.text.trim();
+                                  }
+                                },
+                                icon: const Icon(Icons.edit, size: 16),
+                                label: const Text('Enter Custom Role Title'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      itemBuilder: (context, idx) {
+                        final role = filtered[idx];
+                        final isSelected = controller.selectedRole.value?['id'] == role['id'] ||
+                            controller.selectedRole.value?['_id'] == role['_id'] ||
+                            controller.appliedPositionController.text.trim() == role['name'];
+
+                        final deptName = role['departmentName']?.toString() ?? '';
+                        final desc = role['description']?.toString() ?? '';
+
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          tileColor: isSelected ? const Color(0xFFEFF6FF) : null,
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  role['name']?.toString() ?? '',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              if (deptName.isNotEmpty) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Text(
+                                    deptName,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: desc.isNotEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    desc,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                )
+                              : null,
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: Color(0xFF2563EB), size: 20)
+                              : null,
+                          onTap: () {
+                            controller.selectRole(role);
+                            Navigator.of(dialogCtx).pop();
+                          },
+                        );
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(dialogCtx).pop();
+                        controller.setCustomRoleMode(true);
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 15),
+                      label: const Text('Not listed? Enter custom position', style: TextStyle(fontSize: 12)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                      child: const Text('Cancel', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -48,7 +48,9 @@ class DashboardNavBar extends StatelessWidget {
         items = allItems
             .map((item) {
               final title = item['title'] as String;
-              if (title == 'Dashboard') return item;
+              if (title == 'Dashboard') {
+                return (user?.canAccessDepartmentPage('Dashboard') ?? false) ? item : null;
+              }
 
               if (title == 'Clients' || title == 'Users') {
                 final canAccessUsers = user?.canAccessDepartmentPage('Users') ?? false;

@@ -154,6 +154,33 @@ const roleService = {
         } catch (error) {
             return { status: 400, message: error.message, data: {} };
         }
+    },
+
+    getPublicRoles: async () => {
+        try {
+            const roles = await roleModel.find({
+                isActive: true,
+                name: { $nin: ['Admin', 'admin'] }
+            })
+            .populate('departmentId', 'name code')
+            .sort({ name: 1 })
+            .lean();
+
+            const formatted = roles.map(r => ({
+                id: r._id,
+                _id: r._id,
+                name: r.name,
+                code: r.code || '',
+                description: r.description || '',
+                departmentId: r.departmentId?._id || null,
+                departmentName: r.departmentId?.name || '',
+                departmentCode: r.departmentId?.code || ''
+            }));
+
+            return { status: 200, message: "Public roles fetched successfully", data: formatted };
+        } catch (error) {
+            return { status: 400, message: error.message, data: [] };
+        }
     }
 };
 

@@ -389,6 +389,14 @@ class AuthController extends GetxController {
       Get.offAllNamed(AppRoutes.users);
       return;
     }
+    if (user.canAccessDepartmentPage('KYC')) {
+      Get.offAllNamed(AppRoutes.kyc);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Payments')) {
+      Get.offAllNamed(AppRoutes.pendingPayments);
+      return;
+    }
     if (user.canAccessDepartmentPage('Leads')) {
       Get.offAllNamed(AppRoutes.leads);
       return;
@@ -401,10 +409,18 @@ class AuthController extends GetxController {
       Get.offAllNamed(AppRoutes.subscriptions);
       return;
     }
+    if (user.canAccessDepartmentPage('Notifications')) {
+      Get.offAllNamed(AppRoutes.notifications);
+      return;
+    }
     if (user.canAccessDepartmentPage('Settings')) {
       Get.offAllNamed(AppRoutes.settings);
       return;
     }
-    Get.offAllNamed(AppRoutes.dashboard);
+    if (user.canAccessDepartmentPage('Attendance')) {
+      Get.offAllNamed(AppRoutes.attendance);
+      return;
+    }
+    Get.offAllNamed(AppRoutes.profile);
   }
 }

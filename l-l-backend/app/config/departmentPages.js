@@ -1,5 +1,11 @@
 export const AVAILABLE_DEPARTMENT_PAGES = [
     {
+        key: 'Dashboard',
+        label: 'Dashboard (Sales & Revenue)',
+        description: 'Sales conversion metrics, performance graphs, revenue breakdown, and caller pool stats',
+        features: ['Dashboard']
+    },
+    {
         key: 'Leads',
         label: 'Leads & Sales Pools',
         description: 'Lead distribution, pools, bulk import, follow-ups, and pull stats',

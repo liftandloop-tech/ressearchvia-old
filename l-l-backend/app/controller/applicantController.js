@@ -2,6 +2,7 @@ import staffModel from "../models/staffModel.js";
 import emailService from "../services/emailService.js";
 import axios from "axios";
 import { resolveRoleAndDepartment } from "../services/staffService.js";
+import roleModel from "../models/roleModel.js";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 
@@ -55,10 +56,17 @@ const sendEmailOtp = async (email, otp) => {
 const applicantController = {
     registerApplicant: async (req, res) => {
         try {
-            const { fullName, mobileNumber, emailAddress, dob, gender, currentAddress, permanentAddress, emergencyContact, experienceYears, previousCompany, lastCtc } = req.body;
+            const { fullName, mobileNumber, emailAddress, dob, gender, currentAddress, permanentAddress, emergencyContact, experienceYears, previousCompany, lastCtc, appliedRoleId } = req.body;
 
             if (!fullName || !mobileNumber || !emailAddress) {
                 return res.status(400).send({ status: 400, message: "Full Name, Mobile, and Email are required", data: {} });
+            }
+
+            let roleDoc = null;
+            if (appliedRoleId) {
+                roleDoc = await roleModel.findById(appliedRoleId);
+            } else if (req.body.walkInForm?.appliedPosition) {
+                roleDoc = await roleModel.findOne({ name: { $regex: new RegExp(`^${req.body.walkInForm.appliedPosition.trim()}$`, 'i') } });
             }
 
             let applicant = await staffModel.findOne({
@@ -88,6 +96,11 @@ const applicantController = {
                 applicant.experienceYears = experienceYears;
                 applicant.previousCompany = previousCompany;
                 applicant.lastCtc = lastCtc;
+                if (roleDoc) {
+                    applicant.roleId = roleDoc._id;
+                    applicant.role = roleDoc.name;
+                    if (roleDoc.departmentId) applicant.departmentId = roleDoc.departmentId;
+                }
                 if (req.body.walkInForm) {
                     applicant.walkInForm = req.body.walkInForm;
                     applicant.markModified('walkInForm');
@@ -119,6 +132,9 @@ const applicantController = {
                     experienceYears,
                     previousCompany,
                     lastCtc,
+                    roleId: roleDoc ? roleDoc._id : null,
+                    role: roleDoc ? roleDoc.name : (req.body.walkInForm?.appliedPosition || null),
+                    departmentId: roleDoc?.departmentId ? roleDoc.departmentId : null,
                     walkInForm: req.body.walkInForm || {},
                     stage: 'Applicant',
                     mobileOtp,

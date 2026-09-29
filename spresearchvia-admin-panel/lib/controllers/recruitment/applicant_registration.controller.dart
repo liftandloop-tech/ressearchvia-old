@@ -13,6 +13,12 @@ class ApplicantRegistrationController extends GetxController {
   var applicantId = ''.obs;
   var currentApplicant = Rxn<StaffModel>();
 
+  // Dynamic Open Roles from DB
+  var openRoles = <Map<String, dynamic>>[].obs;
+  var isLoadingRoles = false.obs;
+  var selectedRole = Rxn<Map<String, dynamic>>();
+  var isCustomRole = false.obs;
+
   // Text Form fields - Personal
   final appliedPositionController = TextEditingController();
   final nameController = TextEditingController();
@@ -86,6 +92,35 @@ class ApplicantRegistrationController extends GetxController {
   void onInit() {
     super.onInit();
     initDefaultEducationEntries();
+    fetchPublicRoles();
+  }
+
+  Future<void> fetchPublicRoles() async {
+    isLoadingRoles.value = true;
+    try {
+      final roles = await _applicantService.getPublicRoles();
+      openRoles.assignAll(roles);
+    } catch (e) {
+      debugPrint('Error fetching open roles: $e');
+    } finally {
+      isLoadingRoles.value = false;
+    }
+  }
+
+  void selectRole(Map<String, dynamic>? role) {
+    selectedRole.value = role;
+    if (role != null) {
+      appliedPositionController.text = role['name']?.toString() ?? '';
+      isCustomRole.value = false;
+    }
+  }
+
+  void setCustomRoleMode(bool isCustom) {
+    isCustomRole.value = isCustom;
+    if (isCustom) {
+      selectedRole.value = null;
+      appliedPositionController.clear();
+    }
   }
 
   void initDefaultEducationEntries() {
@@ -203,6 +238,7 @@ class ApplicantRegistrationController extends GetxController {
         'experienceYears': int.tryParse(experienceYearsController.text.trim()) ?? 0,
         'previousCompany': previousCompanyController.text.trim().isEmpty ? null : previousCompanyController.text.trim(),
         'lastCtc': lastCtcController.text.trim().isEmpty ? null : lastCtcController.text.trim(),
+        'appliedRoleId': selectedRole.value?['id'] ?? selectedRole.value?['_id'],
         'walkInForm': walkIn.toJson(),
       };
 
