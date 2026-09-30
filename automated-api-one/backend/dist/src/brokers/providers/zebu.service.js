@@ -213,15 +213,13 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             throw new common_1.BadRequestException('Please link your Zebu broker details first');
         }
         let clientId = userBroker.apiKey || userBroker.brokerClientId || '';
-        if (clientId && !clientId.includes('_')) {
-            clientId = `${clientId}_U`;
-        }
         return `https://go.mynt.in/OAuthlogin/authorize/oauth?client_id=${clientId}&state=${state}`;
     }
     async completeAuthorization(callbackData) {
         this.logger.log(`Completing Zebu OAuth authorization`);
         const authCode = callbackData.params.code;
         const queryClientId = callbackData.params.client_id;
+        const userId = callbackData.params.userId;
         if (!authCode) {
             throw new common_1.BadRequestException('Authorization code (code) is missing in callback data');
         }
@@ -234,25 +232,31 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 brokerUserId: queryClientId || 'mock_zebu_client',
             };
         }
-        let cleanClient = queryClientId || '';
-        if (cleanClient.endsWith('_U')) {
-            cleanClient = cleanClient.slice(0, -2);
+        let userBroker = null;
+        if (userId) {
+            userBroker = await this.prisma.userBroker.findFirst({
+                where: { userId, broker: { code: 'ZEBU' } },
+            });
         }
-        const userBroker = await this.prisma.userBroker.findFirst({
-            where: {
-                OR: [
-                    { brokerClientId: cleanClient },
-                    { apiKey: queryClientId },
-                ],
-            },
-        });
+        if (!userBroker && queryClientId) {
+            let cleanClient = queryClientId;
+            if (cleanClient.endsWith('_U')) {
+                cleanClient = cleanClient.slice(0, -2);
+            }
+            userBroker = await this.prisma.userBroker.findFirst({
+                where: {
+                    OR: [
+                        { brokerClientId: cleanClient },
+                        { brokerClientId: queryClientId },
+                        { apiKey: queryClientId },
+                    ],
+                },
+            });
+        }
         if (!userBroker) {
-            throw new common_1.BadRequestException(`Linked Zebu broker config not found for client_id: ${queryClientId}`);
+            throw new common_1.BadRequestException(`Linked Zebu broker config not found for authorization callback (userId: ${userId || 'N/A'}, client_id: ${queryClientId || 'N/A'})`);
         }
-        let oauthAppId = userBroker.apiKey || userBroker.brokerClientId || '';
-        if (oauthAppId && !oauthAppId.includes('_')) {
-            oauthAppId = `${oauthAppId}_U`;
-        }
+        const oauthAppId = userBroker.apiKey || userBroker.brokerClientId || '';
         const apiSecret = userBroker.apiSecret || '';
         const hashString = `${oauthAppId}${apiSecret}${authCode}`;
         const checkSum = (0, crypto_1.createHash)('sha256').update(hashString).digest('hex');

@@ -262,9 +262,6 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
       throw new BadRequestException('Please link your Zebu broker details first');
     }
     let clientId = userBroker.apiKey || userBroker.brokerClientId || '';
-    if (clientId && !clientId.includes('_')) {
-      clientId = `${clientId}_U`;
-    }
     return `https://go.mynt.in/OAuthlogin/authorize/oauth?client_id=${clientId}&state=${state}`;
   }
 
@@ -272,6 +269,7 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
     this.logger.log(`Completing Zebu OAuth authorization`);
     const authCode = callbackData.params.code;
     const queryClientId = callbackData.params.client_id;
+    const userId = callbackData.params.userId;
     if (!authCode) {
       throw new BadRequestException('Authorization code (code) is missing in callback data');
     }
@@ -286,33 +284,43 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
       };
     }
 
-    // Resolve UserBroker by queryClientId to fetch apiSecret
-    let cleanClient = queryClientId || '';
-    if (cleanClient.endsWith('_U')) {
-      cleanClient = cleanClient.slice(0, -2);
+    // Resolve UserBroker:
+    // 1. By authenticated userId if passed from controller (most reliable when Zebu only returns ?code=...&state=...)
+    // 2. By queryClientId (if provided in callback params)
+    let userBroker: any = null;
+    if (userId) {
+      userBroker = await this.prisma.userBroker.findFirst({
+        where: { userId, broker: { code: 'ZEBU' } },
+      });
     }
 
-    const userBroker = await this.prisma.userBroker.findFirst({
-      where: {
-        OR: [
-          { brokerClientId: cleanClient },
-          { apiKey: queryClientId },
-        ],
-      },
-    });
+    if (!userBroker && queryClientId) {
+      let cleanClient = queryClientId;
+      if (cleanClient.endsWith('_U')) {
+        cleanClient = cleanClient.slice(0, -2);
+      }
+      userBroker = await this.prisma.userBroker.findFirst({
+        where: {
+          OR: [
+            { brokerClientId: cleanClient },
+            { brokerClientId: queryClientId },
+            { apiKey: queryClientId },
+          ],
+        },
+      });
+    }
 
     if (!userBroker) {
-      throw new BadRequestException(`Linked Zebu broker config not found for client_id: ${queryClientId}`);
+      throw new BadRequestException(
+        `Linked Zebu broker config not found for authorization callback (userId: ${userId || 'N/A'}, client_id: ${queryClientId || 'N/A'})`,
+      );
     }
 
-    let oauthAppId = userBroker.apiKey || userBroker.brokerClientId || '';
-    if (oauthAppId && !oauthAppId.includes('_')) {
-      oauthAppId = `${oauthAppId}_U`;
-    }
+    const oauthAppId = userBroker.apiKey || userBroker.brokerClientId || '';
     const apiSecret = userBroker.apiSecret || '';
 
-    // Generate SHA-256 Checksum for GenAcsTok:
-    // SHA256(client_id + api_secret + code)
+    // Generate SHA-256 Checksum for GenAcsTok per Zebu documentation:
+    // SHA256(client_id + secret_key + code) in lowercase hex
     const hashString = `${oauthAppId}${apiSecret}${authCode}`;
     const checkSum = createHash('sha256').update(hashString).digest('hex');
 

@@ -310,7 +310,12 @@ let BrokersController = class BrokersController {
         try {
             const brokerType = brokerCode;
             const adapter = this.brokerFactory.getAdapter(brokerType);
-            const session = await adapter.completeAuthorization({ params: queryParams });
+            const session = await adapter.completeAuthorization({
+                params: {
+                    ...queryParams,
+                    userId: dbState.userId,
+                },
+            });
             let broker = await this.prisma.broker.findFirst({
                 where: { code: brokerCode },
             });
