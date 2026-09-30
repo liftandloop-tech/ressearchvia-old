@@ -129,6 +129,10 @@ class UserManagementController extends GetxController {
     String? sortBy,
     String? sortOrder,
   }) async {
+    if (isLoading.value) {
+      debugPrint('UserManagementController: fetchUsers already in progress, skipping duplicate.');
+      return;
+    }
     if (page != null) currentPage.value = page;
     if (pageSize != null) this.pageSize.value = pageSize;
     if (search != null) searchQuery.value = search;

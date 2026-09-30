@@ -116,7 +116,8 @@ export const salesRevenueService = {
         model: segmentsPlansModel,
         select: 'planName price duration'
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     // 6. Aggregate Realized Revenue & GST breakdown
     let grossTurnover = 0.0;

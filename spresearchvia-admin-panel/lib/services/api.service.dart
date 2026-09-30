@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,23 +6,18 @@ import '../config/routes.config.dart';
 import 'inactivity.service.dart';
 
 class ApiService extends GetConnect {
-  static final Map<String, Future<dynamic>> _inflightRequests = {};
-  static final Map<String, Response> _responseCache = {};
-  static final Map<String, DateTime> _cacheTimestamps = {};
-
   ApiService() {
     httpClient.baseUrl = AppConfig.apiBaseUrl;
-    httpClient.timeout = const Duration(seconds: 30);
+    httpClient.timeout = const Duration(seconds: 15);
     _initializeModifiers();
   }
 
   @override
   void onInit() {
     super.onInit();
-    // Fallback if needed
     if (httpClient.baseUrl == null) {
       httpClient.baseUrl = AppConfig.apiBaseUrl;
-      httpClient.timeout = const Duration(seconds: 30);
+      httpClient.timeout = const Duration(seconds: 15);
     }
   }
 
@@ -37,195 +30,18 @@ class ApiService extends GetConnect {
     Decoder<T>? decoder,
     bool forceRefresh = false,
     int cacheTtlSeconds = 0,
-  }) async {
-    final key = _generateFingerprint('GET', url, query);
-
-    // 1. Check Cache (Disabled by default: only used if caller explicitly requested caching with cacheTtlSeconds > 0)
-    if (!forceRefresh && cacheTtlSeconds > 0 && _responseCache.containsKey(key)) {
-      final timestamp = _cacheTimestamps[key];
-      if (timestamp != null &&
-          DateTime.now().difference(timestamp).inSeconds < cacheTtlSeconds) {
-        debugPrint('ApiService: CACHE HIT: $url');
-        return _responseCache[key]! as Response<T>;
-      }
-    }
-
-    // 2. Check In-flight (Deduplication) - only deduplicate if NOT explicitly force-refreshed
-    if (!forceRefresh && _inflightRequests.containsKey(key)) {
-      debugPrint('ApiService: DEDUPLICATING GET: $url');
-      return _inflightRequests[key]! as Future<Response<T>>;
-    }
-
-    final future = super.get<T>(
+  }) {
+    return super.get<T>(
       url,
       headers: headers,
       contentType: contentType,
       query: query,
       decoder: decoder,
     );
-
-    _inflightRequests[key] = future;
-
-    try {
-      final response = await future;
-
-      // 3. Store in Cache on Success only if caching was explicitly requested
-      if (!response.status.hasError && cacheTtlSeconds > 0) {
-        _responseCache[key] = response;
-        _cacheTimestamps[key] = DateTime.now();
-      }
-
-      return response;
-    } catch (e) {
-      rethrow;
-    } finally {
-      _inflightRequests.remove(key);
-    }
-  }
-
-  @override
-  Future<Response<T>> post<T>(
-    String? url,
-    dynamic body, {
-    String? contentType,
-    Map<String, String>? headers,
-    Map<String, dynamic>? query,
-    Decoder<T>? decoder,
-    Progress? uploadProgress,
-  }) async {
-    clearAllCache();
-    final response = await super.post<T>(
-      url,
-      body,
-      contentType: contentType,
-      headers: headers,
-      query: query,
-      decoder: decoder,
-      uploadProgress: uploadProgress,
-    );
-    clearAllCache();
-    return response;
-  }
-
-  @override
-  Future<Response<T>> put<T>(
-    String url,
-    dynamic body, {
-    String? contentType,
-    Map<String, String>? headers,
-    Map<String, dynamic>? query,
-    Decoder<T>? decoder,
-    Progress? uploadProgress,
-  }) async {
-    clearAllCache();
-    final response = await super.put<T>(
-      url,
-      body,
-      contentType: contentType,
-      headers: headers,
-      query: query,
-      decoder: decoder,
-      uploadProgress: uploadProgress,
-    );
-    clearAllCache();
-    return response;
-  }
-
-  @override
-  Future<Response<T>> delete<T>(
-    String url, {
-    Map<String, String>? headers,
-    String? contentType,
-    Map<String, dynamic>? query,
-    Decoder<T>? decoder,
-  }) async {
-    clearAllCache();
-    final response = await super.delete<T>(
-      url,
-      headers: headers,
-      contentType: contentType,
-      query: query,
-      decoder: decoder,
-    );
-    clearAllCache();
-    return response;
-  }
-
-  @override
-  Future<Response<T>> patch<T>(
-    String url,
-    dynamic body, {
-    String? contentType,
-    Map<String, String>? headers,
-    Map<String, dynamic>? query,
-    Decoder<T>? decoder,
-    Progress? uploadProgress,
-  }) async {
-    clearAllCache();
-    final response = await super.patch<T>(
-      url,
-      body,
-      contentType: contentType,
-      headers: headers,
-      query: query,
-      decoder: decoder,
-      uploadProgress: uploadProgress,
-    );
-    clearAllCache();
-    return response;
-  }
-
-  @override
-  Future<Response<T>> request<T>(
-    String url,
-    String method, {
-    dynamic body,
-    String? contentType,
-    Map<String, String>? headers,
-    Map<String, dynamic>? query,
-    Decoder<T>? decoder,
-    Progress? uploadProgress,
-  }) async {
-    if (method.toUpperCase() != 'GET') {
-      clearAllCache();
-    }
-    final response = await super.request<T>(
-      url,
-      method,
-      body: body,
-      contentType: contentType,
-      headers: headers,
-      query: query,
-      decoder: decoder,
-      uploadProgress: uploadProgress,
-    );
-    if (method.toUpperCase() != 'GET') {
-      clearAllCache();
-    }
-    return response;
-  }
-
-  String _generateFingerprint(
-    String method,
-    String path,
-    Map<String, dynamic>? params,
-  ) {
-    try {
-      // Sort keys for consistent hashing
-      final sortedParams = params == null
-          ? {}
-          : SplayTreeMap<String, dynamic>.from(params);
-      return '$method:$path:${jsonEncode(sortedParams)}';
-    } catch (_) {
-      return '$method:$path:${params?.toString() ?? ""}';
-    }
   }
 
   static void clearAllCache() {
-    _responseCache.clear();
-    _cacheTimestamps.clear();
-    _inflightRequests.clear();
-    debugPrint('ApiService: All cache & in-flight requests cleared');
+    // Safe no-op kept for backwards compatibility with existing callers
   }
 
   void clearCache() => clearAllCache();

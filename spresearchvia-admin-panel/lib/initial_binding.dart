@@ -55,20 +55,22 @@ class InitialBinding extends Bindings {
     Get.put(LeadService(), permanent: true);
     Get.put(PermissionService(), permanent: true);
 
-    // Controllers (Permanent singletons for zero-lag tab transitions & instant caching)
+    // Controllers (Essential root singletons)
     Get.put(AuthController(), permanent: true);
     Get.put(MainDashboardController(), permanent: true);
-    Get.put(DashboardManagementController(), permanent: true);
-    Get.put(UserManagementController(), permanent: true);
-    Get.put(StaffManagementController(), permanent: true);
-    Get.put(SubscriptionManagementController(), permanent: true);
-    Get.put(ReportManagementController(), permanent: true);
-    Get.put(KycManagementController(), permanent: true);
-    Get.put(ResearchNotificationController(), permanent: true);
 
-    // Navigation Controllers
-    Get.put(UsersNavigationController(), permanent: true);
-    Get.put(ReportsNavigationController(), permanent: true);
-    Get.put(SubscriptionNavigationController(), permanent: true);
+    // Domain Controllers (Lazy loaded on-demand per route to prevent startup bottleneck)
+    Get.lazyPut(() => DashboardManagementController(), fenix: true);
+    Get.lazyPut(() => UserManagementController(), fenix: true);
+    Get.lazyPut(() => StaffManagementController(), fenix: true);
+    Get.lazyPut(() => SubscriptionManagementController(), fenix: true);
+    Get.lazyPut(() => ReportManagementController(), fenix: true);
+    Get.lazyPut(() => KycManagementController(), fenix: true);
+    Get.lazyPut(() => ResearchNotificationController(), fenix: true);
+
+    // Navigation Controllers (Lazy loaded on-demand)
+    Get.lazyPut(() => UsersNavigationController(), fenix: true);
+    Get.lazyPut(() => ReportsNavigationController(), fenix: true);
+    Get.lazyPut(() => SubscriptionNavigationController(), fenix: true);
   }
 }

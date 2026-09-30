@@ -22,8 +22,14 @@ class ResearchNotificationController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchLiveActivities(initial: true);
-    _startPolling();
+    // Only start polling if user is already authenticated
+    if (Get.isRegistered<AuthController>()) {
+      final auth = Get.find<AuthController>();
+      if (auth.isAuthenticated.value) {
+        fetchLiveActivities(initial: true);
+        _startPolling();
+      }
+    }
   }
 
   @override
@@ -34,8 +40,8 @@ class ResearchNotificationController extends GetxController {
 
   void _startPolling() {
     _pollingTimer?.cancel();
-    // Check every 5 seconds for live research activities
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Check every 30 seconds for live research activities
+    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       fetchLiveActivities();
     });
   }
