@@ -8,9 +8,11 @@ import { BrokerRegistry } from './registry/broker.registry';
 import { BrokerFactory } from './factory/broker.factory';
 import { PrismaService } from '../prisma.service';
 import { BrokerSessionService } from './services/broker-session.service';
+import { ZebuWebSocketService } from './services/zebu-websocket.service';
 import { AuditModule } from '../audit/audit.module';
 import { InfrastructureModule } from '../infrastructure/infrastructure.module';
 import { InstrumentsModule } from '../instruments/instruments.module';
+import { TradingModule } from '../trading/trading.module';
 
 @Module({
   imports: [
@@ -18,6 +20,7 @@ import { InstrumentsModule } from '../instruments/instruments.module';
     AuditModule,
     InfrastructureModule,
     forwardRef(() => InstrumentsModule),
+    forwardRef(() => TradingModule),
   ],
   controllers: [BrokersController],
   providers: [
@@ -27,12 +30,21 @@ import { InstrumentsModule } from '../instruments/instruments.module';
     BrokerRegistry,
     BrokerFactory,
     BrokerSessionService,
+    ZebuWebSocketService,
     {
       provide: BrokerAdapter,
       useClass: AngelOneService,
     },
   ],
-  exports: [BrokerAdapter, BrokerRegistry, BrokerFactory, BrokerSessionService, AngelOneService, ZebuService],
+  exports: [
+    BrokerAdapter,
+    BrokerRegistry,
+    BrokerFactory,
+    BrokerSessionService,
+    AngelOneService,
+    ZebuService,
+    ZebuWebSocketService,
+  ],
 })
 export class BrokersModule {}
 

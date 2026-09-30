@@ -26,6 +26,21 @@ export declare class OrderMonitoringService {
     private readonly brokerTimeoutMs;
     constructor(prisma: PrismaService, brokerFactory: BrokerFactory, circuitBreaker: CircuitBreakerService, outbox: OutboxService, auditService: AuditService, positionCache: PositionCacheService, multiplierService: MultiplierService, configService: ConfigService, metrics: MetricsService);
     pollOrderStatus(orderId: string, correlationId: string): Promise<MonitoringResult>;
+    processBrokerWebhookOrderUpdate(params: {
+        brokerOrderId: string;
+        status: string;
+        exchange?: string;
+        symbol?: string;
+        averagePrice?: number;
+        filledQuantity?: number;
+        rejectionReason?: string;
+        correlationId?: string;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        orderId?: string;
+        status?: string;
+    }>;
     private reconcileFilled;
     private reconcileFailed;
 }

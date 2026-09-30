@@ -6,6 +6,7 @@ import { RedisService } from '../infrastructure/redis/redis.service';
 import { QueueService } from '../infrastructure/queues/queues.service';
 import { MetricsService } from '../infrastructure/metrics/metrics.service';
 import { BrokerSessionService } from '../brokers/services/broker-session.service';
+import { BrokerFactory } from '../brokers/factory/broker.factory';
 import { OperationsAction, OperationStatus, TradeStatus } from '@prisma/client';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
 import { AlertingService } from '../notifications/alerting.service';
@@ -91,6 +92,12 @@ describe('OpsService', () => {
             resolveAlert: jest.fn().mockResolvedValue({}),
           },
         },
+        {
+          provide: BrokerFactory,
+          useValue: {
+            getAdapter: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -154,7 +161,7 @@ describe('OpsService', () => {
       expect(res.operationId).toBeDefined();
       expect(queueService.addJob).toHaveBeenCalledWith(
         'trade-execution',
-        expect.stringContaining('signal:signal-1:'),
+        expect.stringMatching(/signal[-:]signal-1/),
         { signalId: 'signal-1' },
       );
       expect(prisma.operationsAudit.create).toHaveBeenCalled();

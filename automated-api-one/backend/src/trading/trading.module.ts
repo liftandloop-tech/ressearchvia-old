@@ -55,6 +55,6 @@ import { Queues } from '../infrastructure/queues/queue.constants';
     OrderPlacementProcessor,
     OrderMonitoringProcessor,
   ],
-  exports: [TradingService, SignalOrchestratorService, PositionCacheService, PositionSizingService],
+  exports: [TradingService, SignalOrchestratorService, PositionCacheService, PositionSizingService, OrderMonitoringService],
 })
 export class TradingModule {}

@@ -12,6 +12,9 @@ import {
   Param,
   Query,
   Res,
+  Inject,
+  forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import * as crypto from 'crypto';
@@ -22,6 +25,8 @@ import { BrokerSessionService } from './services/broker-session.service';
 import { BrokerType } from './interfaces/broker-type.enum';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../infrastructure/redis/redis.service';
+import { OrderMonitoringService } from '../trading/services/order-monitoring.service';
+import { ZebuWebSocketService } from './services/zebu-websocket.service';
 import {
   IsNotEmpty,
   IsString,
@@ -68,11 +73,16 @@ export class AuthorizeBrokerDto {
 
 @Controller('brokers')
 export class BrokersController {
+  private readonly logger = new Logger(BrokersController.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly brokerFactory: BrokerFactory,
     private readonly brokerSessionService: BrokerSessionService,
     private readonly redisService: RedisService,
+    @Inject(forwardRef(() => OrderMonitoringService))
+    private readonly orderMonitoringService: OrderMonitoringService,
+    private readonly zebuWebSocketService: ZebuWebSocketService,
   ) {}
 
 
@@ -693,5 +703,156 @@ export class BrokersController {
     } catch (_) {}
 
     return result;
+  }
+
+  // ===========================================================================
+  // Real-Time Broker Order Webhooks / Postbacks
+  // ===========================================================================
+
+  @Post(':brokerCode/postback')
+  @HttpCode(HttpStatus.OK)
+  async handleBrokerPostback(
+    @Param('brokerCode') brokerCodeStr: string,
+    @Body() payload: any,
+  ) {
+    return this.processIncomingPostback(brokerCodeStr, payload);
+  }
+
+  @Post(':brokerCode/webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleBrokerWebhook(
+    @Param('brokerCode') brokerCodeStr: string,
+    @Body() payload: any,
+  ) {
+    return this.processIncomingPostback(brokerCodeStr, payload);
+  }
+
+  @Post('angel-one/postback')
+  @HttpCode(HttpStatus.OK)
+  async handleAngelOnePostback(@Body() payload: any) {
+    return this.processIncomingPostback('ANGEL_ONE', payload);
+  }
+
+  @Post('zebu/postback')
+  @HttpCode(HttpStatus.OK)
+  async handleZebuPostback(@Body() payload: any) {
+    return this.processIncomingPostback('ZEBU', payload);
+  }
+
+  private async processIncomingPostback(brokerCodeStr: string, rawPayload: any) {
+    let payload = rawPayload;
+    if (typeof payload === 'string') {
+      try {
+        payload = JSON.parse(payload);
+      } catch {
+        // Fallback for form-encoded payload containing jData
+        if (payload.includes('jData=')) {
+          const match = payload.match(/jData=({.*?})/);
+          if (match && match[1]) {
+            try {
+              payload = JSON.parse(match[1]);
+            } catch (_) {}
+          }
+        }
+      }
+    }
+
+    if (payload && payload.jData && typeof payload.jData === 'string') {
+      try {
+        payload = JSON.parse(payload.jData);
+      } catch (_) {}
+    } else if (payload && payload.data && typeof payload.data === 'object') {
+      payload = payload.data;
+    }
+
+    const brokerCode = (brokerCodeStr || '').toUpperCase().replace('-', '_');
+    this.logger.log(`[Broker Postback] Received webhook from ${brokerCode}: ${JSON.stringify(payload)}`);
+
+    // Check if this is a Zebu WebSocket connection/activation handshake payload:
+    // e.g. {"accesstoken":"...","t":"a","actid":"ZP00285","uid":"ZP00285","source":"API"}
+    const zebuClientCode = payload.actid || payload.uid;
+    const zebuAccessToken = payload.accesstoken || payload.accessToken;
+    if (
+      (brokerCode === 'ZEBU' || payload.source === 'API' || payload.t === 'a') &&
+      zebuClientCode &&
+      zebuAccessToken &&
+      (payload.t === 'a' || (!payload.norenordno && !payload.orderid && !payload.brokerOrderId))
+    ) {
+      this.logger.log(
+        `[Broker Postback] Received Zebu handshake payload for ${zebuClientCode}. Connecting to WebSocket stream wss://go.mynt.in/NorenWSAPI/...`,
+      );
+      this.zebuWebSocketService.connectUser(zebuClientCode, zebuAccessToken);
+      return {
+        success: true,
+        message: `Zebu WebSocket order stream initialized successfully for ${zebuClientCode} at wss://go.mynt.in/NorenWSAPI/`,
+        broker: 'ZEBU',
+        clientCode: zebuClientCode,
+        wsUrl: 'wss://go.mynt.in/NorenWSAPI/',
+      };
+    }
+
+    let brokerOrderId = '';
+    let status = '';
+    let averagePrice: number | undefined;
+    let filledQuantity: number | undefined;
+    let rejectionReason: string | undefined;
+
+    if (brokerCode === 'ANGEL_ONE' || brokerCode === 'ANGEL') {
+      // Angel One SmartAPI postback format
+      brokerOrderId =
+        payload.orderid ||
+        payload.orderId ||
+        payload.order_id ||
+        payload.brokerOrderId ||
+        '';
+      status = payload.orderstatus || payload.status || '';
+      if (payload.averageprice || payload.avgPrice) {
+        averagePrice = parseFloat(payload.averageprice || payload.avgPrice);
+      }
+      if (payload.filledshares || payload.filledQuantity) {
+        filledQuantity = parseInt(payload.filledshares || payload.filledQuantity, 10);
+      }
+      rejectionReason = payload.text || payload.reason || payload.message;
+    } else if (brokerCode === 'ZEBU') {
+      // Zebu Noren postback format
+      brokerOrderId =
+        payload.norenordno ||
+        payload.orderid ||
+        payload.orderId ||
+        payload.brokerOrderId ||
+        '';
+      status = payload.status || payload.orderstatus || '';
+      if (payload.avgprc || payload.averageprice) {
+        averagePrice = parseFloat(payload.avgprc || payload.averageprice);
+      }
+      if (payload.fillshares || payload.filledshares) {
+        filledQuantity = parseInt(payload.fillshares || payload.filledshares, 10);
+      }
+      rejectionReason = payload.rejreason || payload.text || payload.reason;
+    } else {
+      brokerOrderId =
+        payload.brokerOrderId ||
+        payload.orderId ||
+        payload.orderid ||
+        payload.norenordno ||
+        '';
+      status = payload.status || payload.orderstatus || '';
+    }
+
+    if (!brokerOrderId) {
+      this.logger.warn(`[Broker Postback] No brokerOrderId could be extracted from payload: ${JSON.stringify(rawPayload)}`);
+      return {
+        success: false,
+        message: 'No brokerOrderId found in postback payload',
+      };
+    }
+
+    return this.orderMonitoringService.processBrokerWebhookOrderUpdate({
+      brokerOrderId,
+      status,
+      averagePrice,
+      filledQuantity,
+      rejectionReason,
+    });
   }
 }

@@ -58,7 +58,7 @@ exports.TradingModule = TradingModule = __decorate([
             order_placement_processor_1.OrderPlacementProcessor,
             order_monitoring_processor_1.OrderMonitoringProcessor,
         ],
-        exports: [trading_service_1.TradingService, signal_orchestrator_service_1.SignalOrchestratorService, position_cache_service_1.PositionCacheService, position_sizing_service_1.PositionSizingService],
+        exports: [trading_service_1.TradingService, signal_orchestrator_service_1.SignalOrchestratorService, position_cache_service_1.PositionCacheService, position_sizing_service_1.PositionSizingService, order_monitoring_service_1.OrderMonitoringService],
     })
 ], TradingModule);
 //# sourceMappingURL=trading.module.js.map

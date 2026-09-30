@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { BrokerFactory } from '../factory/broker.factory';
@@ -14,8 +15,8 @@ import { AuditEventType } from '../../audit/enums/audit-event.enum';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { RedisKeys } from '../../infrastructure/redis/redis-keys';
-import { Optional } from '@nestjs/common';
 import { EgressService } from '../../egress/egress.service';
+import { ZebuWebSocketService } from './zebu-websocket.service';
 
 @Injectable()
 export class BrokerSessionService {
@@ -27,6 +28,7 @@ export class BrokerSessionService {
     private readonly auditService: AuditService,
     private readonly redisService: RedisService,
     @Optional() private readonly egressService?: EgressService,
+    @Optional() private readonly zebuWebSocketService?: ZebuWebSocketService,
   ) {}
 
   async storeSession(
@@ -96,6 +98,21 @@ export class BrokerSessionService {
         tokenExpiry: session.tokenExpiry,
       },
     );
+
+    // Auto-connect real-time WebSocket stream for Zebu
+    if (brokerCode === BrokerCode.ZEBU && session.accessToken && this.zebuWebSocketService) {
+      try {
+        const fullBroker = await this.prisma.userBroker.findUnique({
+          where: { id: userBrokerId },
+        });
+        if (fullBroker?.brokerClientId) {
+          this.logger.log(`[BrokerSession] Initializing Zebu real-time WebSocket for ${fullBroker.brokerClientId}`);
+          this.zebuWebSocketService.connectUser(fullBroker.brokerClientId, session.accessToken);
+        }
+      } catch (wsErr: any) {
+        this.logger.warn(`[BrokerSession] Zebu WebSocket auto-connect error: ${wsErr.message}`);
+      }
+    }
   }
 
   async refreshSession(
@@ -214,6 +231,12 @@ export class BrokerSessionService {
         userBrokerId: userBroker.id,
       },
     );
+
+    if (brokerCode === BrokerCode.ZEBU && userBroker.brokerClientId && this.zebuWebSocketService) {
+      try {
+        this.zebuWebSocketService.disconnectUser(userBroker.brokerClientId);
+      } catch (_) {}
+    }
   }
 
   isSessionExpired(tokenExpiry: Date | null): boolean {

@@ -17,9 +17,11 @@ const broker_registry_1 = require("./registry/broker.registry");
 const broker_factory_1 = require("./factory/broker.factory");
 const prisma_service_1 = require("../prisma.service");
 const broker_session_service_1 = require("./services/broker-session.service");
+const zebu_websocket_service_1 = require("./services/zebu-websocket.service");
 const audit_module_1 = require("../audit/audit.module");
 const infrastructure_module_1 = require("../infrastructure/infrastructure.module");
 const instruments_module_1 = require("../instruments/instruments.module");
+const trading_module_1 = require("../trading/trading.module");
 let BrokersModule = class BrokersModule {
 };
 exports.BrokersModule = BrokersModule;
@@ -30,6 +32,7 @@ exports.BrokersModule = BrokersModule = __decorate([
             audit_module_1.AuditModule,
             infrastructure_module_1.InfrastructureModule,
             (0, common_1.forwardRef)(() => instruments_module_1.InstrumentsModule),
+            (0, common_1.forwardRef)(() => trading_module_1.TradingModule),
         ],
         controllers: [brokers_controller_1.BrokersController],
         providers: [
@@ -39,12 +42,21 @@ exports.BrokersModule = BrokersModule = __decorate([
             broker_registry_1.BrokerRegistry,
             broker_factory_1.BrokerFactory,
             broker_session_service_1.BrokerSessionService,
+            zebu_websocket_service_1.ZebuWebSocketService,
             {
                 provide: broker_adapter_interface_1.BrokerAdapter,
                 useClass: angel_one_service_1.AngelOneService,
             },
         ],
-        exports: [broker_adapter_interface_1.BrokerAdapter, broker_registry_1.BrokerRegistry, broker_factory_1.BrokerFactory, broker_session_service_1.BrokerSessionService, angel_one_service_1.AngelOneService, zebu_service_1.ZebuService],
+        exports: [
+            broker_adapter_interface_1.BrokerAdapter,
+            broker_registry_1.BrokerRegistry,
+            broker_factory_1.BrokerFactory,
+            broker_session_service_1.BrokerSessionService,
+            angel_one_service_1.AngelOneService,
+            zebu_service_1.ZebuService,
+            zebu_websocket_service_1.ZebuWebSocketService,
+        ],
     })
 ], BrokersModule);
 //# sourceMappingURL=brokers.module.js.map

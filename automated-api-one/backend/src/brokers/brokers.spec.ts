@@ -18,8 +18,12 @@ import { MetricsService } from '../infrastructure/metrics/metrics.service';
 import { CircuitBreakerService } from '../infrastructure/circuit-breaker/circuit-breaker.service';
 import { BrokerRateLimiterService } from '../infrastructure/redis/broker-rate-limiter.service';
 import { InstrumentsService } from '../instruments/instruments.service';
+import { BrokersController } from './brokers.controller';
+import { OrderMonitoringService } from '../trading/services/order-monitoring.service';
+import { ZebuWebSocketService } from './services/zebu-websocket.service';
 
 describe('Brokers Module Tests', () => {
+  let controller: BrokersController;
   let registry: BrokerRegistry;
   let factory: BrokerFactory;
   let sessionService: BrokerSessionService;
@@ -100,10 +104,26 @@ describe('Brokers Module Tests', () => {
     post: jest.fn(),
   };
 
+  const mockOrderMonitoringService = {
+    processBrokerWebhookOrderUpdate: jest.fn().mockResolvedValue({
+      success: true,
+      message: 'Order marked as FILLED',
+      orderId: 'ord-123',
+      status: 'FILLED',
+    }),
+  };
+
+  const mockZebuWebSocketService = {
+    connectUser: jest.fn(),
+    disconnectUser: jest.fn(),
+    isUserConnected: jest.fn().mockReturnValue(true),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
+      controllers: [BrokersController],
       providers: [
         BrokerRegistry,
         BrokerFactory,
@@ -119,9 +139,12 @@ describe('Brokers Module Tests', () => {
         { provide: CircuitBreakerService, useValue: mockCircuitBreakerService },
         { provide: BrokerRateLimiterService, useValue: mockRateLimiter },
         { provide: InstrumentsService, useValue: {} },
+        { provide: OrderMonitoringService, useValue: mockOrderMonitoringService },
+        { provide: ZebuWebSocketService, useValue: mockZebuWebSocketService },
       ],
     }).compile();
 
+    controller = module.get<BrokersController>(BrokersController);
     registry = module.get<BrokerRegistry>(BrokerRegistry);
     factory = module.get<BrokerFactory>(BrokerFactory);
     sessionService = module.get<BrokerSessionService>(BrokerSessionService);
@@ -427,6 +450,78 @@ describe('Brokers Module Tests', () => {
       expect(session.accessToken).toContain('mock_angel_one_access_token_');
       expect(session.refreshToken).toContain('mock_angel_one_refresh_token_');
       expect(session.expiresAt).toBeDefined();
+    });
+  });
+
+  describe('BrokersController Order Postbacks (Webhooks)', () => {
+    it('should process Angel One order postback successfully', async () => {
+      const payload = {
+        orderid: 'ANGEL_ORD_98765',
+        orderstatus: 'complete',
+        tradingsymbol: 'SBIN-EQ',
+        averageprice: 752.5,
+        filledshares: 10,
+      };
+
+      const result = await controller.handleAngelOnePostback(payload);
+
+      expect(mockOrderMonitoringService.processBrokerWebhookOrderUpdate).toHaveBeenCalledWith({
+        brokerOrderId: 'ANGEL_ORD_98765',
+        status: 'complete',
+        averagePrice: 752.5,
+        filledQuantity: 10,
+        rejectionReason: undefined,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should process Zebu order postback successfully', async () => {
+      const payload = {
+        norenordno: 'ZEBU_ORD_54321',
+        status: 'COMPLETE',
+        tsym: 'TCS-EQ',
+        avgprc: 3450.0,
+        fillshares: 5,
+      };
+
+      const result = await controller.handleZebuPostback(payload);
+
+      expect(mockOrderMonitoringService.processBrokerWebhookOrderUpdate).toHaveBeenCalledWith({
+        brokerOrderId: 'ZEBU_ORD_54321',
+        status: 'COMPLETE',
+        averagePrice: 3450.0,
+        filledQuantity: 5,
+        rejectionReason: undefined,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should initialize Zebu WebSocket stream on receiving Zebu handshake payload', async () => {
+      const payload = {
+        accesstoken: '59c1539ffc60453a0fba7fe74a9f9d4a260b7fa932fed2fda07aa75f06ed0c4e',
+        t: 'a',
+        actid: 'ZP00285',
+        uid: 'ZP00285',
+        source: 'API',
+      };
+
+      const result = await controller.handleZebuPostback(payload);
+
+      expect(mockZebuWebSocketService.connectUser).toHaveBeenCalledWith(
+        'ZP00285',
+        '59c1539ffc60453a0fba7fe74a9f9d4a260b7fa932fed2fda07aa75f06ed0c4e',
+      );
+      expect(result.success).toBe(true);
+      expect(result.wsUrl).toBe('wss://go.mynt.in/NorenWSAPI/');
+      expect(result.clientCode).toBe('ZP00285');
+    });
+
+    it('should reject postback if brokerOrderId is missing and not a handshake payload', async () => {
+      const result = await controller.handleBrokerPostback('ANGEL_ONE', {
+        foo: 'bar',
+      });
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('No brokerOrderId found');
     });
   });
 });

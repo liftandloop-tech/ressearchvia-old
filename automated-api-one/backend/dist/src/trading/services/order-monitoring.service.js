@@ -96,6 +96,53 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
         }
         return { finalStatus: 'PENDING', brokerOrderId: order.brokerOrderId };
     }
+    async processBrokerWebhookOrderUpdate(params) {
+        const { brokerOrderId, status, rejectionReason } = params;
+        const correlationId = params.correlationId || `wh_${Date.now().toString(36)}`;
+        const order = await this.prisma.order.findFirst({
+            where: { brokerOrderId },
+            include: { trade: true },
+        });
+        if (!order) {
+            this.logger.warn(`[Webhook] Order with brokerOrderId ${brokerOrderId} not found in database`);
+            return { success: false, message: `Order with brokerOrderId ${brokerOrderId} not found` };
+        }
+        if (order.status === client_1.OrderStatus.FILLED ||
+            order.status === client_1.OrderStatus.CANCELLED ||
+            order.status === client_1.OrderStatus.REJECTED ||
+            order.status === client_1.OrderStatus.EXPIRED) {
+            this.logger.log(`[Webhook] Order ${order.id} is already in terminal state ${order.status}`);
+            return { success: true, message: `Order already in terminal state ${order.status}`, orderId: order.id, status: order.status };
+        }
+        const trade = order.trade;
+        const normalizedStatus = (status || '').toUpperCase();
+        if (normalizedStatus === 'COMPLETE' ||
+            normalizedStatus === 'EXECUTED' ||
+            normalizedStatus === 'FILLED' ||
+            normalizedStatus === 'TRADED') {
+            await this.reconcileFilled(order.id, trade.id, trade.userId, trade.segmentId, correlationId);
+            this.logger.log(`[Webhook] Order ${order.id} marked as FILLED from broker webhook.`);
+            return { success: true, message: 'Order marked as FILLED', orderId: order.id, status: 'FILLED' };
+        }
+        if (['CANCELLED', 'REJECTED', 'EXPIRED'].includes(normalizedStatus)) {
+            const failStatus = normalizedStatus;
+            await this.reconcileFailed(order.id, trade.id, trade.userId, trade.segmentId, failStatus, correlationId);
+            this.logger.warn(`[Webhook] Order ${order.id} marked as ${failStatus} from broker webhook. Reason: ${rejectionReason || 'N/A'}`);
+            return { success: true, message: `Order marked as ${failStatus}`, orderId: order.id, status: failStatus };
+        }
+        if (normalizedStatus === 'PARTIALLY_FILLED') {
+            await this.prisma.order.update({
+                where: { id: order.id },
+                data: {
+                    status: client_1.OrderStatus.PARTIALLY_FILLED,
+                    ...(params.filledQuantity ? { filledQuantity: params.filledQuantity } : {}),
+                    ...(params.averagePrice ? { averagePrice: params.averagePrice } : {}),
+                },
+            });
+            return { success: true, message: 'Order marked as PARTIALLY_FILLED', orderId: order.id, status: 'PARTIALLY_FILLED' };
+        }
+        return { success: true, message: `Order status acknowledged: ${normalizedStatus}`, orderId: order.id, status: normalizedStatus };
+    }
     async reconcileFilled(orderId, tradeId, userId, segmentId, correlationId) {
         const event = await this.prisma.$transaction(async (tx) => {
             await tx.order.update({

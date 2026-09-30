@@ -17,26 +17,29 @@ exports.BrokerSessionService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma.service");
 const broker_factory_1 = require("../factory/broker.factory");
+const client_1 = require("@prisma/client");
 const audit_service_1 = require("../../audit/audit.service");
 const audit_event_enum_1 = require("../../audit/enums/audit-event.enum");
 const schedule_1 = require("@nestjs/schedule");
 const redis_service_1 = require("../../infrastructure/redis/redis.service");
 const redis_keys_1 = require("../../infrastructure/redis/redis-keys");
-const common_2 = require("@nestjs/common");
 const egress_service_1 = require("../../egress/egress.service");
+const zebu_websocket_service_1 = require("./zebu-websocket.service");
 let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
     prisma;
     brokerFactory;
     auditService;
     redisService;
     egressService;
+    zebuWebSocketService;
     logger = new common_1.Logger(BrokerSessionService_1.name);
-    constructor(prisma, brokerFactory, auditService, redisService, egressService) {
+    constructor(prisma, brokerFactory, auditService, redisService, egressService, zebuWebSocketService) {
         this.prisma = prisma;
         this.brokerFactory = brokerFactory;
         this.auditService = auditService;
         this.redisService = redisService;
         this.egressService = egressService;
+        this.zebuWebSocketService = zebuWebSocketService;
     }
     async storeSession(userId, brokerCode, session, userBrokerId) {
         const updatedBroker = await this.prisma.userBroker.update({
@@ -89,6 +92,20 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
             userBrokerId,
             tokenExpiry: session.tokenExpiry,
         });
+        if (brokerCode === client_1.BrokerCode.ZEBU && session.accessToken && this.zebuWebSocketService) {
+            try {
+                const fullBroker = await this.prisma.userBroker.findUnique({
+                    where: { id: userBrokerId },
+                });
+                if (fullBroker?.brokerClientId) {
+                    this.logger.log(`[BrokerSession] Initializing Zebu real-time WebSocket for ${fullBroker.brokerClientId}`);
+                    this.zebuWebSocketService.connectUser(fullBroker.brokerClientId, session.accessToken);
+                }
+            }
+            catch (wsErr) {
+                this.logger.warn(`[BrokerSession] Zebu WebSocket auto-connect error: ${wsErr.message}`);
+            }
+        }
     }
     async refreshSession(userId, brokerCode) {
         const broker = await this.prisma.broker.findFirst({
@@ -165,6 +182,12 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
             brokerCode,
             userBrokerId: userBroker.id,
         });
+        if (brokerCode === client_1.BrokerCode.ZEBU && userBroker.brokerClientId && this.zebuWebSocketService) {
+            try {
+                this.zebuWebSocketService.disconnectUser(userBroker.brokerClientId);
+            }
+            catch (_) { }
+        }
     }
     isSessionExpired(tokenExpiry) {
         if (!tokenExpiry)
@@ -228,11 +251,13 @@ __decorate([
 ], BrokerSessionService.prototype, "cleanupExpiredAuthStates", null);
 exports.BrokerSessionService = BrokerSessionService = BrokerSessionService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(4, (0, common_2.Optional)()),
+    __param(4, (0, common_1.Optional)()),
+    __param(5, (0, common_1.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         broker_factory_1.BrokerFactory,
         audit_service_1.AuditService,
         redis_service_1.RedisService,
-        egress_service_1.EgressService])
+        egress_service_1.EgressService,
+        zebu_websocket_service_1.ZebuWebSocketService])
 ], BrokerSessionService);
 //# sourceMappingURL=broker-session.service.js.map
