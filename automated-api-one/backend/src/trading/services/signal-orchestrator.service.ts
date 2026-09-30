@@ -398,10 +398,21 @@ export class SignalOrchestratorService {
               take: 1,
               orderBy: { startDate: 'desc' },
             },
-            userBrokers: {
-              where: { status: BrokerStatus.ACTIVE },
-              include: { broker: true },
+            consents: {
+              where: {
+                consentDate: { gte: today },
+                status: ConsentStatus.ACTIVE,
+              },
               take: 1,
+              orderBy: { consentDate: 'desc' },
+            },
+            userBrokers: {
+              where: {
+                status: BrokerStatus.ACTIVE,
+                accessToken: { not: null },
+                tokenExpiry: { gt: new Date() },
+              },
+              include: { broker: true },
             },
           },
         },
@@ -414,7 +425,11 @@ export class SignalOrchestratorService {
     const rows: (SubscriberRow & { userSegmentId: string })[] = [];
 
     for (const us of userSegments) {
-      const activeUserBroker = us.user.userBrokers[0];
+      const todayConsent = us.user.consents?.[0];
+      const activeUserBroker =
+        (todayConsent
+          ? us.user.userBrokers.find((ub) => ub.brokerId === todayConsent.brokerId)
+          : null) || us.user.userBrokers[0];
       const activeSub = us.user.subscriptions[0];
       if (!activeUserBroker || !activeSub) continue;
 

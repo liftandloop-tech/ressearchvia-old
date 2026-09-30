@@ -24,6 +24,7 @@ class _AutomatedBrokerConfigCardState extends State<AutomatedBrokerConfigCard> {
   String selectedBrokerCode = 'ANGEL_ONE';
   final _clientIdController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  final _apiSecretController = TextEditingController();
   final _vendorCodeController = TextEditingController();
 
   // Daily Auth controllers
@@ -36,6 +37,7 @@ class _AutomatedBrokerConfigCardState extends State<AutomatedBrokerConfigCard> {
   void dispose() {
     _clientIdController.dispose();
     _apiKeyController.dispose();
+    _apiSecretController.dispose();
     _vendorCodeController.dispose();
     _mpinController.dispose();
     _totpController.dispose();
@@ -51,7 +53,10 @@ class _AutomatedBrokerConfigCardState extends State<AutomatedBrokerConfigCard> {
         return _buildAddBrokerSection(context);
       }
 
-      final broker = controller.linkedBrokers.first;
+      final broker = controller.linkedBrokers.firstWhere(
+        (b) => b['isSessionActive'] == true,
+        orElse: () => controller.linkedBrokers.first,
+      );
       final isActive = broker['isSessionActive'] == true;
 
       if (!isActive) {
@@ -265,6 +270,18 @@ class _AutomatedBrokerConfigCardState extends State<AutomatedBrokerConfigCard> {
               controller: _vendorCodeController,
               decoration: InputDecoration(
                 labelText: 'Vendor Code',
+                labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _apiSecretController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'API Secret (Secret Key)',
+                hintText: 'Required for Zebu OAuth authentication',
+                hintStyle: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Colors.grey.shade400),
                 labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -648,9 +665,15 @@ class _AutomatedBrokerConfigCardState extends State<AutomatedBrokerConfigCard> {
     final clientId = _clientIdController.text.trim();
     final apiKey = _apiKeyController.text.trim();
     final vendorCode = _vendorCodeController.text.trim();
+    final apiSecret = _apiSecretController.text.trim();
 
     if (clientId.isEmpty || apiKey.isEmpty) {
       SnackbarService.showError('Please fill in Client ID and API Key.');
+      return;
+    }
+
+    if (selectedBrokerCode == 'ZEBU' && apiSecret.isEmpty) {
+      SnackbarService.showError('API Secret (Secret Key) is required for Zebu.');
       return;
     }
 
@@ -660,12 +683,14 @@ class _AutomatedBrokerConfigCardState extends State<AutomatedBrokerConfigCard> {
         selectedBrokerCode,
         clientId,
         apiKey: apiKey,
+        apiSecret: apiSecret.isNotEmpty ? apiSecret : null,
         vendorCode: vendorCode.isNotEmpty ? vendorCode : null,
       );
 
       if (success) {
         _clientIdController.clear();
         _apiKeyController.clear();
+        _apiSecretController.clear();
         _vendorCodeController.clear();
       }
     } finally {

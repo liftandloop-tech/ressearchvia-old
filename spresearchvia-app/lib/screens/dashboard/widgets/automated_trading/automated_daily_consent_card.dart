@@ -38,7 +38,12 @@ class _AutomatedDailyConsentCardState extends State<AutomatedDailyConsentCard> {
     final stratData = controller.currentStrategyData.value?['strategy'];
     final stratType = stratData?['strategyType'] ?? controller.selectedStrategy.value;
     final currentMult = stratData?['currentMultiplier'] ?? 1;
-    final broker = controller.linkedBrokers.isNotEmpty ? controller.linkedBrokers.first : null;
+    final broker = controller.linkedBrokers.isNotEmpty
+        ? controller.linkedBrokers.firstWhere(
+            (b) => b['isSessionActive'] == true,
+            orElse: () => controller.linkedBrokers.first,
+          )
+        : null;
     final margin = double.tryParse(broker?['availableMargin']?.toString() ?? '0') ?? 0.0;
     final date = controller.consentsDate.value;
 
@@ -246,7 +251,12 @@ class _AutomatedDailyConsentCardState extends State<AutomatedDailyConsentCard> {
   Widget _buildPendingConsentCard(BuildContext context) {
     final stratData = controller.currentStrategyData.value?['strategy'];
     final stratType = stratData?['strategyType'] ?? controller.selectedStrategy.value;
-    final broker = controller.linkedBrokers.isNotEmpty ? controller.linkedBrokers.first : null;
+    final broker = controller.linkedBrokers.isNotEmpty
+        ? controller.linkedBrokers.firstWhere(
+            (b) => b['isSessionActive'] == true,
+            orElse: () => controller.linkedBrokers.first,
+          )
+        : null;
     final margin = double.tryParse(broker?['availableMargin']?.toString() ?? '0') ?? 0.0;
     final baseLot = controller.userSegments.isNotEmpty ? (controller.userSegments.first['baseLot'] ?? 1) : 1;
 

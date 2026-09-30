@@ -725,7 +725,7 @@ export class RiskService {
     if (!snapshot) {
       this.logger.warn(`No risk snapshot found for user ${userId}`);
       // Trigger background recalculate
-      const jobId = `risk:recalc:${userId}`;
+      const jobId = `risk-recalc-${userId}`;
       await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, { userId });
       if (defaultMode === 'BLOCK') {
         await this.logViolation(userId, RiskRule.NO_PROFILE, Severity.CRITICAL, { reason: 'No risk snapshot' });

@@ -485,7 +485,7 @@ describe('RiskService', () => {
       expect(result.reason).toContain('stale');
       expect(queueMock.addJob).toHaveBeenCalledWith(
         'risk-recalculate',
-        `risk:recalc:${userId}`,
+        `risk-recalc-${userId}`,
         { userId }
       );
     });

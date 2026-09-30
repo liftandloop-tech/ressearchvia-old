@@ -400,12 +400,19 @@ class AutomatedTradingController extends GetxController {
     }
   }
 
-  Future<bool> linkBroker(String brokerCode, String clientId, {String? apiKey, String? vendorCode}) async {
+  Future<bool> linkBroker(
+    String brokerCode,
+    String clientId, {
+    String? apiKey,
+    String? apiSecret,
+    String? vendorCode,
+  }) async {
     try {
       final response = await _dioClient.post('/brokers/link', data: {
         'brokerCode': brokerCode,
         'brokerClientId': clientId,
         if (apiKey != null) 'apiKey': apiKey,
+        if (apiSecret != null) 'apiSecret': apiSecret,
         if (vendorCode != null) 'vendorCode': vendorCode,
       });
       if (response.statusCode == 200 || response.statusCode == 201) {

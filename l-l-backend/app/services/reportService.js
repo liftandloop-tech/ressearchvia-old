@@ -926,26 +926,34 @@ const reportService = {
                 return { status: 404, message: "Report not found for update", data: {} };
             }
 
-            // 2. Resolve segment IDs and segment names
-            let targetSegmentIds = [];
+            // 2. Resolve segment IDs dynamically by name (no hardcoded ObjectIds)
             const cleanSegment = (segment || '').toUpperCase();
 
+            let segmentNamePatterns = [];
             if (cleanSegment === 'INTRADAY' || cleanSegment === 'DELIVERY') {
-                targetSegmentIds = ['6990582719e0550821bb9436']; // EQUITY CASH
+                segmentNamePatterns = [/equity/i, /cash/i];
             } else if (cleanSegment === 'FNO' || cleanSegment === 'FO') {
-                targetSegmentIds = [
-                    '6990583319e0550821bb943b', // FUTURE DERIVATIVES
-                    '6990584819e0550821bb9447', // STOCK OPTION
-                    '6990585219e0550821bb945a'  // INDEX OPTION
-                ];
+                segmentNamePatterns = [/future/i, /option/i, /derivative/i];
             } else {
-                // Default fallback if unknown segment
-                targetSegmentIds = ['6990582719e0550821bb9436'];
+                // Default fallback to equity/cash
+                segmentNamePatterns = [/equity/i, /cash/i];
             }
 
-            const segmentsData = await segmentModel.find({ _id: { $in: targetSegmentIds } }).select("segmentName");
+            const segmentsData = await segmentModel.find({
+                segmentStatus: 'active',
+                $or: segmentNamePatterns.map(p => ({ segmentName: { $regex: p } })),
+            }).select("segmentName");
             const segmentNames = segmentsData.map(s => s.segmentName);
             const validSegmentIds = segmentsData.map(s => s._id);
+
+            if (validSegmentIds.length === 0) {
+                console.warn(`[AutomatedReport] No matching segments found for cleanSegment="${cleanSegment}". Falling back to all active segments.`);
+                const fallback = await segmentModel.find({ segmentStatus: 'active' }).select("segmentName").limit(1);
+                if (fallback.length > 0) {
+                    validSegmentIds.push(fallback[0]._id);
+                    segmentNames.push(fallback[0].segmentName);
+                }
+            }
 
             // 3. Fetch all active plans
             const activePlans = await segmentsPlanModel.find({ planStatus: 'active' }).select('_id');

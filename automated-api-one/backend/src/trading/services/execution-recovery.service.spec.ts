@@ -90,12 +90,12 @@ describe('ExecutionRecoveryService', () => {
     expect(mockAddJob).toHaveBeenCalledTimes(2);
     expect(mockAddJob).toHaveBeenCalledWith(
       'order-monitoring',
-      'recovery:order-1',
+      'recovery-order-1',
       expect.objectContaining({ orderId: 'order-1', isRecovery: true }),
     );
     expect(mockAddJob).toHaveBeenCalledWith(
       'order-monitoring',
-      'recovery:order-2',
+      'recovery-order-2',
       expect.objectContaining({ orderId: 'order-2', correlationId: 'recovery-order-2', isRecovery: true }),
     );
   });

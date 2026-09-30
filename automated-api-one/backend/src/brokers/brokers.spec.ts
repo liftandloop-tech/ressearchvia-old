@@ -512,8 +512,8 @@ describe('Brokers Module Tests', () => {
         '59c1539ffc60453a0fba7fe74a9f9d4a260b7fa932fed2fda07aa75f06ed0c4e',
       );
       expect(result.success).toBe(true);
-      expect(result.wsUrl).toBe('wss://go.mynt.in/NorenWSAPI/');
-      expect(result.clientCode).toBe('ZP00285');
+      expect((result as any).wsUrl).toBe('wss://go.mynt.in/NorenWSAPI/');
+      expect((result as any).clientCode).toBe('ZP00285');
     });
 
     it('should reject postback if brokerOrderId is missing and not a handshake payload', async () => {
