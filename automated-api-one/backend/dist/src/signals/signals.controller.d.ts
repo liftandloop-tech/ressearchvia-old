@@ -18,4 +18,5 @@ export declare class SignalsController {
         success: boolean;
         signalId: string;
     }>;
+    getRecentSignals(limit?: string): Promise<any>;
 }

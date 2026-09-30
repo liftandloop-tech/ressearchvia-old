@@ -98,11 +98,33 @@ export class SignalsService {
         },
       );
       console.log(`[Integration] Successfully forwarded signal ${signal.id} to l-l-backend`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         `[Integration] Failed to forward signal ${signal.id} to l-l-backend: ${error.message}`,
       );
     }
+  }
+
+  async getRecentSignals(limit: number = 20) {
+    return this.prisma.signal.findMany({
+      take: limit,
+      orderBy: { publishedAt: 'desc' },
+      include: {
+        segmentRelation: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        trades: {
+          select: {
+            id: true,
+            status: true,
+            quantity: true,
+          },
+        },
+      },
+    });
   }
 }
 

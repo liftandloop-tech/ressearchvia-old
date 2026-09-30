@@ -599,15 +599,9 @@ export class ZebuService extends BrokerAdapter implements BrokerClient {
       const start = Date.now();
       try {
         const exch = order.exchange || 'NSE';
-        let prd = 'I'; // Default to MIS ('I') for Equity Cash
-        if (
-          exch === 'NFO' ||
-          exch === 'MCX' ||
-          exch === 'CDS' ||
-          exch === 'BFO' ||
-          exch === 'BCD'
-        ) {
-          prd = 'M'; // NRML for Derivatives/Commodities/Currencies
+        let prd = 'I'; // Strictly MIS ('I') for Intraday Copytrading model across all segments
+        if (order.metadata && (order.metadata as any).productType) {
+          prd = (order.metadata as any).productType;
         }
 
         let tsym = order.symbol;

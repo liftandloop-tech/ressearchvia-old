@@ -94,6 +94,27 @@ let SignalsService = class SignalsService {
             console.error(`[Integration] Failed to forward signal ${signal.id} to l-l-backend: ${error.message}`);
         }
     }
+    async getRecentSignals(limit = 20) {
+        return this.prisma.signal.findMany({
+            take: limit,
+            orderBy: { publishedAt: 'desc' },
+            include: {
+                segmentRelation: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                trades: {
+                    select: {
+                        id: true,
+                        status: true,
+                        quantity: true,
+                    },
+                },
+            },
+        });
+    }
 };
 exports.SignalsService = SignalsService;
 exports.SignalsService = SignalsService = __decorate([

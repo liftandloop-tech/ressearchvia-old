@@ -336,21 +336,13 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             }
             const isBracket = !!((order.metadata && order.metadata.variety === 'ROBO') ||
                 (order.metadata && order.metadata.isBracketOrder));
-            let producttype;
+            let producttype = 'INTRADAY';
             if (isBracket) {
                 variety = 'ROBO';
                 producttype = 'BO';
             }
             else if (order.metadata && order.metadata.productType) {
                 producttype = order.metadata.productType;
-            }
-            else {
-                if (['NFO', 'MCX', 'CDS', 'BFO'].includes(exchange)) {
-                    producttype = 'CARRYFORWARD';
-                }
-                else {
-                    producttype = 'INTRADAY';
-                }
             }
             let priceStr = '0';
             if (ordertype === 'LIMIT' || ordertype === 'STOPLOSS_LIMIT') {

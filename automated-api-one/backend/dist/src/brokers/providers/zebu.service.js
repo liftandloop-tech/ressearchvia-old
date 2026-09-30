@@ -486,12 +486,8 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             try {
                 const exch = order.exchange || 'NSE';
                 let prd = 'I';
-                if (exch === 'NFO' ||
-                    exch === 'MCX' ||
-                    exch === 'CDS' ||
-                    exch === 'BFO' ||
-                    exch === 'BCD') {
-                    prd = 'M';
+                if (order.metadata && order.metadata.productType) {
+                    prd = order.metadata.productType;
                 }
                 let tsym = order.symbol;
                 if ((exch === 'NSE' || exch === 'BSE') && !tsym.endsWith('-EQ')) {

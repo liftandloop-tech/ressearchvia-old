@@ -83,6 +83,9 @@ let SignalsController = class SignalsController {
     async publishSignal(dto) {
         return this.signalsService.publishAndEnqueue(dto);
     }
+    async getRecentSignals(limit) {
+        return this.signalsService.getRecentSignals(limit ? parseInt(limit, 10) : 20);
+    }
 };
 exports.SignalsController = SignalsController;
 __decorate([
@@ -93,6 +96,13 @@ __decorate([
     __metadata("design:paramtypes", [PublishSignalDto]),
     __metadata("design:returntype", Promise)
 ], SignalsController.prototype, "publishSignal", null);
+__decorate([
+    (0, common_1.Get)('recent'),
+    __param(0, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], SignalsController.prototype, "getRecentSignals", null);
 exports.SignalsController = SignalsController = __decorate([
     (0, common_1.Controller)('signals'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

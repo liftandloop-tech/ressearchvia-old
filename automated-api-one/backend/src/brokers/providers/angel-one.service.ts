@@ -429,20 +429,13 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         (order.metadata && (order.metadata as any).isBracketOrder)
       );
 
-      // Determine product type
-      let producttype: string;
+      // Determine product type (Strictly INTRADAY for Intraday Copytrading model)
+      let producttype = 'INTRADAY';
       if (isBracket) {
         variety = 'ROBO';
         producttype = 'BO';
       } else if (order.metadata && (order.metadata as any).productType) {
         producttype = (order.metadata as any).productType;
-      } else {
-        // Exchange/segment-based default product type
-        if (['NFO', 'MCX', 'CDS', 'BFO'].includes(exchange)) {
-          producttype = 'CARRYFORWARD';
-        } else {
-          producttype = 'INTRADAY';
-        }
       }
 
       // Price handling according to Angel One SmartAPI:

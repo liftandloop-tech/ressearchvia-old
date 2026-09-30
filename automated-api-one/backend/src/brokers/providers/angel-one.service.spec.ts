@@ -182,7 +182,7 @@ describe('AngelOneService.placeOrder', () => {
       const callArgs = httpService.post.mock.calls[0];
       const payload = callArgs[1] as any;
       expect(payload.variety).toBe('NORMAL');
-      expect(payload.producttype).toBe('CARRYFORWARD');
+      expect(payload.producttype).toBe('INTRADAY');
       expect(payload.ordertype).toBe('LIMIT');
       expect(payload.price).toBe('150.5');
       expect(payload.triggerprice).toBe('0');

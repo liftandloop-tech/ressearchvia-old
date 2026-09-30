@@ -14,4 +14,5 @@ export declare class SignalsService {
         signalId: string;
     }>;
     private forwardSignalToLlBackend;
+    getRecentSignals(limit?: number): Promise<any>;
 }

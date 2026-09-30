@@ -14,6 +14,11 @@ class AdminAutomatedTradingController extends GetxController {
   var dlqMetrics = <String, dynamic>{}.obs;
   var segments = <dynamic>[].obs;
   var isPublishing = false.obs;
+  var recentSignals = <dynamic>[].obs;
+  var isRecentSignalsLoading = false.obs;
+
+  // Tab State: 0 = Terminal, 1 = Subscribers & Risk, 2 = Brokers, 3 = SRE Operations
+  var selectedTab = 0.obs;
 
   // Live Strategy Monitoring & Config
   var strategyUsers = <dynamic>[].obs;
@@ -28,7 +33,27 @@ class AdminAutomatedTradingController extends GetxController {
     _client.httpClient.baseUrl = AppConfig.automatedApiBaseUrl;
     _client.httpClient.timeout = const Duration(seconds: 30);
     _initializeModifiers();
+
+    final tabParam = Get.parameters['tab'];
+    if (tabParam == 'subscribers') {
+      selectedTab.value = 1;
+    } else if (tabParam == 'brokers') {
+      selectedTab.value = 2;
+    } else if (tabParam == 'operations') {
+      selectedTab.value = 3;
+    } else {
+      selectedTab.value = 0;
+    }
+
     refreshAdminData();
+  }
+
+  void setTab(int index) {
+    selectedTab.value = index;
+    final tabNames = ['terminal', 'subscribers', 'brokers', 'operations'];
+    if (index >= 0 && index < tabNames.length) {
+      Get.parameters['tab'] = tabNames[index];
+    }
   }
 
   void _initializeModifiers() {
@@ -50,6 +75,7 @@ class AdminAutomatedTradingController extends GetxController {
     isOperationLoading.value = true;
     try {
       await Future.wait([
+        fetchRecentSignals(),
         fetchReconciliationRuns(),
         fetchReconciliationIssues(),
         fetchDlqMetrics(),
@@ -204,6 +230,7 @@ class AdminAutomatedTradingController extends GetxController {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         Get.snackbar('Success', 'Trading signal published successfully.');
+        fetchRecentSignals();
         return true;
       }
       final msg = response.body?['message'] ?? 'Failed to publish signal.';
@@ -214,6 +241,20 @@ class AdminAutomatedTradingController extends GetxController {
       return false;
     } finally {
       isPublishing.value = false;
+    }
+  }
+
+  Future<void> fetchRecentSignals() async {
+    isRecentSignalsLoading.value = true;
+    try {
+      final response = await _client.get('/signals/recent');
+      if (response.statusCode == 200 && response.body is List) {
+        recentSignals.assignAll(response.body);
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch recent signals: $e');
+    } finally {
+      isRecentSignalsLoading.value = false;
     }
   }
 

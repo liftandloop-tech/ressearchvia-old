@@ -1,6 +1,8 @@
 import {
   Controller,
   Post,
+  Get,
+  Query,
   Body,
   UseGuards,
   HttpCode,
@@ -58,5 +60,10 @@ export class SignalsController {
   @HttpCode(HttpStatus.OK)
   async publishSignal(@Body() dto: PublishSignalDto) {
     return this.signalsService.publishAndEnqueue(dto);
+  }
+
+  @Get('recent')
+  async getRecentSignals(@Query('limit') limit?: string) {
+    return this.signalsService.getRecentSignals(limit ? parseInt(limit, 10) : 20);
   }
 }

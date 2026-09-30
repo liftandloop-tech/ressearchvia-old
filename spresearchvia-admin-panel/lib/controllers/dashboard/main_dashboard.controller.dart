@@ -108,7 +108,10 @@ class MainDashboardController extends GetxController {
     } else if (currentRoute.startsWith('/leads')) {
       isAllowed = user.canAccessDepartmentPage('Leads') && user.hasPermission('Leads', 'read');
     } else if (currentRoute.startsWith('/automated-trading')) {
-      isAllowed = false;
+      isAllowed = user.isAdmin ||
+          user.canAccessDepartmentPage('Research') ||
+          user.canAccessDepartmentPage('Trading') ||
+          user.hasPermission('AutomatedTrading', 'read');
     } else if (currentRoute.startsWith('/subscriptions')) {
       if (currentRoute.startsWith('/subscriptions/plans/create')) {
         isAllowed = user.isAdmin ||
