@@ -62,7 +62,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       'X-PrivateKey': apiKey,
       'X-ClientLocalIP': '192.168.1.100',
       'X-ClientPublicIP': proxyIp || '106.193.147.98',
-      'X-MACaddress': '02:00:00:00:00:00',
+      'X-MACAddress': '02:00:00:00:00:00',
     };
     if (token) {
       headers.Authorization = `Bearer ${token}`;
@@ -226,9 +226,17 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       const expiresAt = new Date(expMs);
 
       const refreshToken = callbackData.params.refresh_token || '';
+      const feedToken = callbackData.params.feed_token || '';
+      const brokerUserId =
+        outerPayload.username ||
+        outerPayload.client_code ||
+        outerPayload.user_id ||
+        outerPayload.sub ||
+        outerPayload.clientCode ||
+        '';
 
       this.logger.log(
-        `AngelOne OAuth callback processed. Username: ${outerPayload.username}, expires: ${expiresAt.toISOString()}`,
+        `AngelOne OAuth callback processed. User ID: ${brokerUserId}, expires: ${expiresAt.toISOString()}`,
       );
 
       // Store the auth_token directly as accessToken — it's the publisher session token
@@ -236,8 +244,9 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       return {
         accessToken: authToken,
         refreshToken,
+        feedToken,
         expiresAt,
-        brokerUserId: outerPayload.username || '',
+        brokerUserId,
       };
     } catch (error: any) {
       this.logger.error(`Angel One token extraction error: ${error.message}`, error.stack);
@@ -382,10 +391,95 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     }
 
     try {
-      let variety = 'ROBO';
+      const exchange = (order.exchange || 'NSE').toUpperCase();
+
+      // Resolve instrument token and exchange-specific trading symbol (e.g. SBIN -> SBIN-EQ)
+      const instrument = this.instrumentsService.findInstrument
+        ? this.instrumentsService.findInstrument(order.symbol, exchange)
+        : null;
+
+      const symbolToken = instrument?.token || this.instrumentsService.findToken(order.symbol, exchange);
+      const tradingSymbol = instrument?.symbol || order.symbol;
+
+      if (!symbolToken || symbolToken === 'DUMMY_TOKEN') {
+        const errorMsg = `Unable to resolve instrument token for symbol "${order.symbol}" on exchange "${exchange}"`;
+        this.logger.error(errorMsg);
+        return {
+          brokerOrderId: '',
+          status: 'REJECTED',
+          message: errorMsg,
+        };
+      }
+
+      // Determine variety & order type according to Angel One SmartAPI specification
+      let variety = 'NORMAL';
       let ordertype = order.orderType;
 
-      const symbolToken = this.instrumentsService.findToken(order.symbol, order.exchange) || 'DUMMY_TOKEN';
+      if (ordertype === 'SL') {
+        ordertype = 'STOPLOSS_LIMIT';
+      }
+
+      if (ordertype === 'STOPLOSS_LIMIT' || ordertype === 'STOPLOSS_MARKET') {
+        variety = 'STOPLOSS';
+      }
+
+      // Check if bracket order is explicitly requested (requires limit order and valid stoploss & target)
+      const isBracket = !!(
+        (order.metadata && (order.metadata as any).variety === 'ROBO') ||
+        (order.metadata && (order.metadata as any).isBracketOrder)
+      );
+
+      // Determine product type
+      let producttype: string;
+      if (isBracket) {
+        variety = 'ROBO';
+        producttype = 'BO';
+      } else if (order.metadata && (order.metadata as any).productType) {
+        producttype = (order.metadata as any).productType;
+      } else {
+        // Exchange/segment-based default product type
+        if (['NFO', 'MCX', 'CDS', 'BFO'].includes(exchange)) {
+          producttype = 'CARRYFORWARD';
+        } else {
+          producttype = 'INTRADAY';
+        }
+      }
+
+      // Price handling according to Angel One SmartAPI:
+      // For MARKET and STOPLOSS_MARKET orders, price must be "0" or "0.0"
+      let priceStr = '0';
+      if (ordertype === 'LIMIT' || ordertype === 'STOPLOSS_LIMIT') {
+        priceStr = order.price ? order.price.toString() : '0';
+      }
+
+      // Trigger price handling:
+      // Required for STOPLOSS orders, otherwise "0"
+      let triggerPriceStr = '0';
+      if (variety === 'STOPLOSS' || ordertype === 'STOPLOSS_LIMIT' || ordertype === 'STOPLOSS_MARKET') {
+        triggerPriceStr = order.triggerPrice ? order.triggerPrice.toString() : '0';
+      }
+
+      const payload: any = {
+        variety,
+        tradingsymbol: tradingSymbol,
+        symboltoken: symbolToken,
+        transactiontype: order.side,
+        exchange,
+        ordertype,
+        producttype,
+        duration: 'DAY',
+        price: priceStr,
+        triggerprice: triggerPriceStr,
+        quantity: order.quantity.toString(),
+      };
+
+      if (variety === 'ROBO') {
+        payload.squareoff = order.squareoff ? order.squareoff.toString() : '0';
+        payload.stoploss = order.stoploss ? order.stoploss.toString() : '0';
+        if (order.trailingStopLoss) {
+          payload.trailingStopLoss = order.trailingStopLoss.toString();
+        }
+      }
 
       let proxyIp: string | undefined;
       if (httpsAgent && httpsAgent.options) {
@@ -402,23 +496,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       const response = await firstValueFrom(
         this.httpService.post(
           `${this.baseUrl}${AngelOneEndpoints.PLACE_ORDER}`,
-          {
-            variety,
-            tradingsymbol: order.symbol,
-            symboltoken: symbolToken,
-            transactiontype: order.side,
-            exchange: order.exchange,
-            ordertype,
-            producttype: 'BO',
-            duration: 'DAY',
-            price: order.price?.toString() || '0',
-            triggerprice: order.triggerPrice?.toString() || '0',
-            quantity: order.quantity.toString(),
-            squareoff: order.squareoff?.toString(),
-            stoploss: order.stoploss?.toString(),
-            trailingStopLoss: order.trailingStopLoss?.toString(),
-            scripconsent: 'yes',
-          },
+          payload,
           {
             headers: this.getHeaders(token, proxyIp),
             ...(httpsAgent ? { httpsAgent } : {}),
@@ -439,7 +517,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         status: 'REJECTED',
         message: response.data.message || 'Order rejected by broker',
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Order execution failed: ${error.message}`);
       return {
         brokerOrderId: '',

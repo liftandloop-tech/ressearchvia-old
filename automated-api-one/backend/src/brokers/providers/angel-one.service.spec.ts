@@ -164,5 +164,96 @@ describe('AngelOneService.placeOrder', () => {
       expect(result.status).toBe('REJECTED');
       expect(result.message).toBe('Insufficient funds');
     });
+
+    it('should format payload correctly for standard F&O limit order', async () => {
+      httpService.post.mockReturnValue(
+        of({ data: { status: true, data: { orderid: 'AOB_FNO' } } }),
+      );
+
+      await service.placeOrder('TOKEN_ABC', 'CLIENT01', {
+        symbol: 'NIFTY24OCT24000CE',
+        exchange: 'NFO',
+        side: 'BUY',
+        quantity: 50,
+        price: 150.5,
+        orderType: 'LIMIT',
+      });
+
+      const callArgs = httpService.post.mock.calls[0];
+      const payload = callArgs[1] as any;
+      expect(payload.variety).toBe('NORMAL');
+      expect(payload.producttype).toBe('CARRYFORWARD');
+      expect(payload.ordertype).toBe('LIMIT');
+      expect(payload.price).toBe('150.5');
+      expect(payload.triggerprice).toBe('0');
+      expect(payload.quantity).toBe('50');
+      expect(payload.squareoff).toBeUndefined();
+    });
+
+    it('should force price to "0" for MARKET orders', async () => {
+      httpService.post.mockReturnValue(
+        of({ data: { status: true, data: { orderid: 'AOB_MKT' } } }),
+      );
+
+      await service.placeOrder('TOKEN_ABC', 'CLIENT01', {
+        symbol: 'SBIN',
+        exchange: 'NSE',
+        side: 'BUY',
+        quantity: 10,
+        price: 800,
+        orderType: 'MARKET',
+      });
+
+      const callArgs = httpService.post.mock.calls[0];
+      const payload = callArgs[1] as any;
+      expect(payload.variety).toBe('NORMAL');
+      expect(payload.producttype).toBe('INTRADAY');
+      expect(payload.ordertype).toBe('MARKET');
+      expect(payload.price).toBe('0');
+      expect(payload.triggerprice).toBe('0');
+    });
+
+    it('should set variety to STOPLOSS and include triggerprice for STOPLOSS_LIMIT order', async () => {
+      httpService.post.mockReturnValue(
+        of({ data: { status: true, data: { orderid: 'AOB_SL' } } }),
+      );
+
+      await service.placeOrder('TOKEN_ABC', 'CLIENT01', {
+        symbol: 'BANKNIFTY24NOVFUT',
+        exchange: 'NFO',
+        side: 'SELL',
+        quantity: 15,
+        price: 51200,
+        triggerPrice: 51250,
+        orderType: 'STOPLOSS_LIMIT',
+      });
+
+      const callArgs = httpService.post.mock.calls[0];
+      const payload = callArgs[1] as any;
+      expect(payload.variety).toBe('STOPLOSS');
+      expect(payload.ordertype).toBe('STOPLOSS_LIMIT');
+      expect(payload.price).toBe('51200');
+      expect(payload.triggerprice).toBe('51250');
+    });
+
+    it('should reject order if instrument token cannot be resolved', async () => {
+      const mockInst = (service as any).instrumentsService;
+      mockInst.findToken.mockReturnValueOnce(null);
+      if (mockInst.findInstrument) {
+        mockInst.findInstrument.mockReturnValueOnce(null);
+      }
+
+      const result = await service.placeOrder('TOKEN_ABC', 'CLIENT01', {
+        symbol: 'UNKNOWN_SCRIP',
+        exchange: 'NSE',
+        side: 'BUY',
+        quantity: 1,
+        orderType: 'MARKET',
+      });
+
+      expect(result.status).toBe('REJECTED');
+      expect(result.message).toContain('Unable to resolve instrument token');
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
   });
 });

@@ -55,7 +55,7 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             'X-PrivateKey': apiKey,
             'X-ClientLocalIP': '192.168.1.100',
             'X-ClientPublicIP': proxyIp || '106.193.147.98',
-            'X-MACaddress': '02:00:00:00:00:00',
+            'X-MACAddress': '02:00:00:00:00:00',
         };
         if (token) {
             headers.Authorization = `Bearer ${token}`;
@@ -179,12 +179,20 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             const expMs = outerPayload.exp ? outerPayload.exp * 1000 : Date.now() + 18 * 60 * 60 * 1000;
             const expiresAt = new Date(expMs);
             const refreshToken = callbackData.params.refresh_token || '';
-            this.logger.log(`AngelOne OAuth callback processed. Username: ${outerPayload.username}, expires: ${expiresAt.toISOString()}`);
+            const feedToken = callbackData.params.feed_token || '';
+            const brokerUserId = outerPayload.username ||
+                outerPayload.client_code ||
+                outerPayload.user_id ||
+                outerPayload.sub ||
+                outerPayload.clientCode ||
+                '';
+            this.logger.log(`AngelOne OAuth callback processed. User ID: ${brokerUserId}, expires: ${expiresAt.toISOString()}`);
             return {
                 accessToken: authToken,
                 refreshToken,
+                feedToken,
                 expiresAt,
-                brokerUserId: outerPayload.username || '',
+                brokerUserId,
             };
         }
         catch (error) {
@@ -303,9 +311,75 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             };
         }
         try {
-            let variety = 'ROBO';
+            const exchange = (order.exchange || 'NSE').toUpperCase();
+            const instrument = this.instrumentsService.findInstrument
+                ? this.instrumentsService.findInstrument(order.symbol, exchange)
+                : null;
+            const symbolToken = instrument?.token || this.instrumentsService.findToken(order.symbol, exchange);
+            const tradingSymbol = instrument?.symbol || order.symbol;
+            if (!symbolToken || symbolToken === 'DUMMY_TOKEN') {
+                const errorMsg = `Unable to resolve instrument token for symbol "${order.symbol}" on exchange "${exchange}"`;
+                this.logger.error(errorMsg);
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: errorMsg,
+                };
+            }
+            let variety = 'NORMAL';
             let ordertype = order.orderType;
-            const symbolToken = this.instrumentsService.findToken(order.symbol, order.exchange) || 'DUMMY_TOKEN';
+            if (ordertype === 'SL') {
+                ordertype = 'STOPLOSS_LIMIT';
+            }
+            if (ordertype === 'STOPLOSS_LIMIT' || ordertype === 'STOPLOSS_MARKET') {
+                variety = 'STOPLOSS';
+            }
+            const isBracket = !!((order.metadata && order.metadata.variety === 'ROBO') ||
+                (order.metadata && order.metadata.isBracketOrder));
+            let producttype;
+            if (isBracket) {
+                variety = 'ROBO';
+                producttype = 'BO';
+            }
+            else if (order.metadata && order.metadata.productType) {
+                producttype = order.metadata.productType;
+            }
+            else {
+                if (['NFO', 'MCX', 'CDS', 'BFO'].includes(exchange)) {
+                    producttype = 'CARRYFORWARD';
+                }
+                else {
+                    producttype = 'INTRADAY';
+                }
+            }
+            let priceStr = '0';
+            if (ordertype === 'LIMIT' || ordertype === 'STOPLOSS_LIMIT') {
+                priceStr = order.price ? order.price.toString() : '0';
+            }
+            let triggerPriceStr = '0';
+            if (variety === 'STOPLOSS' || ordertype === 'STOPLOSS_LIMIT' || ordertype === 'STOPLOSS_MARKET') {
+                triggerPriceStr = order.triggerPrice ? order.triggerPrice.toString() : '0';
+            }
+            const payload = {
+                variety,
+                tradingsymbol: tradingSymbol,
+                symboltoken: symbolToken,
+                transactiontype: order.side,
+                exchange,
+                ordertype,
+                producttype,
+                duration: 'DAY',
+                price: priceStr,
+                triggerprice: triggerPriceStr,
+                quantity: order.quantity.toString(),
+            };
+            if (variety === 'ROBO') {
+                payload.squareoff = order.squareoff ? order.squareoff.toString() : '0';
+                payload.stoploss = order.stoploss ? order.stoploss.toString() : '0';
+                if (order.trailingStopLoss) {
+                    payload.trailingStopLoss = order.trailingStopLoss.toString();
+                }
+            }
             let proxyIp;
             if (httpsAgent && httpsAgent.options) {
                 const proxyUrl = httpsAgent.options.href || httpsAgent.options.host || httpsAgent.options.hostname;
@@ -317,23 +391,7 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
                     catch (_) { }
                 }
             }
-            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${angel_one_endpoints_1.AngelOneEndpoints.PLACE_ORDER}`, {
-                variety,
-                tradingsymbol: order.symbol,
-                symboltoken: symbolToken,
-                transactiontype: order.side,
-                exchange: order.exchange,
-                ordertype,
-                producttype: 'BO',
-                duration: 'DAY',
-                price: order.price?.toString() || '0',
-                triggerprice: order.triggerPrice?.toString() || '0',
-                quantity: order.quantity.toString(),
-                squareoff: order.squareoff?.toString(),
-                stoploss: order.stoploss?.toString(),
-                trailingStopLoss: order.trailingStopLoss?.toString(),
-                scripconsent: 'yes',
-            }, {
+            const response = await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${this.baseUrl}${angel_one_endpoints_1.AngelOneEndpoints.PLACE_ORDER}`, payload, {
                 headers: this.getHeaders(token, proxyIp),
                 ...(httpsAgent ? { httpsAgent } : {}),
             }));

@@ -58,10 +58,34 @@ let InstrumentsService = InstrumentsService_1 = class InstrumentsService {
         })
             .slice(0, 50);
     }
-    findToken(symbol, exchange) {
-        if (!this.isLoaded)
+    findInstrument(symbol, exchange) {
+        if (!this.isLoaded || !symbol)
             return null;
-        const inst = this.instruments.find((i) => i.symbol === symbol && i.exch_seg === exchange.toUpperCase());
+        const upperSymbol = symbol.trim().toUpperCase();
+        const upperExchange = (exchange || 'NSE').trim().toUpperCase();
+        let inst = this.instruments.find((i) => i.symbol?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange);
+        if (inst) {
+            return { token: inst.token, symbol: inst.symbol };
+        }
+        if (upperExchange === 'NSE' || upperExchange === 'BSE') {
+            const eqSymbol = `${upperSymbol}-EQ`;
+            inst = this.instruments.find((i) => i.symbol?.toUpperCase() === eqSymbol && i.exch_seg === upperExchange);
+            if (inst) {
+                return { token: inst.token, symbol: inst.symbol };
+            }
+            inst = this.instruments.find((i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange && i.symbol?.endsWith('-EQ'));
+            if (inst) {
+                return { token: inst.token, symbol: inst.symbol };
+            }
+        }
+        inst = this.instruments.find((i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange);
+        if (inst) {
+            return { token: inst.token, symbol: inst.symbol };
+        }
+        return null;
+    }
+    findToken(symbol, exchange) {
+        const inst = this.findInstrument(symbol, exchange);
         return inst ? inst.token : null;
     }
     async getLtp(symbol, exchange, symbolToken) {
@@ -69,13 +93,15 @@ let InstrumentsService = InstrumentsService_1 = class InstrumentsService {
             this.logger.warn('AngelOneService not available for LTP fetch');
             return { error: 'Market data service not ready' };
         }
-        const resolvedToken = symbolToken || this.findToken(symbol, exchange) || '';
-        const result = await this.angelOneService.getLtp(exchange, symbol, undefined, resolvedToken);
+        const resolvedInst = this.findInstrument(symbol, exchange);
+        const resolvedToken = symbolToken || resolvedInst?.token || '';
+        const tradingSymbol = resolvedInst?.symbol || symbol;
+        const result = await this.angelOneService.getLtp(exchange, tradingSymbol, undefined, resolvedToken);
         if (!result) {
             return { error: 'Could not fetch LTP. Symbol may not exist or market is closed.' };
         }
         return {
-            symbol,
+            symbol: tradingSymbol,
             exchange,
             token: resolvedToken,
             ...result,

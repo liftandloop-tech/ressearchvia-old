@@ -58,11 +58,51 @@ export class InstrumentsService implements OnModuleInit {
       .slice(0, 50); // Limit to 50 results for performance
   }
 
-  findToken(symbol: string, exchange: string): string | null {
-    if (!this.isLoaded) return null;
-    const inst = this.instruments.find(
-      (i) => i.symbol === symbol && i.exch_seg === exchange.toUpperCase(),
+  findInstrument(symbol: string, exchange: string): { token: string; symbol: string } | null {
+    if (!this.isLoaded || !symbol) return null;
+    const upperSymbol = symbol.trim().toUpperCase();
+    const upperExchange = (exchange || 'NSE').trim().toUpperCase();
+
+    // 1. Direct exact symbol match (e.g. "SBIN-EQ", "NIFTY24OCT24000CE")
+    let inst = this.instruments.find(
+      (i) => i.symbol?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange,
     );
+    if (inst) {
+      return { token: inst.token, symbol: inst.symbol };
+    }
+
+    // 2. Cash equity segment suffix match (e.g. query "SBIN" -> matches "SBIN-EQ" on NSE or BSE)
+    if (upperExchange === 'NSE' || upperExchange === 'BSE') {
+      const eqSymbol = `${upperSymbol}-EQ`;
+      inst = this.instruments.find(
+        (i) => i.symbol?.toUpperCase() === eqSymbol && i.exch_seg === upperExchange,
+      );
+      if (inst) {
+        return { token: inst.token, symbol: inst.symbol };
+      }
+
+      // Check by name if symbol has -EQ
+      inst = this.instruments.find(
+        (i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange && i.symbol?.endsWith('-EQ'),
+      );
+      if (inst) {
+        return { token: inst.token, symbol: inst.symbol };
+      }
+    }
+
+    // 3. Fallback: match by name
+    inst = this.instruments.find(
+      (i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange,
+    );
+    if (inst) {
+      return { token: inst.token, symbol: inst.symbol };
+    }
+
+    return null;
+  }
+
+  findToken(symbol: string, exchange: string): string | null {
+    const inst = this.findInstrument(symbol, exchange);
     return inst ? inst.token : null;
   }
 
@@ -72,15 +112,17 @@ export class InstrumentsService implements OnModuleInit {
       return { error: 'Market data service not ready' };
     }
 
-    const resolvedToken = symbolToken || this.findToken(symbol, exchange) || '';
-    const result = await this.angelOneService.getLtp(exchange, symbol, undefined, resolvedToken);
+    const resolvedInst = this.findInstrument(symbol, exchange);
+    const resolvedToken = symbolToken || resolvedInst?.token || '';
+    const tradingSymbol = resolvedInst?.symbol || symbol;
+    const result = await this.angelOneService.getLtp(exchange, tradingSymbol, undefined, resolvedToken);
 
     if (!result) {
       return { error: 'Could not fetch LTP. Symbol may not exist or market is closed.' };
     }
 
     return {
-      symbol,
+      symbol: tradingSymbol,
       exchange,
       token: resolvedToken,
       ...result,

@@ -8,6 +8,10 @@ export declare class InstrumentsService implements OnModuleInit {
     onModuleInit(): Promise<void>;
     loadInstruments(): Promise<void>;
     search(query: string, exchange?: string): any[];
+    findInstrument(symbol: string, exchange: string): {
+        token: string;
+        symbol: string;
+    } | null;
     findToken(symbol: string, exchange: string): string | null;
     getLtp(symbol: string, exchange: string, symbolToken?: string): Promise<any>;
 }
