@@ -54,6 +54,15 @@ class MainDashboardController extends GetxController {
       return;
     }
 
+    if (user.needsJobAgreement) {
+      if (currentRoute != AppRoutes.jobTermsAgreement) {
+        print('Employee has not signed job terms agreement. Redirecting to agreement screen.');
+        Future.microtask(() => Get.offAllNamed(AppRoutes.jobTermsAgreement));
+        return;
+      }
+      return;
+    }
+
     if (user.isAdmin) return;
     if (currentRoute == AppRoutes.dashboard) {
       if (!user.canAccessDepartmentPage('Dashboard')) {
@@ -143,9 +152,10 @@ class MainDashboardController extends GetxController {
       selectedTab.value = 9;
     else if (currentRoute.startsWith('/leads'))
       selectedTab.value = 10;
-    else if (currentRoute.startsWith('/attendance'))
+    else if (currentRoute.startsWith('/applicants') ||
+        currentRoute.startsWith('/applicant/'))
       selectedTab.value = 11;
-    else if (currentRoute.startsWith('/applicants'))
+    else if (currentRoute.startsWith('/attendance'))
       selectedTab.value = 12;
     else
       selectedTab.value = 0;
@@ -193,10 +203,10 @@ class MainDashboardController extends GetxController {
         Get.offNamed(AppRoutes.leads);
         break;
       case 11:
-        Get.offNamed(AppRoutes.attendance);
+        Get.offNamed(AppRoutes.applicants);
         break;
       case 12:
-        Get.offNamed('/applicants');
+        Get.offNamed(AppRoutes.attendance);
         break;
       default:
         Get.offNamed('/dashboard');

@@ -88,16 +88,24 @@ class AuthController extends GetxController {
               user.value = freshUser;
               await _authService.saveUserData(freshStaff.rawJson!);
               debugPrint('Staff profile refreshed with role: ${freshUser.subscriptionPlan}');
+              if (freshUser.needsJobAgreement && Get.currentRoute != AppRoutes.jobTermsAgreement) {
+                Get.offAllNamed(AppRoutes.jobTermsAgreement);
+              }
             }
           }).catchError((e) {
             debugPrint('Failed to sync latest staff profile: $e');
           });
         }
 
-        // Auto-redirect authenticated user away from login screen if restoring session
+        // Auto-redirect authenticated user away from login screen if restoring session, or gate if agreement pending
         final currentRoute = Get.currentRoute;
         final isPublic = AppRoutes.isPublicRoute(currentRoute);
-        if (!isPublic && (currentRoute == AppRoutes.login || currentRoute == '/' || currentRoute.isEmpty)) {
+        if (storedUser.needsJobAgreement && currentRoute != AppRoutes.jobTermsAgreement) {
+          debugPrint('[AuthController] Staff has not signed job terms agreement. Redirecting to agreement screen.');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Get.offAllNamed(AppRoutes.jobTermsAgreement);
+          });
+        } else if (!isPublic && (currentRoute == AppRoutes.login || currentRoute == '/' || currentRoute.isEmpty)) {
           debugPrint('[AuthController] Authenticated session restored on login route ($currentRoute). Navigating to initial route.');
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _navigateToInitialRoute(storedUser);
@@ -376,7 +384,16 @@ class AuthController extends GetxController {
     }
   }
 
+  void onAgreementSigned(UserModel updatedUser) {
+    user.value = updatedUser;
+    _navigateToInitialRoute(updatedUser);
+  }
+
   void _navigateToInitialRoute(UserModel user) {
+    if (user.needsJobAgreement) {
+      Get.offAllNamed(AppRoutes.jobTermsAgreement);
+      return;
+    }
     if (user.isAdmin || user.canAccessDepartmentPage('Dashboard')) {
       Get.offAllNamed(AppRoutes.dashboard);
       return;

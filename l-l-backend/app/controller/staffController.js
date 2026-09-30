@@ -155,5 +155,18 @@ const staffController = {
         }
     },
 
+    signAgreement: async (req, res) => {
+        try {
+            const response = await staffService.signAgreement({
+                user: req.user,
+                body: req.body,
+                req: req
+            });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
 }
 export default staffController;

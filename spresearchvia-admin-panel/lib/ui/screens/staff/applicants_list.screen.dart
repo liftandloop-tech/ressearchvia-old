@@ -16,6 +16,10 @@ class ApplicantsListScreen extends StatelessWidget {
         ? Get.find<ApplicantsListController>()
         : Get.put(ApplicantsListController(), permanent: true);
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.fetchApplicants();
+    });
+
     return DashboardLayout(
       child: Container(
         color: AppTheme.gray50,

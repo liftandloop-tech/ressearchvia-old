@@ -563,10 +563,7 @@ const staffService = {
   staffList: async ({ user }) => {
     try {
       let query = {
-        $or: [
-          { stage: { $ne: 'Applicant' } },
-          { roleId: { $ne: null } }
-        ]
+        stage: { $ne: 'Applicant' }
       };
 
       console.log('=== staffList called ===');
@@ -588,10 +585,7 @@ const staffService = {
 
         if (!isSystemAdmin && !hasStaffViewAll) {
           query = {
-            $or: [
-              { stage: { $ne: 'Applicant' } },
-              { roleId: { $ne: null } }
-            ],
+            stage: { $ne: 'Applicant' },
             _id: { $in: hierarchy.staffIds }
           };
           console.log(`Staff list scoped for ${hierarchy.staffMember?.fullName} (${hierarchy.staffIds.length} staff):`, JSON.stringify(query));
@@ -1206,6 +1200,52 @@ const staffService = {
         }
       }
       return { status: 200, message: "Staff logged out successfully", data: {} };
+    } catch (error) {
+      return { status: 500, message: error.message, data: {} };
+    }
+  },
+
+  signAgreement: async ({ user, body, req }) => {
+    try {
+      const staffId = user?._id || user?.userId;
+      if (!staffId) {
+        return { status: 401, message: "Unauthorized. Staff context required.", data: {} };
+      }
+
+      const { signature, version } = body || {};
+      if (!signature || !signature.toString().trim()) {
+        return { status: 400, message: "Digital signature is required to sign the agreement.", data: {} };
+      }
+
+      const staff = await staffModel.findById(staffId);
+      if (!staff) {
+        return { status: 404, message: "Staff member not found.", data: {} };
+      }
+
+      const clientIp = req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || req?.socket?.remoteAddress || req?.ip || 'N/A';
+
+      staff.hasSignedAgreement = true;
+      staff.agreementSignedAt = new Date();
+      staff.agreementSignature = signature.toString().trim();
+      staff.agreementIp = clientIp;
+      staff.agreementVersion = version || '1.0';
+      await staff.save();
+
+      const updatedStaff = await staffModel.findById(staff._id)
+        .populate('departmentId')
+        .populate({
+          path: 'roleId',
+          populate: [
+            { path: 'permissionGroups' },
+            { path: 'departmentId' }
+          ]
+        });
+
+      return {
+        status: 200,
+        message: "Job terms agreement signed successfully.",
+        data: { staff: updatedStaff }
+      };
     } catch (error) {
       return { status: 500, message: error.message, data: {} };
     }

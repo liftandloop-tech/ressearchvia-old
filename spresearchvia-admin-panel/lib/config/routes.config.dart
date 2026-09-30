@@ -25,6 +25,9 @@ class AppRoutes {
   static const String strategyConfig = '/automated-trading/strategy-config';
   static const String leads = '/leads';
   static const String attendance = '/attendance';
+  static const String applicants = '/applicants';
+  static const String applicantDetails = '/applicant/:id';
+  static const String jobTermsAgreement = '/job-terms-agreement';
   static const String profile = '/profile';
   static const String apply = '/apply';
   static const String applyContinue = '/apply/continue';

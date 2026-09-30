@@ -359,4 +359,31 @@ class AuthService extends ApiService {
       return (user: null, token: null, error: 'Network error: $e');
     }
   }
+
+  Future<({bool success, UserModel? user, String? error})> signJobAgreement({
+    required String signature,
+    String version = '1.0',
+  }) async {
+    try {
+      final response = await post('/staff/sign-agreement', {
+        'signature': signature,
+        'version': version,
+      });
+
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body;
+        if (data['status'] == 200 && data['data']?['staff'] != null) {
+          final staffData = data['data']['staff'];
+          await _saveUserData(staffData);
+          final user = UserModel.fromJson(staffData);
+          return (success: true, user: user, error: null);
+        }
+        return (success: false, user: null, error: (data['message'] ?? 'Failed to sign agreement') as String);
+      }
+      return (success: false, user: null, error: response.body?['message']?.toString() ?? 'Failed to sign agreement');
+    } catch (e) {
+      debugPrint('Error signing job agreement: $e');
+      return (success: false, user: null, error: 'Network error: $e');
+    }
+  }
 }

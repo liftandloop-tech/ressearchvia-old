@@ -23,6 +23,7 @@ class UserModel {
   final String panCard;
   final String userStatus; // ACTIVE or SUSPENDED
   final bool isViewOnly;
+  final bool hasSignedAgreement;
   final Map<String, dynamic>? rawJson;
 
   UserModel({
@@ -50,6 +51,7 @@ class UserModel {
     this.panCard = '',
     this.userStatus = 'ACTIVE',
     this.isViewOnly = false,
+    this.hasSignedAgreement = false,
     this.rawJson,
   });
 
@@ -206,10 +208,21 @@ class UserModel {
           '',
       userStatus: json['userStatus'] ?? 'ACTIVE',
       isViewOnly: json['isViewOnly'] ?? false,
+      hasSignedAgreement: json['hasSignedAgreement'] == true || json['hasSignedAgreement'] == 'true',
       rawJson: json,
     );
   }
 
+  /// Whether this user is an active employee who must sign the job terms agreement
+  /// before accessing internal features.
+  bool get needsJobAgreement {
+    if (isAdmin) return false;
+    final isStaff = rawJson?['staffId'] != null ||
+        rawJson?['stage'] == 'Employee' ||
+        roleData != null ||
+        departmentData != null;
+    return isStaff && !hasSignedAgreement;
+  }
 
   /// Checks whether the user's assigned department has access to the specified page.
   /// If the department is global or user is admin, returns true.

@@ -35,11 +35,16 @@ import '../ui/screens/staff/applicants_list.screen.dart';
 import '../ui/screens/staff/staff_details.screen.dart';
 import '../ui/screens/staff/staff_profile.screen.dart';
 import '../ui/screens/staff/public_staff_verification.screen.dart';
+import '../ui/screens/staff/job_terms_agreement.screen.dart';
 
 import 'routes.config.dart';
 export 'routes.config.dart';
 
 final appPages = [
+  GetPage(
+    name: AppRoutes.jobTermsAgreement,
+    page: () => const JobTermsAgreementScreen(),
+  ),
   GetPage(name: AppRoutes.login, page: () => const Login()),
   GetPage(name: AppRoutes.forgotPassword, page: () => const ForgotPassword()),
   GetPage(name: AppRoutes.resetPassword, page: () => const ResetPassword()),

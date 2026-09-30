@@ -171,6 +171,26 @@ const staffSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.Mixed,
         default: {}
     },
+    hasSignedAgreement: {
+        type: Boolean,
+        default: false
+    },
+    agreementSignedAt: {
+        type: Date,
+        default: null
+    },
+    agreementSignature: {
+        type: String,
+        default: null
+    },
+    agreementIp: {
+        type: String,
+        default: null
+    },
+    agreementVersion: {
+        type: String,
+        default: '1.0'
+    },
 }, { timestamps: true, versionKey: false });
 const staffModel = mongoose.model("staff", staffSchema);
 export default staffModel;

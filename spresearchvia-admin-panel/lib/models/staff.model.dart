@@ -353,6 +353,9 @@ class StaffModel {
   final String onboardingStatus;
   final bool isEmailVerified;
   final bool isMobileVerified;
+  final bool hasSignedAgreement;
+  final String? agreementSignedAt;
+  final String? agreementSignature;
   final String? photoUrl;
   final String? resumeUrl;
   final String stage;
@@ -392,6 +395,9 @@ class StaffModel {
     this.onboardingStatus = 'PENDING',
     this.isEmailVerified = false,
     this.isMobileVerified = false,
+    this.hasSignedAgreement = false,
+    this.agreementSignedAt,
+    this.agreementSignature,
     this.photoUrl,
     this.resumeUrl,
     this.stage = 'Applicant',
@@ -478,6 +484,9 @@ class StaffModel {
       onboardingStatus: _safeString(json['onboardingStatus']) ?? 'PENDING',
       isEmailVerified: json['isEmailVerified'] ?? false,
       isMobileVerified: json['isMobileVerified'] ?? false,
+      hasSignedAgreement: json['hasSignedAgreement'] == true || json['hasSignedAgreement'] == 'true',
+      agreementSignedAt: _safeString(json['agreementSignedAt']),
+      agreementSignature: _safeString(json['agreementSignature']),
       photoUrl: _safeString(json['photoUrl']),
       resumeUrl: _safeString(json['resumeUrl']),
       stage: _safeString(json['stage']) ?? 'Applicant',
@@ -513,6 +522,9 @@ class StaffModel {
       'assignedDirectorName': assignedDirectorName,
       'mpin': mpin,
       'isViewOnly': isViewOnly,
+      'hasSignedAgreement': hasSignedAgreement,
+      if (agreementSignedAt != null) 'agreementSignedAt': agreementSignedAt,
+      if (agreementSignature != null) 'agreementSignature': agreementSignature,
       'panUrl': panUrl,
       'aadhaarUrl': aadhaarUrl,
       'nismUrl': nismUrl,
