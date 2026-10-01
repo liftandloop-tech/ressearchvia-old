@@ -8,7 +8,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ReconciliationModule } from '../reconciliation/reconciliation.module';
 
 @Module({
-  imports: [InfrastructureModule, BrokersModule, NotificationsModule, ReconciliationModule],
+  imports: [
+    InfrastructureModule,
+    BrokersModule,
+    NotificationsModule,
+    ReconciliationModule,
+  ],
   controllers: [OpsController],
   providers: [OpsService],
   exports: [OpsService],

@@ -96,7 +96,10 @@ describe('EgressService', () => {
 
     it('should rotate token if user already has assignment (409 conflict)', async () => {
       const conflictErr = {
-        response: { status: 409, data: { message: 'User already has assignment' } },
+        response: {
+          status: 409,
+          data: { message: 'User already has assignment' },
+        },
       };
       const rotateResponse = {
         data: {

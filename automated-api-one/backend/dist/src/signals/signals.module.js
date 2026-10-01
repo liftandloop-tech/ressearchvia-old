@@ -19,11 +19,7 @@ let SignalsModule = class SignalsModule {
 exports.SignalsModule = SignalsModule;
 exports.SignalsModule = SignalsModule = __decorate([
     (0, common_1.Module)({
-        imports: [
-            brokers_module_1.BrokersModule,
-            consents_module_1.ConsentsModule,
-            infrastructure_module_1.InfrastructureModule,
-        ],
+        imports: [brokers_module_1.BrokersModule, consents_module_1.ConsentsModule, infrastructure_module_1.InfrastructureModule],
         controllers: [signals_controller_1.SignalsController],
         providers: [signals_service_1.SignalsService, prisma_service_1.PrismaService],
         exports: [signals_service_1.SignalsService],

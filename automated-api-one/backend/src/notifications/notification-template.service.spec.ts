@@ -10,7 +10,9 @@ describe('NotificationTemplateService', () => {
       providers: [NotificationTemplateService],
     }).compile();
 
-    service = module.get<NotificationTemplateService>(NotificationTemplateService);
+    service = module.get<NotificationTemplateService>(
+      NotificationTemplateService,
+    );
   });
 
   it('should generate correct template for ORDER_PLACED', () => {

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -26,7 +32,7 @@ export interface ProxyConfig {
 @Injectable()
 export class ProxyManagerService {
   private readonly logger = new Logger(ProxyManagerService.name);
-  
+
   private partnerId: string;
   private partnerPass: string;
   private baseUrl: string;
@@ -35,9 +41,18 @@ export class ProxyManagerService {
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
   ) {
-    this.partnerId = process.env.STATIC_IP_PARTNER_ID || process.env.PROXY_PARTNER_USERID || 'SPResearchvia';
-    this.partnerPass = process.env.STATIC_IP_PARTNER_PASSWORD || process.env.PROXY_PARTNER_PASSWORD || 'tk29yom43u725g5u';
-    this.baseUrl = process.env.STATIC_IP_PARTNER_BASE_URL || process.env.PROXY_API_URL || 'https://partners-uat.staticip.in';
+    this.partnerId =
+      process.env.STATIC_IP_PARTNER_ID ||
+      process.env.PROXY_PARTNER_USERID ||
+      'SPResearchvia';
+    this.partnerPass =
+      process.env.STATIC_IP_PARTNER_PASSWORD ||
+      process.env.PROXY_PARTNER_PASSWORD ||
+      'tk29yom43u725g5u';
+    this.baseUrl =
+      process.env.STATIC_IP_PARTNER_BASE_URL ||
+      process.env.PROXY_API_URL ||
+      'https://partners-uat.staticip.in';
   }
 
   private getAuthBody() {
@@ -98,42 +113,60 @@ export class ProxyManagerService {
   /**
    * Primary automated flow: User purchases a Static IP for their UserBroker
    */
-  async purchaseProxy(userBrokerId: string, validityMonths: number, iptype: 'ipv4' | 'ipv6') {
+  async purchaseProxy(
+    userBrokerId: string,
+    validityMonths: number,
+    iptype: 'ipv4' | 'ipv6',
+  ) {
     // 1. Transactional DB check and PENDING record creation (separate from external API call)
-    const { orderId, proxyId, brokerName } = await this.prisma.$transaction(async (tx) => {
-      const userBroker = await tx.userBroker.findUnique({
-        where: { id: userBrokerId },
-        include: { user: true, broker: true },
-      });
+    const { orderId, proxyId, brokerName } = await this.prisma.$transaction(
+      async (tx) => {
+        const userBroker = await tx.userBroker.findUnique({
+          where: { id: userBrokerId },
+          include: { user: true, broker: true },
+        });
 
-      if (!userBroker) {
-        throw new NotFoundException(`UserBroker ${userBrokerId} not found`);
-      }
+        if (!userBroker) {
+          throw new NotFoundException(`UserBroker ${userBrokerId} not found`);
+        }
 
-      const existingProxy = await tx.proxyCredential.findFirst({
-        where: {
-          userBrokerId,
-          status: { in: [ProxyStatus.ACTIVE, ProxyStatus.PENDING, ProxyStatus.RENEWING] },
-        },
-      });
+        const existingProxy = await tx.proxyCredential.findFirst({
+          where: {
+            userBrokerId,
+            status: {
+              in: [
+                ProxyStatus.ACTIVE,
+                ProxyStatus.PENDING,
+                ProxyStatus.RENEWING,
+              ],
+            },
+          },
+        });
 
-      if (existingProxy) {
-        throw new ConflictException(`Broker account already has an active or pending proxy (${existingProxy.status})`);
-      }
+        if (existingProxy) {
+          throw new ConflictException(
+            `Broker account already has an active or pending proxy (${existingProxy.status})`,
+          );
+        }
 
-      const orderId = randomUUID();
-      const created = await tx.proxyCredential.create({
-        data: {
+        const orderId = randomUUID();
+        const created = await tx.proxyCredential.create({
+          data: {
+            orderId,
+            brokerName: userBroker.broker.code,
+            validityMonths,
+            status: ProxyStatus.PENDING,
+            userBrokerId,
+          },
+        });
+
+        return {
           orderId,
+          proxyId: created.id,
           brokerName: userBroker.broker.code,
-          validityMonths,
-          status: ProxyStatus.PENDING,
-          userBrokerId,
-        },
-      });
-
-      return { orderId, proxyId: created.id, brokerName: userBroker.broker.code };
-    });
+        };
+      },
+    );
 
     // 2. Call Partner API outside the DB transaction
     let data;
@@ -145,12 +178,23 @@ export class ProxyManagerService {
         iptype,
       });
     } catch (err: any) {
-      this.logger.error(`API Call failed for purchaseProxy order ${orderId}, leaving as PENDING for reconciliation.`);
+      this.logger.error(
+        `API Call failed for purchaseProxy order ${orderId}, leaving as PENDING for reconciliation.`,
+      );
       return this.prisma.proxyCredential.findUnique({
         where: { id: proxyId },
         include: {
           userBroker: {
-            include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
         },
       });
@@ -162,20 +206,36 @@ export class ProxyManagerService {
   /**
    * Admin issue proxy (optionally linked to a userBrokerId)
    */
-  async issueIp(brokerName: string, validityMonths: number, iptype: 'ipv4' | 'ipv6', userBrokerId?: string) {
+  async issueIp(
+    brokerName: string,
+    validityMonths: number,
+    iptype: 'ipv4' | 'ipv6',
+    userBrokerId?: string,
+  ) {
     const { orderId, proxyId } = await this.prisma.$transaction(async (tx) => {
       if (userBrokerId) {
-        const userBroker = await tx.userBroker.findUnique({ where: { id: userBrokerId } });
-        if (!userBroker) throw new NotFoundException(`UserBroker ${userBrokerId} not found`);
+        const userBroker = await tx.userBroker.findUnique({
+          where: { id: userBrokerId },
+        });
+        if (!userBroker)
+          throw new NotFoundException(`UserBroker ${userBrokerId} not found`);
 
         const existingProxy = await tx.proxyCredential.findFirst({
           where: {
             userBrokerId,
-            status: { in: [ProxyStatus.ACTIVE, ProxyStatus.PENDING, ProxyStatus.RENEWING] },
+            status: {
+              in: [
+                ProxyStatus.ACTIVE,
+                ProxyStatus.PENDING,
+                ProxyStatus.RENEWING,
+              ],
+            },
           },
         });
         if (existingProxy) {
-          throw new ConflictException(`Broker account already has an active or pending proxy (${existingProxy.status})`);
+          throw new ConflictException(
+            `Broker account already has an active or pending proxy (${existingProxy.status})`,
+          );
         }
       }
 
@@ -202,12 +262,23 @@ export class ProxyManagerService {
         iptype,
       });
     } catch (err: any) {
-      this.logger.error(`API Call failed for issueIp order ${orderId}, leaving as PENDING for reconciliation.`);
+      this.logger.error(
+        `API Call failed for issueIp order ${orderId}, leaving as PENDING for reconciliation.`,
+      );
       return this.prisma.proxyCredential.findUnique({
         where: { id: proxyId },
         include: {
           userBroker: {
-            include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
         },
       });
@@ -217,9 +288,12 @@ export class ProxyManagerService {
   }
 
   async renewIp(proxyId: string, validityMonths: number) {
-    const proxy = await this.prisma.proxyCredential.findUnique({ where: { id: proxyId } });
+    const proxy = await this.prisma.proxyCredential.findUnique({
+      where: { id: proxyId },
+    });
     if (!proxy) throw new NotFoundException('Proxy not found');
-    if (!proxy.ip_userid) throw new BadRequestException('Cannot renew: missing ip_userid');
+    if (!proxy.ip_userid)
+      throw new BadRequestException('Cannot renew: missing ip_userid');
 
     const orderId = randomUUID();
 
@@ -241,7 +315,9 @@ export class ProxyManagerService {
         old_ip_userid: proxy.ip_userid,
       });
     } catch (err: any) {
-      this.logger.error(`API Call failed for renewIp order ${orderId}, leaving as RENEWING for reconciliation.`);
+      this.logger.error(
+        `API Call failed for renewIp order ${orderId}, leaving as RENEWING for reconciliation.`,
+      );
       return updatedProxy;
     }
 
@@ -253,21 +329,29 @@ export class ProxyManagerService {
    */
   async assignProxy(proxyId: string, userBrokerId: string) {
     return this.prisma.$transaction(async (tx) => {
-      const userBroker = await tx.userBroker.findUnique({ where: { id: userBrokerId } });
+      const userBroker = await tx.userBroker.findUnique({
+        where: { id: userBrokerId },
+      });
       if (!userBroker) throw new NotFoundException('Broker account not found');
 
       const existingActive = await tx.proxyCredential.findFirst({
         where: {
           userBrokerId,
-          status: { in: [ProxyStatus.ACTIVE, ProxyStatus.PENDING, ProxyStatus.RENEWING] },
+          status: {
+            in: [ProxyStatus.ACTIVE, ProxyStatus.PENDING, ProxyStatus.RENEWING],
+          },
           NOT: { id: proxyId },
         },
       });
       if (existingActive) {
-        throw new ConflictException('Broker account already has an active or pending proxy');
+        throw new ConflictException(
+          'Broker account already has an active or pending proxy',
+        );
       }
 
-      const proxy = await tx.proxyCredential.findUnique({ where: { id: proxyId } });
+      const proxy = await tx.proxyCredential.findUnique({
+        where: { id: proxyId },
+      });
       if (!proxy) throw new NotFoundException('Proxy not found');
 
       return tx.proxyCredential.update({
@@ -275,7 +359,16 @@ export class ProxyManagerService {
         data: { userBrokerId },
         include: {
           userBroker: {
-            include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
         },
       });
@@ -286,7 +379,9 @@ export class ProxyManagerService {
    * Admin manual unassignment
    */
   async unassignProxy(proxyId: string) {
-    const proxy = await this.prisma.proxyCredential.findUnique({ where: { id: proxyId } });
+    const proxy = await this.prisma.proxyCredential.findUnique({
+      where: { id: proxyId },
+    });
     if (!proxy) throw new NotFoundException('Proxy not found');
 
     return this.prisma.proxyCredential.update({
@@ -294,7 +389,16 @@ export class ProxyManagerService {
       data: { userBrokerId: null },
       include: {
         userBroker: {
-          include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
         },
       },
     });
@@ -306,9 +410,17 @@ export class ProxyManagerService {
   async getAssignableTargets() {
     return this.prisma.userBroker.findMany({
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         proxyCredential: {
-          select: { id: true, ip: true, port: true, status: true, expiresAt: true },
+          select: {
+            id: true,
+            ip: true,
+            port: true,
+            status: true,
+            expiresAt: true,
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -318,12 +430,21 @@ export class ProxyManagerService {
   /**
    * Runtime lookup of active proxy configuration for broker execution
    */
-  async getProxyConfigForUserBroker(userBrokerId: string): Promise<ProxyConfig | null> {
+  async getProxyConfigForUserBroker(
+    userBrokerId: string,
+  ): Promise<ProxyConfig | null> {
     const proxy = await this.prisma.proxyCredential.findUnique({
       where: { userBrokerId },
     });
 
-    if (!proxy || proxy.status !== ProxyStatus.ACTIVE || !proxy.ip || !proxy.port || !proxy.ip_userid || !proxy.ip_password) {
+    if (
+      !proxy ||
+      proxy.status !== ProxyStatus.ACTIVE ||
+      !proxy.ip ||
+      !proxy.port ||
+      !proxy.ip_userid ||
+      !proxy.ip_password
+    ) {
       return null;
     }
 
@@ -369,20 +490,26 @@ export class ProxyManagerService {
         match: false,
         latencyMs: 0,
         status: 'FAIL',
-        message: 'Proxy configuration is incomplete (missing IP, port, or credentials)',
+        message:
+          'Proxy configuration is incomplete (missing IP, port, or credentials)',
       };
     }
 
     const start = Date.now();
     try {
-      const auth = Buffer.from(`${proxy.ip_userid}:${proxy.ip_password}`).toString('base64');
+      const auth = Buffer.from(
+        `${proxy.ip_userid}:${proxy.ip_password}`,
+      ).toString('base64');
       let httpsAgent: any = undefined;
       if (HttpsProxyAgentClass) {
-        httpsAgent = new HttpsProxyAgentClass(`http://${proxy.ip}:${proxy.port}`, {
-          headers: {
-            'Proxy-Authorization': `Basic ${auth}`,
+        httpsAgent = new HttpsProxyAgentClass(
+          `http://${proxy.ip}:${proxy.port}`,
+          {
+            headers: {
+              'Proxy-Authorization': `Basic ${auth}`,
+            },
           },
-        });
+        );
       }
 
       const res = await axios.get('https://api.ipify.org?format=json', {
@@ -456,9 +583,16 @@ export class ProxyManagerService {
   /**
    * Verify proxy connectivity through the static proxy tunnel
    */
-  async validateProxyConnectivity(ip: string, port: number, ip_userid: string, ip_password: string): Promise<boolean> {
+  async validateProxyConnectivity(
+    ip: string,
+    port: number,
+    ip_userid: string,
+    ip_password: string,
+  ): Promise<boolean> {
     try {
-      const auth = Buffer.from(`${ip_userid}:${ip_password}`).toString('base64');
+      const auth = Buffer.from(`${ip_userid}:${ip_password}`).toString(
+        'base64',
+      );
       let httpsAgent: any = undefined;
       if (HttpsProxyAgentClass) {
         httpsAgent = new HttpsProxyAgentClass(`http://${ip}:${port}`, {
@@ -476,7 +610,9 @@ export class ProxyManagerService {
       });
       return true;
     } catch (err: any) {
-      this.logger.warn(`Proxy connectivity test notice for ${ip}:${port}: ${err.message}`);
+      this.logger.warn(
+        `Proxy connectivity test notice for ${ip}:${port}: ${err.message}`,
+      );
       return true;
     }
   }
@@ -484,7 +620,7 @@ export class ProxyManagerService {
   private async processOrderResponse(internalId: string, data: any) {
     if (data.status === 'success' && data.ip_details) {
       const details = data.ip_details;
-      
+
       let expiresAt: Date | undefined;
       if (details.validity) {
         expiresAt = this.parseExpiryDate(details.validity);
@@ -492,8 +628,18 @@ export class ProxyManagerService {
         expiresAt = this.parseExpiryDate(details.updated_validity);
       }
 
-      if (details.ip && details.port && details.ip_userid && details.ip_password) {
-        await this.validateProxyConnectivity(details.ip, details.port, details.ip_userid, details.ip_password);
+      if (
+        details.ip &&
+        details.port &&
+        details.ip_userid &&
+        details.ip_password
+      ) {
+        await this.validateProxyConnectivity(
+          details.ip,
+          details.port,
+          details.ip_userid,
+          details.ip_password,
+        );
       }
 
       return this.prisma.proxyCredential.update({
@@ -509,7 +655,16 @@ export class ProxyManagerService {
         },
         include: {
           userBroker: {
-            include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
         },
       });
@@ -519,7 +674,16 @@ export class ProxyManagerService {
           where: { id: internalId },
           include: {
             userBroker: {
-              include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                  },
+                },
+              },
             },
           },
         });
@@ -532,7 +696,16 @@ export class ProxyManagerService {
         },
         include: {
           userBroker: {
-            include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
         },
       });
@@ -541,7 +714,16 @@ export class ProxyManagerService {
         where: { id: internalId },
         include: {
           userBroker: {
-            include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
         },
       });
@@ -551,7 +733,16 @@ export class ProxyManagerService {
       where: { id: internalId },
       include: {
         userBroker: {
-          include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
         },
       },
     });
@@ -560,9 +751,9 @@ export class ProxyManagerService {
   @Cron(CronExpression.EVERY_MINUTE)
   async reconcilePendingOrders() {
     this.logger.debug('Running Proxy Reconciliation Loop...');
-    
+
     const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-    
+
     const stuckOrders = await this.prisma.proxyCredential.findMany({
       where: {
         status: { in: [ProxyStatus.PENDING, ProxyStatus.RENEWING] },
@@ -579,15 +770,19 @@ export class ProxyManagerService {
             where: { id: order.id },
             data: { status: ProxyStatus.FAILED },
           });
-          this.logger.log(`Order ${order.orderId} was never received by partner. Marked FAILED.`);
+          this.logger.log(
+            `Order ${order.orderId} was never received by partner. Marked FAILED.`,
+          );
         } else {
           await this.processOrderResponse(order.id, statusData);
         }
       } catch (e: any) {
-        this.logger.error(`Failed to reconcile order ${order.orderId}: ${e.message}`);
+        this.logger.error(
+          `Failed to reconcile order ${order.orderId}: ${e.message}`,
+        );
       }
     }
-    
+
     await this.prisma.proxyCredential.updateMany({
       where: {
         status: ProxyStatus.ACTIVE,

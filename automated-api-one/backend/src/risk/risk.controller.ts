@@ -213,7 +213,10 @@ export class RiskController {
   }
 
   @Put('profiles/:id')
-  async updateProfile(@Param('id') id: string, @Body() dto: UpdateRiskProfileDto) {
+  async updateProfile(
+    @Param('id') id: string,
+    @Body() dto: UpdateRiskProfileDto,
+  ) {
     return this.riskService.updateProfile(id, dto);
   }
 
@@ -234,7 +237,6 @@ export class RiskController {
   // ==========================================
   // Legacy / Backwards-Compatibility Endpoints
   // ==========================================
-
 
   @Get('events')
   async getEvents(@Request() req, @Query() query: GetRiskEventsDto) {

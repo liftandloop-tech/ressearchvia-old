@@ -38,7 +38,10 @@ export class OrderMonitoringProcessor extends WorkerHost {
     private readonly configService: ConfigService,
   ) {
     super();
-    this.concurrency = this.configService.get<number>('ORDER_MONITORING_CONCURRENCY', 50);
+    this.concurrency = this.configService.get<number>(
+      'ORDER_MONITORING_CONCURRENCY',
+      50,
+    );
   }
 
   async process(job: Job<OrderMonitoringPayload>): Promise<void> {
@@ -54,7 +57,10 @@ export class OrderMonitoringProcessor extends WorkerHost {
     );
 
     try {
-      const result = await this.orderMonitoringService.pollOrderStatus(orderId, correlationId);
+      const result = await this.orderMonitoringService.pollOrderStatus(
+        orderId,
+        correlationId,
+      );
 
       if (result.finalStatus === 'PENDING') {
         // Non-terminal — re-throw to trigger BullMQ exponential backoff retry

@@ -9,4 +9,3 @@ export enum RiskCode {
   SEGMENT_PAUSED = 'SEGMENT_PAUSED',
   UNKNOWN = 'UNKNOWN',
 }
-

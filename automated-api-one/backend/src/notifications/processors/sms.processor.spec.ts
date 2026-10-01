@@ -71,8 +71,14 @@ describe('SmsProcessor', () => {
       where: { id: 'del-1' },
       include: { notification: true },
     });
-    expect(twilioMock.sendSms).toHaveBeenCalledWith('+123456789', 'Fresh SMS Message');
-    expect(circuitMock.execute).toHaveBeenCalledWith('twilio-notifications', expect.any(Function));
+    expect(twilioMock.sendSms).toHaveBeenCalledWith(
+      '+123456789',
+      'Fresh SMS Message',
+    );
+    expect(circuitMock.execute).toHaveBeenCalledWith(
+      'twilio-notifications',
+      expect.any(Function),
+    );
     expect(queueMock.updateJobStatus).toHaveBeenCalledWith(
       expect.any(String),
       'job-1',
@@ -98,8 +104,15 @@ describe('SmsProcessor', () => {
     await processor.process(job);
 
     expect(twilioMock.sendSms).not.toHaveBeenCalled();
-    expect(msg91Mock.sendSms).toHaveBeenCalledWith('+123456789', 'Static SMS Message');
-    expect(metricsMock.incrementNotificationFailover).toHaveBeenCalledWith('twilio', 'msg91', 'SMS');
+    expect(msg91Mock.sendSms).toHaveBeenCalledWith(
+      '+123456789',
+      'Static SMS Message',
+    );
+    expect(metricsMock.incrementNotificationFailover).toHaveBeenCalledWith(
+      'twilio',
+      'msg91',
+      'SMS',
+    );
   });
 
   it('should fail job and update delivery status to FAILED if both primary and secondary fail', async () => {

@@ -48,10 +48,17 @@ export class PushProcessor extends WorkerHost {
       }
 
       const pStart = Date.now();
-      const providerId = await this.circuitBreaker.execute('push-notifications', async () => {
-        return await this.fcmProvider.sendPush(token, finalTitle, finalBody);
-      });
-      this.metrics.observeNotificationProviderLatency('fcm', 'PUSH', Date.now() - pStart);
+      const providerId = await this.circuitBreaker.execute(
+        'push-notifications',
+        async () => {
+          return await this.fcmProvider.sendPush(token, finalTitle, finalBody);
+        },
+      );
+      this.metrics.observeNotificationProviderLatency(
+        'fcm',
+        'PUSH',
+        Date.now() - pStart,
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -64,12 +71,24 @@ export class PushProcessor extends WorkerHost {
         },
       });
 
-      this.metrics.observeNotificationDeliveryDuration('PUSH', 'fcm', Date.now() - startTime);
+      this.metrics.observeNotificationDeliveryDuration(
+        'PUSH',
+        'fcm',
+        Date.now() - startTime,
+      );
 
-      await this.queueService.updateJobStatus(Queues.PUSH, job.id!, QueueJobStatus.COMPLETED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.PUSH,
+        job.id!,
+        QueueJobStatus.COMPLETED,
+        job.attemptsMade,
+      );
     } catch (err) {
       this.metrics.incrementNotificationProviderFailures('fcm', 'PUSH');
-      this.logger.error(`Push delivery ${deliveryId} failed: ${err.message}`, err.stack);
+      this.logger.error(
+        `Push delivery ${deliveryId} failed: ${err.message}`,
+        err.stack,
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -80,7 +99,12 @@ export class PushProcessor extends WorkerHost {
         },
       });
 
-      await this.queueService.updateJobStatus(Queues.PUSH, job.id!, QueueJobStatus.FAILED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.PUSH,
+        job.id!,
+        QueueJobStatus.FAILED,
+        job.attemptsMade,
+      );
       throw err;
     }
   }

@@ -33,18 +33,23 @@ export class ConsentsController {
     },
   ) {
     const userId = req.user.userId;
-    const ipAddress = (req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress) as string;
+    const ipAddress = (req.headers['x-forwarded-for'] ||
+      req.ip ||
+      req.socket?.remoteAddress) as string;
     const userAgent = req.headers['user-agent'] as string;
 
-    const consent = await this.consentsService.grantConsentWithStrategy(userId, {
-      brokerId: body.brokerId,
-      strategy: body.strategy,
-      baseMultiplier: body.baseMultiplier ?? 1,
-      consentAccepted: body.consentAccepted ?? true,
-      agreementVersion: body.agreementVersion ?? 'v1.0',
-      ipAddress: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
-      userAgent,
-    });
+    const consent = await this.consentsService.grantConsentWithStrategy(
+      userId,
+      {
+        brokerId: body.brokerId,
+        strategy: body.strategy,
+        baseMultiplier: body.baseMultiplier ?? 1,
+        consentAccepted: body.consentAccepted ?? true,
+        agreementVersion: body.agreementVersion ?? 'v1.0',
+        ipAddress: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
+        userAgent,
+      },
+    );
 
     return {
       status: consent.status,
@@ -91,7 +96,9 @@ export class ConsentsController {
     },
   ) {
     const userId = req.user.userId;
-    const ipAddress = (req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress) as string;
+    const ipAddress = (req.headers['x-forwarded-for'] ||
+      req.ip ||
+      req.socket?.remoteAddress) as string;
     const userAgent = req.headers['user-agent'] as string;
 
     const updated = await this.consentsService.changeUserStrategy(
@@ -104,7 +111,8 @@ export class ConsentsController {
 
     return {
       success: true,
-      message: 'Strategy changed successfully. New cycle active with 1x multiplier.',
+      message:
+        'Strategy changed successfully. New cycle active with 1x multiplier.',
       strategy: updated,
     };
   }

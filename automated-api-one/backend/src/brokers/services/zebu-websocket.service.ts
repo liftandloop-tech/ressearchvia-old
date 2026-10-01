@@ -11,7 +11,9 @@ import { OrderMonitoringService } from '../../trading/services/order-monitoring.
 import { PrismaService } from '../../prisma.service';
 
 @Injectable()
-export class ZebuWebSocketService implements OnModuleDestroy, OnApplicationBootstrap {
+export class ZebuWebSocketService
+  implements OnModuleDestroy, OnApplicationBootstrap
+{
   private readonly logger = new Logger(ZebuWebSocketService.name);
   private readonly wsUrl = 'wss://go.mynt.in/NorenWSAPI/';
   private readonly sockets = new Map<string, WebSocket>();
@@ -77,7 +79,9 @@ export class ZebuWebSocketService implements OnModuleDestroy, OnApplicationBoots
     // Close existing socket if already open
     const existing = this.sockets.get(clientCode);
     if (existing && existing.readyState === WebSocket.OPEN) {
-      this.logger.log(`[Zebu WebSocket] Stream already active and connected for ${clientCode}`);
+      this.logger.log(
+        `[Zebu WebSocket] Stream already active and connected for ${clientCode}`,
+      );
       return;
     }
 
@@ -141,35 +145,49 @@ export class ZebuWebSocketService implements OnModuleDestroy, OnApplicationBoots
 
             // 3. Heartbeat response ('h')
             if (msg.t === 'h') {
-              this.logger.debug(`[Zebu WebSocket] Heartbeat ack from ${clientCode}`);
+              this.logger.debug(
+                `[Zebu WebSocket] Heartbeat ack from ${clientCode}`,
+              );
               continue;
             }
 
             // 4. Real-time Order Update Feed ('om')
-            if (msg.t === 'om' || msg.norenordno || (msg.orderid && msg.status)) {
+            if (
+              msg.t === 'om' ||
+              msg.norenordno ||
+              (msg.orderid && msg.status)
+            ) {
               this.logger.log(
                 `[Zebu WebSocket] Live order update for ${clientCode}: ${JSON.stringify(msg)}`,
               );
               const brokerOrderId = msg.norenordno || msg.orderid;
               const status = msg.status || msg.orderstatus;
-              const averagePrice = msg.avgprc ? parseFloat(msg.avgprc) : undefined;
-              const filledQuantity = msg.fillshares ? parseInt(msg.fillshares, 10) : undefined;
+              const averagePrice = msg.avgprc
+                ? parseFloat(msg.avgprc)
+                : undefined;
+              const filledQuantity = msg.fillshares
+                ? parseInt(msg.fillshares, 10)
+                : undefined;
               const rejectionReason = msg.rejreason || msg.reason;
 
               if (brokerOrderId && status) {
-                await this.orderMonitoringService.processBrokerWebhookOrderUpdate({
-                  brokerOrderId,
-                  status,
-                  averagePrice,
-                  filledQuantity,
-                  rejectionReason,
-                });
+                await this.orderMonitoringService.processBrokerWebhookOrderUpdate(
+                  {
+                    brokerOrderId,
+                    status,
+                    averagePrice,
+                    filledQuantity,
+                    rejectionReason,
+                  },
+                );
               }
               continue;
             }
 
             // Other socket notifications
-            this.logger.debug(`[Zebu WebSocket] Received message for ${clientCode}: ${text}`);
+            this.logger.debug(
+              `[Zebu WebSocket] Received message for ${clientCode}: ${text}`,
+            );
           }
         } catch (err: any) {
           this.logger.error(
@@ -228,7 +246,9 @@ export class ZebuWebSocketService implements OnModuleDestroy, OnApplicationBoots
 
     const timer = setTimeout(() => {
       this.reconnectTimers.delete(clientCode);
-      this.logger.log(`[Zebu WebSocket] Reconnecting stream for ${clientCode}...`);
+      this.logger.log(
+        `[Zebu WebSocket] Reconnecting stream for ${clientCode}...`,
+      );
       this.connectUser(creds.clientCode, creds.accessToken);
     }, 10000); // Reconnect attempt after 10s
 
@@ -251,7 +271,9 @@ export class ZebuWebSocketService implements OnModuleDestroy, OnApplicationBoots
       } catch (_) {}
       this.sockets.delete(clientCode);
     }
-    this.logger.log(`[Zebu WebSocket] Disconnected stream for client ${clientCode}`);
+    this.logger.log(
+      `[Zebu WebSocket] Disconnected stream for client ${clientCode}`,
+    );
   }
 
   isUserConnected(clientCode: string): boolean {

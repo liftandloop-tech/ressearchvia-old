@@ -48,18 +48,19 @@ describe('Trading Platform API (e2e)', () => {
     // Generate valid bcrypt hash for the login test
     const pepperedSecret = '123456default_mpin_pepper_secret';
     mockMpinHash = await bcrypt.hash(pepperedSecret, 10);
-  });
-
-  beforeEach(async () => {
     const testEnv = await createTestApp();
     app = testEnv.app;
     prismaMock = testEnv.prismaMock;
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (app) {
       await app.close();
     }
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('Authentication Flow', () => {

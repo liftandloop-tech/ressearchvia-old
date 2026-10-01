@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/config/app.config.dart';
+import '../../services/in_app_update.service.dart';
 import 'setting.tile.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -51,6 +53,13 @@ class SettingsScreen extends StatelessWidget {
               subtitle: 'Review & grant daily execution consent',
               icon: Icons.gpp_good_outlined,
               onTap: () => Get.toNamed(AppRoutes.consent),
+            ),
+            const SizedBox(height: 10),
+            SettingTile(
+              title: 'Check for Updates',
+              subtitle: 'Version ${AppConfig.appVersion} • Tap to check Play Store updates',
+              icon: Icons.system_update_outlined,
+              onTap: () => InAppUpdateService.checkForUpdate(isManualCheck: true),
             ),
           ],
         ),

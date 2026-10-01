@@ -28,7 +28,9 @@ export class SmsProcessor extends WorkerHost {
     const { deliveryId, to, message } = job.data;
     const startTime = Date.now();
 
-    this.logger.log(`Processing SMS job ${job.id} for delivery ${deliveryId} to ${to}`);
+    this.logger.log(
+      `Processing SMS job ${job.id} for delivery ${deliveryId} to ${to}`,
+    );
 
     let providerUsed = 'twilio';
     let providerId = '';
@@ -52,19 +54,32 @@ export class SmsProcessor extends WorkerHost {
 
       const pStart = Date.now();
       try {
-        providerId = await this.circuitBreaker.execute('twilio-notifications', async () => {
-          return await this.twilioProvider.sendSms(to, finalMessage);
-        });
-        this.metrics.observeNotificationProviderLatency('twilio', 'SMS', Date.now() - pStart);
+        providerId = await this.circuitBreaker.execute(
+          'twilio-notifications',
+          async () => {
+            return await this.twilioProvider.sendSms(to, finalMessage);
+          },
+        );
+        this.metrics.observeNotificationProviderLatency(
+          'twilio',
+          'SMS',
+          Date.now() - pStart,
+        );
       } catch (twilioErr) {
         this.metrics.incrementNotificationProviderFailures('twilio', 'SMS');
-        this.logger.warn(`Twilio failed or circuit open. Failing over to Msg91. Error: ${twilioErr.message}`);
+        this.logger.warn(
+          `Twilio failed or circuit open. Failing over to Msg91. Error: ${twilioErr.message}`,
+        );
         this.metrics.incrementNotificationFailover('twilio', 'msg91', 'SMS');
 
         const msgStart = Date.now();
         providerUsed = 'msg91';
         providerId = await this.msg91Provider.sendSms(to, finalMessage);
-        this.metrics.observeNotificationProviderLatency('msg91', 'SMS', Date.now() - msgStart);
+        this.metrics.observeNotificationProviderLatency(
+          'msg91',
+          'SMS',
+          Date.now() - msgStart,
+        );
       }
 
       await this.prisma.notificationDelivery.update({
@@ -78,11 +93,23 @@ export class SmsProcessor extends WorkerHost {
         },
       });
 
-      this.metrics.observeNotificationDeliveryDuration('SMS', providerUsed, Date.now() - startTime);
+      this.metrics.observeNotificationDeliveryDuration(
+        'SMS',
+        providerUsed,
+        Date.now() - startTime,
+      );
 
-      await this.queueService.updateJobStatus(Queues.SMS, job.id!, QueueJobStatus.COMPLETED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.SMS,
+        job.id!,
+        QueueJobStatus.COMPLETED,
+        job.attemptsMade,
+      );
     } catch (err) {
-      this.logger.error(`SMS delivery ${deliveryId} failed: ${err.message}`, err.stack);
+      this.logger.error(
+        `SMS delivery ${deliveryId} failed: ${err.message}`,
+        err.stack,
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -93,7 +120,12 @@ export class SmsProcessor extends WorkerHost {
         },
       });
 
-      await this.queueService.updateJobStatus(Queues.SMS, job.id!, QueueJobStatus.FAILED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.SMS,
+        job.id!,
+        QueueJobStatus.FAILED,
+        job.attemptsMade,
+      );
       throw err;
     }
   }

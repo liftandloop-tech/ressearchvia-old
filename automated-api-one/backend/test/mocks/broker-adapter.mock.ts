@@ -94,24 +94,15 @@ export class MockBrokerAdapter extends BrokerAdapter {
     return { brokerOrderId, status: 'EXECUTED' };
   }
 
-  async getPositions(
-    token: string,
-    clientCode: string,
-  ): Promise<any[]> {
+  async getPositions(token: string, clientCode: string): Promise<any[]> {
     return [];
   }
 
-  async getHoldings(
-    token: string,
-    clientCode: string,
-  ): Promise<any[]> {
+  async getHoldings(token: string, clientCode: string): Promise<any[]> {
     return [];
   }
 
-  async getFunds(
-    token: string,
-    clientCode: string,
-  ): Promise<any> {
+  async getFunds(token: string, clientCode: string): Promise<any> {
     return { available: 100000.0, total: 100000.0 };
   }
 
@@ -139,7 +130,13 @@ export class MockBrokerAdapter extends BrokerAdapter {
     clientCode: string,
     orderId: string,
     variety: string,
-    order: { quantity: number; price?: number; ordertype?: string; producttype?: string; duration?: string }
+    order: {
+      quantity: number;
+      price?: number;
+      ordertype?: string;
+      producttype?: string;
+      duration?: string;
+    },
   ): Promise<OrderResponse> {
     return { brokerOrderId: orderId, status: 'PENDING' };
   }
@@ -148,15 +145,12 @@ export class MockBrokerAdapter extends BrokerAdapter {
     token: string,
     clientCode: string,
     orderId: string,
-    variety: string
+    variety: string,
   ): Promise<OrderResponse> {
     return { brokerOrderId: orderId, status: 'CANCELLED' };
   }
 
-  async getTradeBook(
-    token: string,
-    clientCode: string
-  ): Promise<any[]> {
+  async getTradeBook(token: string, clientCode: string): Promise<any[]> {
     return [];
   }
 
@@ -164,7 +158,7 @@ export class MockBrokerAdapter extends BrokerAdapter {
     token: string,
     exchange: string,
     symbol: string,
-    symbolToken: string
+    symbolToken: string,
   ): Promise<any> {
     return {
       exchange,
@@ -178,9 +172,8 @@ export class MockBrokerAdapter extends BrokerAdapter {
   async getOrderDetails(
     token: string,
     clientCode: string,
-    orderId: string
+    orderId: string,
   ): Promise<OrderResponse> {
     return { brokerOrderId: orderId, status: 'EXECUTED' };
   }
 }
-

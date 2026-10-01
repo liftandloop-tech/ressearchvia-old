@@ -156,7 +156,9 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
         const userLockKey = `reconciliation:user:${userId}:${brokerId}`;
         if (this.redisService.isHealthy()) {
             try {
-                const locked = await this.redisService.getClient().set(userLockKey, '1', 'EX', 7200, 'NX');
+                const locked = await this.redisService
+                    .getClient()
+                    .set(userLockKey, '1', 'EX', 7200, 'NX');
                 if (locked !== 'OK') {
                     this.logger.warn(`User broker reconciliation already running for lock: ${userLockKey}`);
                     await this.prisma.reconciliationShard.update({
@@ -200,8 +202,12 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
                 if (dbTrade.brokerTradeId) {
                     matchedIndex = brokerTrades.findIndex((bt) => bt.tradeId === dbTrade.brokerTradeId);
                 }
-                if (matchedIndex === -1 && dbTrade.orders && dbTrade.orders.length > 0) {
-                    const brokerOrderIds = dbTrade.orders.map((o) => o.brokerOrderId).filter(Boolean);
+                if (matchedIndex === -1 &&
+                    dbTrade.orders &&
+                    dbTrade.orders.length > 0) {
+                    const brokerOrderIds = dbTrade.orders
+                        .map((o) => o.brokerOrderId)
+                        .filter(Boolean);
                     matchedIndex = brokerTrades.findIndex((bt) => brokerOrderIds.includes(bt.orderId));
                 }
                 if (matchedIndex === -1) {
@@ -237,14 +243,24 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
             }
             for (const dbTrade of dbTrades) {
                 if (!dbMatchedIds.has(dbTrade.id)) {
-                    await this.registerIssue(runId, userId, brokerId, client_1.ReconciliationIssueType.TRADE_MISSING_IN_BROKER, client_1.Severity.CRITICAL, dbTrade.id, {}, { id: dbTrade.id, quantity: dbTrade.quantity, price: dbTrade.entryPrice });
+                    await this.registerIssue(runId, userId, brokerId, client_1.ReconciliationIssueType.TRADE_MISSING_IN_BROKER, client_1.Severity.CRITICAL, dbTrade.id, {}, {
+                        id: dbTrade.id,
+                        quantity: dbTrade.quantity,
+                        price: dbTrade.entryPrice,
+                    });
                     issuesFoundCount++;
                 }
             }
             const dbOrders = await this.prisma.order.findMany({
                 where: {
                     trade: { userId },
-                    status: { in: [client_1.OrderStatus.PENDING, client_1.OrderStatus.PLACED, client_1.OrderStatus.PARTIALLY_FILLED] },
+                    status: {
+                        in: [
+                            client_1.OrderStatus.PENDING,
+                            client_1.OrderStatus.PLACED,
+                            client_1.OrderStatus.PARTIALLY_FILLED,
+                        ],
+                    },
                 },
                 include: { trade: true },
             });
@@ -255,8 +271,12 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
                     const brokerDetails = await adapter.getOrderDetails(token, clientCode, order.brokerOrderId);
                     const brokerMappedStatus = this.mapOrderStatus(brokerDetails.status);
                     if (brokerMappedStatus !== order.status) {
-                        if ((order.status === client_1.OrderStatus.PENDING || order.status === client_1.OrderStatus.PLACED || order.status === client_1.OrderStatus.PARTIALLY_FILLED) &&
-                            (brokerMappedStatus === client_1.OrderStatus.FILLED || brokerMappedStatus === client_1.OrderStatus.REJECTED || brokerMappedStatus === client_1.OrderStatus.CANCELLED)) {
+                        if ((order.status === client_1.OrderStatus.PENDING ||
+                            order.status === client_1.OrderStatus.PLACED ||
+                            order.status === client_1.OrderStatus.PARTIALLY_FILLED) &&
+                            (brokerMappedStatus === client_1.OrderStatus.FILLED ||
+                                brokerMappedStatus === client_1.OrderStatus.REJECTED ||
+                                brokerMappedStatus === client_1.OrderStatus.CANCELLED)) {
                             await this.applyAutoResolution(order.id, brokerMappedStatus, userId);
                             await this.registerIssue(runId, userId, brokerId, client_1.ReconciliationIssueType.ORDER_STATUS_MISMATCH, client_1.Severity.WARNING, order.id, { status: brokerMappedStatus }, { status: order.status }, client_1.ReconciliationIssueStatus.RESOLVED);
                             this.metrics.incrementReconciliationAutoResolved(brokerCode);
@@ -336,7 +356,13 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
                 where: {
                     userId,
                     brokerId,
-                    status: { in: [client_1.ReconciliationIssueStatus.OPEN, client_1.ReconciliationIssueStatus.INVESTIGATING, client_1.ReconciliationIssueStatus.ESCALATED] },
+                    status: {
+                        in: [
+                            client_1.ReconciliationIssueStatus.OPEN,
+                            client_1.ReconciliationIssueStatus.INVESTIGATING,
+                            client_1.ReconciliationIssueStatus.ESCALATED,
+                        ],
+                    },
                 },
             });
             await this.prisma.reconciliationSnapshot.upsert({
@@ -400,21 +426,26 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
         });
         if (!run)
             return;
-        const allFinished = run.shards.every((s) => s.status === client_1.ReconciliationStatus.COMPLETED || s.status === client_1.ReconciliationStatus.FAILED);
+        const allFinished = run.shards.every((s) => s.status === client_1.ReconciliationStatus.COMPLETED ||
+            s.status === client_1.ReconciliationStatus.FAILED);
         if (allFinished) {
             const failedShards = run.shards.some((s) => s.status === client_1.ReconciliationStatus.FAILED);
             const totalIssues = run.shards.reduce((acc, s) => acc + s.issuesFound, 0);
             await this.prisma.reconciliationRun.update({
                 where: { id: runId },
                 data: {
-                    status: failedShards ? client_1.ReconciliationStatus.FAILED : client_1.ReconciliationStatus.COMPLETED,
+                    status: failedShards
+                        ? client_1.ReconciliationStatus.FAILED
+                        : client_1.ReconciliationStatus.COMPLETED,
                     completedAt: new Date(),
                     mismatchesFound: totalIssues,
                 },
             });
             if (this.redisService.isHealthy()) {
                 try {
-                    await this.redisService.getClient().del(`reconciliation:run:${runId}`);
+                    await this.redisService
+                        .getClient()
+                        .del(`reconciliation:run:${runId}`);
                 }
                 catch (err) {
                     this.logger.warn(`Failed to release run lock: ${err.message}`);
@@ -425,11 +456,15 @@ let ReconciliationService = ReconciliationService_1 = class ReconciliationServic
     }
     async registerIssue(runId, userId, brokerId, issueType, severity, resourceId, brokerValue, dbValue, initialStatus = client_1.ReconciliationIssueStatus.OPEN) {
         const fingerprintRaw = `${userId}:${brokerId}:${issueType}:${resourceId}`;
-        const fingerprint = crypto.createHash('sha256').update(fingerprintRaw).digest('hex');
+        const fingerprint = crypto
+            .createHash('sha256')
+            .update(fingerprintRaw)
+            .digest('hex');
         const existingIssue = await this.prisma.reconciliationIssue.findUnique({
             where: { fingerprint },
         });
-        if (existingIssue && existingIssue.status !== client_1.ReconciliationIssueStatus.RESOLVED) {
+        if (existingIssue &&
+            existingIssue.status !== client_1.ReconciliationIssueStatus.RESOLVED) {
             await this.prisma.reconciliationIssue.update({
                 where: { id: existingIssue.id },
                 data: {

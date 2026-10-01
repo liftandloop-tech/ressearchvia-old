@@ -20,7 +20,9 @@ import { UserSegmentStatus } from '@prisma/client';
     origin: '*',
   },
 })
-export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class TradingGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(TradingGateway.name);
 
   @WebSocketServer()
@@ -37,7 +39,8 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
    * Handshake authentication, connection rate limiting, and presence tracking.
    */
   async handleConnection(socket: Socket) {
-    const ip = socket.handshake.address || socket.conn.remoteAddress || 'unknown';
+    const ip =
+      socket.handshake.address || socket.conn.remoteAddress || 'unknown';
 
     // 1. Connection Rate Limiting
     const isAllowed = await this.checkConnectionRateLimit(ip);
@@ -50,7 +53,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
     // 2. JWT Handshake Authentication
     const token = this.extractToken(socket);
     if (!token) {
-      this.logger.warn(`Authentication failed: No token provided from IP=${ip}`);
+      this.logger.warn(
+        `Authentication failed: No token provided from IP=${ip}`,
+      );
       socket.disconnect(true);
       return;
     }
@@ -76,12 +81,19 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
       }
 
       // 4. Redis Presence Tracking
-      await this.addPresence(userId, socket.id, socket.data.appVersion, socket.data.platform);
+      await this.addPresence(
+        userId,
+        socket.id,
+        socket.data.appVersion,
+        socket.data.platform,
+      );
 
       this.metrics.incrementWsConnections();
       this.updateMetricsGauges();
 
-      this.logger.log(`Client connected: Socket=${socket.id} User=${userId} IP=${ip}`);
+      this.logger.log(
+        `Client connected: Socket=${socket.id} User=${userId} IP=${ip}`,
+      );
     } catch (err: any) {
       this.logger.warn(`Authentication failed for IP=${ip}: ${err.message}`);
       socket.disconnect(true);
@@ -97,7 +109,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
       await this.removePresence(userId, socket.id);
       this.metrics.incrementWsDisconnects();
       this.updateMetricsGauges();
-      this.logger.log(`Client disconnected: Socket=${socket.id} User=${userId}`);
+      this.logger.log(
+        `Client disconnected: Socket=${socket.id} User=${userId}`,
+      );
     }
   }
 
@@ -140,7 +154,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
     });
 
     if (!userSegment || userSegment.status !== UserSegmentStatus.ACTIVE) {
-      this.logger.warn(`Unauthorized segment join attempt: User=${userId} Segment=${segmentId}`);
+      this.logger.warn(
+        `Unauthorized segment join attempt: User=${userId} Segment=${segmentId}`,
+      );
       socket.emit('error', { message: 'Unauthorized to join segment room' });
       return;
     }
@@ -180,12 +196,19 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
       }
       return current <= 20; // 20 connections per minute
     } catch (err: any) {
-      this.logger.error(`Failed to execute rate limit check for IP ${ip}: ${err.message}`);
+      this.logger.error(
+        `Failed to execute rate limit check for IP ${ip}: ${err.message}`,
+      );
       return true;
     }
   }
 
-  private async addPresence(userId: string, socketId: string, appVersion: string, platform: string) {
+  private async addPresence(
+    userId: string,
+    socketId: string,
+    appVersion: string,
+    platform: string,
+  ) {
     if (!this.redisService.isHealthy()) return;
 
     const redisKey = `ws:user:${userId}`;
@@ -218,7 +241,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
       await client.set(redisKey, JSON.stringify(presence), 'EX', 120); // 2 minutes TTL
     } catch (err: any) {
-      this.logger.error(`Presence tracking error for User ${userId}: ${err.message}`);
+      this.logger.error(
+        `Presence tracking error for User ${userId}: ${err.message}`,
+      );
     }
   }
 
@@ -233,7 +258,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
 
       const presence = JSON.parse(existing);
       presence.connections = Math.max(0, presence.connections - 1);
-      presence.socketIds = presence.socketIds.filter((id: string) => id !== socketId);
+      presence.socketIds = presence.socketIds.filter(
+        (id: string) => id !== socketId,
+      );
       presence.lastSeen = new Date().toISOString();
 
       if (presence.connections === 0 || presence.socketIds.length === 0) {
@@ -242,7 +269,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
         await client.set(redisKey, JSON.stringify(presence), 'EX', 120);
       }
     } catch (err: any) {
-      this.logger.error(`Presence removal error for User ${userId}: ${err.message}`);
+      this.logger.error(
+        `Presence removal error for User ${userId}: ${err.message}`,
+      );
     }
   }
 
@@ -259,7 +288,9 @@ export class TradingGateway implements OnGatewayConnection, OnGatewayDisconnect 
         await client.set(redisKey, JSON.stringify(presence), 'EX', 120);
       }
     } catch (err: any) {
-      this.logger.error(`Presence refresh error for User ${userId}: ${err.message}`);
+      this.logger.error(
+        `Presence refresh error for User ${userId}: ${err.message}`,
+      );
     }
   }
 

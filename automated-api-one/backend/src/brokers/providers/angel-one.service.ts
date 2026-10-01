@@ -96,7 +96,11 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     } catch {
       try {
         const response: any = await firstValueFrom(
-          this.httpService.request({ method: 'OPTIONS', url: this.baseUrl, timeout: 3000 }),
+          this.httpService.request({
+            method: 'OPTIONS',
+            url: this.baseUrl,
+            timeout: 3000,
+          }),
         );
         return {
           reachable: response.status < 500,
@@ -176,7 +180,10 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       );
     } catch (error: any) {
       const detail = error.response?.data;
-      this.logger.error(`Angel One session generation error: ${error.message}`, error.stack);
+      this.logger.error(
+        `Angel One session generation error: ${error.message}`,
+        error.stack,
+      );
       if (detail) {
         this.logger.error(`Angel One error details: ${JSON.stringify(detail)}`);
       }
@@ -189,7 +196,8 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
 
   async getAuthorizationUrl(state: string): Promise<string> {
     const apiKey = this.configService.get<string>('ANGEL_ONE_API_KEY') || '';
-    const redirectUrl = this.configService.get<string>('ANGEL_ONE_REDIRECT_URL') || '';
+    const redirectUrl =
+      this.configService.get<string>('ANGEL_ONE_REDIRECT_URL') || '';
     if (!apiKey) {
       throw new BadRequestException('Angel One API Key is not configured');
     }
@@ -198,15 +206,21 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     )}&state=${state}`;
   }
 
-  async completeAuthorization(callbackData: BrokerCallbackData): Promise<BrokerSession> {
+  async completeAuthorization(
+    callbackData: BrokerCallbackData,
+  ): Promise<BrokerSession> {
     this.logger.log(`Completing authorization flow for Angel One`);
     const authToken = callbackData.params.auth_token;
     if (!authToken) {
-      throw new BadRequestException('Authorization token (auth_token) is missing in callback data');
+      throw new BadRequestException(
+        'Authorization token (auth_token) is missing in callback data',
+      );
     }
 
     if (this.isMock) {
-      this.logger.log(`[SANDBOX MOCK] Generating session using auth_token: ${authToken}`);
+      this.logger.log(
+        `[SANDBOX MOCK] Generating session using auth_token: ${authToken}`,
+      );
       return {
         accessToken: `mock_angel_one_access_token_mockclient_${Date.now()}`,
         refreshToken: `mock_angel_one_refresh_token_mockclient`,
@@ -222,7 +236,9 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       const outerPayload = JSON.parse(payloadJson);
 
       // Determine expiry from the outer JWT's `exp` claim
-      const expMs = outerPayload.exp ? outerPayload.exp * 1000 : Date.now() + 18 * 60 * 60 * 1000;
+      const expMs = outerPayload.exp
+        ? outerPayload.exp * 1000
+        : Date.now() + 18 * 60 * 60 * 1000;
       const expiresAt = new Date(expMs);
 
       const refreshToken = callbackData.params.refresh_token || '';
@@ -249,8 +265,13 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         brokerUserId,
       };
     } catch (error: any) {
-      this.logger.error(`Angel One token extraction error: ${error.message}`, error.stack);
-      throw new BadRequestException(`Broker token extraction error: ${error.message}`);
+      this.logger.error(
+        `Angel One token extraction error: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Broker token extraction error: ${error.message}`,
+      );
     }
   }
 
@@ -325,7 +346,9 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
           activeStatus: data.activeStatus || 'ACTIVE',
         };
       }
-      throw new Error(response.data?.message || 'Failed to fetch profile from broker');
+      throw new Error(
+        response.data?.message || 'Failed to fetch profile from broker',
+      );
     } catch (error) {
       this.logger.error(`Get profile failed: ${error.message}`);
       throw error;
@@ -354,7 +377,11 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         }),
       );
 
-      if (response.data && response.data.status === true && Array.isArray(response.data.data)) {
+      if (
+        response.data &&
+        response.data.status === true &&
+        Array.isArray(response.data.data)
+      ) {
         return response.data.data.map((o: any) => ({
           brokerOrderId: o.orderid || '',
           symbol: o.tradingsymbol || '',
@@ -398,7 +425,9 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         ? this.instrumentsService.findInstrument(order.symbol, exchange)
         : null;
 
-      const symbolToken = instrument?.token || this.instrumentsService.findToken(order.symbol, exchange);
+      const symbolToken =
+        instrument?.token ||
+        this.instrumentsService.findToken(order.symbol, exchange);
       const tradingSymbol = instrument?.symbol || order.symbol;
 
       if (!symbolToken || symbolToken === 'DUMMY_TOKEN') {
@@ -448,8 +477,14 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       // Trigger price handling:
       // Required for STOPLOSS orders, otherwise "0"
       let triggerPriceStr = '0';
-      if (variety === 'STOPLOSS' || ordertype === 'STOPLOSS_LIMIT' || ordertype === 'STOPLOSS_MARKET') {
-        triggerPriceStr = order.triggerPrice ? order.triggerPrice.toString() : '0';
+      if (
+        variety === 'STOPLOSS' ||
+        ordertype === 'STOPLOSS_LIMIT' ||
+        ordertype === 'STOPLOSS_MARKET'
+      ) {
+        triggerPriceStr = order.triggerPrice
+          ? order.triggerPrice.toString()
+          : '0';
       }
 
       const payload: any = {
@@ -477,10 +512,15 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       let proxyIp: string | undefined;
       if (httpsAgent && httpsAgent.options) {
         // Extract IP address from HttpsProxyAgent instance configuration parameters
-        const proxyUrl = httpsAgent.options.href || httpsAgent.options.host || httpsAgent.options.hostname;
+        const proxyUrl =
+          httpsAgent.options.href ||
+          httpsAgent.options.host ||
+          httpsAgent.options.hostname;
         if (proxyUrl) {
           try {
-            const parsed = new URL(httpsAgent.options.href || `http://${proxyUrl}`);
+            const parsed = new URL(
+              httpsAgent.options.href || `http://${proxyUrl}`,
+            );
             proxyIp = parsed.hostname;
           } catch (_) {}
         }
@@ -570,8 +610,15 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     symbol: string,
     token?: string,
     symbolToken?: string,
-  ): Promise<{ ltp: number; close: number; open: number; high: number; low: number } | null> {
-    const resolvedToken = symbolToken || this.instrumentsService.findToken(symbol, exchange) || '';
+  ): Promise<{
+    ltp: number;
+    close: number;
+    open: number;
+    high: number;
+    low: number;
+  } | null> {
+    const resolvedToken =
+      symbolToken || this.instrumentsService.findToken(symbol, exchange) || '';
 
     if (this.isMock) {
       // Return plausible mock prices
@@ -609,10 +656,14 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         };
       }
 
-      this.logger.warn(`getLtp returned non-ok: ${JSON.stringify(response.data)}`);
+      this.logger.warn(
+        `getLtp returned non-ok: ${JSON.stringify(response.data)}`,
+      );
       return null;
     } catch (error: any) {
-      this.logger.error(`getLtp failed for ${symbol}@${exchange}: ${error.message}`);
+      this.logger.error(
+        `getLtp failed for ${symbol}@${exchange}: ${error.message}`,
+      );
       return null;
     }
   }
@@ -778,10 +829,18 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     clientCode: string,
     orderId: string,
     variety: string,
-    order: { quantity: number; price?: number; ordertype?: string; producttype?: string; duration?: string }
+    order: {
+      quantity: number;
+      price?: number;
+      ordertype?: string;
+      producttype?: string;
+      duration?: string;
+    },
   ): Promise<OrderResponse> {
     if (this.isMock) {
-      this.logger.log(`[SANDBOX MOCK] Modifying order ${orderId}: ${JSON.stringify(order)}`);
+      this.logger.log(
+        `[SANDBOX MOCK] Modifying order ${orderId}: ${JSON.stringify(order)}`,
+      );
       return {
         brokerOrderId: orderId,
         status: 'PENDING',
@@ -843,7 +902,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     token: string,
     clientCode: string,
     orderId: string,
-    variety: string
+    variety: string,
   ): Promise<OrderResponse> {
     if (this.isMock) {
       this.logger.log(`[SANDBOX MOCK] Cancelling order ${orderId}`);
@@ -901,7 +960,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
 
   async getTradeBook(
     token: string,
-    clientCode: string
+    clientCode: string,
   ): Promise<BrokerTrade[]> {
     if (this.isMock) {
       return [
@@ -922,12 +981,19 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       const start = Date.now();
       try {
         const response = await firstValueFrom(
-          this.httpService.get(`${this.baseUrl}${AngelOneEndpoints.TRADE_BOOK}`, {
-            headers: this.getHeaders(token),
-          }),
+          this.httpService.get(
+            `${this.baseUrl}${AngelOneEndpoints.TRADE_BOOK}`,
+            {
+              headers: this.getHeaders(token),
+            },
+          ),
         );
 
-        this.metrics.incrementBrokerCalls('angelone', 'getTradeBook', 'success');
+        this.metrics.incrementBrokerCalls(
+          'angelone',
+          'getTradeBook',
+          'success',
+        );
         this.metrics.observeBrokerLatency('angelone', Date.now() - start);
 
         if (response.data && response.data.status === true) {
@@ -944,7 +1010,11 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
         }
         return [];
       } catch (error) {
-        this.metrics.incrementBrokerCalls('angelone', 'getTradeBook', 'failure');
+        this.metrics.incrementBrokerCalls(
+          'angelone',
+          'getTradeBook',
+          'failure',
+        );
         this.metrics.incrementBrokerFailures('angelone', 'getTradeBook');
         this.metrics.observeBrokerLatency('angelone', Date.now() - start);
         throw error;
@@ -956,7 +1026,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
     token: string,
     exchange: string,
     symbol: string,
-    symbolToken: string
+    symbolToken: string,
   ): Promise<BrokerLtp> {
     if (this.isMock) {
       return {
@@ -980,51 +1050,66 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       }
     }
 
-    const ltpVal = await this.circuitBreaker.execute('angelone-ltp', async () => {
-      await this.rateLimiter.throttle('angelone', 'market');
-      const start = Date.now();
-      try {
-        const response = await firstValueFrom(
-          this.httpService.post(
-            `${this.baseUrl}${AngelOneEndpoints.LTP_DATA}`,
-            {
-              exchange,
-              tradingsymbol: symbol,
-              symboltoken: symbolToken,
-            },
-            {
-              headers: this.getHeaders(token),
-            },
-          ),
-        );
+    const ltpVal = await this.circuitBreaker.execute(
+      'angelone-ltp',
+      async () => {
+        await this.rateLimiter.throttle('angelone', 'market');
+        const start = Date.now();
+        try {
+          const response = await firstValueFrom(
+            this.httpService.post(
+              `${this.baseUrl}${AngelOneEndpoints.LTP_DATA}`,
+              {
+                exchange,
+                tradingsymbol: symbol,
+                symboltoken: symbolToken,
+              },
+              {
+                headers: this.getHeaders(token),
+              },
+            ),
+          );
 
-        this.metrics.incrementBrokerCalls('angelone', 'getLtpData', 'success');
-        this.metrics.observeBrokerLatency('angelone', Date.now() - start);
+          this.metrics.incrementBrokerCalls(
+            'angelone',
+            'getLtpData',
+            'success',
+          );
+          this.metrics.observeBrokerLatency('angelone', Date.now() - start);
 
-        if (response.data && response.data.status === true) {
-          const data = response.data.data;
-          const ltpResponse: BrokerLtp = {
-            exchange: data.exchange,
-            symbol: data.tradingsymbol,
-            token: data.symboltoken,
-            ltp: parseFloat(data.ltp || '0'),
-            timestamp: new Date(),
-          };
-          return ltpResponse;
+          if (response.data && response.data.status === true) {
+            const data = response.data.data;
+            const ltpResponse: BrokerLtp = {
+              exchange: data.exchange,
+              symbol: data.tradingsymbol,
+              token: data.symboltoken,
+              ltp: parseFloat(data.ltp || '0'),
+              timestamp: new Date(),
+            };
+            return ltpResponse;
+          }
+
+          throw new Error(
+            response.data.message || 'Failed to fetch LTP from broker',
+          );
+        } catch (error) {
+          this.metrics.incrementBrokerCalls(
+            'angelone',
+            'getLtpData',
+            'failure',
+          );
+          this.metrics.incrementBrokerFailures('angelone', 'getLtpData');
+          this.metrics.observeBrokerLatency('angelone', Date.now() - start);
+          throw error;
         }
-
-        throw new Error(response.data.message || 'Failed to fetch LTP from broker');
-      } catch (error) {
-        this.metrics.incrementBrokerCalls('angelone', 'getLtpData', 'failure');
-        this.metrics.incrementBrokerFailures('angelone', 'getLtpData');
-        this.metrics.observeBrokerLatency('angelone', Date.now() - start);
-        throw error;
-      }
-    });
+      },
+    );
 
     if (this.redisService.isHealthy()) {
       try {
-        await this.redisService.getClient().set(cacheKey, JSON.stringify(ltpVal), 'EX', 1);
+        await this.redisService
+          .getClient()
+          .set(cacheKey, JSON.stringify(ltpVal), 'EX', 1);
       } catch (err) {
         this.logger.error(`Error saving LTP cache: ${err.message}`);
       }
@@ -1036,7 +1121,7 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
   async getOrderDetails(
     token: string,
     clientCode: string,
-    orderId: string
+    orderId: string,
   ): Promise<OrderResponse> {
     if (this.isMock) {
       return {
@@ -1051,24 +1136,41 @@ export class AngelOneService extends BrokerAdapter implements BrokerClient {
       const start = Date.now();
       try {
         const response = await firstValueFrom(
-          this.httpService.get(`${this.baseUrl}${AngelOneEndpoints.ORDER_DETAILS}${orderId}`, {
-            headers: this.getHeaders(token),
-          }),
+          this.httpService.get(
+            `${this.baseUrl}${AngelOneEndpoints.ORDER_DETAILS}${orderId}`,
+            {
+              headers: this.getHeaders(token),
+            },
+          ),
         );
 
-        this.metrics.incrementBrokerCalls('angelone', 'getOrderDetails', 'success');
+        this.metrics.incrementBrokerCalls(
+          'angelone',
+          'getOrderDetails',
+          'success',
+        );
         this.metrics.observeBrokerLatency('angelone', Date.now() - start);
 
-        if (response.data && response.data.status === true && response.data.data) {
+        if (
+          response.data &&
+          response.data.status === true &&
+          response.data.data
+        ) {
           return {
             brokerOrderId: response.data.data.orderid,
             status: this.mapOrderStatus(response.data.data.status),
             message: response.data.data.text || response.data.data.status,
           };
         }
-        throw new Error(response.data.message || 'Failed to fetch order details');
+        throw new Error(
+          response.data.message || 'Failed to fetch order details',
+        );
       } catch (error) {
-        this.metrics.incrementBrokerCalls('angelone', 'getOrderDetails', 'failure');
+        this.metrics.incrementBrokerCalls(
+          'angelone',
+          'getOrderDetails',
+          'failure',
+        );
         this.metrics.incrementBrokerFailures('angelone', 'getOrderDetails');
         this.metrics.observeBrokerLatency('angelone', Date.now() - start);
         throw error;

@@ -99,7 +99,9 @@ export interface BrokerClient {
   }): Promise<SessionResponse>;
 
   getAuthorizationUrl(state: string): Promise<string>;
-  completeAuthorization(callbackData: BrokerCallbackData): Promise<BrokerSession>;
+  completeAuthorization(
+    callbackData: BrokerCallbackData,
+  ): Promise<BrokerSession>;
 
   validateSession(token: string): Promise<boolean>;
 
@@ -138,32 +140,35 @@ export interface BrokerClient {
     clientCode: string,
     orderId: string,
     variety: string,
-    order: { quantity: number; price?: number; ordertype?: string; producttype?: string; duration?: string }
+    order: {
+      quantity: number;
+      price?: number;
+      ordertype?: string;
+      producttype?: string;
+      duration?: string;
+    },
   ): Promise<OrderResponse>;
 
   cancelOrder(
     token: string,
     clientCode: string,
     orderId: string,
-    variety: string
+    variety: string,
   ): Promise<OrderResponse>;
 
-  getTradeBook(
-    token: string,
-    clientCode: string
-  ): Promise<BrokerTrade[]>;
+  getTradeBook(token: string, clientCode: string): Promise<BrokerTrade[]>;
 
   getLtpData(
     token: string,
     exchange: string,
     symbol: string,
-    symbolToken: string
+    symbolToken: string,
   ): Promise<BrokerLtp>;
 
   getOrderDetails(
     token: string,
     clientCode: string,
-    orderId: string
+    orderId: string,
   ): Promise<OrderResponse>;
 }
 
@@ -184,4 +189,3 @@ export interface BrokerLtp {
   ltp: number;
   timestamp: Date;
 }
-

@@ -1,7 +1,10 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma.service';
-import { REPORT_STORAGE_PROVIDER, ReportStorageProvider } from '../providers/report-storage.provider';
+import {
+  REPORT_STORAGE_PROVIDER,
+  ReportStorageProvider,
+} from '../providers/report-storage.provider';
 import { ExportState } from '@prisma/client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -36,17 +39,26 @@ export class CsvCleanupProcessor {
         },
       });
 
-      this.logger.log(`Found ${expiredExports.length} exports older than 7 days for cleanup.`);
+      this.logger.log(
+        `Found ${expiredExports.length} exports older than 7 days for cleanup.`,
+      );
 
       for (const exp of expiredExports) {
         if (exp.fileUrl && exp.fileUrl.startsWith('/uploads/reports/')) {
           const fileName = exp.fileUrl.replace('/uploads/reports/', '');
-          const filePath = path.join(process.cwd(), 'uploads', 'reports', fileName);
+          const filePath = path.join(
+            process.cwd(),
+            'uploads',
+            'reports',
+            fileName,
+          );
           try {
             await fs.unlink(filePath);
             this.logger.log(`Deleted file: ${filePath}`);
           } catch (err) {
-            this.logger.warn(`Failed to delete local file ${filePath}: ${err.message}`);
+            this.logger.warn(
+              `Failed to delete local file ${filePath}: ${err.message}`,
+            );
           }
         }
 

@@ -28,7 +28,9 @@ let IdempotencyService = IdempotencyService_1 = class IdempotencyService {
         this.redisService.assertHealthy();
         const redisKey = redis_keys_1.RedisKeys.idempotency(key);
         try {
-            const result = await this.redisService.getClient().set(redisKey, '1', 'EX', ttlSeconds, 'NX');
+            const result = await this.redisService
+                .getClient()
+                .set(redisKey, '1', 'EX', ttlSeconds, 'NX');
             if (result !== 'OK') {
                 this.logger.warn(`Duplicate request detected via Redis for key: ${key}`);
                 return false;
@@ -46,7 +48,10 @@ let IdempotencyService = IdempotencyService_1 = class IdempotencyService {
             catch (dbErr) {
                 if (dbErr.code === 'P2002') {
                     this.logger.warn(`Duplicate request detected via Database for key: ${key}`);
-                    await this.redisService.getClient().del(redisKey).catch(() => { });
+                    await this.redisService
+                        .getClient()
+                        .del(redisKey)
+                        .catch(() => { });
                     return false;
                 }
                 throw dbErr;

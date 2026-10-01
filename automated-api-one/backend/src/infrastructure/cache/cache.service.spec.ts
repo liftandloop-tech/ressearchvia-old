@@ -73,13 +73,21 @@ describe('CacheService', () => {
       clientMock.set.mockResolvedValue('OK');
       await service.set('test_key', { a: 1 }, 60);
       expect(redisService.assertHealthy).toHaveBeenCalled();
-      expect(clientMock.set).toHaveBeenCalledWith('test_key', JSON.stringify({ a: 1 }), 'EX', 60);
+      expect(clientMock.set).toHaveBeenCalledWith(
+        'test_key',
+        JSON.stringify({ a: 1 }),
+        'EX',
+        60,
+      );
     });
 
     it('should set value without TTL if not provided', async () => {
       clientMock.set.mockResolvedValue('OK');
       await service.set('test_key', { a: 1 });
-      expect(clientMock.set).toHaveBeenCalledWith('test_key', JSON.stringify({ a: 1 }));
+      expect(clientMock.set).toHaveBeenCalledWith(
+        'test_key',
+        JSON.stringify({ a: 1 }),
+      );
     });
   });
 

@@ -13,4 +13,3 @@ export const AngelOneEndpoints = {
   ORDER_DETAILS: '/rest/secure/angelbroking/order/v1/details/', // suffix uniqueOrderId
   REFRESH_TOKEN: '/rest/auth/angelbroking/jwt/v1/generateTokens',
 };
-

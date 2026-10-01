@@ -7,7 +7,7 @@ declare abstract class BaseQueueEventsListener extends QueueEventsHost {
     protected abstract readonly queueName: string;
     protected abstract readonly dlqQueueName: string;
     constructor(queueService: QueueService);
-    onJobFailed({ jobId, failedReason }: {
+    onJobFailed({ jobId, failedReason, }: {
         jobId: string;
         failedReason: string;
     }): Promise<void>;

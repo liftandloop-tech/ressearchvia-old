@@ -85,7 +85,11 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
         }
         catch {
             try {
-                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.request({ method: 'OPTIONS', url: this.baseUrl, timeout: 3000 }));
+                const response = await (0, rxjs_1.firstValueFrom)(this.httpService.request({
+                    method: 'OPTIONS',
+                    url: this.baseUrl,
+                    timeout: 3000,
+                }));
                 return {
                     reachable: response.status < 500,
                     responseTimeMs: Date.now() - start,
@@ -176,7 +180,9 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             const payloadBase64 = authToken.split('.')[1];
             const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
             const outerPayload = JSON.parse(payloadJson);
-            const expMs = outerPayload.exp ? outerPayload.exp * 1000 : Date.now() + 18 * 60 * 60 * 1000;
+            const expMs = outerPayload.exp
+                ? outerPayload.exp * 1000
+                : Date.now() + 18 * 60 * 60 * 1000;
             const expiresAt = new Date(expMs);
             const refreshToken = callbackData.params.refresh_token || '';
             const feedToken = callbackData.params.feed_token || '';
@@ -282,7 +288,9 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             const response = await (0, rxjs_1.firstValueFrom)(this.httpService.get(`${this.baseUrl}${angel_one_endpoints_1.AngelOneEndpoints.ORDER_BOOK}`, {
                 headers: this.getHeaders(token),
             }));
-            if (response.data && response.data.status === true && Array.isArray(response.data.data)) {
+            if (response.data &&
+                response.data.status === true &&
+                Array.isArray(response.data.data)) {
                 return response.data.data.map((o) => ({
                     brokerOrderId: o.orderid || '',
                     symbol: o.tradingsymbol || '',
@@ -315,7 +323,8 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             const instrument = this.instrumentsService.findInstrument
                 ? this.instrumentsService.findInstrument(order.symbol, exchange)
                 : null;
-            const symbolToken = instrument?.token || this.instrumentsService.findToken(order.symbol, exchange);
+            const symbolToken = instrument?.token ||
+                this.instrumentsService.findToken(order.symbol, exchange);
             const tradingSymbol = instrument?.symbol || order.symbol;
             if (!symbolToken || symbolToken === 'DUMMY_TOKEN') {
                 const errorMsg = `Unable to resolve instrument token for symbol "${order.symbol}" on exchange "${exchange}"`;
@@ -349,8 +358,12 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
                 priceStr = order.price ? order.price.toString() : '0';
             }
             let triggerPriceStr = '0';
-            if (variety === 'STOPLOSS' || ordertype === 'STOPLOSS_LIMIT' || ordertype === 'STOPLOSS_MARKET') {
-                triggerPriceStr = order.triggerPrice ? order.triggerPrice.toString() : '0';
+            if (variety === 'STOPLOSS' ||
+                ordertype === 'STOPLOSS_LIMIT' ||
+                ordertype === 'STOPLOSS_MARKET') {
+                triggerPriceStr = order.triggerPrice
+                    ? order.triggerPrice.toString()
+                    : '0';
             }
             const payload = {
                 variety,
@@ -374,7 +387,9 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
             }
             let proxyIp;
             if (httpsAgent && httpsAgent.options) {
-                const proxyUrl = httpsAgent.options.href || httpsAgent.options.host || httpsAgent.options.hostname;
+                const proxyUrl = httpsAgent.options.href ||
+                    httpsAgent.options.host ||
+                    httpsAgent.options.hostname;
                 if (proxyUrl) {
                     try {
                         const parsed = new URL(httpsAgent.options.href || `http://${proxyUrl}`);
@@ -796,7 +811,9 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
         });
         if (this.redisService.isHealthy()) {
             try {
-                await this.redisService.getClient().set(cacheKey, JSON.stringify(ltpVal), 'EX', 1);
+                await this.redisService
+                    .getClient()
+                    .set(cacheKey, JSON.stringify(ltpVal), 'EX', 1);
             }
             catch (err) {
                 this.logger.error(`Error saving LTP cache: ${err.message}`);
@@ -821,7 +838,9 @@ let AngelOneService = AngelOneService_1 = class AngelOneService extends broker_a
                 }));
                 this.metrics.incrementBrokerCalls('angelone', 'getOrderDetails', 'success');
                 this.metrics.observeBrokerLatency('angelone', Date.now() - start);
-                if (response.data && response.data.status === true && response.data.data) {
+                if (response.data &&
+                    response.data.status === true &&
+                    response.data.data) {
                     return {
                         brokerOrderId: response.data.data.orderid,
                         status: this.mapOrderStatus(response.data.data.status),

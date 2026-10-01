@@ -112,12 +112,20 @@ let MetricsCollectorService = MetricsCollectorService_1 = class MetricsCollector
                     this.metrics.setRedisConnectedClients(parseInt(connectedClientsMatch[1], 10));
                 }
                 const lockKeys = await client.keys('lock:*').catch(() => []);
-                const reportLockKeys = await client.keys('report:lock:*').catch(() => []);
-                const snapshotLockKeys = await client.keys('analytics:snapshot:lock:*').catch(() => []);
+                const reportLockKeys = await client
+                    .keys('report:lock:*')
+                    .catch(() => []);
+                const snapshotLockKeys = await client
+                    .keys('analytics:snapshot:lock:*')
+                    .catch(() => []);
                 const totalActiveLocks = lockKeys.length + reportLockKeys.length + snapshotLockKeys.length;
                 this.metrics.setDistributedLocksActive(totalActiveLocks);
-                const outboxIdempotencyKeys = await client.keys('outbox:idempotency:*').catch(() => []);
-                const reportIdempotencyKeys = await client.keys('report:idempotency:*').catch(() => []);
+                const outboxIdempotencyKeys = await client
+                    .keys('outbox:idempotency:*')
+                    .catch(() => []);
+                const reportIdempotencyKeys = await client
+                    .keys('report:idempotency:*')
+                    .catch(() => []);
                 const totalIdempotencyKeys = outboxIdempotencyKeys.length + reportIdempotencyKeys.length;
                 this.metrics.setRedisIdempotencyKeysActive(totalIdempotencyKeys);
             }

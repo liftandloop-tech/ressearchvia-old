@@ -49,7 +49,8 @@ let InstrumentsService = InstrumentsService_1 = class InstrumentsService {
             return [];
         return this.instruments
             .filter((inst) => {
-            const matchesQuery = (inst.symbol && inst.symbol.toLowerCase().includes(normalizedQuery)) ||
+            const matchesQuery = (inst.symbol &&
+                inst.symbol.toLowerCase().includes(normalizedQuery)) ||
                 (inst.name && inst.name.toLowerCase().includes(normalizedQuery));
             const matchesExchange = exchange
                 ? inst.exch_seg === exchange.toUpperCase()
@@ -73,7 +74,9 @@ let InstrumentsService = InstrumentsService_1 = class InstrumentsService {
             if (inst) {
                 return { token: inst.token, symbol: inst.symbol };
             }
-            inst = this.instruments.find((i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange && i.symbol?.endsWith('-EQ'));
+            inst = this.instruments.find((i) => i.name?.toUpperCase() === upperSymbol &&
+                i.exch_seg === upperExchange &&
+                i.symbol?.endsWith('-EQ'));
             if (inst) {
                 return { token: inst.token, symbol: inst.symbol };
             }
@@ -98,7 +101,9 @@ let InstrumentsService = InstrumentsService_1 = class InstrumentsService {
         const tradingSymbol = resolvedInst?.symbol || symbol;
         const result = await this.angelOneService.getLtp(exchange, tradingSymbol, undefined, resolvedToken);
         if (!result) {
-            return { error: 'Could not fetch LTP. Symbol may not exist or market is closed.' };
+            return {
+                error: 'Could not fetch LTP. Symbol may not exist or market is closed.',
+            };
         }
         return {
             symbol: tradingSymbol,

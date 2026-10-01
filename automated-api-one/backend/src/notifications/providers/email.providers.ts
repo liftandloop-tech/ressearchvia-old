@@ -32,7 +32,9 @@ export class SmtpProvider implements EmailProvider {
       throw new Error('SMTP failed to send email');
     }
     const host = this.config.get<string>('SMTP_HOST') || 'localhost';
-    this.logger.log(`[SMTP Mock] Sending email via ${host} to ${to}: ${subject}`);
+    this.logger.log(
+      `[SMTP Mock] Sending email via ${host} to ${to}: ${subject}`,
+    );
     return `smtp-${Date.now()}`;
   }
 }

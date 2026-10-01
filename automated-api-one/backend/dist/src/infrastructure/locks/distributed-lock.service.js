@@ -64,7 +64,9 @@ let DistributedLockService = DistributedLockService_1 = class DistributedLockSer
         this.redisService.assertHealthy();
         const token = crypto.randomUUID();
         try {
-            const result = await this.redisService.getClient().set(key, token, 'PX', ttlMs, 'NX');
+            const result = await this.redisService
+                .getClient()
+                .set(key, token, 'PX', ttlMs, 'NX');
             if (result === 'OK') {
                 if (options?.autoRenew) {
                     this.startHeartbeat(key, token, ttlMs);
@@ -89,7 +91,9 @@ let DistributedLockService = DistributedLockService_1 = class DistributedLockSer
       end
     `;
         try {
-            const result = await this.redisService.getClient().eval(script, 1, key, token);
+            const result = await this.redisService
+                .getClient()
+                .eval(script, 1, key, token);
             return result === 1;
         }
         catch (err) {
@@ -107,7 +111,9 @@ let DistributedLockService = DistributedLockService_1 = class DistributedLockSer
       end
     `;
         try {
-            const result = await this.redisService.getClient().eval(script, 1, key, token, ttlMs);
+            const result = await this.redisService
+                .getClient()
+                .eval(script, 1, key, token, ttlMs);
             return result === 1;
         }
         catch (err) {

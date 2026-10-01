@@ -7,7 +7,10 @@ import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 import { OutboxService } from '../../infrastructure/outbox/outbox.service';
 import { Queues } from '../../infrastructure/queues/queue.constants';
 import { ReportsService } from '../reports.service';
-import { REPORT_STORAGE_PROVIDER, ReportStorageProvider } from '../providers/report-storage.provider';
+import {
+  REPORT_STORAGE_PROVIDER,
+  ReportStorageProvider,
+} from '../providers/report-storage.provider';
 import { ReportState, ExportState } from '@prisma/client';
 
 @Processor(Queues.REPORT_GENERATION)
@@ -31,24 +34,26 @@ export class ReportGenerationProcessor extends WorkerHost {
     const lockKey = `report:lock:${reportId}`;
     const idempotencyKey = `report:idempotency:${userId}:${type}:${period}${segmentId ? `:${segmentId}` : ''}`;
 
-    this.logger.log(`Processing report generation job ${job.id} for report ${reportId}`);
+    this.logger.log(
+      `Processing report generation job ${job.id} for report ${reportId}`,
+    );
 
     // Rule 5: Cache Stampede Protection (SETNX report:lock:{reportId} TTL 60s)
     try {
-      const lockAcquired = await this.redisService.getClient().set(
-        lockKey,
-        '1',
-        'EX',
-        60,
-        'NX',
-      );
+      const lockAcquired = await this.redisService
+        .getClient()
+        .set(lockKey, '1', 'EX', 60, 'NX');
 
       if (lockAcquired !== 'OK') {
-        this.logger.warn(`Stampede lock active for report ${reportId}. Worker exiting.`);
+        this.logger.warn(
+          `Stampede lock active for report ${reportId}. Worker exiting.`,
+        );
         return;
       }
     } catch (err) {
-      this.logger.error(`Failed to acquire stampede lock for report ${reportId}: ${err.message}`);
+      this.logger.error(
+        `Failed to acquire stampede lock for report ${reportId}: ${err.message}`,
+      );
       throw err;
     }
 
@@ -60,7 +65,10 @@ export class ReportGenerationProcessor extends WorkerHost {
       });
 
       // Parse date bounds
-      const { startDate, endDate } = this.reportsService.parsePeriod(type, period);
+      const { startDate, endDate } = this.reportsService.parsePeriod(
+        type,
+        period,
+      );
 
       // Fetch user's segments
       const userSegments = segmentId
@@ -79,15 +87,39 @@ export class ReportGenerationProcessor extends WorkerHost {
               userId,
               segmentId: seg.segmentId,
               date: {
-                gte: new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate(), 0, 0, 0, 0)),
-                lte: new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate(), 23, 59, 59, 999)),
+                gte: new Date(
+                  Date.UTC(
+                    currentDate.getUTCFullYear(),
+                    currentDate.getUTCMonth(),
+                    currentDate.getUTCDate(),
+                    0,
+                    0,
+                    0,
+                    0,
+                  ),
+                ),
+                lte: new Date(
+                  Date.UTC(
+                    currentDate.getUTCFullYear(),
+                    currentDate.getUTCMonth(),
+                    currentDate.getUTCDate(),
+                    23,
+                    59,
+                    59,
+                    999,
+                  ),
+                ),
               },
             },
           });
 
           if (!snapshotExists) {
             // Missing -> aggregate and create snapshot
-            await this.reportsService.calculateAndUpsertSnapshot(userId, seg.segmentId, currentDate);
+            await this.reportsService.calculateAndUpsertSnapshot(
+              userId,
+              seg.segmentId,
+              currentDate,
+            );
           }
         }
         // Advance current date by 1 day
@@ -162,7 +194,13 @@ export class ReportGenerationProcessor extends WorkerHost {
       });
 
       // Cache the report
-      await this.reportsService.cacheReport(userId, type, period, segmentId, reportData);
+      await this.reportsService.cacheReport(
+        userId,
+        type,
+        period,
+        segmentId,
+        reportData,
+      );
 
       // Rule 3: REPORT_READY Must Include Download Metadata
       await this.outboxService.createEvent(
@@ -184,24 +222,41 @@ export class ReportGenerationProcessor extends WorkerHost {
 
       this.metrics.incrementReportsGenerated();
       this.metrics.observeReportGenerationDuration(Date.now() - startTime);
-      this.logger.log(`Successfully completed report generation for report ${reportId}`);
+      this.logger.log(
+        `Successfully completed report generation for report ${reportId}`,
+      );
     } catch (err) {
-      this.logger.error(`Failed to generate report ${reportId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to generate report ${reportId}: ${err.message}`,
+        err.stack,
+      );
       this.metrics.incrementReportGenerationFailed();
 
-      await this.prisma.report.update({
-        where: { id: reportId },
-        data: {
-          status: ReportState.FAILED,
-          error: err.message,
-        },
-      }).catch(dbErr => this.logger.error(`Failed to save report error state to DB: ${dbErr.message}`));
+      await this.prisma.report
+        .update({
+          where: { id: reportId },
+          data: {
+            status: ReportState.FAILED,
+            error: err.message,
+          },
+        })
+        .catch((dbErr) =>
+          this.logger.error(
+            `Failed to save report error state to DB: ${dbErr.message}`,
+          ),
+        );
 
       throw err;
     } finally {
       // Cleanup locks
-      await this.redisService.getClient().del(lockKey).catch(() => {});
-      await this.redisService.getClient().del(idempotencyKey).catch(() => {});
+      await this.redisService
+        .getClient()
+        .del(lockKey)
+        .catch(() => {});
+      await this.redisService
+        .getClient()
+        .del(idempotencyKey)
+        .catch(() => {});
     }
   }
 }
@@ -221,7 +276,9 @@ export class ReportExportProcessor extends WorkerHost {
 
   async process(job: Job<any, any, string>): Promise<any> {
     const { exportId, userId, type, period, segmentId } = job.data;
-    this.logger.log(`Processing report export job ${job.id} for export ${exportId}`);
+    this.logger.log(
+      `Processing report export job ${job.id} for export ${exportId}`,
+    );
 
     try {
       await this.prisma.reportExport.update({
@@ -234,7 +291,8 @@ export class ReportExportProcessor extends WorkerHost {
           orderBy: { createdAt: 'desc' },
         });
 
-        let csvContent = 'operationId,createdAt,operatorId,action,status,resourceType,resourceId,errorMessage,metadata\n';
+        let csvContent =
+          'operationId,createdAt,operatorId,action,status,resourceType,resourceId,errorMessage,metadata\n';
         for (const audit of audits) {
           const opId = audit.operationId;
           const created = audit.createdAt.toISOString();
@@ -243,8 +301,12 @@ export class ReportExportProcessor extends WorkerHost {
           const stat = audit.status;
           const resType = audit.resourceType;
           const resId = audit.resourceId;
-          const errMsg = audit.errorMessage ? audit.errorMessage.replace(/"/g, '""') : '';
-          const metaStr = audit.metadata ? JSON.stringify(audit.metadata).replace(/"/g, '""') : '';
+          const errMsg = audit.errorMessage
+            ? audit.errorMessage.replace(/"/g, '""')
+            : '';
+          const metaStr = audit.metadata
+            ? JSON.stringify(audit.metadata).replace(/"/g, '""')
+            : '';
 
           csvContent += `"${opId}","${created}","${operator}","${act}","${stat}","${resType}","${resId}","${errMsg}","${metaStr}"\n`;
         }
@@ -281,11 +343,16 @@ export class ReportExportProcessor extends WorkerHost {
           },
         );
 
-        this.logger.log(`Successfully completed SRE audit logs export ${exportId}`);
+        this.logger.log(
+          `Successfully completed SRE audit logs export ${exportId}`,
+        );
         return;
       }
 
-      const { startDate, endDate } = this.reportsService.parsePeriod(type, period);
+      const { startDate, endDate } = this.reportsService.parsePeriod(
+        type,
+        period,
+      );
 
       // Fetch all snapshots in range
       const snapshots = await this.prisma.analyticsSnapshot.findMany({
@@ -301,7 +368,8 @@ export class ReportExportProcessor extends WorkerHost {
       });
 
       // Construct CSV
-      let csvContent = 'Date,Realized PnL,Unrealized PnL,Win Rate,Total Trades,Winning Trades,Losing Trades,ROI%\n';
+      let csvContent =
+        'Date,Realized PnL,Unrealized PnL,Win Rate,Total Trades,Winning Trades,Losing Trades,ROI%\n';
       for (const snap of snapshots) {
         const dateStr = snap.date.toISOString().split('T')[0];
         csvContent += `${dateStr},${snap.realizedPnl},${snap.unrealizedPnl},${snap.winRate},${snap.totalTrades},${snap.winningTrades},${snap.losingTrades},${snap.roi}\n`;
@@ -325,15 +393,16 @@ export class ReportExportProcessor extends WorkerHost {
       this.logger.log(`Successfully completed export ${exportId}`);
     } catch (err) {
       this.logger.error(`Failed to export CSV ${exportId}: ${err.message}`);
-      await this.prisma.reportExport.update({
-        where: { id: exportId },
-        data: {
-          status: ExportState.FAILED,
-          error: err.message,
-        },
-      }).catch(() => {});
+      await this.prisma.reportExport
+        .update({
+          where: { id: exportId },
+          data: {
+            status: ExportState.FAILED,
+            error: err.message,
+          },
+        })
+        .catch(() => {});
       throw err;
     }
   }
 }
-

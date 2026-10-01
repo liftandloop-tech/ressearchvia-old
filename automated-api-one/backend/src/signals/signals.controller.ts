@@ -64,6 +64,8 @@ export class SignalsController {
 
   @Get('recent')
   async getRecentSignals(@Query('limit') limit?: string) {
-    return this.signalsService.getRecentSignals(limit ? parseInt(limit, 10) : 20);
+    return this.signalsService.getRecentSignals(
+      limit ? parseInt(limit, 10) : 20,
+    );
   }
 }

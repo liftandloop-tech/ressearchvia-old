@@ -66,9 +66,13 @@ describe('WebsocketProcessor', () => {
     });
 
     it('should fail queue job if broadcast throws', async () => {
-      websocketServiceMock.broadcast.mockRejectedValue(new Error('Broadcast failed'));
+      websocketServiceMock.broadcast.mockRejectedValue(
+        new Error('Broadcast failed'),
+      );
 
-      await expect(processor.process(mockJob)).rejects.toThrow('Broadcast failed');
+      await expect(processor.process(mockJob)).rejects.toThrow(
+        'Broadcast failed',
+      );
 
       expect(queueServiceMock.updateJobStatus).toHaveBeenCalledWith(
         Queues.WEBSOCKET,

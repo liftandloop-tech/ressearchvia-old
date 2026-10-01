@@ -224,7 +224,10 @@ describe('AlertingService', () => {
         },
       });
       // PagerDuty should execute through the circuit breaker
-      expect(circuitBreakerMock.execute).toHaveBeenCalledWith('pagerduty-alerts', expect.any(Function));
+      expect(circuitBreakerMock.execute).toHaveBeenCalledWith(
+        'pagerduty-alerts',
+        expect.any(Function),
+      );
     });
   });
 });

@@ -10,7 +10,12 @@ import {
   HttpStatus,
   Body,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -132,7 +137,10 @@ export class OpsController {
   @Post('brokers/:userBrokerId/refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Force refresh user broker session token' })
-  async forceBrokerRefresh(@Request() req, @Param('userBrokerId') userBrokerId: string) {
+  async forceBrokerRefresh(
+    @Request() req,
+    @Param('userBrokerId') userBrokerId: string,
+  ) {
     const operatorId = req.user.userId;
     return this.opsService.forceBrokerSessionRefresh(operatorId, userBrokerId);
   }
@@ -173,7 +181,9 @@ export class OpsController {
 
   @Post('trading/stop')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Stop trading globally (15 min TTL or permanent kill switch)' })
+  @ApiOperation({
+    summary: 'Stop trading globally (15 min TTL or permanent kill switch)',
+  })
   @ApiQuery({ name: 'permanent', type: Boolean, required: false })
   @ApiQuery({ name: 'reason', type: String, required: false })
   async stopTrading(
@@ -242,7 +252,8 @@ export class OpsController {
   @ApiOperation({ summary: 'Get all reconciliation issues' })
   @ApiQuery({ name: 'resolved', type: Boolean, required: false })
   async getReconciliationIssues(@Query('resolved') resolved?: string) {
-    const isResolved = resolved === 'true' ? true : resolved === 'false' ? false : undefined;
+    const isResolved =
+      resolved === 'true' ? true : resolved === 'false' ? false : undefined;
     return this.opsService.getReconciliationIssues(isResolved);
   }
 
@@ -307,7 +318,11 @@ export class OpsController {
     @Body('reason') reason?: string,
   ) {
     const operatorId = req.user.userId;
-    return this.opsService.toggleGlobalEmergencyLock(operatorId, blocked, reason);
+    return this.opsService.toggleGlobalEmergencyLock(
+      operatorId,
+      blocked,
+      reason,
+    );
   }
 
   @Post('alerts/:alertId/acknowledge')
@@ -327,20 +342,26 @@ export class OpsController {
   }
 
   @Get('users/:identifier/live-broker-data')
-  @ApiOperation({ summary: 'Get live broker portfolio and books for a specific user' })
+  @ApiOperation({
+    summary: 'Get live broker portfolio and books for a specific user',
+  })
   async getUserLiveBrokerData(@Param('identifier') identifier: string) {
     return this.opsService.getUserLiveBrokerData(identifier);
   }
 
   @Get('strategy/config')
-  @ApiOperation({ summary: 'Get system-wide automated trading strategy configuration' })
+  @ApiOperation({
+    summary: 'Get system-wide automated trading strategy configuration',
+  })
   async getSystemStrategyConfig() {
     return this.opsService.getSystemStrategyConfig();
   }
 
   @Post('strategy/config')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update system-wide strategy configuration (limits & toggles)' })
+  @ApiOperation({
+    summary: 'Update system-wide strategy configuration (limits & toggles)',
+  })
   async updateSystemStrategyConfig(
     @Request() req,
     @Body()
@@ -359,13 +380,19 @@ export class OpsController {
   }
 
   @Get('users/:userId/strategy')
-  @ApiOperation({ summary: 'Get automated trading strategy details and history for a specific user' })
+  @ApiOperation({
+    summary:
+      'Get automated trading strategy details and history for a specific user',
+  })
   async getUserStrategyView(@Param('userId') userId: string) {
     return this.opsService.getUserStrategyView(userId);
   }
 
   @Get('strategy/dashboard')
-  @ApiOperation({ summary: 'Get active automated trading users with live strategy & streak metrics' })
+  @ApiOperation({
+    summary:
+      'Get active automated trading users with live strategy & streak metrics',
+  })
   async getStrategyDashboardUsers(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -376,4 +403,3 @@ export class OpsController {
     );
   }
 }
-

@@ -1,12 +1,29 @@
-import { Injectable, Inject, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../infrastructure/redis/redis.service';
 import { QueueService } from '../infrastructure/queues/queues.service';
 import { MetricsService } from '../infrastructure/metrics/metrics.service';
 import { OutboxService } from '../infrastructure/outbox/outbox.service';
-import { Queues, getSnapshotQueueName } from '../infrastructure/queues/queue.constants';
-import { REPORT_STORAGE_PROVIDER, ReportStorageProvider } from './providers/report-storage.provider';
-import { Report, ReportExport, AnalyticsSnapshot, ReportState, ExportState } from '@prisma/client';
+import {
+  Queues,
+  getSnapshotQueueName,
+} from '../infrastructure/queues/queue.constants';
+import {
+  REPORT_STORAGE_PROVIDER,
+  ReportStorageProvider,
+} from './providers/report-storage.provider';
+import {
+  Report,
+  ReportExport,
+  AnalyticsSnapshot,
+  ReportState,
+  ExportState,
+} from '@prisma/client';
 
 @Injectable()
 export class ReportsService {
@@ -24,14 +41,37 @@ export class ReportsService {
   /**
    * Parse a period string (e.g. YYYY-MM-DD or YYYY-MM) to UTC date bounds.
    */
-  parsePeriod(type: string, period: string): { startDate: Date; endDate: Date } {
+  parsePeriod(
+    type: string,
+    period: string,
+  ): { startDate: Date; endDate: Date } {
     if (type === 'DAILY' || (period && period.length === 10)) {
       const date = new Date(period);
       if (isNaN(date.getTime())) {
         throw new Error(`Invalid date format for daily period: ${period}`);
       }
-      const startDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
-      const endDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+      const startDate = new Date(
+        Date.UTC(
+          date.getUTCFullYear(),
+          date.getUTCMonth(),
+          date.getUTCDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+      const endDate = new Date(
+        Date.UTC(
+          date.getUTCFullYear(),
+          date.getUTCMonth(),
+          date.getUTCDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
       return { startDate, endDate };
     } else {
       // MONTHLY format YYYY-MM
@@ -50,12 +90,17 @@ export class ReportsService {
   /**
    * Retrieves a report from Redis cache if exists.
    */
-  async getReportFromCache(userId: string, type: string, period: string, segmentId?: string): Promise<any | null> {
+  async getReportFromCache(
+    userId: string,
+    type: string,
+    period: string,
+    segmentId?: string,
+  ): Promise<any | null> {
     const cacheKey = segmentId
       ? `report:v1:segment:${userId}:${segmentId}:${period}`
       : type === 'DAILY'
-      ? `report:v1:daily:${userId}:${period}`
-      : `report:v1:monthly:${userId}:${period}`;
+        ? `report:v1:daily:${userId}:${period}`
+        : `report:v1:monthly:${userId}:${period}`;
 
     try {
       const cached = await this.redisService.getClient().get(cacheKey);
@@ -64,7 +109,9 @@ export class ReportsService {
         return JSON.parse(cached);
       }
     } catch (err) {
-      this.logger.warn(`Failed to read from cache key ${cacheKey}: ${err.message}`);
+      this.logger.warn(
+        `Failed to read from cache key ${cacheKey}: ${err.message}`,
+      );
     }
     this.metrics.incrementReportCacheMisses();
     return null;
@@ -73,12 +120,18 @@ export class ReportsService {
   /**
    * Caches a completed report.
    */
-  async cacheReport(userId: string, type: string, period: string, segmentId: string | undefined, data: any): Promise<void> {
+  async cacheReport(
+    userId: string,
+    type: string,
+    period: string,
+    segmentId: string | undefined,
+    data: any,
+  ): Promise<void> {
     const cacheKey = segmentId
       ? `report:v1:segment:${userId}:${segmentId}:${period}`
       : type === 'DAILY'
-      ? `report:v1:daily:${userId}:${period}`
-      : `report:v1:monthly:${userId}:${period}`;
+        ? `report:v1:daily:${userId}:${period}`
+        : `report:v1:monthly:${userId}:${period}`;
 
     try {
       await this.redisService.getClient().set(
@@ -100,17 +153,33 @@ export class ReportsService {
     type: 'DAILY' | 'MONTHLY',
     period: string,
     segmentId?: string,
-  ): Promise<{ status: string; reportId?: string; estimatedWait?: string; data?: any }> {
+  ): Promise<{
+    status: string;
+    reportId?: string;
+    estimatedWait?: string;
+    data?: any;
+  }> {
     if (this.redisService.isHealthy()) {
-      const isGlobalMaint = await this.redisService.getClient().get('system:maintenance:global');
-      const isReportsMaint = await this.redisService.getClient().get('system:maintenance:reports');
+      const isGlobalMaint = await this.redisService
+        .getClient()
+        .get('system:maintenance:global');
+      const isReportsMaint = await this.redisService
+        .getClient()
+        .get('system:maintenance:reports');
       if (isGlobalMaint === 'true' || isReportsMaint === 'true') {
-        throw new ServiceUnavailableException('Report generation is currently disabled due to system maintenance');
+        throw new ServiceUnavailableException(
+          'Report generation is currently disabled due to system maintenance',
+        );
       }
     }
 
     // 1. Check cache first
-    const cachedData = await this.getReportFromCache(userId, type, period, segmentId);
+    const cachedData = await this.getReportFromCache(
+      userId,
+      type,
+      period,
+      segmentId,
+    );
     if (cachedData) {
       return { status: 'COMPLETED', data: cachedData };
     }
@@ -120,7 +189,9 @@ export class ReportsService {
       const q = this.queueService.getQueue(Queues.REPORT_GENERATION);
       const queueDepth = await q.getWaitingCount();
       if (queueDepth > 10000) {
-        this.logger.warn(`Report queue depth exceeded limit (waiting=${queueDepth}). Rejecting request.`);
+        this.logger.warn(
+          `Report queue depth exceeded limit (waiting=${queueDepth}). Rejecting request.`,
+        );
         return { status: 'QUEUED', estimatedWait: 'later' };
       }
     } catch (err) {
@@ -260,22 +331,44 @@ export class ReportsService {
    * Calculations are based purely on completed Trade & Position records.
    * Rule 2: Report Generation Must Use Snapshot Lock (analytics:snapshot:lock:{userId}:{segmentId}:{date} TTL 60s)
    */
-  async calculateAndUpsertSnapshot(userId: string, segmentId: string, date: Date): Promise<AnalyticsSnapshot> {
-    const startOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
-    const endOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+  async calculateAndUpsertSnapshot(
+    userId: string,
+    segmentId: string,
+    date: Date,
+  ): Promise<AnalyticsSnapshot> {
+    const startOfDay = new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
+    const endOfDay = new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
+    );
     const dateStr = startOfDay.toISOString().split('T')[0];
 
     const lockKey = `analytics:snapshot:lock:${userId}:${segmentId}:${dateStr}`;
-    const acquired = await this.redisService.getClient().set(
-      lockKey,
-      '1',
-      'EX',
-      60,
-      'NX',
-    );
+    const acquired = await this.redisService
+      .getClient()
+      .set(lockKey, '1', 'EX', 60, 'NX');
 
     if (acquired !== 'OK') {
-      this.logger.warn(`Snapshot lock active for user ${userId} segment ${segmentId} on ${dateStr}. Skipping generation.`);
+      this.logger.warn(
+        `Snapshot lock active for user ${userId} segment ${segmentId} on ${dateStr}. Skipping generation.`,
+      );
       const existing = await this.prisma.analyticsSnapshot.findFirst({
         where: {
           userId,
@@ -286,7 +379,9 @@ export class ReportsService {
       if (existing) {
         return existing;
       }
-      throw new Error(`Snapshot calculation currently locked for ${userId}:${segmentId} on ${dateStr}`);
+      throw new Error(
+        `Snapshot calculation currently locked for ${userId}:${segmentId} on ${dateStr}`,
+      );
     }
 
     try {
@@ -381,7 +476,10 @@ export class ReportsService {
       this.metrics.incrementAnalyticsSnapshotsCreated();
       return snapshot;
     } finally {
-      await this.redisService.getClient().del(lockKey).catch(() => {});
+      await this.redisService
+        .getClient()
+        .del(lockKey)
+        .catch(() => {});
     }
   }
 }

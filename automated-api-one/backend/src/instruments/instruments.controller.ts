@@ -8,10 +8,7 @@ export class InstrumentsController {
   constructor(private readonly instrumentsService: InstrumentsService) {}
 
   @Get()
-  search(
-    @Query('search') query: string,
-    @Query('exchange') exchange?: string,
-  ) {
+  search(@Query('search') query: string, @Query('exchange') exchange?: string) {
     return this.instrumentsService.search(query || '', exchange);
   }
 

@@ -68,7 +68,9 @@ describe('SegmentsService', () => {
     });
 
     it('should create segment subscription if it does not exist', async () => {
-      prismaMock.segmentMaster.findUnique.mockResolvedValue({ id: 'strategy-1' });
+      prismaMock.segmentMaster.findUnique.mockResolvedValue({
+        id: 'strategy-1',
+      });
       prismaMock.userSegment.findFirst.mockResolvedValue(null);
       prismaMock.userSegment.create.mockResolvedValue({
         id: 'us-1',
@@ -81,7 +83,9 @@ describe('SegmentsService', () => {
     });
 
     it('should update existing segment subscription if it exists', async () => {
-      prismaMock.segmentMaster.findUnique.mockResolvedValue({ id: 'strategy-1' });
+      prismaMock.segmentMaster.findUnique.mockResolvedValue({
+        id: 'strategy-1',
+      });
       prismaMock.userSegment.findFirst.mockResolvedValue({
         id: 'us-1',
         status: UserSegmentStatus.PAUSED,
@@ -121,7 +125,12 @@ describe('SegmentsService', () => {
   describe('getUserSegments', () => {
     it('should return configured segments for user', async () => {
       prismaMock.userSegment.findMany.mockResolvedValue([
-        { id: 'us-1', userId: 'user-1', segmentId: 'strategy-1', capital: 10000 },
+        {
+          id: 'us-1',
+          userId: 'user-1',
+          segmentId: 'strategy-1',
+          capital: 10000,
+        },
       ]);
 
       const result = await service.getUserSegments('user-1');

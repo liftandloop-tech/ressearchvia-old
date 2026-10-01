@@ -40,32 +40,86 @@ describe('QueueService', () => {
         QueueService,
         { provide: RedisService, useValue: mockRedis },
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: getQueueToken(Queues.SIGNAL_PROCESSING), useValue: mockQueue },
+        {
+          provide: getQueueToken(Queues.SIGNAL_PROCESSING),
+          useValue: mockQueue,
+        },
         { provide: getQueueToken(Queues.ORDER_PLACEMENT), useValue: mockQueue },
-        { provide: getQueueToken(Queues.ORDER_MONITORING), useValue: mockQueue },
+        {
+          provide: getQueueToken(Queues.ORDER_MONITORING),
+          useValue: mockQueue,
+        },
         { provide: getQueueToken(Queues.NOTIFICATION), useValue: mockQueue },
         { provide: getQueueToken(Queues.SIGNAL_DLQ), useValue: mockQueue },
         { provide: getQueueToken(Queues.ORDER_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.ORDER_MONITORING_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.NOTIFICATION_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.OUTBOX_DISPATCHER), useValue: mockQueue },
-        { provide: getQueueToken(Queues.OUTBOX_DISPATCHER_DLQ), useValue: mockQueue },
+        {
+          provide: getQueueToken(Queues.ORDER_MONITORING_DLQ),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.NOTIFICATION_DLQ),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.OUTBOX_DISPATCHER),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.OUTBOX_DISPATCHER_DLQ),
+          useValue: mockQueue,
+        },
         { provide: getQueueToken(Queues.WEBSOCKET), useValue: mockQueue },
         { provide: getQueueToken(Queues.WEBSOCKET_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.REPORT_GENERATION), useValue: mockQueue },
-        { provide: getQueueToken(Queues.REPORT_GENERATION_DLQ), useValue: mockQueue },
+        {
+          provide: getQueueToken(Queues.REPORT_GENERATION),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.REPORT_GENERATION_DLQ),
+          useValue: mockQueue,
+        },
         { provide: getQueueToken(Queues.REPORT_EXPORT), useValue: mockQueue },
-        { provide: getQueueToken(Queues.REPORT_EXPORT_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.ANALYTICS_SNAPSHOT), useValue: mockQueue },
-        { provide: getQueueToken(Queues.ANALYTICS_SNAPSHOT_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.POSITION_REBUILD), useValue: mockQueue },
-        { provide: getQueueToken(Queues.POSITION_REBUILD_DLQ), useValue: mockQueue },
+        {
+          provide: getQueueToken(Queues.REPORT_EXPORT_DLQ),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.ANALYTICS_SNAPSHOT),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.ANALYTICS_SNAPSHOT_DLQ),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.POSITION_REBUILD),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.POSITION_REBUILD_DLQ),
+          useValue: mockQueue,
+        },
         { provide: getQueueToken(Queues.RECONCILIATION), useValue: mockQueue },
-        { provide: getQueueToken(Queues.RECONCILIATION_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.RISK_RECALCULATE), useValue: mockQueue },
-        { provide: getQueueToken(Queues.RISK_RECALCULATE_DLQ), useValue: mockQueue },
-        { provide: getQueueToken(Queues.ANALYTICS_RECALCULATE), useValue: mockQueue },
-        { provide: getQueueToken(Queues.ANALYTICS_RECALCULATE_DLQ), useValue: mockQueue },
+        {
+          provide: getQueueToken(Queues.RECONCILIATION_DLQ),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.RISK_RECALCULATE),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.RISK_RECALCULATE_DLQ),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.ANALYTICS_RECALCULATE),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken(Queues.ANALYTICS_RECALCULATE_DLQ),
+          useValue: mockQueue,
+        },
         { provide: getQueueToken(Queues.EMAIL), useValue: mockQueue },
         { provide: getQueueToken(Queues.EMAIL_DLQ), useValue: mockQueue },
         { provide: getQueueToken(Queues.SMS), useValue: mockQueue },
@@ -90,8 +144,14 @@ describe('QueueService', () => {
 
     // Pre-populate dynamic sharded map with mock queue so real Queue creation is bypassed in tests
     for (let i = 0; i < 10; i++) {
-      service['shardedSnapshotQueues'].set(`analytics-snapshot-${i}`, mockQueue);
-      service['shardedSnapshotQueues'].set(`analytics-snapshot-dlq-${i}`, mockQueue);
+      service['shardedSnapshotQueues'].set(
+        `analytics-snapshot-${i}`,
+        mockQueue,
+      );
+      service['shardedSnapshotQueues'].set(
+        `analytics-snapshot-dlq-${i}`,
+        mockQueue,
+      );
     }
   });
 
@@ -105,8 +165,13 @@ describe('QueueService', () => {
 
   describe('addJob', () => {
     it('should upsert job in DB and publish to queue', async () => {
-      await service.addJob(Queues.SIGNAL_PROCESSING, 'job_123', { data: 'test' }, 1);
-      
+      await service.addJob(
+        Queues.SIGNAL_PROCESSING,
+        'job_123',
+        { data: 'test' },
+        1,
+      );
+
       expect(prismaService.queueJob.upsert).toHaveBeenCalledWith({
         where: {
           queueName_jobId: {
@@ -158,8 +223,12 @@ describe('QueueService', () => {
 
   describe('updateJobStatus', () => {
     it('should update job status in database', async () => {
-      await service.updateJobStatus(Queues.SIGNAL_PROCESSING, 'job_123', QueueJobStatus.COMPLETED);
-      
+      await service.updateJobStatus(
+        Queues.SIGNAL_PROCESSING,
+        'job_123',
+        QueueJobStatus.COMPLETED,
+      );
+
       expect(prismaService.queueJob.update).toHaveBeenCalledWith({
         where: {
           queueName_jobId: {
@@ -180,7 +249,7 @@ describe('QueueService', () => {
       const metrics = await service.getAggregatedMetrics();
       expect(metrics).toEqual({
         waiting: 52, // 26 queues * 2 waiting
-        active: 26,  // 26 queues * 1 active
+        active: 26, // 26 queues * 1 active
         failed: 0,
         dlq: 0,
       });

@@ -24,7 +24,9 @@ describe('NotificationDeduplicationService', () => {
       ],
     }).compile();
 
-    service = module.get<NotificationDeduplicationService>(NotificationDeduplicationService);
+    service = module.get<NotificationDeduplicationService>(
+      NotificationDeduplicationService,
+    );
   });
 
   it('should return false if Redis is unhealthy (fail open)', async () => {

@@ -48,7 +48,8 @@ export class EgressService {
     private readonly redisService: RedisService,
   ) {
     this.egressManagerUrl =
-      this.configService.get<string>('EGRESS_MANAGER_URL') || 'http://localhost:8080';
+      this.configService.get<string>('EGRESS_MANAGER_URL') ||
+      'http://localhost:8080';
     this.proxyHost =
       this.configService.get<string>('EGRESS_PROXY_HOST') || 'localhost';
     this.proxyPort =
@@ -62,7 +63,9 @@ export class EgressService {
   // 1. ALLOCATE EGRESS IP FOR USER
   // ─────────────────────────────────────────────────────────────────────────────
   async allocateEgress(userId: string): Promise<UserEgressCredentials> {
-    this.logger.log(`[EgressService] Requesting IP allocation for user ${userId} from ${this.egressManagerUrl}`);
+    this.logger.log(
+      `[EgressService] Requesting IP allocation for user ${userId} from ${this.egressManagerUrl}`,
+    );
 
     try {
       const response = await firstValueFrom(
@@ -91,18 +94,26 @@ export class EgressService {
       };
 
       await this.cacheCredentialsInRedis(userId, credentials);
-      this.logger.log(`[EgressService] Successfully allocated IP ${credentials.publicIp} for user ${userId} (username: ${credentials.proxyUsername})`);
+      this.logger.log(
+        `[EgressService] Successfully allocated IP ${credentials.publicIp} for user ${userId} (username: ${credentials.proxyUsername})`,
+      );
       return credentials;
     } catch (err: any) {
       // If user already has an active assignment (409 Conflict), rotate token to recover credentials
       if (err.response?.status === 409) {
-        this.logger.log(`[EgressService] User ${userId} already has active assignment. Rotating token to recover.`);
+        this.logger.log(
+          `[EgressService] User ${userId} already has active assignment. Rotating token to recover.`,
+        );
         return this.rotateToken(userId);
       }
 
       const errorMsg = err.response?.data?.message || err.message;
-      this.logger.error(`[EgressService] Allocation failed for user ${userId}: ${errorMsg}`);
-      throw new InternalServerErrorException(`Egress allocation failed: ${errorMsg}`);
+      this.logger.error(
+        `[EgressService] Allocation failed for user ${userId}: ${errorMsg}`,
+      );
+      throw new InternalServerErrorException(
+        `Egress allocation failed: ${errorMsg}`,
+      );
     }
   }
 
@@ -124,9 +135,13 @@ export class EgressService {
       return response.data;
     } catch (err: any) {
       if (err.response?.status === 404) {
-        throw new NotFoundException(`No active egress assignment found for user ${userId}`);
+        throw new NotFoundException(
+          `No active egress assignment found for user ${userId}`,
+        );
       }
-      throw new InternalServerErrorException(`Egress resolution failed: ${err.message}`);
+      throw new InternalServerErrorException(
+        `Egress resolution failed: ${err.message}`,
+      );
     }
   }
 
@@ -150,7 +165,9 @@ export class EgressService {
 
       const data = response.data;
       if (!data.success) {
-        throw new Error(data.message || 'Token rotation failed on Egress Manager');
+        throw new Error(
+          data.message || 'Token rotation failed on Egress Manager',
+        );
       }
 
       const credentials: UserEgressCredentials = {
@@ -162,15 +179,21 @@ export class EgressService {
       };
 
       await this.cacheCredentialsInRedis(userId, credentials);
-      this.logger.log(`[EgressService] Successfully rotated token for user ${userId} -> IP ${credentials.publicIp}`);
+      this.logger.log(
+        `[EgressService] Successfully rotated token for user ${userId} -> IP ${credentials.publicIp}`,
+      );
       return credentials;
     } catch (err: any) {
       if (err.response?.status === 404) {
         // If no assignment exists, allocate fresh
-        this.logger.log(`[EgressService] No active assignment to rotate for user ${userId}. Allocating fresh.`);
+        this.logger.log(
+          `[EgressService] No active assignment to rotate for user ${userId}. Allocating fresh.`,
+        );
         return this.allocateEgress(userId);
       }
-      throw new InternalServerErrorException(`Token rotation failed: ${err.message}`);
+      throw new InternalServerErrorException(
+        `Token rotation failed: ${err.message}`,
+      );
     }
   }
 
@@ -197,13 +220,17 @@ export class EgressService {
         try {
           await this.redisService.getClient().del(RedisKeys.userEgress(userId));
         } catch (rErr: any) {
-          this.logger.warn(`[EgressService] Redis cache del failed on release: ${rErr.message}`);
+          this.logger.warn(
+            `[EgressService] Redis cache del failed on release: ${rErr.message}`,
+          );
         }
       }
 
       return response.data?.success === true;
     } catch (err: any) {
-      this.logger.error(`[EgressService] Release failed for user ${userId}: ${err.message}`);
+      this.logger.error(
+        `[EgressService] Release failed for user ${userId}: ${err.message}`,
+      );
       return false;
     }
   }
@@ -222,7 +249,9 @@ export class EgressService {
       );
       return response.data?.success === true;
     } catch (err: any) {
-      this.logger.error(`[EgressService] Reconciliation trigger failed: ${err.message}`);
+      this.logger.error(
+        `[EgressService] Reconciliation trigger failed: ${err.message}`,
+      );
       return false;
     }
   }
@@ -234,7 +263,9 @@ export class EgressService {
     // 1. Fast path: Check Redis cache
     if (this.redisService.isHealthy()) {
       try {
-        const cachedRaw = await this.redisService.getClient().get(RedisKeys.userEgress(userId));
+        const cachedRaw = await this.redisService
+          .getClient()
+          .get(RedisKeys.userEgress(userId));
         if (cachedRaw) {
           const cached = JSON.parse(cachedRaw) as UserEgressCredentials;
           if (cached.proxyUsername && cached.token && cached.publicIp) {
@@ -242,7 +273,9 @@ export class EgressService {
           }
         }
       } catch (rErr: any) {
-        this.logger.warn(`[EgressService] Redis read failed for user ${userId}: ${rErr.message}`);
+        this.logger.warn(
+          `[EgressService] Redis read failed for user ${userId}: ${rErr.message}`,
+        );
       }
     }
 
@@ -264,10 +297,17 @@ export class EgressService {
   // ─────────────────────────────────────────────────────────────────────────────
   // 7. GET CONFIGURED HTTPS PROXY AGENT FOR USER BROKER CALLS
   // ─────────────────────────────────────────────────────────────────────────────
-  async getProxyAgentForUser(userId: string): Promise<HttpsProxyAgent<string> | undefined> {
+  async getProxyAgentForUser(
+    userId: string,
+  ): Promise<HttpsProxyAgent<string> | undefined> {
     try {
       const credentials = await this.getOrCreateUserEgress(userId);
-      if (!credentials.proxyHost || !credentials.proxyPort || !credentials.proxyUsername || !credentials.token) {
+      if (
+        !credentials.proxyHost ||
+        !credentials.proxyPort ||
+        !credentials.proxyUsername ||
+        !credentials.token
+      ) {
         return undefined;
       }
 
@@ -275,7 +315,9 @@ export class EgressService {
       const proxyUrl = `http://${auth}@${credentials.proxyHost}:${credentials.proxyPort}`;
       return new HttpsProxyAgent(proxyUrl);
     } catch (err: any) {
-      this.logger.error(`[EgressService] Failed to create proxy agent for user ${userId}: ${err.message}`);
+      this.logger.error(
+        `[EgressService] Failed to create proxy agent for user ${userId}: ${err.message}`,
+      );
       return undefined;
     }
   }
@@ -339,15 +381,16 @@ export class EgressService {
   // 9. POOL STATUS SUMMARY
   // ─────────────────────────────────────────────────────────────────────────────
   async getPoolStatus(): Promise<any> {
-    const [totalIps, availableIps, activeAssignments, poolList] = await Promise.all([
-      this.prisma.ipPool.count(),
-      this.prisma.ipPool.count({ where: { status: 'AVAILABLE' } }),
-      this.prisma.userIpAssignment.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.ipPool.findMany({
-        take: 50,
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    const [totalIps, availableIps, activeAssignments, poolList] =
+      await Promise.all([
+        this.prisma.ipPool.count(),
+        this.prisma.ipPool.count({ where: { status: 'AVAILABLE' } }),
+        this.prisma.userIpAssignment.count({ where: { status: 'ACTIVE' } }),
+        this.prisma.ipPool.findMany({
+          take: 50,
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
 
     return {
       totalIps,
@@ -360,15 +403,24 @@ export class EgressService {
   // ─────────────────────────────────────────────────────────────────────────────
   // REDIS CACHE HELPER
   // ─────────────────────────────────────────────────────────────────────────────
-  private async cacheCredentialsInRedis(userId: string, creds: UserEgressCredentials): Promise<void> {
+  private async cacheCredentialsInRedis(
+    userId: string,
+    creds: UserEgressCredentials,
+  ): Promise<void> {
     if (this.redisService.isHealthy()) {
       try {
         const key = RedisKeys.userEgress(userId);
         // Cache for 24 hours
-        await this.redisService.getClient().set(key, JSON.stringify(creds), 'EX', 86400);
-        this.logger.debug(`[EgressService] Cached egress credentials in Redis for user ${userId}`);
+        await this.redisService
+          .getClient()
+          .set(key, JSON.stringify(creds), 'EX', 86400);
+        this.logger.debug(
+          `[EgressService] Cached egress credentials in Redis for user ${userId}`,
+        );
       } catch (err: any) {
-        this.logger.warn(`[EgressService] Failed to cache credentials in Redis for user ${userId}: ${err.message}`);
+        this.logger.warn(
+          `[EgressService] Failed to cache credentials in Redis for user ${userId}: ${err.message}`,
+        );
       }
     }
   }

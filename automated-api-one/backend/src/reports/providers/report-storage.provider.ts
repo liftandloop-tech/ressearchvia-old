@@ -12,7 +12,11 @@ export const REPORT_STORAGE_PROVIDER = 'ReportStorageProvider';
 export class LocalStorageProvider implements ReportStorageProvider {
   private readonly uploadDir = path.join(process.cwd(), 'uploads', 'reports');
 
-  async upload(fileName: string, content: Buffer, mimeType: string): Promise<string> {
+  async upload(
+    fileName: string,
+    content: Buffer,
+    mimeType: string,
+  ): Promise<string> {
     try {
       await fs.mkdir(this.uploadDir, { recursive: true });
       const filePath = path.join(this.uploadDir, fileName);
@@ -20,7 +24,9 @@ export class LocalStorageProvider implements ReportStorageProvider {
       // Return local file path or relative URL
       return `/uploads/reports/${fileName}`;
     } catch (error) {
-      throw new Error(`Failed to upload file to local storage: ${error.message}`);
+      throw new Error(
+        `Failed to upload file to local storage: ${error.message}`,
+      );
     }
   }
 }

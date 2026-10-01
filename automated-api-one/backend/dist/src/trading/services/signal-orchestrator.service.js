@@ -50,7 +50,12 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
         const validTransitions = {
             [client_1.SignalState.RECEIVED]: [client_1.SignalState.VALIDATED, client_1.SignalState.FAILED],
             [client_1.SignalState.VALIDATED]: [client_1.SignalState.PROCESSING, client_1.SignalState.FAILED],
-            [client_1.SignalState.PROCESSING]: [client_1.SignalState.PROCESSING, client_1.SignalState.COMPLETED, client_1.SignalState.PARTIALLY_COMPLETED, client_1.SignalState.FAILED],
+            [client_1.SignalState.PROCESSING]: [
+                client_1.SignalState.PROCESSING,
+                client_1.SignalState.COMPLETED,
+                client_1.SignalState.PARTIALLY_COMPLETED,
+                client_1.SignalState.FAILED,
+            ],
             [client_1.SignalState.COMPLETED]: [],
             [client_1.SignalState.PARTIALLY_COMPLETED]: [],
             [client_1.SignalState.FAILED]: [],
@@ -81,12 +86,16 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
         const correlationId = (0, crypto_1.randomUUID)();
         this.logger.log(`[${correlationId}] Processing signal ${signalId}`);
         this.redisService.assertHealthy();
-        const isTradingDisabled = await this.redisService.getClient().get('trading:global:disabled');
+        const isTradingDisabled = await this.redisService
+            .getClient()
+            .get('trading:global:disabled');
         if (isTradingDisabled === 'true') {
             this.logger.warn(`[${correlationId}] Signal processing/fan-out blocked due to global trading kill switch`);
             throw new common_1.ServiceUnavailableException('Trading is disabled globally via kill switch');
         }
-        const isGlobalRiskBlocked = await this.redisService.getClient().get('risk:global:blocked');
+        const isGlobalRiskBlocked = await this.redisService
+            .getClient()
+            .get('risk:global:blocked');
         if (isGlobalRiskBlocked === 'true') {
             this.logger.warn(`[${correlationId}] Signal processing/fan-out blocked due to global emergency risk lock`);
             throw new common_1.ServiceUnavailableException('Trading is disabled globally via global emergency risk lock');
@@ -110,7 +119,13 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
         if (!signal) {
             this.logger.error(`[${correlationId}] Signal ${signalId} not found`);
             await this.idempotencyService.markFailed(idempotencyKey);
-            return { state: client_1.SignalState.FAILED, totalUsers: 0, successUsers: 0, rejectedUsers: 0, correlationId };
+            return {
+                state: client_1.SignalState.FAILED,
+                totalUsers: 0,
+                successUsers: 0,
+                rejectedUsers: 0,
+                correlationId,
+            };
         }
         const execution = await this.prisma.segmentExecution.create({
             data: {
@@ -130,7 +145,13 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
                 errorSummary: 'No associated segment relation found',
             });
             await this.idempotencyService.markFailed(idempotencyKey);
-            return { state: client_1.SignalState.FAILED, totalUsers: 0, successUsers: 0, rejectedUsers: 0, correlationId };
+            return {
+                state: client_1.SignalState.FAILED,
+                totalUsers: 0,
+                successUsers: 0,
+                rejectedUsers: 0,
+                correlationId,
+            };
         }
         await this.updateExecutionState(execution.id, client_1.SignalState.VALIDATED);
         await this.updateExecutionState(execution.id, client_1.SignalState.PROCESSING);
@@ -144,7 +165,10 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
                     ? client_1.SignalState.FAILED
                     : client_1.SignalState.PARTIALLY_COMPLETED;
         const completedAt = new Date();
-        const processingDurationMs = completedAt.getTime() - execution.startedAt.getTime();
+        const startedAtTime = execution.startedAt
+            ? new Date(execution.startedAt).getTime()
+            : completedAt.getTime();
+        const processingDurationMs = completedAt.getTime() - startedAtTime;
         await this.updateExecutionState(execution.id, finalState, {
             totalUsers,
             processedUsers: totalUsers,
@@ -334,7 +358,9 @@ let SignalOrchestratorService = SignalOrchestratorService_1 = class SignalOrches
     }
     async enqueueForUser(signal, subscriber, correlationId) {
         if (this.redisService.isHealthy()) {
-            const userBlocked = await this.redisService.getClient().get(`user:risk:blocked:${subscriber.userId}`);
+            const userBlocked = await this.redisService
+                .getClient()
+                .get(`user:risk:blocked:${subscriber.userId}`);
             if (userBlocked === 'true') {
                 this.logger.warn(`[${correlationId}] Skip fanning out to user ${subscriber.userId} due to risk lock`);
                 return false;

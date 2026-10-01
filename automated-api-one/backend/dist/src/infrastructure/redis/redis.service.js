@@ -90,14 +90,20 @@ let RedisService = RedisService_1 = class RedisService {
                 this.logger.warn('Redis connection startup timeout reached (2s). Bootstrapping anyway.');
                 resolve();
             }, 2000);
-            this.client.once('ready', () => {
+            if (this.client?.once) {
+                this.client.once('ready', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                });
+                this.client.once('error', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                });
+            }
+            else {
                 clearTimeout(timeout);
                 resolve();
-            });
-            this.client.once('error', () => {
-                clearTimeout(timeout);
-                resolve();
-            });
+            }
         });
     }
     async onModuleDestroy() {

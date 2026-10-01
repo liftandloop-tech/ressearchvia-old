@@ -14,6 +14,8 @@ import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/segment.service.dart';
 import 'package:spresearch_web/services/auth.service.dart';
+import '../users/user_details.controller.dart';
+import '../users/user_management.controller.dart';
 
 class ManageSubscriptionController extends GetxController {
   late final SubscriptionService _subscriptionService;
@@ -23,6 +25,16 @@ class ManageSubscriptionController extends GetxController {
   late final AcquisitionService _acquisitionService;
   late final SegmentService _segmentService;
   late final AuthService _authService;
+
+  void _syncUserAndManagement(String userId) {
+    if (userId.isEmpty) return;
+    if (Get.isRegistered<UserDetailsController>()) {
+      Get.find<UserDetailsController>().fetchUserDetails(userId, forceRefresh: true);
+    }
+    if (Get.isRegistered<UserManagementController>()) {
+      Get.find<UserManagementController>().fetchUsers();
+    }
+  }
 
   var isLoading = false.obs;
   var userSubscriptions = <Map<String, dynamic>>[].obs;
@@ -465,6 +477,7 @@ class ManageSubscriptionController extends GetxController {
       );
       // Wait a moment and then refresh the UI if possible
       await fetchUserSubscriptions(currentUserId.value);
+      _syncUserAndManagement(currentUserId.value);
     } else {
       Get.snackbar(
         'Error',
@@ -550,6 +563,7 @@ class ManageSubscriptionController extends GetxController {
         colorText: Colors.white,
       );
       fetchUserSubscriptions(userId);
+      _syncUserAndManagement(userId);
     } else {
       Get.snackbar(
         'Error',
@@ -573,6 +587,7 @@ class ManageSubscriptionController extends GetxController {
         colorText: Colors.white,
       );
       fetchUserSubscriptions(userId);
+      _syncUserAndManagement(userId);
     } else {
       Get.snackbar(
         'Error',
@@ -596,6 +611,7 @@ class ManageSubscriptionController extends GetxController {
         colorText: Colors.white,
       );
       fetchUserSubscriptions(userId);
+      _syncUserAndManagement(userId);
     } else {
       Get.snackbar(
         'Error',
@@ -657,6 +673,7 @@ class ManageSubscriptionController extends GetxController {
           colorText: Colors.white,
         );
         await fetchUserSubscriptions(currentUserId.value);
+        _syncUserAndManagement(currentUserId.value);
       } else {
         Get.snackbar(
           'Error',
@@ -1296,6 +1313,7 @@ class ManageSubscriptionController extends GetxController {
                                                                       colorText: Colors.white,
                                                                     );
                                                                     fetchUserSubscriptions(userId);
+                                                                    _syncUserAndManagement(userId);
                                                                   } else {
                                                                     Get.snackbar(
                                                                       'Error',
@@ -2453,6 +2471,7 @@ class ManageSubscriptionController extends GetxController {
         );
         if (currentUserId.value.isNotEmpty) {
           await fetchUserSubscriptions(currentUserId.value);
+          _syncUserAndManagement(currentUserId.value);
         }
         return true;
       } else {

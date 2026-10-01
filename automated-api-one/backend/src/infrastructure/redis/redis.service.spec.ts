@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { RedisService, PlatformMode, RedisDegradedException } from './redis.service';
+import {
+  RedisService,
+  PlatformMode,
+  RedisDegradedException,
+} from './redis.service';
 import Redis from 'ioredis';
 
 jest.mock('ioredis', () => {
@@ -8,6 +12,10 @@ jest.mock('ioredis', () => {
     const events: Record<string, Function[]> = {};
     return {
       on: jest.fn().mockImplementation((event, callback) => {
+        if (!events[event]) events[event] = [];
+        events[event].push(callback);
+      }),
+      once: jest.fn().mockImplementation((event, callback) => {
         if (!events[event]) events[event] = [];
         events[event].push(callback);
       }),
@@ -60,7 +68,7 @@ describe('RedisService', () => {
 
   it('should track health status on events', () => {
     const client: any = service.getClient();
-    
+
     // Initially false (until ready is emitted)
     expect(service.isHealthy()).toBe(false);
     expect(service.getPlatformMode()).toBe(PlatformMode.NORMAL);

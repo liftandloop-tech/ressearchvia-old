@@ -8,7 +8,12 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { StrategyModule } from '../strategy/strategy.module';
 
 @Module({
-  imports: [AuditModule, NotificationsModule, SubscriptionsModule, StrategyModule],
+  imports: [
+    AuditModule,
+    NotificationsModule,
+    SubscriptionsModule,
+    StrategyModule,
+  ],
   controllers: [ConsentsController],
   providers: [ConsentsService, PrismaService],
   exports: [ConsentsService],

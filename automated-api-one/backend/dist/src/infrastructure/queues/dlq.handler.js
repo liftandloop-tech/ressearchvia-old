@@ -22,7 +22,7 @@ let BaseQueueEventsListener = class BaseQueueEventsListener extends bullmq_1.Que
         super();
         this.queueService = queueService;
     }
-    async onJobFailed({ jobId, failedReason }) {
+    async onJobFailed({ jobId, failedReason, }) {
         this.logger.warn(`Job ${jobId} failed in queue ${this.queueName}. Reason: ${failedReason}`);
         try {
             const queue = this.queueService.getQueue(this.queueName);

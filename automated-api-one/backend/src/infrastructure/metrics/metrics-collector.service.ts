@@ -45,13 +45,15 @@ export class MetricsCollectorService {
             const waiting = await queue.getWaitingCount();
             const active = await queue.getActiveCount();
             const failed = await queue.getFailedCount();
-            
+
             this.metrics.setQueueDepth(queueName, waiting);
             this.metrics.setQueueProcessing(queueName, active);
             this.metrics.setQueueFailed(queueName, failed);
           }
         } catch (queueErr) {
-          this.logger.warn(`Failed to collect queue metrics for ${queueName}: ${queueErr.message}`);
+          this.logger.warn(
+            `Failed to collect queue metrics for ${queueName}: ${queueErr.message}`,
+          );
         }
       }
     } catch (err) {
@@ -84,7 +86,9 @@ export class MetricsCollectorService {
             this.metrics.setQueueDlqDepth(dlqName, waiting);
           }
         } catch (queueErr) {
-          this.logger.warn(`Failed to collect DLQ depth for ${dlqName}: ${queueErr.message}`);
+          this.logger.warn(
+            `Failed to collect DLQ depth for ${dlqName}: ${queueErr.message}`,
+          );
         }
       }
     } catch (err) {
@@ -103,7 +107,7 @@ export class MetricsCollectorService {
 
         // Fetch INFO stats
         const info = await client.info();
-        
+
         const usedMemoryMatch = info.match(/used_memory:(\d+)/);
         if (usedMemoryMatch) {
           this.metrics.setRedisMemoryUsage(parseInt(usedMemoryMatch[1], 10));
@@ -111,23 +115,37 @@ export class MetricsCollectorService {
 
         const connectedClientsMatch = info.match(/connected_clients:(\d+)/);
         if (connectedClientsMatch) {
-          this.metrics.setRedisConnectedClients(parseInt(connectedClientsMatch[1], 10));
+          this.metrics.setRedisConnectedClients(
+            parseInt(connectedClientsMatch[1], 10),
+          );
         }
 
         // Count active locks (keys starting with lock:, report:lock:, analytics:snapshot:lock:)
         const lockKeys = await client.keys('lock:*').catch(() => []);
-        const reportLockKeys = await client.keys('report:lock:*').catch(() => []);
-        const snapshotLockKeys = await client.keys('analytics:snapshot:lock:*').catch(() => []);
-        const totalActiveLocks = lockKeys.length + reportLockKeys.length + snapshotLockKeys.length;
+        const reportLockKeys = await client
+          .keys('report:lock:*')
+          .catch(() => []);
+        const snapshotLockKeys = await client
+          .keys('analytics:snapshot:lock:*')
+          .catch(() => []);
+        const totalActiveLocks =
+          lockKeys.length + reportLockKeys.length + snapshotLockKeys.length;
         this.metrics.setDistributedLocksActive(totalActiveLocks);
 
         // Count active idempotency keys (e.g., outbox:idempotency:*, signal:idempotency:*, order:idempotency:*)
-        const outboxIdempotencyKeys = await client.keys('outbox:idempotency:*').catch(() => []);
-        const reportIdempotencyKeys = await client.keys('report:idempotency:*').catch(() => []);
-        const totalIdempotencyKeys = outboxIdempotencyKeys.length + reportIdempotencyKeys.length;
+        const outboxIdempotencyKeys = await client
+          .keys('outbox:idempotency:*')
+          .catch(() => []);
+        const reportIdempotencyKeys = await client
+          .keys('report:idempotency:*')
+          .catch(() => []);
+        const totalIdempotencyKeys =
+          outboxIdempotencyKeys.length + reportIdempotencyKeys.length;
         this.metrics.setRedisIdempotencyKeysActive(totalIdempotencyKeys);
       } catch (redisErr) {
-        this.logger.warn(`Failed to collect Redis telemetry metrics: ${redisErr.message}`);
+        this.logger.warn(
+          `Failed to collect Redis telemetry metrics: ${redisErr.message}`,
+        );
       }
     }
 
@@ -138,7 +156,9 @@ export class MetricsCollectorService {
       });
       this.metrics.setOpenPositions(openPositionsCount);
     } catch (err) {
-      this.logger.error(`Failed to collect open positions metric: ${err.message}`);
+      this.logger.error(
+        `Failed to collect open positions metric: ${err.message}`,
+      );
     }
 
     try {
@@ -198,7 +218,9 @@ export class MetricsCollectorService {
       });
       this.metrics.setConsentsActiveToday(activeConsents);
     } catch (dbErr) {
-      this.logger.warn(`Failed to collect database KPI metrics: ${dbErr.message}`);
+      this.logger.warn(
+        `Failed to collect database KPI metrics: ${dbErr.message}`,
+      );
     }
 
     // 5. Collect Outbox event telemetry
@@ -218,8 +240,9 @@ export class MetricsCollectorService {
       });
       this.metrics.setOutboxEventsFailed(failedCount);
     } catch (outboxErr) {
-      this.logger.warn(`Failed to collect outbox telemetry: ${outboxErr.message}`);
+      this.logger.warn(
+        `Failed to collect outbox telemetry: ${outboxErr.message}`,
+      );
     }
   }
 }
-

@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { ProxyManagerService } from './proxy-manager.service';
 import { PrismaService } from '../prisma.service';
 
@@ -13,11 +21,25 @@ export class ProxyManagerController {
    * Primary automated user purchase endpoint
    */
   @Post('proxies/purchase')
-  async purchaseProxy(@Body() body: { userBrokerId: string; validityMonths: number; iptype: 'ipv4' | 'ipv6' }) {
+  async purchaseProxy(
+    @Body()
+    body: {
+      userBrokerId: string;
+      validityMonths: number;
+      iptype: 'ipv4' | 'ipv6';
+    },
+  ) {
     if (!body.userBrokerId || !body.validityMonths || !body.iptype) {
-      throw new HttpException('Missing required fields (userBrokerId, validityMonths, iptype)', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing required fields (userBrokerId, validityMonths, iptype)',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    return this.proxyService.purchaseProxy(body.userBrokerId, body.validityMonths, body.iptype);
+    return this.proxyService.purchaseProxy(
+      body.userBrokerId,
+      body.validityMonths,
+      body.iptype,
+    );
   }
 
   @Get('admin/proxies')
@@ -71,15 +93,34 @@ export class ProxyManagerController {
   }
 
   @Post('admin/proxies/issue')
-  async issueProxy(@Body() body: { brokerName: string; validityMonths: number; iptype: 'ipv4' | 'ipv6'; userBrokerId?: string }) {
+  async issueProxy(
+    @Body()
+    body: {
+      brokerName: string;
+      validityMonths: number;
+      iptype: 'ipv4' | 'ipv6';
+      userBrokerId?: string;
+    },
+  ) {
     if (!body.brokerName || !body.validityMonths || !body.iptype) {
-      throw new HttpException('Missing required fields', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Missing required fields',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    return this.proxyService.issueIp(body.brokerName, body.validityMonths, body.iptype, body.userBrokerId);
+    return this.proxyService.issueIp(
+      body.brokerName,
+      body.validityMonths,
+      body.iptype,
+      body.userBrokerId,
+    );
   }
 
   @Post('admin/proxies/:id/assign')
-  async assignProxy(@Param('id') id: string, @Body() body: { userBrokerId: string }) {
+  async assignProxy(
+    @Param('id') id: string,
+    @Body() body: { userBrokerId: string },
+  ) {
     if (!body.userBrokerId) {
       throw new HttpException('Missing userBrokerId', HttpStatus.BAD_REQUEST);
     }
@@ -92,7 +133,10 @@ export class ProxyManagerController {
   }
 
   @Post('admin/proxies/:id/renew')
-  async renewProxy(@Param('id') id: string, @Body() body: { validityMonths: number }) {
+  async renewProxy(
+    @Param('id') id: string,
+    @Body() body: { validityMonths: number },
+  ) {
     if (!body.validityMonths) {
       throw new HttpException('Missing validityMonths', HttpStatus.BAD_REQUEST);
     }
@@ -141,7 +185,8 @@ export class ProxyManagerController {
         },
       },
     });
-    if (!proxy) throw new HttpException('Proxy not found', HttpStatus.NOT_FOUND);
+    if (!proxy)
+      throw new HttpException('Proxy not found', HttpStatus.NOT_FOUND);
     return proxy;
   }
 
@@ -153,8 +198,9 @@ export class ProxyManagerController {
     const proxy = await this.prisma.proxyCredential.findUnique({
       where: { id },
     });
-    if (!proxy) throw new HttpException('Proxy not found', HttpStatus.NOT_FOUND);
-    
+    if (!proxy)
+      throw new HttpException('Proxy not found', HttpStatus.NOT_FOUND);
+
     return {
       ip_userid: proxy.ip_userid,
       ip_password: proxy.ip_password,

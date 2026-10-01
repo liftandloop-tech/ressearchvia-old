@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ReportGenerationProcessor, ReportExportProcessor } from './report-generation.processor';
+import {
+  ReportGenerationProcessor,
+  ReportExportProcessor,
+} from './report-generation.processor';
 import { AnalyticsSnapshotProcessor } from './analytics-snapshot.processor';
 import { PrismaService } from '../../prisma.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
@@ -31,7 +34,13 @@ describe('Report Processors', () => {
 
     const mockPrisma = {
       report: {
-        update: jest.fn().mockResolvedValue({ id: 'rep-123', userId: 'usr-1', reportType: 'DAILY', fileUrl: '/uploads/reports/test.json', generatedAt: new Date() }),
+        update: jest.fn().mockResolvedValue({
+          id: 'rep-123',
+          userId: 'usr-1',
+          reportType: 'DAILY',
+          fileUrl: '/uploads/reports/test.json',
+          generatedAt: new Date(),
+        }),
       },
       reportExport: {
         update: jest.fn().mockResolvedValue({ id: 'exp-123' }),
@@ -100,9 +109,13 @@ describe('Report Processors', () => {
       ],
     }).compile();
 
-    reportProcessor = module.get<ReportGenerationProcessor>(ReportGenerationProcessor);
+    reportProcessor = module.get<ReportGenerationProcessor>(
+      ReportGenerationProcessor,
+    );
     exportProcessor = module.get<ReportExportProcessor>(ReportExportProcessor);
-    snapshotProcessor = module.get<AnalyticsSnapshotProcessor>(AnalyticsSnapshotProcessor);
+    snapshotProcessor = module.get<AnalyticsSnapshotProcessor>(
+      AnalyticsSnapshotProcessor,
+    );
     prisma = module.get<PrismaService>(PrismaService);
     redis = module.get<RedisService>(RedisService);
     outbox = module.get<OutboxService>(OutboxService);
@@ -115,7 +128,12 @@ describe('Report Processors', () => {
 
       const mockJob = {
         id: 'job-1',
-        data: { reportId: 'rep-123', userId: 'usr-1', type: 'DAILY', period: '2026-06-12' },
+        data: {
+          reportId: 'rep-123',
+          userId: 'usr-1',
+          type: 'DAILY',
+          period: '2026-06-12',
+        },
       } as Job;
 
       await reportProcessor.process(mockJob);
@@ -128,7 +146,12 @@ describe('Report Processors', () => {
 
       const mockJob = {
         id: 'job-1',
-        data: { reportId: 'rep-123', userId: 'usr-1', type: 'DAILY', period: '2026-06-12' },
+        data: {
+          reportId: 'rep-123',
+          userId: 'usr-1',
+          type: 'DAILY',
+          period: '2026-06-12',
+        },
       } as Job;
 
       await reportProcessor.process(mockJob);

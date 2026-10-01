@@ -8,6 +8,8 @@ import '../services/api_client.service.dart';
 import '../services/api_exception.service.dart';
 import '../services/secure_storage.service.dart';
 import '../services/snackbar.service.dart';
+import 'user.controller.dart';
+import 'segment_plan.controller.dart';
 
 class PlanPurchaseController extends GetxController {
   final ApiClient _apiClient = ApiClient();
@@ -144,7 +146,16 @@ class PlanPurchaseController extends GetxController {
         data: formData,
       );
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        if (Get.isRegistered<UserController>()) {
+          Get.find<UserController>().fetchLatestUserDetails();
+        }
+        if (Get.isRegistered<SegmentPlanController>()) {
+          Get.find<SegmentPlanController>().fetchActiveSegment(force: true);
+        }
+        return true;
+      }
+      return false;
     } catch (e) {
       final error = ApiErrorHandler.handleError(e);
       SnackbarService.showError(error.message);
@@ -179,6 +190,12 @@ class PlanPurchaseController extends GetxController {
         if (success) {
           SnackbarService.showSuccess('Payment verified successfully');
           await fetchUserPlan();
+          if (Get.isRegistered<UserController>()) {
+            Get.find<UserController>().fetchLatestUserDetails();
+          }
+          if (Get.isRegistered<SegmentPlanController>()) {
+            Get.find<SegmentPlanController>().fetchActiveSegment(force: true);
+          }
           return true;
         } else {
           SnackbarService.showError(

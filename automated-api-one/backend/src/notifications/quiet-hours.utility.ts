@@ -46,7 +46,12 @@ export function getNextActiveTime(
     const [endHour, endMin] = endStr.split(':').map(Number);
 
     // Create a DateTime representing endStr today
-    let target = dt.set({ hour: endHour, minute: endMin, second: 0, millisecond: 0 });
+    let target = dt.set({
+      hour: endHour,
+      minute: endMin,
+      second: 0,
+      millisecond: 0,
+    });
 
     if (dt >= target) {
       target = target.plus({ days: 1 });

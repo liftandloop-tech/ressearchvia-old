@@ -9,13 +9,14 @@ import '../controllers/auth.controller.dart';
 import '../controllers/user.controller.dart';
 import '../controllers/segment_plan.controller.dart';
 import '../services/secure_storage.service.dart';
+import '../services/in_app_update.service.dart';
 import '../core/routes/app_routes.dart';
 import 'dashboard/dashboard.screen.dart';
 import 'profile/profile.screen.dart';
 import 'research/research_reports.screen.dart';
 import 'subscription/choose_plan.screen.dart';
 
-class TabsController extends GetxController {
+class TabsController extends GetxController with WidgetsBindingObserver {
   final RxInt currentIndex = 0.obs;
   final RxBool isRegistrationSkipped = false.obs;
 
@@ -24,6 +25,8 @@ class TabsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+
     if (Get.arguments is int) {
       currentIndex.value = Get.arguments;
     }
@@ -37,10 +40,24 @@ class TabsController extends GetxController {
     // Load the skip flag once on startup
     _loadSkipFlag();
 
-    // Show suspension popup if user is suspended
+    // Show suspension popup if user is suspended & check for app updates
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkSuspensionStatus();
+      InAppUpdateService.checkForUpdate();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      InAppUpdateService.checkUpdateOnResume();
+    }
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
   }
 
   Future<void> _loadSkipFlag() async {
@@ -129,6 +146,27 @@ class TabsController extends GetxController {
         }
       }
       currentIndex.value = index;
+
+      // Instantly refresh data for the newly focused tab so actions in other screens/modals reflect immediately
+      if (index == 0) {
+        if (Get.isRegistered<UserController>()) {
+          Get.find<UserController>().fetchLatestUserDetails();
+        }
+        if (Get.isRegistered<SegmentPlanController>()) {
+          Get.find<SegmentPlanController>().fetchActiveSegment(force: true);
+        }
+        if (Get.isRegistered<ReportController>()) {
+          Get.find<ReportController>().refreshData();
+        }
+      } else if (index == 1) {
+        if (Get.isRegistered<ReportController>()) {
+          Get.find<ReportController>().refreshData(force: true);
+        }
+      } else if (index == 3) {
+        if (Get.isRegistered<UserController>()) {
+          Get.find<UserController>().fetchLatestUserDetails();
+        }
+      }
     }
   }
 

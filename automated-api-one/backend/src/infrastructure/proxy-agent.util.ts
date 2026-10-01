@@ -12,7 +12,9 @@ export interface ProxyConfig {
  * Creates an HttpsProxyAgent configured with user proxy details.
  * Returns undefined if no proxy is configured.
  */
-export function createProxyAgent(config: ProxyConfig): HttpsProxyAgent<string> | undefined {
+export function createProxyAgent(
+  config: ProxyConfig,
+): HttpsProxyAgent<string> | undefined {
   if (!config.proxyIp || !config.proxyPort) {
     return undefined;
   }

@@ -18,11 +18,13 @@ export abstract class BrokerAdapter {
     clientCode: string;
     password: string;
     totpKey: string;
-    apiKey?: string;     // Per-user API key (e.g. Zebu appkey); ignored by OAuth-based brokers
+    apiKey?: string; // Per-user API key (e.g. Zebu appkey); ignored by OAuth-based brokers
     vendorCode?: string; // Per-user vendor code (e.g. Zebu vc); ignored by OAuth-based brokers
   }): Promise<SessionResponse>;
   abstract getAuthorizationUrl(state: string): Promise<string>;
-  abstract completeAuthorization(callbackData: BrokerCallbackData): Promise<BrokerSession>;
+  abstract completeAuthorization(
+    callbackData: BrokerCallbackData,
+  ): Promise<BrokerSession>;
   abstract validateSession(token: string): Promise<boolean>;
   abstract getMargin(token: string, clientCode: string): Promise<number>;
   abstract getProfile(token: string, clientCode?: string): Promise<any>;
@@ -59,32 +61,37 @@ export abstract class BrokerAdapter {
     clientCode: string,
     orderId: string,
     variety: string,
-    order: { quantity: number; price?: number; ordertype?: string; producttype?: string; duration?: string }
+    order: {
+      quantity: number;
+      price?: number;
+      ordertype?: string;
+      producttype?: string;
+      duration?: string;
+    },
   ): Promise<OrderResponse>;
 
   abstract cancelOrder(
     token: string,
     clientCode: string,
     orderId: string,
-    variety: string
+    variety: string,
   ): Promise<OrderResponse>;
 
   abstract getTradeBook(
     token: string,
-    clientCode: string
+    clientCode: string,
   ): Promise<BrokerTrade[]>;
 
   abstract getLtpData(
     token: string,
     exchange: string,
     symbol: string,
-    symbolToken: string
+    symbolToken: string,
   ): Promise<BrokerLtp>;
 
   abstract getOrderDetails(
     token: string,
     clientCode: string,
-    orderId: string
+    orderId: string,
   ): Promise<OrderResponse>;
 }
-

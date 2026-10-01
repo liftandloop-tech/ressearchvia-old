@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { RedisService } from '../infrastructure/redis/redis.service';
 import { QueueService } from '../infrastructure/queues/queues.service';
@@ -6,12 +11,21 @@ import { MetricsService } from '../infrastructure/metrics/metrics.service';
 import { BrokerSessionService } from '../brokers/services/broker-session.service';
 import { BrokerFactory } from '../brokers/factory/broker.factory';
 import { BrokerType } from '../brokers/interfaces/broker-type.enum';
-import { OperationsAction, OperationStatus, TradeStatus, QueueJobStatus, ExportState, ReconciliationIssueStatus, ReconciliationIssueType, Severity, ReconciliationStatus } from '@prisma/client';
+import {
+  OperationsAction,
+  OperationStatus,
+  TradeStatus,
+  QueueJobStatus,
+  ExportState,
+  ReconciliationIssueStatus,
+  ReconciliationIssueType,
+  Severity,
+  ReconciliationStatus,
+} from '@prisma/client';
 import { Queues } from '../infrastructure/queues/queue.constants';
 import { Cron } from '@nestjs/schedule';
 import { ReconciliationService } from '../reconciliation/reconciliation.service';
 import * as crypto from 'crypto';
-
 
 import { AlertingService } from '../notifications/alerting.service';
 
@@ -44,13 +58,9 @@ export class OpsService {
     // Idempotency check: ops:idempotency:{action}:{resourceId} (60s TTL)
     const idempotencyKey = `ops:idempotency:${action}:${resourceId}`;
     if (this.redisService.isHealthy()) {
-      const acquired = await this.redisService.getClient().set(
-        idempotencyKey,
-        '1',
-        'EX',
-        60,
-        'NX',
-      );
+      const acquired = await this.redisService
+        .getClient()
+        .set(idempotencyKey, '1', 'EX', 60, 'NX');
       if (acquired !== 'OK') {
         this.metrics.incrementOperationsRejected(action);
         throw new BadRequestException(
@@ -75,7 +85,9 @@ export class OpsService {
       });
       this.metrics.incrementOperationsAuditRecords();
     } catch (auditErr: any) {
-      this.logger.error(`Failed to create operations audit record: ${auditErr.message || auditErr}`);
+      this.logger.error(
+        `Failed to create operations audit record: ${auditErr.message || auditErr}`,
+      );
       this.metrics.incrementOperationsAuditFailures();
     }
 
@@ -89,12 +101,16 @@ export class OpsService {
         try {
           await this.redisService.getClient().del(idempotencyKey);
         } catch (redisErr: any) {
-          this.logger.warn(`Failed to clear idempotency key ${idempotencyKey} from Redis: ${redisErr.message || redisErr}`);
+          this.logger.warn(
+            `Failed to clear idempotency key ${idempotencyKey} from Redis: ${redisErr.message || redisErr}`,
+          );
         }
       }
 
       const isRejected = err instanceof BadRequestException;
-      const status = isRejected ? OperationStatus.REJECTED : OperationStatus.FAILED;
+      const status = isRejected
+        ? OperationStatus.REJECTED
+        : OperationStatus.FAILED;
 
       if (audit) {
         try {
@@ -107,7 +123,9 @@ export class OpsService {
           });
           this.metrics.incrementOperationsAuditRecords();
         } catch (auditErr: any) {
-          this.logger.error(`Failed to update operations audit record: ${auditErr.message || auditErr}`);
+          this.logger.error(
+            `Failed to update operations audit record: ${auditErr.message || auditErr}`,
+          );
           this.metrics.incrementOperationsAuditFailures();
         }
       } else {
@@ -140,14 +158,20 @@ export class OpsService {
           },
         },
       });
-      this.logger.log(`OperationsAudit cleanup complete. Removed ${count} records older than 180 days.`);
+      this.logger.log(
+        `OperationsAudit cleanup complete. Removed ${count} records older than 180 days.`,
+      );
     } catch (err: any) {
-      this.logger.error(`Failed to clean up OperationsAudit records: ${err.message || err}`);
+      this.logger.error(
+        `Failed to clean up OperationsAudit records: ${err.message || err}`,
+      );
     }
   }
 
-
-  async replaySignal(operatorId: string, signalId: string): Promise<{ operationId: string }> {
+  async replaySignal(
+    operatorId: string,
+    signalId: string,
+  ): Promise<{ operationId: string }> {
     return this.runOperation(
       operatorId,
       OperationsAction.REPLAY_SIGNAL,
@@ -163,10 +187,12 @@ export class OpsService {
           throw new NotFoundException(`Signal ${signalId} not found`);
         }
 
-        const metadata = (signal.metadata as any) || {};
+        const metadata = signal.metadata || {};
         const replayCount = metadata.replayCount || 0;
         if (replayCount >= 5) {
-          throw new BadRequestException(`Signal ${signalId} has exceeded the maximum replay limit of 5`);
+          throw new BadRequestException(
+            `Signal ${signalId} has exceeded the maximum replay limit of 5`,
+          );
         }
         metadata.replayCount = replayCount + 1;
         await this.prisma.signal.update({
@@ -179,14 +205,18 @@ export class OpsService {
         });
 
         if (!segment) {
-          throw new BadRequestException(`Segment ${signal.segmentId} not found`);
+          throw new BadRequestException(
+            `Segment ${signal.segmentId} not found`,
+          );
         }
 
         if (this.redisService.isHealthy()) {
           const lockKey = `lock:segment:${signal.segmentId}`;
           const isLocked = await this.redisService.getClient().exists(lockKey);
           if (isLocked === 1) {
-            throw new BadRequestException(`Segment ${signal.segmentId} is currently locked`);
+            throw new BadRequestException(
+              `Segment ${signal.segmentId} is currently locked`,
+            );
           }
         }
 
@@ -203,16 +233,17 @@ export class OpsService {
 
         // Re-enqueue using unique job ID
         const jobId = `signal-${signalId}-${operationId}`;
-        await this.queueService.addJob(
-          Queues.SIGNAL_PROCESSING,
-          jobId,
-          { signalId },
-        );
+        await this.queueService.addJob(Queues.SIGNAL_PROCESSING, jobId, {
+          signalId,
+        });
       },
     );
   }
 
-  async replayOutboxEvent(operatorId: string, eventId: string): Promise<{ operationId: string }> {
+  async replayOutboxEvent(
+    operatorId: string,
+    eventId: string,
+  ): Promise<{ operationId: string }> {
     return this.runOperation(
       operatorId,
       OperationsAction.REPLAY_OUTBOX,
@@ -232,7 +263,9 @@ export class OpsService {
         const newEvent = await this.prisma.outboxEvent.create({
           data: {
             eventType: original.eventType,
-            eventKey: original.eventKey ? `${original.eventKey}:replay:${operationId}` : null,
+            eventKey: original.eventKey
+              ? `${original.eventKey}:replay:${operationId}`
+              : null,
             aggregateId: original.aggregateId,
             version: original.version,
             correlationId: original.correlationId,
@@ -242,11 +275,9 @@ export class OpsService {
           },
         });
 
-        await this.queueService.addJob(
-          Queues.OUTBOX_DISPATCHER,
-          newEvent.id,
-          { outboxEventId: newEvent.id },
-        );
+        await this.queueService.addJob(Queues.OUTBOX_DISPATCHER, newEvent.id, {
+          outboxEventId: newEvent.id,
+        });
       },
     );
   }
@@ -289,7 +320,9 @@ export class OpsService {
 
         const job = await dlqQueue.getJob(jobId);
         if (!job) {
-          throw new NotFoundException(`Job ${jobId} not found in DLQ ${queueName}`);
+          throw new NotFoundException(
+            `Job ${jobId} not found in DLQ ${queueName}`,
+          );
         }
 
         const jobData = job.data || {};
@@ -336,7 +369,9 @@ export class OpsService {
 
         const job = await dlqQueue.getJob(jobId);
         if (!job) {
-          throw new NotFoundException(`Job ${jobId} not found in DLQ ${queueName}`);
+          throw new NotFoundException(
+            `Job ${jobId} not found in DLQ ${queueName}`,
+          );
         }
 
         await job.remove();
@@ -383,7 +418,8 @@ export class OpsService {
       },
       async () => {
         const isOrderQueue =
-          queueName === Queues.ORDER_PLACEMENT || queueName === Queues.ORDER_MONITORING;
+          queueName === Queues.ORDER_PLACEMENT ||
+          queueName === Queues.ORDER_MONITORING;
 
         if (isOrderQueue && this.isMarketHours() && !force) {
           throw new BadRequestException(
@@ -435,7 +471,9 @@ export class OpsService {
     reason: string,
   ): Promise<{ operationId: string }> {
     if (!reason) {
-      throw new BadRequestException('A reason is mandatory for draining a queue');
+      throw new BadRequestException(
+        'A reason is mandatory for draining a queue',
+      );
     }
 
     let drainedJobsCount = 0;
@@ -482,7 +520,10 @@ export class OpsService {
     );
   }
 
-  async unlockSegment(operatorId: string, segmentId: string): Promise<{ operationId: string }> {
+  async unlockSegment(
+    operatorId: string,
+    segmentId: string,
+  ): Promise<{ operationId: string }> {
     return this.runOperation(
       operatorId,
       OperationsAction.SEGMENT_UNLOCK,
@@ -533,7 +574,9 @@ export class OpsService {
 
         if (this.redisService.isHealthy()) {
           const rateLimitKey = `ops:broker-refresh:${userBrokerId}`;
-          const isRateLimited = await this.redisService.getClient().exists(rateLimitKey);
+          const isRateLimited = await this.redisService
+            .getClient()
+            .exists(rateLimitKey);
           if (isRateLimited === 1) {
             throw new BadRequestException(
               `Rate limit exceeded: session refresh for broker connection ${userBrokerId} is restricted to once per 60 seconds.`,
@@ -547,12 +590,18 @@ export class OpsService {
           await this.redisService.getClient().del(sessionKey);
         }
 
-        await this.brokerSessionService.refreshSession(userBroker.userId, userBroker.broker.code);
+        await this.brokerSessionService.refreshSession(
+          userBroker.userId,
+          userBroker.broker.code,
+        );
       },
     );
   }
 
-  async rebuildPositions(operatorId: string, userId?: string): Promise<{ operationId: string }> {
+  async rebuildPositions(
+    operatorId: string,
+    userId?: string,
+  ): Promise<{ operationId: string }> {
     return this.runOperation(
       operatorId,
       OperationsAction.POSITION_REBUILD,
@@ -569,7 +618,10 @@ export class OpsService {
     );
   }
 
-  async enableMaintenance(operatorId: string, type: string): Promise<{ operationId: string }> {
+  async enableMaintenance(
+    operatorId: string,
+    type: string,
+  ): Promise<{ operationId: string }> {
     const validTypes = ['global', 'signals', 'subscriptions', 'reports'];
     if (!validTypes.includes(type)) {
       throw new BadRequestException(`Invalid maintenance type: ${type}`);
@@ -592,7 +644,10 @@ export class OpsService {
     );
   }
 
-  async disableMaintenance(operatorId: string, type: string): Promise<{ operationId: string }> {
+  async disableMaintenance(
+    operatorId: string,
+    type: string,
+  ): Promise<{ operationId: string }> {
     const validTypes = ['global', 'signals', 'subscriptions', 'reports'];
     if (!validTypes.includes(type)) {
       throw new BadRequestException(`Invalid maintenance type: ${type}`);
@@ -621,7 +676,9 @@ export class OpsService {
     reason?: string,
   ): Promise<{ operationId: string }> {
     const defaultReason = reason || 'Emergency emergency market event';
-    const expiresAt = permanent ? 'never' : new Date(Date.now() + 900 * 1000).toISOString();
+    const expiresAt = permanent
+      ? 'never'
+      : new Date(Date.now() + 900 * 1000).toISOString();
     const payload = JSON.stringify({
       enabled: true,
       reason: defaultReason,
@@ -638,9 +695,13 @@ export class OpsService {
       async () => {
         if (this.redisService.isHealthy()) {
           if (permanent) {
-            await this.redisService.getClient().set('trading:global:disabled', payload);
+            await this.redisService
+              .getClient()
+              .set('trading:global:disabled', payload);
           } else {
-            await this.redisService.getClient().set('trading:global:disabled', payload, 'EX', 900);
+            await this.redisService
+              .getClient()
+              .set('trading:global:disabled', payload, 'EX', 900);
           }
         } else {
           throw new BadRequestException('Redis is not available');
@@ -707,7 +768,9 @@ export class OpsService {
       ...(query.action ? { action: query.action as OperationsAction } : {}),
       ...(query.operatorId ? { operatorId: query.operatorId } : {}),
       ...(query.status ? { status: query.status as OperationStatus } : {}),
-      ...(query.from && !isNaN(Date.parse(query.from)) ? { createdAt: { gte: new Date(query.from) } } : {}),
+      ...(query.from && !isNaN(Date.parse(query.from))
+        ? { createdAt: { gte: new Date(query.from) } }
+        : {}),
     };
 
     return this.prisma.operationsAudit.paginate({
@@ -727,9 +790,14 @@ export class OpsService {
 
   async getReconciliationIssues(resolved?: boolean): Promise<any[]> {
     return this.prisma.reconciliationIssue.findMany({
-      where: resolved !== undefined
-        ? { status: resolved ? ReconciliationIssueStatus.RESOLVED : { not: ReconciliationIssueStatus.RESOLVED } }
-        : undefined,
+      where:
+        resolved !== undefined
+          ? {
+              status: resolved
+                ? ReconciliationIssueStatus.RESOLVED
+                : { not: ReconciliationIssueStatus.RESOLVED },
+            }
+          : undefined,
       orderBy: { createdAt: 'desc' },
       include: { user: true, broker: true },
     });
@@ -740,10 +808,16 @@ export class OpsService {
       where: { status: ReconciliationIssueStatus.OPEN },
     });
     const criticalCount = await this.prisma.reconciliationIssue.count({
-      where: { severity: Severity.CRITICAL, status: { not: ReconciliationIssueStatus.RESOLVED } },
+      where: {
+        severity: Severity.CRITICAL,
+        status: { not: ReconciliationIssueStatus.RESOLVED },
+      },
     });
     const warningCount = await this.prisma.reconciliationIssue.count({
-      where: { severity: Severity.WARNING, status: { not: ReconciliationIssueStatus.RESOLVED } },
+      where: {
+        severity: Severity.WARNING,
+        status: { not: ReconciliationIssueStatus.RESOLVED },
+      },
     });
     const escalatedCount = await this.prisma.reconciliationIssue.count({
       where: { status: ReconciliationIssueStatus.ESCALATED },
@@ -767,7 +841,10 @@ export class OpsService {
     };
   }
 
-  async resolveReconciliationIssue(operatorId: string, issueId: string): Promise<any> {
+  async resolveReconciliationIssue(
+    operatorId: string,
+    issueId: string,
+  ): Promise<any> {
     return this.runOperation(
       operatorId,
       OperationsAction.RECONCILIATION_RESOLVE,
@@ -780,7 +857,9 @@ export class OpsService {
         });
 
         if (!issue) {
-          throw new NotFoundException(`Reconciliation issue ${issueId} not found`);
+          throw new NotFoundException(
+            `Reconciliation issue ${issueId} not found`,
+          );
         }
 
         const updatedIssue = await this.prisma.reconciliationIssue.update({
@@ -793,14 +872,27 @@ export class OpsService {
           where: {
             userId: issue.userId,
             brokerId: issue.brokerId,
-            status: { in: [ReconciliationIssueStatus.OPEN, ReconciliationIssueStatus.INVESTIGATING, ReconciliationIssueStatus.ESCALATED] },
+            status: {
+              in: [
+                ReconciliationIssueStatus.OPEN,
+                ReconciliationIssueStatus.INVESTIGATING,
+                ReconciliationIssueStatus.ESCALATED,
+              ],
+            },
           },
         });
 
         await this.prisma.reconciliationSnapshot.upsert({
-          where: { userId_brokerId: { userId: issue.userId, brokerId: issue.brokerId } },
+          where: {
+            userId_brokerId: { userId: issue.userId, brokerId: issue.brokerId },
+          },
           update: { openIssues },
-          create: { userId: issue.userId, brokerId: issue.brokerId, openIssues, lastReconciledAt: new Date() },
+          create: {
+            userId: issue.userId,
+            brokerId: issue.brokerId,
+            openIssues,
+            lastReconciledAt: new Date(),
+          },
         });
 
         // Invalidate portfolio analytics cache on reconciliation resolution
@@ -820,7 +912,10 @@ export class OpsService {
     );
   }
 
-  async escalateReconciliationIssue(operatorId: string, issueId: string): Promise<any> {
+  async escalateReconciliationIssue(
+    operatorId: string,
+    issueId: string,
+  ): Promise<any> {
     return this.runOperation(
       operatorId,
       OperationsAction.RECONCILIATION_RESOLVE, // mapped under resolve action workflow
@@ -833,7 +928,9 @@ export class OpsService {
         });
 
         if (!issue) {
-          throw new NotFoundException(`Reconciliation issue ${issueId} not found`);
+          throw new NotFoundException(
+            `Reconciliation issue ${issueId} not found`,
+          );
         }
 
         const updatedIssue = await this.prisma.reconciliationIssue.update({
@@ -870,13 +967,17 @@ export class OpsService {
       'global',
       {},
       async () => {
-        const runId = await this.reconciliationService.triggerReconciliation(operatorId);
+        const runId =
+          await this.reconciliationService.triggerReconciliation(operatorId);
         return { runId };
       },
     );
   }
 
-  async recalculateRiskSnapshot(operatorId: string, userId: string): Promise<{ operationId: string }> {
+  async recalculateRiskSnapshot(
+    operatorId: string,
+    userId: string,
+  ): Promise<{ operationId: string }> {
     return this.runOperation(
       operatorId,
       OperationsAction.RISK_RECALCULATE,
@@ -885,16 +986,17 @@ export class OpsService {
       { userId },
       async (operationId) => {
         const jobId = `risk-recalc-${userId}-manual-${operationId}`;
-        await this.queueService.addJob(
-          Queues.RISK_RECALCULATE,
-          jobId,
-          { userId },
-        );
+        await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, {
+          userId,
+        });
       },
     );
   }
 
-  async unblockUserRisk(operatorId: string, userId: string): Promise<{ operationId: string }> {
+  async unblockUserRisk(
+    operatorId: string,
+    userId: string,
+  ): Promise<{ operationId: string }> {
     return this.runOperation(
       operatorId,
       OperationsAction.RISK_UNBLOCK,
@@ -903,7 +1005,9 @@ export class OpsService {
       { userId },
       async () => {
         if (this.redisService.isHealthy()) {
-          await this.redisService.getClient().del(`user:risk:blocked:${userId}`);
+          await this.redisService
+            .getClient()
+            .del(`user:risk:blocked:${userId}`);
         }
 
         // Update risk snapshot to HEALTHY
@@ -945,11 +1049,17 @@ export class OpsService {
           throw new BadRequestException('Redis is not available');
         }
         if (blocked) {
-          await this.redisService.getClient().set('risk:global:blocked', 'true');
-          this.logger.warn(`Global emergency risk lock activated by operator ${operatorId}. Reason: ${reason}`);
+          await this.redisService
+            .getClient()
+            .set('risk:global:blocked', 'true');
+          this.logger.warn(
+            `Global emergency risk lock activated by operator ${operatorId}. Reason: ${reason}`,
+          );
         } else {
           await this.redisService.getClient().del('risk:global:blocked');
-          this.logger.warn(`Global emergency risk lock deactivated by operator ${operatorId}`);
+          this.logger.warn(
+            `Global emergency risk lock deactivated by operator ${operatorId}`,
+          );
         }
       },
     );
@@ -976,7 +1086,9 @@ export class OpsService {
     });
 
     if (!userBroker) {
-      throw new NotFoundException(`No linked broker connection found for '${userIdOrCode}'`);
+      throw new NotFoundException(
+        `No linked broker connection found for '${userIdOrCode}'`,
+      );
     }
 
     const isSessionActive = await this.brokerSessionService.validateSession(
@@ -1005,10 +1117,18 @@ export class OpsService {
     const adapter = this.brokerFactory.getAdapter(brokerType);
 
     const [positions, holdings, orders, trades] = await Promise.all([
-      adapter.getPositions(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
-      adapter.getHoldings(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
-      adapter.getOrders(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
-      adapter.getTradeBook(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
+      adapter
+        .getPositions(userBroker.accessToken, userBroker.brokerClientId)
+        .catch(() => []),
+      adapter
+        .getHoldings(userBroker.accessToken, userBroker.brokerClientId)
+        .catch(() => []),
+      adapter
+        .getOrders(userBroker.accessToken, userBroker.brokerClientId)
+        .catch(() => []),
+      adapter
+        .getTradeBook(userBroker.accessToken, userBroker.brokerClientId)
+        .catch(() => []),
     ]);
 
     return {
@@ -1062,12 +1182,25 @@ export class OpsService {
         where: { id: existing.id },
         data: {
           isFixed1xEnabled: data.isFixed1xEnabled ?? existing.isFixed1xEnabled,
-          isLossMultiplier2xEnabled: data.isLossMultiplier2xEnabled ?? existing.isLossMultiplier2xEnabled,
-          maxAllowedMultiplier: data.maxAllowedMultiplier ?? existing.maxAllowedMultiplier,
-          maxGlobalQuantity: data.maxGlobalQuantity !== undefined ? data.maxGlobalQuantity : existing.maxGlobalQuantity,
-          maxGlobalExposureInr: data.maxGlobalExposureInr !== undefined ? data.maxGlobalExposureInr : existing.maxGlobalExposureInr,
-          maxDailyLossInr: data.maxDailyLossInr !== undefined ? data.maxDailyLossInr : existing.maxDailyLossInr,
-          maxConsecutiveLosses: data.maxConsecutiveLosses ?? existing.maxConsecutiveLosses,
+          isLossMultiplier2xEnabled:
+            data.isLossMultiplier2xEnabled ??
+            existing.isLossMultiplier2xEnabled,
+          maxAllowedMultiplier:
+            data.maxAllowedMultiplier ?? existing.maxAllowedMultiplier,
+          maxGlobalQuantity:
+            data.maxGlobalQuantity !== undefined
+              ? data.maxGlobalQuantity
+              : existing.maxGlobalQuantity,
+          maxGlobalExposureInr:
+            data.maxGlobalExposureInr !== undefined
+              ? data.maxGlobalExposureInr
+              : existing.maxGlobalExposureInr,
+          maxDailyLossInr:
+            data.maxDailyLossInr !== undefined
+              ? data.maxDailyLossInr
+              : existing.maxDailyLossInr,
+          maxConsecutiveLosses:
+            data.maxConsecutiveLosses ?? existing.maxConsecutiveLosses,
           updatedByAdminId: operatorId,
         },
       });
@@ -1091,7 +1224,9 @@ export class OpsService {
       try {
         await this.redisService.getClient().del('system:strategy:config');
       } catch (err: any) {
-        this.logger.warn(`Failed to invalidate system strategy cache: ${err.message}`);
+        this.logger.warn(
+          `Failed to invalidate system strategy cache: ${err.message}`,
+        );
       }
     }
 
@@ -1126,20 +1261,29 @@ export class OpsService {
 
     const currentStrategy = user.tradingStrategies[0];
     const latestConsent = user.consents[0];
-    const isTradingActive = user.segments.length > 0 && latestConsent?.status === 'ACTIVE';
+    const isTradingActive =
+      user.segments.length > 0 && latestConsent?.status === 'ACTIVE';
 
     const card = {
       automatedTrading: isTradingActive ? 'Active' : 'Inactive',
-      strategy: currentStrategy ? (currentStrategy.strategyType === 'LOSS_MULTIPLIER_2X' ? '2× Loss Multiplier' : 'Fixed 1×') : 'Fixed 1×',
+      strategy: currentStrategy
+        ? currentStrategy.strategyType === 'LOSS_MULTIPLIER_2X'
+          ? '2× Loss Multiplier'
+          : 'Fixed 1×'
+        : 'Fixed 1×',
       strategyType: currentStrategy?.strategyType ?? 'FIXED_1X',
       baseMultiplier: `${currentStrategy?.baseMultiplier ?? 1}×`,
       currentMultiplier: `${currentStrategy?.currentMultiplier ?? 1}×`,
       lastTradeResult: currentStrategy?.lastTradeResult ?? 'None',
       consecutiveLosses: currentStrategy?.consecutiveLosses ?? 0,
       nextTradeMultiplier: `${currentStrategy?.nextTradeMultiplier ?? 1}×`,
-      strategySelectedOn: currentStrategy?.strategySelectedAt ?? currentStrategy?.createdAt ?? null,
+      strategySelectedOn:
+        currentStrategy?.strategySelectedAt ??
+        currentStrategy?.createdAt ??
+        null,
       agreementVersion: currentStrategy?.agreementVersion ?? 'v1.0',
-      consentStatus: latestConsent?.status === 'ACTIVE' ? 'Accepted' : 'Pending',
+      consentStatus:
+        latestConsent?.status === 'ACTIVE' ? 'Accepted' : 'Pending',
       status: currentStrategy?.status ?? 'ACTIVE',
       version: currentStrategy?.version ?? 1,
     };
@@ -1147,7 +1291,11 @@ export class OpsService {
     const history = user.strategyChangeHistories.map((h) => ({
       id: h.id,
       dateTime: h.createdAt,
-      previous: h.previousStrategy ? (h.previousStrategy === 'LOSS_MULTIPLIER_2X' ? '2×' : '1×') : '—',
+      previous: h.previousStrategy
+        ? h.previousStrategy === 'LOSS_MULTIPLIER_2X'
+          ? '2×'
+          : '1×'
+        : '—',
       new: h.newStrategy === 'LOSS_MULTIPLIER_2X' ? '2×' : '1×',
       previousMultiplier: `${h.previousMultiplier}×`,
       newMultiplier: `${h.newMultiplier}×`,
@@ -1199,7 +1347,10 @@ export class OpsService {
     const rows = users.map((u) => {
       const strat = u.tradingStrategies[0];
       const broker = u.userBrokers[0];
-      const capital = u.segments.reduce((acc, s) => acc + (s.capitalAllocated ? Number(s.capitalAllocated) : 0), 0);
+      const capital = u.segments.reduce(
+        (acc, s) => acc + (s.capitalAllocated ? Number(s.capitalAllocated) : 0),
+        0,
+      );
       const mult = strat?.currentMultiplier ?? 1;
 
       return {
@@ -1208,7 +1359,10 @@ export class OpsService {
         mobile: u.mobile,
         clientId: broker?.brokerClientId ?? '—',
         brokerCode: broker?.broker?.code ?? '—',
-        strategy: strat?.strategyType === 'LOSS_MULTIPLIER_2X' ? '2× Loss Multiplier' : 'Fixed 1×',
+        strategy:
+          strat?.strategyType === 'LOSS_MULTIPLIER_2X'
+            ? '2× Loss Multiplier'
+            : 'Fixed 1×',
         strategyType: strat?.strategyType ?? 'FIXED_1X',
         currentMultiplier: `${mult}×`,
         consecutiveLosses: strat?.consecutiveLosses ?? 0,
@@ -1226,4 +1380,3 @@ export class OpsService {
     };
   }
 }
-

@@ -1,7 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ReportsService } from './reports.service';
-import { LocalStorageProvider, REPORT_STORAGE_PROVIDER } from './providers/report-storage.provider';
-import { ReportGenerationProcessor, ReportExportProcessor } from './processors/report-generation.processor';
+import {
+  LocalStorageProvider,
+  REPORT_STORAGE_PROVIDER,
+} from './providers/report-storage.provider';
+import {
+  ReportGenerationProcessor,
+  ReportExportProcessor,
+} from './processors/report-generation.processor';
 import { AnalyticsSnapshotProcessor } from './processors/analytics-snapshot.processor';
 import { CsvCleanupProcessor } from './processors/csv-cleanup.processor';
 import { PrismaModule } from '../database/prisma/prisma.module';

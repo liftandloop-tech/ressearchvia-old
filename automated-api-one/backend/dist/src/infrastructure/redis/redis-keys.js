@@ -16,7 +16,9 @@ exports.RedisKeys = {
     position: (userId, segmentId) => `position:${userId}:${segmentId}`,
     userEgress: (userId) => `egress:user:${userId}`,
     userEgressLock: (userId) => `lock:egress:${userId}`,
-    strategy: (userId, segmentId) => segmentId ? `strategy:${userId}:${segmentId}` : `strategy:${userId}:default`,
+    strategy: (userId, segmentId) => segmentId
+        ? `strategy:${userId}:${segmentId}`
+        : `strategy:${userId}:default`,
     systemStrategyConfig: () => `system:strategy:config`,
 };
 //# sourceMappingURL=redis-keys.js.map

@@ -34,13 +34,9 @@ export class DistributedLockService implements OnModuleDestroy {
 
     try {
       // SET key token NX PX ttlMs
-      const result = await this.redisService.getClient().set(
-        key,
-        token,
-        'PX',
-        ttlMs,
-        'NX',
-      );
+      const result = await this.redisService
+        .getClient()
+        .set(key, token, 'PX', ttlMs, 'NX');
 
       if (result === 'OK') {
         if (options?.autoRenew) {
@@ -50,7 +46,9 @@ export class DistributedLockService implements OnModuleDestroy {
       }
       return null;
     } catch (err) {
-      this.logger.error(`Failed to acquire lock for key: ${key}. Error: ${err.message}`);
+      this.logger.error(
+        `Failed to acquire lock for key: ${key}. Error: ${err.message}`,
+      );
       throw err;
     }
   }
@@ -71,15 +69,14 @@ export class DistributedLockService implements OnModuleDestroy {
     `;
 
     try {
-      const result = await this.redisService.getClient().eval(
-        script,
-        1,
-        key,
-        token,
-      );
+      const result = await this.redisService
+        .getClient()
+        .eval(script, 1, key, token);
       return result === 1;
     } catch (err) {
-      this.logger.error(`Failed to release lock for key: ${key}. Error: ${err.message}`);
+      this.logger.error(
+        `Failed to release lock for key: ${key}. Error: ${err.message}`,
+      );
       throw err;
     }
   }
@@ -87,7 +84,11 @@ export class DistributedLockService implements OnModuleDestroy {
   /**
    * Extends the TTL of a lock if ownership token matches.
    */
-  async extendLock(key: string, token: string, ttlMs: number): Promise<boolean> {
+  async extendLock(
+    key: string,
+    token: string,
+    ttlMs: number,
+  ): Promise<boolean> {
     this.redisService.assertHealthy();
 
     const script = `
@@ -99,16 +100,14 @@ export class DistributedLockService implements OnModuleDestroy {
     `;
 
     try {
-      const result = await this.redisService.getClient().eval(
-        script,
-        1,
-        key,
-        token,
-        ttlMs,
-      );
+      const result = await this.redisService
+        .getClient()
+        .eval(script, 1, key, token, ttlMs);
       return result === 1;
     } catch (err) {
-      this.logger.error(`Failed to extend lock for key: ${key}. Error: ${err.message}`);
+      this.logger.error(
+        `Failed to extend lock for key: ${key}. Error: ${err.message}`,
+      );
       return false;
     }
   }
@@ -123,11 +122,15 @@ export class DistributedLockService implements OnModuleDestroy {
       try {
         const extended = await this.extendLock(key, token, ttlMs);
         if (!extended) {
-          this.logger.warn(`Failed to renew heartbeat lock for ${key}. Clearing timer.`);
+          this.logger.warn(
+            `Failed to renew heartbeat lock for ${key}. Clearing timer.`,
+          );
           this.stopHeartbeat(key);
         }
       } catch (err) {
-        this.logger.error(`Heartbeat renewal failed for ${key}: ${err.message}`);
+        this.logger.error(
+          `Heartbeat renewal failed for ${key}: ${err.message}`,
+        );
         this.stopHeartbeat(key);
       }
     }, intervalMs);

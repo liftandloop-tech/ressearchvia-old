@@ -68,8 +68,15 @@ describe('PushProcessor', () => {
       where: { id: 'del-1' },
       include: { notification: true },
     });
-    expect(fcmMock.sendPush).toHaveBeenCalledWith('token-123', 'Fresh Push Title', 'Fresh Push Msg');
-    expect(circuitMock.execute).toHaveBeenCalledWith('push-notifications', expect.any(Function));
+    expect(fcmMock.sendPush).toHaveBeenCalledWith(
+      'token-123',
+      'Fresh Push Title',
+      'Fresh Push Msg',
+    );
+    expect(circuitMock.execute).toHaveBeenCalledWith(
+      'push-notifications',
+      expect.any(Function),
+    );
     expect(queueMock.updateJobStatus).toHaveBeenCalledWith(
       expect.any(String),
       'job-1',

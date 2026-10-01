@@ -53,7 +53,9 @@ let OutboxService = OutboxService_1 = class OutboxService {
     }
     async enqueueEvent(eventId) {
         try {
-            await this.queueService.addJob(queue_constants_1.Queues.OUTBOX_DISPATCHER, eventId, { outboxEventId: eventId });
+            await this.queueService.addJob(queue_constants_1.Queues.OUTBOX_DISPATCHER, eventId, {
+                outboxEventId: eventId,
+            });
         }
         catch (err) {
             this.logger.error(`Failed to enqueue outbox dispatcher job for event ${eventId}: ${err.message}`);

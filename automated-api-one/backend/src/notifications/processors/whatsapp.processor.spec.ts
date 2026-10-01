@@ -73,7 +73,10 @@ describe('WhatsAppProcessor', () => {
       'trade_alert',
       ['John', 'Aggregated Trade Info'],
     );
-    expect(circuitMock.execute).toHaveBeenCalledWith('whatsapp-notifications', expect.any(Function));
+    expect(circuitMock.execute).toHaveBeenCalledWith(
+      'whatsapp-notifications',
+      expect.any(Function),
+    );
     expect(queueMock.updateJobStatus).toHaveBeenCalledWith(
       expect.any(String),
       'job-1',
@@ -84,7 +87,9 @@ describe('WhatsAppProcessor', () => {
 
   it('should fail job and update delivery status to FAILED if WhatsApp provider throws', async () => {
     prismaMock.notificationDelivery.findUnique.mockResolvedValue(null);
-    whatsappMock.sendWhatsApp.mockRejectedValue(new Error('WhatsApp service down'));
+    whatsappMock.sendWhatsApp.mockRejectedValue(
+      new Error('WhatsApp service down'),
+    );
 
     const job = {
       id: 'job-2',
@@ -97,7 +102,9 @@ describe('WhatsAppProcessor', () => {
       },
     } as any;
 
-    await expect(processor.process(job)).rejects.toThrow('WhatsApp service down');
+    await expect(processor.process(job)).rejects.toThrow(
+      'WhatsApp service down',
+    );
     expect(prismaMock.notificationDelivery.update).toHaveBeenLastCalledWith({
       where: { id: 'del-2' },
       data: expect.objectContaining({

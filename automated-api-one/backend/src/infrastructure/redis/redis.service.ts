@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -8,7 +13,9 @@ export enum PlatformMode {
 }
 
 export class RedisDegradedException extends Error {
-  constructor(message = 'Redis is currently down. Write/Trading operations are suspended.') {
+  constructor(
+    message = 'Redis is currently down. Write/Trading operations are suspended.',
+  ) {
     super(message);
     this.name = 'RedisDegradedException';
   }
@@ -59,14 +66,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       if (this.isConnected) {
         this.isConnected = false;
         this.mode = PlatformMode.REDIS_DEGRADED;
-        this.logger.error('Redis connection lost. Platform mode: REDIS_DEGRADED');
+        this.logger.error(
+          'Redis connection lost. Platform mode: REDIS_DEGRADED',
+        );
       }
     });
 
     this.client.on('close', () => {
       this.isConnected = false;
       this.mode = PlatformMode.REDIS_DEGRADED;
-      this.logger.warn('Redis connection closed. Platform mode: REDIS_DEGRADED');
+      this.logger.warn(
+        'Redis connection closed. Platform mode: REDIS_DEGRADED',
+      );
     });
 
     this.client.on('end', () => {
@@ -82,19 +93,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
     return new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        this.logger.warn('Redis connection startup timeout reached (2s). Bootstrapping anyway.');
+        this.logger.warn(
+          'Redis connection startup timeout reached (2s). Bootstrapping anyway.',
+        );
         resolve();
       }, 2000);
 
-      this.client.once('ready', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
+      if (this.client?.once) {
+        this.client.once('ready', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
 
-      this.client.once('error', () => {
+        this.client.once('error', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      } else {
         clearTimeout(timeout);
         resolve();
-      });
+      }
     });
   }
 

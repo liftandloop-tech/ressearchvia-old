@@ -18,9 +18,14 @@ export class NotificationRateLimiterService {
 
   constructor(private readonly redisService: RedisService) {}
 
-  async isRateLimited(userId: string, channel: NotificationChannel): Promise<boolean> {
+  async isRateLimited(
+    userId: string,
+    channel: NotificationChannel,
+  ): Promise<boolean> {
     if (!this.redisService.isHealthy()) {
-      this.logger.warn(`Redis is unhealthy. Bypassing rate limiting for notification channel: ${channel}`);
+      this.logger.warn(
+        `Redis is unhealthy. Bypassing rate limiting for notification channel: ${channel}`,
+      );
       return false;
     }
 
@@ -47,13 +52,17 @@ export class NotificationRateLimiterService {
       const count = results[2][1] as number;
 
       if (count > limit) {
-        this.logger.warn(`Notification rate limit exceeded for user ${userId} on channel ${channel}: ${count}/${limit}`);
+        this.logger.warn(
+          `Notification rate limit exceeded for user ${userId} on channel ${channel}: ${count}/${limit}`,
+        );
         return true;
       }
 
       return false;
     } catch (err) {
-      this.logger.error(`Error in notification rate limiter check for user ${userId} on channel ${channel}: ${err.message}`);
+      this.logger.error(
+        `Error in notification rate limiter check for user ${userId} on channel ${channel}: ${err.message}`,
+      );
       return false; // Fail open
     }
   }

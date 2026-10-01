@@ -20,7 +20,14 @@ class ProfileImageContent extends StatelessWidget {
 
     if (imagePath.startsWith('http')) {
       isNetwork = true;
-    } else if (imagePath.startsWith('uploads/')) {
+    } else if (imagePath.startsWith('uploads/') || imagePath.startsWith('/uploads/') || imagePath.startsWith('app/uploads/') || imagePath.startsWith('/app/uploads/')) {
+      String cleanPath = imagePath;
+      if (cleanPath.startsWith('/')) {
+        cleanPath = cleanPath.substring(1);
+      }
+      if (cleanPath.startsWith('app/')) {
+        cleanPath = cleanPath.substring(4);
+      }
       // Construct full URL relative to API Base
       String baseUrl = AppConfig.baseUrl;
       if (baseUrl.endsWith('/api')) {
@@ -29,7 +36,7 @@ class ProfileImageContent extends StatelessWidget {
       if (baseUrl.endsWith('/')) {
         baseUrl = baseUrl.substring(0, baseUrl.length - 1);
       }
-      finalUrl = '$baseUrl/$imagePath';
+      finalUrl = '$baseUrl/$cleanPath';
       isNetwork = true;
     }
 

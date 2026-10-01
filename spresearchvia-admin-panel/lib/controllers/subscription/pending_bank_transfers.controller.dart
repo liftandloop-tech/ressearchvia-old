@@ -16,6 +16,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'dart:html' as html;
+import '../users/user_management.controller.dart';
 
 class QrmpScheduleInfo {
   final String quarterName; // 'Q1', 'Q2', 'Q3', 'Q4'
@@ -1006,9 +1007,15 @@ class PendingBankTransfersController extends GetxController {
                       if (utrController.text.isNotEmpty) {
                         installment['utrNumber'] = utrController.text;
                       }
-                      if (onPaymentUpdated != null) {
-                        onPaymentUpdated(payment);
+                    } else {
+                      payment['amountPaid'] = amt;
+                      payment['amount'] = amt;
+                      if (utrController.text.isNotEmpty) {
+                        payment['utrNumber'] = utrController.text;
                       }
+                    }
+                    if (onPaymentUpdated != null) {
+                      onPaymentUpdated(payment);
                     }
                     fetchPendingTransfers();
                   } else {
@@ -1663,6 +1670,9 @@ class PendingBankTransfersController extends GetxController {
         colorText: Colors.white,
       );
       fetchPendingTransfers();
+      if (Get.isRegistered<UserManagementController>()) {
+        Get.find<UserManagementController>().fetchUsers();
+      }
     } else {
       Get.snackbar(
         "Error",
@@ -1736,6 +1746,9 @@ class PendingBankTransfersController extends GetxController {
           colorText: Colors.white,
         );
         await fetchPendingTransfers();
+        if (Get.isRegistered<UserManagementController>()) {
+          Get.find<UserManagementController>().fetchUsers();
+        }
         return true;
       } else {
         Get.snackbar(
@@ -2296,6 +2309,9 @@ class PendingBankTransfersController extends GetxController {
         colorText: Colors.white,
       );
       fetchPendingKyc();
+      if (Get.isRegistered<UserManagementController>()) {
+        Get.find<UserManagementController>().fetchUsers();
+      }
     } else {
       Get.snackbar(
         "Error",
@@ -2318,6 +2334,9 @@ class PendingBankTransfersController extends GetxController {
         colorText: Colors.white,
       );
       fetchPendingKyc();
+      if (Get.isRegistered<UserManagementController>()) {
+        Get.find<UserManagementController>().fetchUsers();
+      }
     } else {
       Get.snackbar(
         "Error",

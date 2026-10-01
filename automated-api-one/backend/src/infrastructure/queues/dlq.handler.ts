@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { QueueEventsListener, QueueEventsHost, OnQueueEvent } from '@nestjs/bullmq';
+import {
+  QueueEventsListener,
+  QueueEventsHost,
+  OnQueueEvent,
+} from '@nestjs/bullmq';
 import { QueueService } from './queues.service';
 import { Queues } from './queue.constants';
 import { QueueJobStatus } from '@prisma/client';
@@ -15,48 +19,82 @@ abstract class BaseQueueEventsListener extends QueueEventsHost {
   }
 
   @OnQueueEvent('failed')
-  async onJobFailed({ jobId, failedReason }: { jobId: string; failedReason: string }) {
-    this.logger.warn(`Job ${jobId} failed in queue ${this.queueName}. Reason: ${failedReason}`);
+  async onJobFailed({
+    jobId,
+    failedReason,
+  }: {
+    jobId: string;
+    failedReason: string;
+  }) {
+    this.logger.warn(
+      `Job ${jobId} failed in queue ${this.queueName}. Reason: ${failedReason}`,
+    );
 
     try {
       const queue = this.queueService.getQueue(this.queueName);
       const job = await queue.getJob(jobId);
 
       if (!job) {
-        this.logger.error(`Job ${jobId} not found in queue ${this.queueName} to evaluate retry count.`);
+        this.logger.error(
+          `Job ${jobId} not found in queue ${this.queueName} to evaluate retry count.`,
+        );
         return;
       }
 
       const attemptsMade = job.attemptsMade;
       const maxAttempts = job.opts.attempts || 1;
 
-      this.logger.log(`Job ${jobId} attempts made: ${attemptsMade}/${maxAttempts}`);
+      this.logger.log(
+        `Job ${jobId} attempts made: ${attemptsMade}/${maxAttempts}`,
+      );
 
       if (attemptsMade >= maxAttempts) {
-        this.logger.error(`Job ${jobId} retries exhausted (${attemptsMade}/${maxAttempts}). Routing to DLQ: ${this.dlqQueueName}`);
-        
+        this.logger.error(
+          `Job ${jobId} retries exhausted (${attemptsMade}/${maxAttempts}). Routing to DLQ: ${this.dlqQueueName}`,
+        );
+
         // 1. Update status to DLQ in DB
-        await this.queueService.updateJobStatus(this.queueName, jobId, QueueJobStatus.DLQ, attemptsMade);
-        
+        await this.queueService.updateJobStatus(
+          this.queueName,
+          jobId,
+          QueueJobStatus.DLQ,
+          attemptsMade,
+        );
+
         // 2. Add to DLQ BullMQ Queue
         const dlqQueue = this.queueService.getQueue(this.dlqQueueName);
         await dlqQueue.add(jobId, job.data, { jobId });
       } else {
         // Just update attempts count in DB
-        await this.queueService.updateJobStatus(this.queueName, jobId, QueueJobStatus.ACTIVE, attemptsMade);
+        await this.queueService.updateJobStatus(
+          this.queueName,
+          jobId,
+          QueueJobStatus.ACTIVE,
+          attemptsMade,
+        );
       }
     } catch (err) {
-      this.logger.error(`Failed to handle failure routing for job ${jobId}: ${err.message}`);
+      this.logger.error(
+        `Failed to handle failure routing for job ${jobId}: ${err.message}`,
+      );
     }
   }
 
   @OnQueueEvent('completed')
   async onJobCompleted({ jobId }: { jobId: string }) {
-    this.logger.log(`Job ${jobId} successfully completed in queue ${this.queueName}`);
+    this.logger.log(
+      `Job ${jobId} successfully completed in queue ${this.queueName}`,
+    );
     try {
-      await this.queueService.updateJobStatus(this.queueName, jobId, QueueJobStatus.COMPLETED);
+      await this.queueService.updateJobStatus(
+        this.queueName,
+        jobId,
+        QueueJobStatus.COMPLETED,
+      );
     } catch (err) {
-      this.logger.error(`Failed to update DB completion for job ${jobId}: ${err.message}`);
+      this.logger.error(
+        `Failed to update DB completion for job ${jobId}: ${err.message}`,
+      );
     }
   }
 }
@@ -76,7 +114,9 @@ export class SignalQueueEventsListener extends BaseQueueEventsListener {
 @Injectable()
 @QueueEventsListener(Queues.ORDER_PLACEMENT)
 export class OrderPlacementQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(OrderPlacementQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    OrderPlacementQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.ORDER_PLACEMENT;
   protected readonly dlqQueueName = Queues.ORDER_DLQ;
 
@@ -100,7 +140,9 @@ export class NotificationQueueEventsListener extends BaseQueueEventsListener {
 @Injectable()
 @QueueEventsListener(Queues.ORDER_MONITORING)
 export class OrderMonitoringQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(OrderMonitoringQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    OrderMonitoringQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.ORDER_MONITORING;
   protected readonly dlqQueueName = Queues.ORDER_MONITORING_DLQ;
 
@@ -136,7 +178,9 @@ export class WebsocketQueueEventsListener extends BaseQueueEventsListener {
 @Injectable()
 @QueueEventsListener(Queues.REPORT_GENERATION)
 export class ReportGenerationQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(ReportGenerationQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    ReportGenerationQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.REPORT_GENERATION;
   protected readonly dlqQueueName = Queues.REPORT_GENERATION_DLQ;
 
@@ -160,7 +204,9 @@ export class ReportExportQueueEventsListener extends BaseQueueEventsListener {
 @Injectable()
 @QueueEventsListener(Queues.ANALYTICS_SNAPSHOT)
 export class AnalyticsSnapshotQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(AnalyticsSnapshotQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    AnalyticsSnapshotQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.ANALYTICS_SNAPSHOT;
   protected readonly dlqQueueName = Queues.ANALYTICS_SNAPSHOT_DLQ;
 
@@ -172,7 +218,9 @@ export class AnalyticsSnapshotQueueEventsListener extends BaseQueueEventsListene
 @Injectable()
 @QueueEventsListener(Queues.POSITION_REBUILD)
 export class PositionRebuildQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(PositionRebuildQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    PositionRebuildQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.POSITION_REBUILD;
   protected readonly dlqQueueName = Queues.POSITION_REBUILD_DLQ;
 
@@ -184,7 +232,9 @@ export class PositionRebuildQueueEventsListener extends BaseQueueEventsListener 
 @Injectable()
 @QueueEventsListener(Queues.RECONCILIATION)
 export class ReconciliationQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(ReconciliationQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    ReconciliationQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.RECONCILIATION;
   protected readonly dlqQueueName = Queues.RECONCILIATION_DLQ;
 
@@ -196,7 +246,9 @@ export class ReconciliationQueueEventsListener extends BaseQueueEventsListener {
 @Injectable()
 @QueueEventsListener(Queues.RISK_RECALCULATE)
 export class RiskRecalculateQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(RiskRecalculateQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    RiskRecalculateQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.RISK_RECALCULATE;
   protected readonly dlqQueueName = Queues.RISK_RECALCULATE_DLQ;
 
@@ -208,7 +260,9 @@ export class RiskRecalculateQueueEventsListener extends BaseQueueEventsListener 
 @Injectable()
 @QueueEventsListener(Queues.ANALYTICS_RECALCULATE)
 export class AnalyticsRecalculateQueueEventsListener extends BaseQueueEventsListener {
-  protected readonly logger = new Logger(AnalyticsRecalculateQueueEventsListener.name);
+  protected readonly logger = new Logger(
+    AnalyticsRecalculateQueueEventsListener.name,
+  );
   protected readonly queueName = Queues.ANALYTICS_RECALCULATE;
   protected readonly dlqQueueName = Queues.ANALYTICS_RECALCULATE_DLQ;
 
@@ -264,4 +318,3 @@ export class PushQueueEventsListener extends BaseQueueEventsListener {
     super(queueService);
   }
 }
-

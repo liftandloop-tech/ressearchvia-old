@@ -705,13 +705,27 @@ let MetricsService = class MetricsService {
             registers: [this.registry],
         });
     }
-    incrementSignalsReceived() { this.signalsReceived.inc(); }
-    incrementSignalsProcessed() { this.signalsProcessed.inc(); }
-    incrementSignalsFailed() { this.signalsFailed.inc(); }
-    incrementOrdersPlaced() { this.ordersPlaced.inc(); }
-    incrementOrdersFilled() { this.ordersFilled.inc(); }
-    incrementOrdersRejected() { this.ordersRejected.inc(); }
-    incrementRiskRejected() { this.riskRejected.inc(); }
+    incrementSignalsReceived() {
+        this.signalsReceived.inc();
+    }
+    incrementSignalsProcessed() {
+        this.signalsProcessed.inc();
+    }
+    incrementSignalsFailed() {
+        this.signalsFailed.inc();
+    }
+    incrementOrdersPlaced() {
+        this.ordersPlaced.inc();
+    }
+    incrementOrdersFilled() {
+        this.ordersFilled.inc();
+    }
+    incrementOrdersRejected() {
+        this.ordersRejected.inc();
+    }
+    incrementRiskRejected() {
+        this.riskRejected.inc();
+    }
     incrementBrokerCalls(broker, operation, status) {
         this.brokerCalls.inc({
             broker,
@@ -725,80 +739,228 @@ let MetricsService = class MetricsService {
             operation: operation || 'unknown',
         });
     }
-    incrementBrokerTimeouts(broker) { this.brokerTimeouts.inc({ broker }); }
-    incrementBrokerCircuitOpen(broker) { this.brokerCircuitOpen.inc({ broker }); }
-    incrementDlqReplayed(queue) { this.dlqReplayed.inc({ queue }); }
-    incrementDlqPurged(queue) { this.dlqPurged.inc({ queue }); }
-    incrementWebsocketAuthFailures() { this.websocketAuthFailures.inc(); }
-    incrementWebsocketRateLimited() { this.websocketRateLimited.inc(); }
-    incrementSignalFanoutUsers(count = 1) { this.signalFanoutUsers.inc(count); }
-    incrementOrderPlacementAttempts() { this.orderPlacementAttempts.inc(); }
-    incrementOrderMonitoringAttempts() { this.orderMonitoringAttempts.inc(); }
-    incrementExecutionSuccess() { this.executionSuccess.inc(); }
-    incrementExecutionFailed() { this.executionFailed.inc(); }
-    incrementMultiplierResets() { this.multiplierResets.inc(); }
-    incrementMultiplierEscalations() { this.multiplierEscalations.inc(); }
-    incrementRecoveryJobs() { this.recoveryJobs.inc(); }
-    incrementRecoveryJobsFailed() { this.recoveryJobsFailed.inc(); }
-    incrementRecoveryOrdersRecovered(count = 1) { this.recoveryOrdersRecovered.inc(count); }
-    incrementReportsGenerated() { this.reportsGenerated.inc(); }
-    incrementReportCacheHits() { this.reportCacheHits.inc(); }
-    incrementReportCacheMisses() { this.reportCacheMisses.inc(); }
-    incrementReportGenerationFailed() { this.reportGenerationFailed.inc(); }
-    incrementAnalyticsSnapshotsCreated() { this.analyticsSnapshotsCreated.inc(); }
-    incrementOutboxEventsCreated() { this.outboxEventsCreated.inc(); }
-    incrementOutboxEventsProcessed() { this.outboxEventsProcessed.inc(); }
-    incrementOutboxEventsFailed() { this.outboxEventsFailed.inc(); }
-    incrementOutboxEventsDlq() { this.outboxEventsDlq.inc(); }
-    incrementWsConnections() { this.wsConnectionsTotal.inc(); }
-    incrementWsDisconnects() { this.wsDisconnectsTotal.inc(); }
-    incrementWsMessagesSent() { this.wsMessagesSentTotal.inc(); }
-    incrementWsMessagesFailed() { this.wsMessagesFailedTotal.inc(); }
-    incrementWsOrphanedRooms() { this.wsOrphanedRoomsTotal.inc(); }
-    incrementOperationsRequests(action) { this.operationsRequests.inc({ action }); }
-    incrementOperationsSuccess(action) { this.operationsSuccess.inc({ action }); }
-    incrementOperationsFailed(action) { this.operationsFailed.inc({ action }); }
-    incrementOperationsRejected(action) { this.operationsRejected.inc({ action }); }
-    incrementQueuePausedTotal(queue) { this.queuePausedTotal.inc({ queue }); }
-    incrementOperationsAuditRecords() { this.operationsAuditRecordsTotal.inc(); }
-    incrementOperationsAuditFailures() { this.operationsAuditFailuresTotal.inc(); }
-    setActiveSegments(count) { this.activeSegmentsGauge.set(count); }
-    setSubscribersActive(count) { this.subscribersActiveGauge.set(count); }
-    setSparkSubscriptions(count) { this.sparkSubscriptionsGauge.set(count); }
-    setSplendidSubscriptions(count) { this.splendidSubscriptionsGauge.set(count); }
-    setConsentsActiveToday(count) { this.consentsActiveTodayGauge.set(count); }
-    setSegmentsActive(count) { this.segmentsActiveGauge.set(count); }
-    setSegmentsPaused(count) { this.segmentsPausedGauge.set(count); }
-    setSegmentsRiskLocked(count) { this.segmentsRiskLockedGauge.set(count); }
-    setQueueDepth(queueName, depth) { this.queueDepth.set({ queue: queueName }, depth); }
-    setQueueProcessing(queueName, count) { this.queueProcessing.set({ queue: queueName }, count); }
-    setQueueFailed(queueName, count) { this.queueFailed.set({ queue: queueName }, count); }
-    setQueueDlqDepth(queueName, count) { this.queueDlqDepth.set({ queue: queueName }, count); }
-    setRedisMemoryUsage(bytes) { this.redisMemoryUsage.set(bytes); }
-    setRedisConnectedClients(count) { this.redisConnectedClients.set(count); }
-    setDistributedLocksActive(count) { this.distributedLocksActive.set(count); }
-    setRedisIdempotencyKeysActive(count) { this.idempotencyKeysTotal.set(count); }
-    setOutboxEventsPending(count) { this.outboxEventsPending.set(count); }
-    setOutboxEventsProcessing(count) { this.outboxEventsProcessingGauge.set(count); }
-    setOutboxEventsFailed(count) { this.outboxEventsFailedGauge.set(count); }
-    setOutboxEventsDlqCount(count) { this.outboxEventsDlqGauge.set(count); }
-    setBrokerCircuitState(broker, state) { this.brokerCircuitState.set({ broker }, state); }
-    setOpenPositions(count) { this.openPositionsGauge.set(count); }
-    setWsActiveConnections(count) { this.wsActiveConnectionsGauge.set(count); }
-    setWsRoomUsers(count) { this.wsRoomUsersGauge.set(count); }
-    setWsRoomSegments(count) { this.wsRoomSegmentsGauge.set(count); }
-    setWsRoomAdmin(count) { this.wsRoomAdminGauge.set(count); }
-    observeBrokerLatency(broker, ms) { this.brokerLatency.observe({ broker }, ms); }
-    observeRedisLatency(ms) { this.redisLatency.observe(ms); }
-    observeSignalProcessingDuration(ms) { this.signalProcessingDuration.observe(ms); }
-    observeOrderPlacementDuration(ms) { this.orderPlacementDuration.observe(ms); }
-    observeAnalyticsSnapshotDuration(ms) { this.analyticsSnapshotDuration.observe(ms); }
-    observeReportGenerationDuration(ms) { this.reportGenerationDuration.observe(ms); }
-    observeBrokerCircuitOpenDuration(broker, ms) { this.brokerCircuitOpenDuration.observe({ broker }, ms); }
-    observeReconciliationDuration(ms) { this.reconciliationDuration.observe(ms); }
-    incrementReconciliationRuns() { this.reconciliationRuns.inc(); }
+    incrementBrokerTimeouts(broker) {
+        this.brokerTimeouts.inc({ broker });
+    }
+    incrementBrokerCircuitOpen(broker) {
+        this.brokerCircuitOpen.inc({ broker });
+    }
+    incrementDlqReplayed(queue) {
+        this.dlqReplayed.inc({ queue });
+    }
+    incrementDlqPurged(queue) {
+        this.dlqPurged.inc({ queue });
+    }
+    incrementWebsocketAuthFailures() {
+        this.websocketAuthFailures.inc();
+    }
+    incrementWebsocketRateLimited() {
+        this.websocketRateLimited.inc();
+    }
+    incrementSignalFanoutUsers(count = 1) {
+        this.signalFanoutUsers.inc(count);
+    }
+    incrementOrderPlacementAttempts() {
+        this.orderPlacementAttempts.inc();
+    }
+    incrementOrderMonitoringAttempts() {
+        this.orderMonitoringAttempts.inc();
+    }
+    incrementExecutionSuccess() {
+        this.executionSuccess.inc();
+    }
+    incrementExecutionFailed() {
+        this.executionFailed.inc();
+    }
+    incrementMultiplierResets() {
+        this.multiplierResets.inc();
+    }
+    incrementMultiplierEscalations() {
+        this.multiplierEscalations.inc();
+    }
+    incrementRecoveryJobs() {
+        this.recoveryJobs.inc();
+    }
+    incrementRecoveryJobsFailed() {
+        this.recoveryJobsFailed.inc();
+    }
+    incrementRecoveryOrdersRecovered(count = 1) {
+        this.recoveryOrdersRecovered.inc(count);
+    }
+    incrementReportsGenerated() {
+        this.reportsGenerated.inc();
+    }
+    incrementReportCacheHits() {
+        this.reportCacheHits.inc();
+    }
+    incrementReportCacheMisses() {
+        this.reportCacheMisses.inc();
+    }
+    incrementReportGenerationFailed() {
+        this.reportGenerationFailed.inc();
+    }
+    incrementAnalyticsSnapshotsCreated() {
+        this.analyticsSnapshotsCreated.inc();
+    }
+    incrementOutboxEventsCreated() {
+        this.outboxEventsCreated.inc();
+    }
+    incrementOutboxEventsProcessed() {
+        this.outboxEventsProcessed.inc();
+    }
+    incrementOutboxEventsFailed() {
+        this.outboxEventsFailed.inc();
+    }
+    incrementOutboxEventsDlq() {
+        this.outboxEventsDlq.inc();
+    }
+    incrementWsConnections() {
+        this.wsConnectionsTotal.inc();
+    }
+    incrementWsDisconnects() {
+        this.wsDisconnectsTotal.inc();
+    }
+    incrementWsMessagesSent() {
+        this.wsMessagesSentTotal.inc();
+    }
+    incrementWsMessagesFailed() {
+        this.wsMessagesFailedTotal.inc();
+    }
+    incrementWsOrphanedRooms() {
+        this.wsOrphanedRoomsTotal.inc();
+    }
+    incrementOperationsRequests(action) {
+        this.operationsRequests.inc({ action });
+    }
+    incrementOperationsSuccess(action) {
+        this.operationsSuccess.inc({ action });
+    }
+    incrementOperationsFailed(action) {
+        this.operationsFailed.inc({ action });
+    }
+    incrementOperationsRejected(action) {
+        this.operationsRejected.inc({ action });
+    }
+    incrementQueuePausedTotal(queue) {
+        this.queuePausedTotal.inc({ queue });
+    }
+    incrementOperationsAuditRecords() {
+        this.operationsAuditRecordsTotal.inc();
+    }
+    incrementOperationsAuditFailures() {
+        this.operationsAuditFailuresTotal.inc();
+    }
+    setActiveSegments(count) {
+        this.activeSegmentsGauge.set(count);
+    }
+    setSubscribersActive(count) {
+        this.subscribersActiveGauge.set(count);
+    }
+    setSparkSubscriptions(count) {
+        this.sparkSubscriptionsGauge.set(count);
+    }
+    setSplendidSubscriptions(count) {
+        this.splendidSubscriptionsGauge.set(count);
+    }
+    setConsentsActiveToday(count) {
+        this.consentsActiveTodayGauge.set(count);
+    }
+    setSegmentsActive(count) {
+        this.segmentsActiveGauge.set(count);
+    }
+    setSegmentsPaused(count) {
+        this.segmentsPausedGauge.set(count);
+    }
+    setSegmentsRiskLocked(count) {
+        this.segmentsRiskLockedGauge.set(count);
+    }
+    setQueueDepth(queueName, depth) {
+        this.queueDepth.set({ queue: queueName }, depth);
+    }
+    setQueueProcessing(queueName, count) {
+        this.queueProcessing.set({ queue: queueName }, count);
+    }
+    setQueueFailed(queueName, count) {
+        this.queueFailed.set({ queue: queueName }, count);
+    }
+    setQueueDlqDepth(queueName, count) {
+        this.queueDlqDepth.set({ queue: queueName }, count);
+    }
+    setRedisMemoryUsage(bytes) {
+        this.redisMemoryUsage.set(bytes);
+    }
+    setRedisConnectedClients(count) {
+        this.redisConnectedClients.set(count);
+    }
+    setDistributedLocksActive(count) {
+        this.distributedLocksActive.set(count);
+    }
+    setRedisIdempotencyKeysActive(count) {
+        this.idempotencyKeysTotal.set(count);
+    }
+    setOutboxEventsPending(count) {
+        this.outboxEventsPending.set(count);
+    }
+    setOutboxEventsProcessing(count) {
+        this.outboxEventsProcessingGauge.set(count);
+    }
+    setOutboxEventsFailed(count) {
+        this.outboxEventsFailedGauge.set(count);
+    }
+    setOutboxEventsDlqCount(count) {
+        this.outboxEventsDlqGauge.set(count);
+    }
+    setBrokerCircuitState(broker, state) {
+        this.brokerCircuitState.set({ broker }, state);
+    }
+    setOpenPositions(count) {
+        this.openPositionsGauge.set(count);
+    }
+    setWsActiveConnections(count) {
+        this.wsActiveConnectionsGauge.set(count);
+    }
+    setWsRoomUsers(count) {
+        this.wsRoomUsersGauge.set(count);
+    }
+    setWsRoomSegments(count) {
+        this.wsRoomSegmentsGauge.set(count);
+    }
+    setWsRoomAdmin(count) {
+        this.wsRoomAdminGauge.set(count);
+    }
+    observeBrokerLatency(broker, ms) {
+        this.brokerLatency.observe({ broker }, ms);
+    }
+    observeRedisLatency(ms) {
+        this.redisLatency.observe(ms);
+    }
+    observeSignalProcessingDuration(ms) {
+        this.signalProcessingDuration.observe(ms);
+    }
+    observeOrderPlacementDuration(ms) {
+        this.orderPlacementDuration.observe(ms);
+    }
+    observeAnalyticsSnapshotDuration(ms) {
+        this.analyticsSnapshotDuration.observe(ms);
+    }
+    observeReportGenerationDuration(ms) {
+        this.reportGenerationDuration.observe(ms);
+    }
+    observeBrokerCircuitOpenDuration(broker, ms) {
+        this.brokerCircuitOpenDuration.observe({ broker }, ms);
+    }
+    observeReconciliationDuration(ms) {
+        this.reconciliationDuration.observe(ms);
+    }
+    incrementReconciliationRuns() {
+        this.reconciliationRuns.inc();
+    }
     incrementReconciliationIssuesTotal(issueType, severity, broker) {
-        this.reconciliationIssuesTotal.inc({ issue_type: issueType, severity, broker });
+        this.reconciliationIssuesTotal.inc({
+            issue_type: issueType,
+            severity,
+            broker,
+        });
     }
     setReconciliationIssuesOpen(issueType, severity, broker, count) {
         this.reconciliationIssuesOpen.set({ issue_type: issueType, severity, broker }, count);
@@ -821,14 +983,24 @@ let MetricsService = class MetricsService {
     setRiskDailyPnl(user, pnl) {
         this.riskDailyPnl.set({ user }, pnl);
     }
-    incrementAnalyticsRuns() { this.analyticsRuns.inc(); }
-    observeAnalyticsDuration(ms) { this.analyticsDuration.observe(ms); }
-    incrementAnalyticsFailures() { this.analyticsFailures.inc(); }
+    incrementAnalyticsRuns() {
+        this.analyticsRuns.inc();
+    }
+    observeAnalyticsDuration(ms) {
+        this.analyticsDuration.observe(ms);
+    }
+    incrementAnalyticsFailures() {
+        this.analyticsFailures.inc();
+    }
     incrementAnalyticsRetentionDeleted(sourceType, count = 1) {
         this.analyticsRetentionDeleted.inc({ source_type: sourceType }, count);
     }
-    setAnalyticsStaleSnapshots(count) { this.analyticsStaleSnapshots.set(count); }
-    incrementAnalyticsUsersProcessed(count = 1) { this.analyticsUsersProcessed.inc(count); }
+    setAnalyticsStaleSnapshots(count) {
+        this.analyticsStaleSnapshots.set(count);
+    }
+    incrementAnalyticsUsersProcessed(count = 1) {
+        this.analyticsUsersProcessed.inc(count);
+    }
     setNotificationQueueDepth(channel, count) {
         this.notificationQueueDepth.set({ channel }, count);
     }

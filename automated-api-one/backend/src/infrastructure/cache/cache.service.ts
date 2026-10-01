@@ -10,14 +10,18 @@ export class CacheService {
   async get<T>(key: string): Promise<T | null> {
     try {
       if (!this.redisService.isHealthy()) {
-        this.logger.warn(`Redis is unhealthy. Cache GET bypassed for key: ${key}`);
+        this.logger.warn(
+          `Redis is unhealthy. Cache GET bypassed for key: ${key}`,
+        );
         return null;
       }
       const val = await this.redisService.getClient().get(key);
       if (!val) return null;
       return JSON.parse(val) as T;
     } catch (err) {
-      this.logger.warn(`Failed to fetch from cache for key: ${key}. Error: ${err.message}`);
+      this.logger.warn(
+        `Failed to fetch from cache for key: ${key}. Error: ${err.message}`,
+      );
       return null;
     }
   }
@@ -26,7 +30,9 @@ export class CacheService {
     this.redisService.assertHealthy();
     const serialized = JSON.stringify(value);
     if (ttlSeconds) {
-      await this.redisService.getClient().set(key, serialized, 'EX', ttlSeconds);
+      await this.redisService
+        .getClient()
+        .set(key, serialized, 'EX', ttlSeconds);
     } else {
       await this.redisService.getClient().set(key, serialized);
     }

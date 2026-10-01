@@ -4,6 +4,8 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import {
@@ -42,7 +44,9 @@ export class RiskService {
     private readonly prisma: PrismaService,
     private readonly subscriptionsService: SubscriptionsService,
     private readonly consentsService: ConsentsService,
+    @Inject(forwardRef(() => BrokerSessionService))
     private readonly brokerSessionService: BrokerSessionService,
+    @Inject(forwardRef(() => BrokerFactory))
     private readonly brokerFactory: BrokerFactory,
     private readonly auditService: AuditService,
     private readonly redisService: RedisService,
@@ -423,8 +427,7 @@ export class RiskService {
       const currentLoss = dailyPnl < 0 ? Math.abs(dailyPnl) : 0;
       const dailyLossLimit = Number(us.dailyLossLimit);
       const isLocked =
-        currentLoss >= dailyLossLimit ||
-        us.status === UserSegmentStatus.PAUSED;
+        currentLoss >= dailyLossLimit || us.status === UserSegmentStatus.PAUSED;
 
       statusList.push({
         segmentId: us.segmentId,
@@ -585,10 +588,7 @@ export class RiskService {
     return true;
   }
 
-  async validateLossLimit(
-    userId: string,
-    segmentId: string,
-  ): Promise<boolean> {
+  async validateLossLimit(userId: string, segmentId: string): Promise<boolean> {
     const userSegment = await this.prisma.userSegment.findFirst({
       where: { userId, segmentId },
     });
@@ -653,18 +653,42 @@ export class RiskService {
 
     // 1. Emergency locks checks first
     if (this.redisService.isHealthy()) {
-      const globalBlocked = await this.redisService.getClient().get('risk:global:blocked');
+      const globalBlocked = await this.redisService
+        .getClient()
+        .get('risk:global:blocked');
       if (globalBlocked === 'true') {
-        this.logger.warn(`Order blocked due to global emergency risk lock: user=${userId}`);
-        await this.logViolation(userId, RiskRule.STALE_SNAPSHOT, Severity.CRITICAL, { reason: 'Global emergency risk lock' });
-        return { approved: false, code: RiskCode.UNKNOWN, reason: 'Global emergency risk lock is active' };
+        this.logger.warn(
+          `Order blocked due to global emergency risk lock: user=${userId}`,
+        );
+        await this.logViolation(
+          userId,
+          RiskRule.STALE_SNAPSHOT,
+          Severity.CRITICAL,
+          { reason: 'Global emergency risk lock' },
+        );
+        return {
+          approved: false,
+          code: RiskCode.UNKNOWN,
+          reason: 'Global emergency risk lock is active',
+        };
       }
 
-      const userBlocked = await this.redisService.getClient().get(`user:risk:blocked:${userId}`);
+      const userBlocked = await this.redisService
+        .getClient()
+        .get(`user:risk:blocked:${userId}`);
       if (userBlocked === 'true') {
         this.logger.warn(`Order blocked due to user risk lock: user=${userId}`);
-        await this.logViolation(userId, RiskRule.STALE_SNAPSHOT, Severity.CRITICAL, { reason: 'User risk lock' });
-        return { approved: false, code: RiskCode.DAILY_LOSS_LIMIT, reason: 'User risk circuit breaker is active' };
+        await this.logViolation(
+          userId,
+          RiskRule.STALE_SNAPSHOT,
+          Severity.CRITICAL,
+          { reason: 'User risk lock' },
+        );
+        return {
+          approved: false,
+          code: RiskCode.DAILY_LOSS_LIMIT,
+          reason: 'User risk circuit breaker is active',
+        };
       }
     }
 
@@ -678,17 +702,33 @@ export class RiskService {
     // Freshness check:
     if (snapshot) {
       const freshnessMs = Date.now() - new Date(snapshot.updatedAt).getTime();
-      if (freshnessMs > 300000) { // 5 minutes
-        this.logger.warn(`Stale risk snapshot for user ${userId}. Age: ${freshnessMs}ms`);
+      if (freshnessMs > 300000) {
+        // 5 minutes
+        this.logger.warn(
+          `Stale risk snapshot for user ${userId}. Age: ${freshnessMs}ms`,
+        );
         // Trigger background recalculate
         const jobId = `risk-recalc-${userId}`;
-        await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, { userId });
-        
+        await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, {
+          userId,
+        });
+
         if (defaultMode === 'BLOCK') {
-          await this.logViolation(userId, RiskRule.STALE_SNAPSHOT, Severity.CRITICAL, { freshnessMs });
-          return { approved: false, code: RiskCode.UNKNOWN, reason: 'Risk snapshot is stale' };
+          await this.logViolation(
+            userId,
+            RiskRule.STALE_SNAPSHOT,
+            Severity.CRITICAL,
+            { freshnessMs },
+          );
+          return {
+            approved: false,
+            code: RiskCode.UNKNOWN,
+            reason: 'Risk snapshot is stale',
+          };
         } else {
-          this.logger.log(`Stale risk snapshot allowed by default mode ALLOW for user ${userId}`);
+          this.logger.log(
+            `Stale risk snapshot allowed by default mode ALLOW for user ${userId}`,
+          );
         }
       }
     }
@@ -701,22 +741,32 @@ export class RiskService {
           { segmentId, userId: null, brokerId: null },
           { brokerId, userId: null, segmentId: null },
           { userId: null, segmentId: null, brokerId: null }, // global fallback
-        ]
+        ],
       },
-      orderBy: [
-        { priority: 'desc' },
-        { version: 'desc' },
-      ],
+      orderBy: [{ priority: 'desc' }, { version: 'desc' }],
     });
 
     if (applicableProfiles.length === 0) {
       if (defaultMode === 'BLOCK') {
-        this.logger.warn(`No risk profile found for user ${userId} and RISK_DEFAULT_MODE=BLOCK`);
-        await this.logViolation(userId, RiskRule.NO_PROFILE, Severity.CRITICAL, { reason: 'No risk profile' });
-        return { approved: false, code: RiskCode.UNKNOWN, reason: 'No active risk profile found' };
+        this.logger.warn(
+          `No risk profile found for user ${userId} and RISK_DEFAULT_MODE=BLOCK`,
+        );
+        await this.logViolation(
+          userId,
+          RiskRule.NO_PROFILE,
+          Severity.CRITICAL,
+          { reason: 'No risk profile' },
+        );
+        return {
+          approved: false,
+          code: RiskCode.UNKNOWN,
+          reason: 'No active risk profile found',
+        };
       } else {
         // Log evaluation as approved
-        await this.logEvaluation(userId, true, 0, orderValue, { info: 'No profile, allowed by default' });
+        await this.logEvaluation(userId, true, 0, orderValue, {
+          info: 'No profile, allowed by default',
+        });
         return { approved: true };
       }
     }
@@ -726,12 +776,25 @@ export class RiskService {
       this.logger.warn(`No risk snapshot found for user ${userId}`);
       // Trigger background recalculate
       const jobId = `risk-recalc-${userId}`;
-      await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, { userId });
+      await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, {
+        userId,
+      });
       if (defaultMode === 'BLOCK') {
-        await this.logViolation(userId, RiskRule.NO_PROFILE, Severity.CRITICAL, { reason: 'No risk snapshot' });
-        return { approved: false, code: RiskCode.UNKNOWN, reason: 'No risk snapshot found' };
+        await this.logViolation(
+          userId,
+          RiskRule.NO_PROFILE,
+          Severity.CRITICAL,
+          { reason: 'No risk snapshot' },
+        );
+        return {
+          approved: false,
+          code: RiskCode.UNKNOWN,
+          reason: 'No risk snapshot found',
+        };
       } else {
-        await this.logEvaluation(userId, true, 0, orderValue, { info: 'No snapshot, allowed by default' });
+        await this.logEvaluation(userId, true, 0, orderValue, {
+          info: 'No snapshot, allowed by default',
+        });
         return { approved: true };
       }
     }
@@ -743,12 +806,28 @@ export class RiskService {
       // Rule 1: Max Capital Per User
       const maxCap = Number(profile.maxCapitalPerUser);
       if (maxCap > 0) {
-        const potentialCapital = Number(snapshot.currentCapitalUsed) + orderValue;
+        const potentialCapital =
+          Number(snapshot.currentCapitalUsed) + orderValue;
         evaluatedRulesResult['MAX_CAPITAL_USER'] = { potentialCapital, maxCap };
         if (potentialCapital > maxCap) {
-          await this.logViolation(userId, RiskRule.MAX_CAPITAL_USER, Severity.CRITICAL, { potentialCapital, maxCap });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.INSUFFICIENT_CAPITAL, reason: 'Exceeded Max Capital Limit' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_CAPITAL_USER,
+            Severity.CRITICAL,
+            { potentialCapital, maxCap },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.INSUFFICIENT_CAPITAL,
+            reason: 'Exceeded Max Capital Limit',
+          };
         }
       }
 
@@ -756,11 +835,29 @@ export class RiskService {
       const maxCapSeg = Number(profile.maxCapitalPerSegment);
       if (maxCapSeg > 0 && profile.segmentId === segmentId) {
         const potentialSegmentCapital = orderValue; // Simplified per-segment order limit
-        evaluatedRulesResult['MAX_CAPITAL_SEGMENT'] = { potentialSegmentCapital, maxCapSeg };
+        evaluatedRulesResult['MAX_CAPITAL_SEGMENT'] = {
+          potentialSegmentCapital,
+          maxCapSeg,
+        };
         if (potentialSegmentCapital > maxCapSeg) {
-          await this.logViolation(userId, RiskRule.MAX_CAPITAL_SEGMENT, Severity.WARNING, { potentialSegmentCapital, maxCapSeg });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.INSUFFICIENT_CAPITAL, reason: 'Exceeded Max Capital Per Segment' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_CAPITAL_SEGMENT,
+            Severity.WARNING,
+            { potentialSegmentCapital, maxCapSeg },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.INSUFFICIENT_CAPITAL,
+            reason: 'Exceeded Max Capital Per Segment',
+          };
         }
       }
 
@@ -770,13 +867,30 @@ export class RiskService {
         const currentLoss = Number(snapshot.dailyLoss);
         evaluatedRulesResult['MAX_DAILY_LOSS'] = { currentLoss, maxLoss };
         if (currentLoss >= maxLoss) {
-          await this.logViolation(userId, RiskRule.MAX_DAILY_LOSS, Severity.CRITICAL, { currentLoss, maxLoss });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_DAILY_LOSS,
+            Severity.CRITICAL,
+            { currentLoss, maxLoss },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
           // Lock user
           if (this.redisService.isHealthy()) {
-            await this.redisService.getClient().set(`user:risk:blocked:${userId}`, 'true');
+            await this.redisService
+              .getClient()
+              .set(`user:risk:blocked:${userId}`, 'true');
           }
-          return { approved: false, code: RiskCode.DAILY_LOSS_LIMIT, reason: 'Exceeded Max Daily Loss Limit' };
+          return {
+            approved: false,
+            code: RiskCode.DAILY_LOSS_LIMIT,
+            reason: 'Exceeded Max Daily Loss Limit',
+          };
         }
       }
 
@@ -784,53 +898,134 @@ export class RiskService {
       const maxPositions = profile.maxOpenPositions;
       if (maxPositions > 0) {
         const currentOpenPositions = snapshot.openPositionsCount;
-        evaluatedRulesResult['MAX_OPEN_POSITIONS'] = { currentOpenPositions, maxPositions };
+        evaluatedRulesResult['MAX_OPEN_POSITIONS'] = {
+          currentOpenPositions,
+          maxPositions,
+        };
         if (currentOpenPositions >= maxPositions) {
-          await this.logViolation(userId, RiskRule.MAX_OPEN_POSITIONS, Severity.WARNING, { currentOpenPositions, maxPositions });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.UNKNOWN, reason: 'Exceeded Max Open Positions Limit' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_OPEN_POSITIONS,
+            Severity.WARNING,
+            { currentOpenPositions, maxPositions },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.UNKNOWN,
+            reason: 'Exceeded Max Open Positions Limit',
+          };
         }
       }
 
       // Rule 5: Max Position Size (for the current symbol)
       const maxPosSize = profile.maxPositionSize;
       if (maxPosSize > 0) {
-        const symbolExposures = snapshot.exposurePerSymbol as Record<string, any>;
+        const symbolExposures = snapshot.exposurePerSymbol as Record<
+          string,
+          any
+        >;
         const currentSymbolQty = symbolExposures[symbol]?.quantity || 0;
         const potentialQty = currentSymbolQty + quantity;
-        evaluatedRulesResult['MAX_POSITION_SIZE'] = { potentialQty, maxPosSize };
+        evaluatedRulesResult['MAX_POSITION_SIZE'] = {
+          potentialQty,
+          maxPosSize,
+        };
         if (potentialQty > maxPosSize) {
-          await this.logViolation(userId, RiskRule.MAX_POSITION_SIZE, Severity.WARNING, { potentialQty, maxPosSize });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.UNKNOWN, reason: 'Exceeded Max Position Size Limit' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_POSITION_SIZE,
+            Severity.WARNING,
+            { potentialQty, maxPosSize },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.UNKNOWN,
+            reason: 'Exceeded Max Position Size Limit',
+          };
         }
       }
 
       // Rule 6: Max Exposure Per Symbol
       const maxSymbolExposure = Number(profile.maxExposurePerSymbol);
       if (maxSymbolExposure > 0) {
-        const symbolExposures = snapshot.exposurePerSymbol as Record<string, any>;
+        const symbolExposures = snapshot.exposurePerSymbol as Record<
+          string,
+          any
+        >;
         const currentExposure = symbolExposures[symbol]?.exposure || 0;
         const potentialExposure = currentExposure + orderValue;
-        evaluatedRulesResult['MAX_EXPOSURE_SYMBOL'] = { potentialExposure, maxSymbolExposure };
+        evaluatedRulesResult['MAX_EXPOSURE_SYMBOL'] = {
+          potentialExposure,
+          maxSymbolExposure,
+        };
         if (potentialExposure > maxSymbolExposure) {
-          await this.logViolation(userId, RiskRule.MAX_EXPOSURE_SYMBOL, Severity.CRITICAL, { potentialExposure, maxSymbolExposure });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.UNKNOWN, reason: 'Exceeded Max Exposure Per Symbol Limit' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_EXPOSURE_SYMBOL,
+            Severity.CRITICAL,
+            { potentialExposure, maxSymbolExposure },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.UNKNOWN,
+            reason: 'Exceeded Max Exposure Per Symbol Limit',
+          };
         }
       }
 
       // Rule 7: Max Exposure Per Broker
       const maxBrokerExposure = Number(profile.maxExposurePerBroker);
       if (maxBrokerExposure > 0) {
-        const brokerExposures = snapshot.exposurePerBroker as Record<string, any>;
+        const brokerExposures = snapshot.exposurePerBroker as Record<
+          string,
+          any
+        >;
         const currentExposure = brokerExposures[brokerId] || 0;
         const potentialExposure = currentExposure + orderValue;
-        evaluatedRulesResult['MAX_EXPOSURE_BROKER'] = { potentialExposure, maxBrokerExposure };
+        evaluatedRulesResult['MAX_EXPOSURE_BROKER'] = {
+          potentialExposure,
+          maxBrokerExposure,
+        };
         if (potentialExposure > maxBrokerExposure) {
-          await this.logViolation(userId, RiskRule.MAX_EXPOSURE_BROKER, Severity.CRITICAL, { potentialExposure, maxBrokerExposure });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.UNKNOWN, reason: 'Exceeded Max Exposure Per Broker Limit' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_EXPOSURE_BROKER,
+            Severity.CRITICAL,
+            { potentialExposure, maxBrokerExposure },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.UNKNOWN,
+            reason: 'Exceeded Max Exposure Per Broker Limit',
+          };
         }
       }
 
@@ -838,18 +1033,42 @@ export class RiskService {
       const maxOrders = profile.maxConcurrentOrders;
       if (maxOrders > 0) {
         const currentOrders = snapshot.concurrentOrdersCount;
-        evaluatedRulesResult['MAX_CONCURRENT_ORDERS'] = { currentOrders, maxOrders };
+        evaluatedRulesResult['MAX_CONCURRENT_ORDERS'] = {
+          currentOrders,
+          maxOrders,
+        };
         if (currentOrders >= maxOrders) {
-          await this.logViolation(userId, RiskRule.MAX_CONCURRENT_ORDERS, Severity.INFO, { currentOrders, maxOrders });
-          await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-          return { approved: false, code: RiskCode.UNKNOWN, reason: 'Exceeded Max Concurrent Orders Limit' };
+          await this.logViolation(
+            userId,
+            RiskRule.MAX_CONCURRENT_ORDERS,
+            Severity.INFO,
+            { currentOrders, maxOrders },
+          );
+          await this.logEvaluation(
+            userId,
+            false,
+            profile.version,
+            orderValue,
+            evaluatedRulesResult,
+          );
+          return {
+            approved: false,
+            code: RiskCode.UNKNOWN,
+            reason: 'Exceeded Max Concurrent Orders Limit',
+          };
         }
       }
     }
 
     // Approved!
     const bestProfile = applicableProfiles[0];
-    await this.logEvaluation(userId, true, bestProfile.version, orderValue, evaluatedRulesResult);
+    await this.logEvaluation(
+      userId,
+      true,
+      bestProfile.version,
+      orderValue,
+      evaluatedRulesResult,
+    );
     return { approved: true };
   }
 
@@ -872,7 +1091,9 @@ export class RiskService {
 
     // If critical, trigger the user circuit breaker in Redis
     if (severity === Severity.CRITICAL && this.redisService.isHealthy()) {
-      await this.redisService.getClient().set(`user:risk:blocked:${userId}`, 'true');
+      await this.redisService
+        .getClient()
+        .set(`user:risk:blocked:${userId}`, 'true');
       this.metrics.incrementRiskUsersBlocked();
     }
 
@@ -918,7 +1139,10 @@ export class RiskService {
 
       // 2. Aggregate currentCapitalUsed, exposurePerSymbol, exposurePerBroker
       let currentCapitalUsed = 0;
-      const exposurePerSymbol: Record<string, { quantity: number; exposure: number }> = {};
+      const exposurePerSymbol: Record<
+        string,
+        { quantity: number; exposure: number }
+      > = {};
       const exposurePerBroker: Record<string, number> = {};
 
       for (const pos of openPositions) {
@@ -936,7 +1160,8 @@ export class RiskService {
         exposurePerSymbol[symbol].exposure += qty * currPrice;
 
         const brokerId = pos.trade.brokerId;
-        exposurePerBroker[brokerId] = (exposurePerBroker[brokerId] || 0) + (qty * currPrice);
+        exposurePerBroker[brokerId] =
+          (exposurePerBroker[brokerId] || 0) + qty * currPrice;
       }
 
       // 3. Aggregate concurrentOrdersCount
@@ -983,7 +1208,7 @@ export class RiskService {
             { segmentId: { not: null }, userId: null, brokerId: null },
             { brokerId: { not: null }, userId: null, segmentId: null },
             { userId: null, segmentId: null, brokerId: null }, // global fallback
-          ]
+          ],
         },
         orderBy: { priority: 'desc' },
       });
@@ -998,7 +1223,10 @@ export class RiskService {
         if (maxCap > 0) {
           if (currentCapitalUsed >= maxCap) {
             state = 'BLOCKED';
-          } else if (currentCapitalUsed >= maxCap * 0.8 && state !== 'BLOCKED') {
+          } else if (
+            currentCapitalUsed >= maxCap * 0.8 &&
+            state !== 'BLOCKED'
+          ) {
             state = 'WARNING';
           }
         }
@@ -1018,7 +1246,10 @@ export class RiskService {
         if (maxOpenPos > 0) {
           if (openPositions.length >= maxOpenPos) {
             state = 'BLOCKED';
-          } else if (openPositions.length >= maxOpenPos * 0.8 && state !== 'BLOCKED') {
+          } else if (
+            openPositions.length >= maxOpenPos * 0.8 &&
+            state !== 'BLOCKED'
+          ) {
             state = 'WARNING';
           }
         }
@@ -1028,7 +1259,10 @@ export class RiskService {
         if (maxConcurrent > 0) {
           if (concurrentOrdersCount >= maxConcurrent) {
             state = 'BLOCKED';
-          } else if (concurrentOrdersCount >= maxConcurrent * 0.8 && state !== 'BLOCKED') {
+          } else if (
+            concurrentOrdersCount >= maxConcurrent * 0.8 &&
+            state !== 'BLOCKED'
+          ) {
             state = 'WARNING';
           }
         }
@@ -1090,7 +1324,9 @@ export class RiskService {
 
       return snapshot;
     } catch (err) {
-      this.logger.error(`Failed to recalculate risk snapshot for user ${userId}: ${err.message}`);
+      this.logger.error(
+        `Failed to recalculate risk snapshot for user ${userId}: ${err.message}`,
+      );
       try {
         await this.prisma.riskSnapshot.upsert({
           where: { userId },
@@ -1111,7 +1347,9 @@ export class RiskService {
           },
         });
       } catch (dbErr) {
-        this.logger.error(`Failed to write failed recalculation status to DB for user ${userId}: ${dbErr.message}`);
+        this.logger.error(
+          `Failed to write failed recalculation status to DB for user ${userId}: ${dbErr.message}`,
+        );
       }
       throw err;
     }
@@ -1121,7 +1359,9 @@ export class RiskService {
   async cleanupEvaluations(): Promise<void> {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    this.logger.log(`Running nightly risk evaluations cleanup. Removing records older than: ${thirtyDaysAgo}`);
+    this.logger.log(
+      `Running nightly risk evaluations cleanup. Removing records older than: ${thirtyDaysAgo}`,
+    );
     try {
       const deleted = await this.prisma.riskEvaluation.deleteMany({
         where: {
@@ -1130,7 +1370,9 @@ export class RiskService {
       });
       this.logger.log(`Pruned ${deleted.count} old risk evaluations.`);
     } catch (err) {
-      this.logger.error(`Failed to cleanup old risk evaluations: ${err.message}`);
+      this.logger.error(
+        `Failed to cleanup old risk evaluations: ${err.message}`,
+      );
     }
   }
 
@@ -1193,17 +1435,35 @@ export class RiskService {
 
     const updatedData: any = {};
     if (data.userId !== undefined) updatedData.userId = data.userId || null;
-    if (data.segmentId !== undefined) updatedData.segmentId = data.segmentId || null;
-    if (data.brokerId !== undefined) updatedData.brokerId = data.brokerId || null;
+    if (data.segmentId !== undefined)
+      updatedData.segmentId = data.segmentId || null;
+    if (data.brokerId !== undefined)
+      updatedData.brokerId = data.brokerId || null;
     if (data.priority !== undefined) updatedData.priority = data.priority;
-    if (data.maxCapitalPerUser !== undefined) updatedData.maxCapitalPerUser = new Prisma.Decimal(data.maxCapitalPerUser);
-    if (data.maxCapitalPerSegment !== undefined) updatedData.maxCapitalPerSegment = new Prisma.Decimal(data.maxCapitalPerSegment);
-    if (data.maxDailyLoss !== undefined) updatedData.maxDailyLoss = new Prisma.Decimal(data.maxDailyLoss);
-    if (data.maxOpenPositions !== undefined) updatedData.maxOpenPositions = data.maxOpenPositions;
-    if (data.maxPositionSize !== undefined) updatedData.maxPositionSize = data.maxPositionSize;
-    if (data.maxExposurePerSymbol !== undefined) updatedData.maxExposurePerSymbol = new Prisma.Decimal(data.maxExposurePerSymbol);
-    if (data.maxExposurePerBroker !== undefined) updatedData.maxExposurePerBroker = new Prisma.Decimal(data.maxExposurePerBroker);
-    if (data.maxConcurrentOrders !== undefined) updatedData.maxConcurrentOrders = data.maxConcurrentOrders;
+    if (data.maxCapitalPerUser !== undefined)
+      updatedData.maxCapitalPerUser = new Prisma.Decimal(
+        data.maxCapitalPerUser,
+      );
+    if (data.maxCapitalPerSegment !== undefined)
+      updatedData.maxCapitalPerSegment = new Prisma.Decimal(
+        data.maxCapitalPerSegment,
+      );
+    if (data.maxDailyLoss !== undefined)
+      updatedData.maxDailyLoss = new Prisma.Decimal(data.maxDailyLoss);
+    if (data.maxOpenPositions !== undefined)
+      updatedData.maxOpenPositions = data.maxOpenPositions;
+    if (data.maxPositionSize !== undefined)
+      updatedData.maxPositionSize = data.maxPositionSize;
+    if (data.maxExposurePerSymbol !== undefined)
+      updatedData.maxExposurePerSymbol = new Prisma.Decimal(
+        data.maxExposurePerSymbol,
+      );
+    if (data.maxExposurePerBroker !== undefined)
+      updatedData.maxExposurePerBroker = new Prisma.Decimal(
+        data.maxExposurePerBroker,
+      );
+    if (data.maxConcurrentOrders !== undefined)
+      updatedData.maxConcurrentOrders = data.maxConcurrentOrders;
 
     return this.prisma.riskProfile.update({
       where: { id },
@@ -1228,4 +1488,3 @@ export class RiskService {
     });
   }
 }
-

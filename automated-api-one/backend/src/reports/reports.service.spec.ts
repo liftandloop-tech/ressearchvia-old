@@ -30,12 +30,21 @@ describe('ReportsService', () => {
 
     const mockModulePrisma = {
       report: {
-        create: jest.fn().mockResolvedValue({ id: 'rep-123', userId: 'usr-1', reportType: 'DAILY', status: 'REQUESTED' }),
+        create: jest.fn().mockResolvedValue({
+          id: 'rep-123',
+          userId: 'usr-1',
+          reportType: 'DAILY',
+          status: 'REQUESTED',
+        }),
         findFirst: jest.fn(),
         update: jest.fn(),
       },
       reportExport: {
-        create: jest.fn().mockResolvedValue({ id: 'exp-123', userId: 'usr-1', status: 'REQUESTED' }),
+        create: jest.fn().mockResolvedValue({
+          id: 'exp-123',
+          userId: 'usr-1',
+          status: 'REQUESTED',
+        }),
       },
       userSegment: {
         findUnique: jest.fn().mockResolvedValue({ capital: 100000 }),
@@ -129,7 +138,11 @@ describe('ReportsService', () => {
     it('should return COMPLETED status if cache hit', async () => {
       mockRedisClient.get.mockResolvedValue(JSON.stringify({ some: 'data' }));
 
-      const res = await service.getReportOrEnqueue('usr-1', 'DAILY', '2026-06-12');
+      const res = await service.getReportOrEnqueue(
+        'usr-1',
+        'DAILY',
+        '2026-06-12',
+      );
       expect(res.status).toBe('COMPLETED');
       expect(res.data).toEqual({ some: 'data' });
       expect(metrics.incrementReportCacheHits).toHaveBeenCalled();
@@ -139,7 +152,11 @@ describe('ReportsService', () => {
       mockRedisClient.get.mockResolvedValue(null);
       mockRedisClient.set.mockResolvedValue('OK');
 
-      const res = await service.getReportOrEnqueue('usr-1', 'DAILY', '2026-06-12');
+      const res = await service.getReportOrEnqueue(
+        'usr-1',
+        'DAILY',
+        '2026-06-12',
+      );
       expect(res.status).toBe('REQUESTED');
       expect(res.reportId).toBe('rep-123');
       expect(prisma.report.create).toHaveBeenCalled();
@@ -157,7 +174,11 @@ describe('ReportsService', () => {
         getWaitingCount: jest.fn().mockResolvedValue(12000), // depth > 10000
       } as any);
 
-      const res = await service.getReportOrEnqueue('usr-1', 'DAILY', '2026-06-12');
+      const res = await service.getReportOrEnqueue(
+        'usr-1',
+        'DAILY',
+        '2026-06-12',
+      );
       expect(res.status).toBe('QUEUED');
       expect(res.estimatedWait).toBe('later');
       expect(prisma.report.create).not.toHaveBeenCalled();

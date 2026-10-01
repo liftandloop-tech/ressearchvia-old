@@ -25,7 +25,7 @@ exports.RiskModule = RiskModule = __decorate([
         imports: [
             subscriptions_module_1.SubscriptionsModule,
             consents_module_1.ConsentsModule,
-            brokers_module_1.BrokersModule,
+            (0, common_1.forwardRef)(() => brokers_module_1.BrokersModule),
             audit_module_1.AuditModule,
             infrastructure_module_1.InfrastructureModule,
         ],

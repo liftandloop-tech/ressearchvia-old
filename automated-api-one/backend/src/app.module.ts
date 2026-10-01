@@ -47,18 +47,18 @@ import { EgressModule } from './egress/egress.module';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-        useFactory: (config: ConfigService) => {
-          const connectionOptions: any = {
-            host: config.get<string>('REDIS_HOST', 'localhost'),
-            port: config.get<number>('REDIS_PORT', 6379),
-            password: config.get<string>('REDIS_PASSWORD'),
-          };
-          const username = config.get<string>('REDIS_USERNAME');
-          if (username && username !== 'default' && username !== 'sp-redis') {
-            connectionOptions.username = username;
-          }
-          return { connection: connectionOptions };
-        },
+      useFactory: (config: ConfigService) => {
+        const connectionOptions: any = {
+          host: config.get<string>('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+          password: config.get<string>('REDIS_PASSWORD'),
+        };
+        const username = config.get<string>('REDIS_USERNAME');
+        if (username && username !== 'default' && username !== 'sp-redis') {
+          connectionOptions.username = username;
+        }
+        return { connection: connectionOptions };
+      },
     }),
     PrismaModule,
     InfrastructureModule,

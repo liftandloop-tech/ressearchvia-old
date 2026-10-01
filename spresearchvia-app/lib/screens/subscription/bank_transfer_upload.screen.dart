@@ -13,6 +13,7 @@ import '../../controllers/auth.controller.dart';
 import '../../controllers/user.controller.dart';
 import '../../services/snackbar.service.dart';
 import '../../services/secure_storage.service.dart';
+import '../../controllers/subscription_history.controller.dart';
 
 class BankTransferUploadScreen extends StatefulWidget {
   const BankTransferUploadScreen({super.key});
@@ -199,6 +200,15 @@ class _BankTransferUploadScreenState extends State<BankTransferUploadScreen> {
         SnackbarService.showSuccess(
           'Proof uploaded successfully! Waiting for verification.',
         );
+
+        if (Get.isRegistered<SubscriptionHistoryController>()) {
+          Get.find<SubscriptionHistoryController>().loadRegistrationHistory();
+          Get.find<SubscriptionHistoryController>().loadSegmentHistory();
+        }
+        if (Get.isRegistered<SegmentPlanController>()) {
+          Get.find<SegmentPlanController>().fetchActiveSegment(force: true);
+          Get.find<SegmentPlanController>().fetchActivePartialInfo();
+        }
         
         // Refresh Auth User from backend and navigate to Dashboard
         await Get.find<AuthController>().checkAuthStatus();

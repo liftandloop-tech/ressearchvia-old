@@ -22,22 +22,31 @@ class FilePreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPdf = fileName.toLowerCase().endsWith('.pdf');
-    final isImage = [
+    final combinedTarget = '$fileName ${fileUrl ?? ''}'.toLowerCase();
+    bool isPdf = combinedTarget.contains('.pdf');
+    bool isImage = [
       '.jpg',
       '.jpeg',
       '.png',
       '.gif',
       '.webp',
-    ].any((ext) => fileName.toLowerCase().endsWith(ext));
-    final isVideo = [
+    ].any((ext) => combinedTarget.contains(ext));
+    bool isVideo = [
       '.mp4',
       '.mov',
       '.avi',
       '.mkv',
       '.webm',
       '.3gp',
-    ].any((ext) => fileName.toLowerCase().endsWith(ext));
+    ].any((ext) => combinedTarget.contains(ext));
+
+    if (!isPdf && !isImage && !isVideo) {
+      if (combinedTarget.contains('video') || combinedTarget.contains('kycvid')) {
+        isVideo = true;
+      } else if (combinedTarget.contains('photo') || combinedTarget.contains('image') || combinedTarget.contains('kycimg')) {
+        isImage = true;
+      }
+    }
 
     return Dialog(
       backgroundColor: Colors.white,

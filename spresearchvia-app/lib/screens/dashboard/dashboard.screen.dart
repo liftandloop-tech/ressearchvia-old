@@ -12,6 +12,7 @@ import '../../controllers/report.controller.dart';
 import '../../widgets/reminder.popup.dart';
 import '../../widgets/app_logo.dart';
 import 'widgets/premium_plan_card.dart';
+import '../research/widgets/trading_accuracy_card.dart';
 import '../../controllers/dashboard.controller.dart';
 import '../../controllers/segment_plan.controller.dart';
 
@@ -318,6 +319,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    SizedBox(
+                      height: responsive.spacing(AppDimensions.spacing15),
+                    ),
+                    GetX<ReportController>(
+                      builder: (reportCtrl) {
+                        final stats = reportCtrl.effectiveDashboardAccuracy;
+                        return TradingAccuracyCard(
+                          stats: stats,
+                          title: 'Trading Calls Accuracy',
+                          subtitle: 'Target Achieved • Partially Booked • Stoploss',
+                          showFilterAction: true,
+                          onTap: () {
+                            reportCtrl.selectedTabIndex.value = 0;
+                            final tabsCtrl = Get.find<TabsController>();
+                            tabsCtrl.changeTab(1);
+                          },
+                        );
+                      },
                     ),
                     SizedBox(
                       height: responsive.spacing(AppDimensions.spacing20),

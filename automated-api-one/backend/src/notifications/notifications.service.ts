@@ -118,7 +118,9 @@ export class NotificationsService {
     batchKey?: string,
   ): Promise<Notification> {
     if (data && data.fingerprint) {
-      const isDup = await this.deduplication.shouldDeduplicate(data.fingerprint);
+      const isDup = await this.deduplication.shouldDeduplicate(
+        data.fingerprint,
+      );
       if (isDup) {
         this.metrics.incrementNotificationDeduplicated(event.toString());
         return {} as any;
@@ -152,7 +154,10 @@ export class NotificationsService {
       });
 
       if (existingNotification) {
-        const updatedMsg = this.aggregateMessage(existingNotification.message, event);
+        const updatedMsg = this.aggregateMessage(
+          existingNotification.message,
+          event,
+        );
         const updatedTitle = 'Aggregated Trade Events';
 
         const updatedNotif = await this.prisma.notification.update({
@@ -180,30 +185,50 @@ export class NotificationsService {
     });
 
     const isCritical = BYPASS_QUIET_HOURS.includes(event);
-    const inQuietHours = user.quietHoursEnabled && isWithinQuietHours(
-      new Date(),
-      user.quietTimezone || 'Asia/Kolkata',
-      user.quietStart || '22:00',
-      user.quietEnd || '08:00',
-    );
+    const inQuietHours =
+      user.quietHoursEnabled &&
+      isWithinQuietHours(
+        new Date(),
+        user.quietTimezone || 'Asia/Kolkata',
+        user.quietStart || '22:00',
+        user.quietEnd || '08:00',
+      );
 
-    const targetScheduledTime = (inQuietHours && !isCritical)
-      ? getNextActiveTime(new Date(), user.quietTimezone || 'Asia/Kolkata', user.quietEnd || '08:00')
-      : (batchKey ? new Date(Date.now() + 60000) : new Date());
+    const targetScheduledTime =
+      inQuietHours && !isCritical
+        ? getNextActiveTime(
+            new Date(),
+            user.quietTimezone || 'Asia/Kolkata',
+            user.quietEnd || '08:00',
+          )
+        : batchKey
+          ? new Date(Date.now() + 60000)
+          : new Date();
 
     const isDeferred = inQuietHours && !isCritical;
     if (isDeferred) {
       this.metrics.incrementNotificationQuietHourDeferrals();
     }
 
-    const channels: NotificationChannel[] = ['EMAIL', 'SMS', 'WHATSAPP', 'PUSH', 'WEBSOCKET'];
+    const channels: NotificationChannel[] = [
+      'EMAIL',
+      'SMS',
+      'WHATSAPP',
+      'PUSH',
+      'WEBSOCKET',
+    ];
     for (const channel of channels) {
-      const pref = user.notificationPreferences.find(p => p.eventType === event && p.channel === channel);
+      const pref = user.notificationPreferences.find(
+        (p) => p.eventType === event && p.channel === channel,
+      );
       const isEnabled = pref ? pref.enabled : true;
 
       if (!isEnabled) continue;
 
-      const isRateLimited = await this.rateLimiter.isRateLimited(userId, channel);
+      const isRateLimited = await this.rateLimiter.isRateLimited(
+        userId,
+        channel,
+      );
       if (isRateLimited) {
         this.metrics.incrementNotificationRateLimited(channel, userId);
         continue;
@@ -250,9 +275,23 @@ export class NotificationsService {
 
       const queueName = this.getChannelQueueName(channel);
       const delay = batchKey ? 60000 : undefined;
-      const payload = this.getDeliveryPayload(channel, user, title, body, delivery.id, event, data);
+      const payload = this.getDeliveryPayload(
+        channel,
+        user,
+        title,
+        body,
+        delivery.id,
+        event,
+        data,
+      );
 
-      await this.queueService.addJob(queueName, delivery.id, payload, undefined, delay);
+      await this.queueService.addJob(
+        queueName,
+        delivery.id,
+        payload,
+        undefined,
+        delay,
+      );
     }
 
     return notification;
@@ -280,7 +319,10 @@ export class NotificationsService {
         const { notification, channel } = delivery;
         const { user, title, message } = notification;
 
-        const isRateLimited = await this.rateLimiter.isRateLimited(user.id, channel);
+        const isRateLimited = await this.rateLimiter.isRateLimited(
+          user.id,
+          channel,
+        );
         if (isRateLimited) {
           this.metrics.incrementNotificationRateLimited(channel, user.id);
           await this.prisma.notificationDelivery.update({
@@ -295,11 +337,26 @@ export class NotificationsService {
         }
 
         const queueName = this.getChannelQueueName(channel);
-        const payload = this.getDeliveryPayload(channel, user, title, message, delivery.id, notification.type, {});
-        
-        await this.queueService.addJob(queueName, delivery.id, payload, undefined);
+        const payload = this.getDeliveryPayload(
+          channel,
+          user,
+          title,
+          message,
+          delivery.id,
+          notification.type,
+          {},
+        );
+
+        await this.queueService.addJob(
+          queueName,
+          delivery.id,
+          payload,
+          undefined,
+        );
       } catch (err) {
-        this.logger.error(`Failed to dispatch scheduled delivery ${delivery.id}: ${err.message}`);
+        this.logger.error(
+          `Failed to dispatch scheduled delivery ${delivery.id}: ${err.message}`,
+        );
       }
     }
   }
@@ -319,7 +376,13 @@ export class NotificationsService {
   }
 
   async updatePreferences(userId: string, dto: any) {
-    const { preferences, quietHoursEnabled, quietStart, quietEnd, quietTimezone } = dto;
+    const {
+      preferences,
+      quietHoursEnabled,
+      quietStart,
+      quietEnd,
+      quietTimezone,
+    } = dto;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
@@ -359,33 +422,50 @@ export class NotificationsService {
 
   private mapEventToType(event: NotificationEvent): NotificationType {
     switch (event) {
-      case NotificationEvent.ORDER_PLACED: return NotificationType.TRADE_EXECUTED;
-      case NotificationEvent.ORDER_FILLED: return NotificationType.TRADE_EXECUTED;
-      case NotificationEvent.ORDER_REJECTED: return NotificationType.TRADE_EXECUTED;
-      case NotificationEvent.RISK_BLOCKED: return NotificationType.TRADE_EXECUTED;
-      case NotificationEvent.TARGET_HIT: return NotificationType.TARGET_HIT;
-      case NotificationEvent.STOP_LOSS_HIT: return NotificationType.SL_HIT;
-      default: return NotificationType.TRADE_EXECUTED;
+      case NotificationEvent.ORDER_PLACED:
+        return NotificationType.TRADE_EXECUTED;
+      case NotificationEvent.ORDER_FILLED:
+        return NotificationType.TRADE_EXECUTED;
+      case NotificationEvent.ORDER_REJECTED:
+        return NotificationType.TRADE_EXECUTED;
+      case NotificationEvent.RISK_BLOCKED:
+        return NotificationType.TRADE_EXECUTED;
+      case NotificationEvent.TARGET_HIT:
+        return NotificationType.TARGET_HIT;
+      case NotificationEvent.STOP_LOSS_HIT:
+        return NotificationType.SL_HIT;
+      default:
+        return NotificationType.TRADE_EXECUTED;
     }
   }
 
   private getChannelProvider(channel: NotificationChannel): string {
     switch (channel) {
-      case 'EMAIL': return 'resend';
-      case 'SMS': return 'twilio';
-      case 'WHATSAPP': return 'whatsapp-cloud';
-      case 'PUSH': return 'fcm';
-      default: return 'mock';
+      case 'EMAIL':
+        return 'resend';
+      case 'SMS':
+        return 'twilio';
+      case 'WHATSAPP':
+        return 'whatsapp-cloud';
+      case 'PUSH':
+        return 'fcm';
+      default:
+        return 'mock';
     }
   }
 
   private getChannelQueueName(channel: NotificationChannel): string {
     switch (channel) {
-      case 'EMAIL': return Queues.EMAIL;
-      case 'SMS': return Queues.SMS;
-      case 'WHATSAPP': return Queues.WHATSAPP;
-      case 'PUSH': return Queues.PUSH;
-      default: return Queues.NOTIFICATION;
+      case 'EMAIL':
+        return Queues.EMAIL;
+      case 'SMS':
+        return Queues.SMS;
+      case 'WHATSAPP':
+        return Queues.WHATSAPP;
+      case 'PUSH':
+        return Queues.PUSH;
+      default:
+        return Queues.NOTIFICATION;
     }
   }
 
@@ -400,7 +480,12 @@ export class NotificationsService {
   ): any {
     switch (channel) {
       case 'EMAIL':
-        return { deliveryId, to: user.email || 'test@example.com', subject: title, body };
+        return {
+          deliveryId,
+          to: user.email || 'test@example.com',
+          subject: title,
+          body,
+        };
       case 'SMS':
         return { deliveryId, to: user.mobile, message: body };
       case 'WHATSAPP':
@@ -417,24 +502,38 @@ export class NotificationsService {
     }
   }
 
-  private mapEventToWebsocketEvent(event: NotificationEvent): WebsocketEvent | null {
+  private mapEventToWebsocketEvent(
+    event: NotificationEvent,
+  ): WebsocketEvent | null {
     switch (event) {
-      case NotificationEvent.ORDER_PLACED: return WebsocketEvent.SIGNAL_RECEIVED;
-      case NotificationEvent.ORDER_FILLED: return WebsocketEvent.ORDER_EXECUTED;
-      case NotificationEvent.ORDER_REJECTED: return WebsocketEvent.ORDER_REJECTED;
-      case NotificationEvent.RISK_BLOCKED: return WebsocketEvent.RISK_LOCKED;
-      case NotificationEvent.TARGET_HIT: return WebsocketEvent.TARGET_HIT;
-      case NotificationEvent.STOP_LOSS_HIT: return WebsocketEvent.STOPLOSS_HIT;
-      case NotificationEvent.SUBSCRIPTION_EXPIRED: return WebsocketEvent.SUBSCRIPTION_EXPIRED;
-      case NotificationEvent.BROKER_DISCONNECTED: return WebsocketEvent.BROKER_DISCONNECTED;
-      default: return null;
+      case NotificationEvent.ORDER_PLACED:
+        return WebsocketEvent.SIGNAL_RECEIVED;
+      case NotificationEvent.ORDER_FILLED:
+        return WebsocketEvent.ORDER_EXECUTED;
+      case NotificationEvent.ORDER_REJECTED:
+        return WebsocketEvent.ORDER_REJECTED;
+      case NotificationEvent.RISK_BLOCKED:
+        return WebsocketEvent.RISK_LOCKED;
+      case NotificationEvent.TARGET_HIT:
+        return WebsocketEvent.TARGET_HIT;
+      case NotificationEvent.STOP_LOSS_HIT:
+        return WebsocketEvent.STOPLOSS_HIT;
+      case NotificationEvent.SUBSCRIPTION_EXPIRED:
+        return WebsocketEvent.SUBSCRIPTION_EXPIRED;
+      case NotificationEvent.BROKER_DISCONNECTED:
+        return WebsocketEvent.BROKER_DISCONNECTED;
+      default:
+        return null;
     }
   }
 
-  private aggregateMessage(existingMsg: string, newEvent: NotificationEvent): string {
+  private aggregateMessage(
+    existingMsg: string,
+    newEvent: NotificationEvent,
+  ): string {
     const lines = existingMsg.split('\n').filter(Boolean);
     const counts: Record<string, number> = {};
-    
+
     for (const line of lines) {
       const match = line.match(/^(\d+)\s+(.+)$/);
       if (match) {
@@ -456,12 +555,18 @@ export class NotificationsService {
 
   private getEventLabel(event: NotificationEvent): string {
     switch (event) {
-      case NotificationEvent.TARGET_HIT: return 'targets hit';
-      case NotificationEvent.ORDER_FILLED: return 'orders filled';
-      case NotificationEvent.ORDER_PLACED: return 'orders placed';
-      case NotificationEvent.ORDER_REJECTED: return 'orders rejected';
-      case NotificationEvent.RISK_BLOCKED: return 'risk violations';
-      default: return 'alerts';
+      case NotificationEvent.TARGET_HIT:
+        return 'targets hit';
+      case NotificationEvent.ORDER_FILLED:
+        return 'orders filled';
+      case NotificationEvent.ORDER_PLACED:
+        return 'orders placed';
+      case NotificationEvent.ORDER_REJECTED:
+        return 'orders rejected';
+      case NotificationEvent.RISK_BLOCKED:
+        return 'risk violations';
+      default:
+        return 'alerts';
     }
   }
 }

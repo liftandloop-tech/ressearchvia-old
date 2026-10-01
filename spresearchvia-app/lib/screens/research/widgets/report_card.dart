@@ -13,6 +13,7 @@ class ReportCard extends StatelessWidget {
     required this.onView,
     this.updates = const [],
     this.isLocked = false,
+    this.outcome,
   });
 
   final String title;
@@ -23,12 +24,17 @@ class ReportCard extends StatelessWidget {
   final VoidCallback onView;
   final List<ReportUpdate> updates;
   final bool isLocked;
+  final TradingCallOutcome? outcome;
 
   @override
   Widget build(BuildContext context) {
     // Determine latest update status for card accent
     final latestUpdate = updates.isNotEmpty ? updates.last : null;
     final latestStatus = latestUpdate?.normalizedStatus;
+
+    final isTarget = outcome == TradingCallOutcome.targetAchieved || latestStatus == 'target_achieved';
+    final isPartial = outcome == TradingCallOutcome.partiallyBooked || latestStatus == 'partial_profit';
+    final isStoploss = outcome == TradingCallOutcome.stoplossHit || latestStatus == 'stoploss_hit';
 
     Color? leftBorderColor;
     Color? latestBadgeColor;
@@ -37,21 +43,21 @@ class ReportCard extends StatelessWidget {
     String? latestLabel;
     IconData? latestIcon;
 
-    if (latestStatus == 'stoploss_hit') {
+    if (isStoploss) {
       leftBorderColor = const Color(0xFFDC2626);
       latestBadgeColor = const Color(0xFFDC2626);
       latestBadgeBg = const Color(0xFFFEF2F2);
       latestBadgeBorder = const Color(0xFFFCA5A5);
       latestLabel = 'Stoploss Hit';
       latestIcon = Icons.cancel_outlined;
-    } else if (latestStatus == 'target_achieved') {
+    } else if (isTarget) {
       leftBorderColor = const Color(0xFF16A34A);
       latestBadgeColor = const Color(0xFF16A34A);
       latestBadgeBg = const Color(0xFFF0FDF4);
       latestBadgeBorder = const Color(0xFF86EFAC);
       latestLabel = 'Target Achieved';
       latestIcon = Icons.check_circle_outline;
-    } else if (latestStatus == 'partial_profit') {
+    } else if (isPartial) {
       leftBorderColor = const Color(0xFFEA580C);
       latestBadgeColor = const Color(0xFFEA580C);
       latestBadgeBg = const Color(0xFFFFF7ED);
@@ -217,46 +223,6 @@ class ReportCard extends StatelessWidget {
         ),
       ),
     );
-    
-    // Wrap with blur overlay if locked
-    if (isLocked) {
-      return Stack(
-        children: [
-          baseCard,
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.lock_outline,
-                      size: 40,
-                      color: const Color(0xff163174).withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Content published before\nyour plan started',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: const Color(0xff163174).withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
     
     return baseCard;
   }

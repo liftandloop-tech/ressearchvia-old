@@ -198,7 +198,12 @@ let ConsentsService = ConsentsService_1 = class ConsentsService {
             include: { broker: true },
         });
         if (!activeUserBroker) {
-            return { active: false, broker: null, consentDate: null, status: 'NOT_GRANTED' };
+            return {
+                active: false,
+                broker: null,
+                consentDate: null,
+                status: 'NOT_GRANTED',
+            };
         }
         const todayStr = getTodayISTString();
         const todayDate = new Date(`${todayStr}T00:00:00.000Z`);

@@ -59,7 +59,10 @@ export class EgressController {
   async releaseUserEgress(@Request() req) {
     const userId = req.user.userId;
     const success = await this.egressService.releaseEgress(userId);
-    return { success, message: success ? 'Egress IP released back to pool' : 'Release failed' };
+    return {
+      success,
+      message: success ? 'Egress IP released back to pool' : 'Release failed',
+    };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -80,6 +83,9 @@ export class EgressController {
   @HttpCode(HttpStatus.OK)
   async reconcileProxy() {
     const success = await this.egressService.reconcileProxy();
-    return { success, message: success ? 'Proxy mappings reconciled' : 'Reconciliation failed' };
+    return {
+      success,
+      message: success ? 'Proxy mappings reconciled' : 'Reconciliation failed',
+    };
   }
 }

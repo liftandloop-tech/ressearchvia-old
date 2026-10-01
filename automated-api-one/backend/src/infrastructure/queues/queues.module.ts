@@ -59,8 +59,12 @@ import {
     BullModule.registerQueue({ name: Queues.WHATSAPP_DLQ }),
     BullModule.registerQueue({ name: Queues.PUSH }),
     BullModule.registerQueue({ name: Queues.PUSH_DLQ }),
-    ...Array.from({ length: 10 }, (_, i) => BullModule.registerQueue({ name: `analytics-snapshot-${i}` })),
-    ...Array.from({ length: 10 }, (_, i) => BullModule.registerQueue({ name: `analytics-snapshot-dlq-${i}` })),
+    ...Array.from({ length: 10 }, (_, i) =>
+      BullModule.registerQueue({ name: `analytics-snapshot-${i}` }),
+    ),
+    ...Array.from({ length: 10 }, (_, i) =>
+      BullModule.registerQueue({ name: `analytics-snapshot-dlq-${i}` }),
+    ),
   ],
   providers: [
     QueueService,

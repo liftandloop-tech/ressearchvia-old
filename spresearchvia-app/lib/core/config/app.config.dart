@@ -60,4 +60,5 @@ class AppConfig {
   static Duration get networkTimeout => const Duration(seconds: 30);
 
   static int get otpSize => 4;
+  static const String appVersion = '2.7.1';
 }

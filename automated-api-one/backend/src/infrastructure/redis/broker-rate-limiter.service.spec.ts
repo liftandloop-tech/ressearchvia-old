@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BrokerRateLimiterService, BrokerRateLimitException } from './broker-rate-limiter.service';
+import {
+  BrokerRateLimiterService,
+  BrokerRateLimitException,
+} from './broker-rate-limiter.service';
 import { RedisService } from './redis.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -76,7 +79,9 @@ describe('BrokerRateLimiterService', () => {
       [null, 1],
     ]);
 
-    await expect(service.throttle('ANGEL_ONE')).rejects.toThrow(BrokerRateLimitException);
+    await expect(service.throttle('ANGEL_ONE')).rejects.toThrow(
+      BrokerRateLimitException,
+    );
   });
 
   it('should fail open (return true) if Redis is unhealthy', async () => {

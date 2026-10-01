@@ -80,7 +80,8 @@ describe('Consent Module (e2e)', () => {
         id: 'ub-1',
         brokerId: testBrokerId,
       });
-      prismaMock.consent.upsert.mockResolvedValue({
+      prismaMock.consent.findFirst.mockResolvedValue(null);
+      prismaMock.consent.create.mockResolvedValue({
         id: 'consent-1',
         status: ConsentStatus.ACTIVE,
         consentDate: new Date(),
@@ -97,6 +98,7 @@ describe('Consent Module (e2e)', () => {
       expect(res.body).toEqual({
         status: 'ACTIVE',
         consentDate: getTodayISTString(),
+        strategy: 'FIXED_1X',
       });
     });
 
@@ -134,6 +136,7 @@ describe('Consent Module (e2e)', () => {
         active: true,
         broker: 'ANGEL_ONE',
         consentDate: getTodayISTString(),
+        status: 'ACTIVE',
       });
 
       // Assert status endpoint does the same
@@ -161,6 +164,7 @@ describe('Consent Module (e2e)', () => {
         active: false,
         broker: 'ANGEL_ONE',
         consentDate: getTodayISTString(),
+        status: 'NOT_GRANTED',
       });
     });
   });

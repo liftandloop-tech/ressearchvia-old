@@ -29,7 +29,10 @@ export class OrderPlacementProcessor extends WorkerHost {
     private readonly configService: ConfigService,
   ) {
     super();
-    this.concurrency = this.configService.get<number>('ORDER_PLACEMENT_CONCURRENCY', 20);
+    this.concurrency = this.configService.get<number>(
+      'ORDER_PLACEMENT_CONCURRENCY',
+      20,
+    );
   }
 
   async process(job: Job<ExecutionContext>): Promise<void> {

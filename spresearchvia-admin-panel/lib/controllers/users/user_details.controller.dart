@@ -8,6 +8,7 @@ import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'package:spresearch_web/config/app.config.dart';
+import 'user_management.controller.dart';
 
 class UserDetailsController extends GetxController {
   late final UserDetailsService _service;
@@ -63,6 +64,9 @@ class UserDetailsController extends GetxController {
 
       if (success) {
         await fetchUserDetails(userId, forceRefresh: true);
+        if (Get.isRegistered<UserManagementController>()) {
+          Get.find<UserManagementController>().fetchUsers();
+        }
         Get.snackbar('Success', 'KYC Status updated to $status');
       } else {
         Get.snackbar('Error', 'Failed to update KYC Status');
@@ -282,6 +286,9 @@ class UserDetailsController extends GetxController {
       final success = await _userService.suspendUser(userId, reason: reason);
       if (success) {
         await fetchUserDetails(userId, forceRefresh: true);
+        if (Get.isRegistered<UserManagementController>()) {
+          Get.find<UserManagementController>().fetchUsers();
+        }
         Get.snackbar('Success', 'User account suspended');
       } else {
         Get.snackbar('Error', 'Failed to suspend user account');
@@ -301,6 +308,9 @@ class UserDetailsController extends GetxController {
       final success = await _userService.activateUser(userId);
       if (success) {
         await fetchUserDetails(userId, forceRefresh: true);
+        if (Get.isRegistered<UserManagementController>()) {
+          Get.find<UserManagementController>().fetchUsers();
+        }
         Get.snackbar('Success', 'User account activated');
       } else {
         Get.snackbar('Error', 'Failed to activate user account');
@@ -347,6 +357,9 @@ class UserDetailsController extends GetxController {
 
           if (success) {
             await fetchUserDetails(userId, forceRefresh: true);
+            if (Get.isRegistered<UserManagementController>()) {
+              Get.find<UserManagementController>().fetchUsers();
+            }
             Get.snackbar('Success', 'Document updated successfully');
           } else {
             Get.snackbar('Error', 'Failed to update document');

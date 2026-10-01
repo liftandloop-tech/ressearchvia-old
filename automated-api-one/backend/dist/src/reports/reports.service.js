@@ -95,8 +95,12 @@ let ReportsService = ReportsService_1 = class ReportsService {
     }
     async getReportOrEnqueue(userId, type, period, segmentId) {
         if (this.redisService.isHealthy()) {
-            const isGlobalMaint = await this.redisService.getClient().get('system:maintenance:global');
-            const isReportsMaint = await this.redisService.getClient().get('system:maintenance:reports');
+            const isGlobalMaint = await this.redisService
+                .getClient()
+                .get('system:maintenance:global');
+            const isReportsMaint = await this.redisService
+                .getClient()
+                .get('system:maintenance:reports');
             if (isGlobalMaint === 'true' || isReportsMaint === 'true') {
                 throw new common_1.ServiceUnavailableException('Report generation is currently disabled due to system maintenance');
             }
@@ -195,7 +199,9 @@ let ReportsService = ReportsService_1 = class ReportsService {
         const endOfDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
         const dateStr = startOfDay.toISOString().split('T')[0];
         const lockKey = `analytics:snapshot:lock:${userId}:${segmentId}:${dateStr}`;
-        const acquired = await this.redisService.getClient().set(lockKey, '1', 'EX', 60, 'NX');
+        const acquired = await this.redisService
+            .getClient()
+            .set(lockKey, '1', 'EX', 60, 'NX');
         if (acquired !== 'OK') {
             this.logger.warn(`Snapshot lock active for user ${userId} segment ${segmentId} on ${dateStr}. Skipping generation.`);
             const existing = await this.prisma.analyticsSnapshot.findFirst({
@@ -295,7 +301,10 @@ let ReportsService = ReportsService_1 = class ReportsService {
             return snapshot;
         }
         finally {
-            await this.redisService.getClient().del(lockKey).catch(() => { });
+            await this.redisService
+                .getClient()
+                .del(lockKey)
+                .catch(() => { });
         }
     }
 };

@@ -458,7 +458,14 @@ describe('RiskService', () => {
         return null;
       });
 
-      const result = await service.evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId);
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        quantity,
+        price,
+        brokerId,
+        segmentId,
+      );
       expect(result.approved).toBe(false);
       expect(result.reason).toContain('Global emergency risk lock');
     });
@@ -469,7 +476,14 @@ describe('RiskService', () => {
         return null;
       });
 
-      const result = await service.evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId);
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        quantity,
+        price,
+        brokerId,
+        segmentId,
+      );
       expect(result.approved).toBe(false);
       expect(result.reason).toContain('User risk circuit breaker');
     });
@@ -480,20 +494,34 @@ describe('RiskService', () => {
         updatedAt: new Date(Date.now() - 360000), // 6 minutes ago (stale)
       });
 
-      const result = await service.evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId);
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        quantity,
+        price,
+        brokerId,
+        segmentId,
+      );
       expect(result.approved).toBe(false);
       expect(result.reason).toContain('stale');
       expect(queueMock.addJob).toHaveBeenCalledWith(
         'risk-recalculate',
         `risk-recalc-${userId}`,
-        { userId }
+        { userId },
       );
     });
 
     it('should fail closed when no profiles exist and RISK_DEFAULT_MODE=BLOCK', async () => {
       prismaMock.riskProfile.findMany.mockResolvedValue([]);
 
-      const result = await service.evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId);
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        quantity,
+        price,
+        brokerId,
+        segmentId,
+      );
       expect(result.approved).toBe(false);
       expect(result.reason).toContain('No active risk profile found');
     });
@@ -502,7 +530,14 @@ describe('RiskService', () => {
       process.env.RISK_DEFAULT_MODE = 'ALLOW';
       prismaMock.riskProfile.findMany.mockResolvedValue([]);
 
-      const result = await service.evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId);
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        quantity,
+        price,
+        brokerId,
+        segmentId,
+      );
       expect(result.approved).toBe(true);
     });
 
@@ -517,10 +552,17 @@ describe('RiskService', () => {
           version: 1,
           maxCapitalPerUser: 100000, // 50000 used + 150000 order = 200000 (> 100000 limit)
           priority: 1,
-        }
+        },
       ]);
 
-      const result = await service.evaluateRisk(userId, symbol, 100, 1500, brokerId, segmentId); // 150,000 order value
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        100,
+        1500,
+        brokerId,
+        segmentId,
+      ); // 150,000 order value
       expect(result.approved).toBe(false);
       expect(result.reason).toContain('Exceeded Max Capital Limit');
     });
@@ -536,10 +578,17 @@ describe('RiskService', () => {
           version: 1,
           maxDailyLoss: 5000, // limit is 5000, currently 6000 lost
           priority: 1,
-        }
+        },
       ]);
 
-      const result = await service.evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId);
+      const result = await service.evaluateRisk(
+        userId,
+        symbol,
+        quantity,
+        price,
+        brokerId,
+        segmentId,
+      );
       expect(result.approved).toBe(false);
       expect(result.reason).toContain('Exceeded Max Daily Loss Limit');
     });

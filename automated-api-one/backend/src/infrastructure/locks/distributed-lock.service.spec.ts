@@ -48,7 +48,13 @@ describe('DistributedLockService', () => {
       expect(redisService.assertHealthy).toHaveBeenCalled();
       expect(token).toBeDefined();
       expect(typeof token).toBe('string');
-      expect(clientMock.set).toHaveBeenCalledWith('my_lock', token, 'PX', 10000, 'NX');
+      expect(clientMock.set).toHaveBeenCalledWith(
+        'my_lock',
+        token,
+        'PX',
+        10000,
+        'NX',
+      );
     });
 
     it('should return null if lock acquisition fails', async () => {
@@ -61,12 +67,20 @@ describe('DistributedLockService', () => {
       clientMock.set.mockResolvedValue('OK');
       clientMock.eval.mockResolvedValue(1); // Successful extension
 
-      const token = await service.acquireLock('my_lock', 3000, { autoRenew: true });
+      const token = await service.acquireLock('my_lock', 3000, {
+        autoRenew: true,
+      });
       expect(token).toBeDefined();
 
       // Interval is ttlMs / 3 = 1000ms. Fast forward 1000ms.
       await jest.advanceTimersByTimeAsync(1000);
-      expect(clientMock.eval).toHaveBeenCalledWith(expect.any(String), 1, 'my_lock', token, 3000);
+      expect(clientMock.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
+        'my_lock',
+        token,
+        3000,
+      );
     });
   });
 
@@ -75,7 +89,12 @@ describe('DistributedLockService', () => {
       clientMock.eval.mockResolvedValue(1);
       const res = await service.releaseLock('my_lock', 'my_token');
       expect(res).toBe(true);
-      expect(clientMock.eval).toHaveBeenCalledWith(expect.any(String), 1, 'my_lock', 'my_token');
+      expect(clientMock.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
+        'my_lock',
+        'my_token',
+      );
     });
 
     it('should return false if lock released failed (e.g. token mismatch)', async () => {
@@ -90,7 +109,13 @@ describe('DistributedLockService', () => {
       clientMock.eval.mockResolvedValue(1);
       const res = await service.extendLock('my_lock', 'my_token', 5000);
       expect(res).toBe(true);
-      expect(clientMock.eval).toHaveBeenCalledWith(expect.any(String), 1, 'my_lock', 'my_token', 5000);
+      expect(clientMock.eval).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
+        'my_lock',
+        'my_token',
+        5000,
+      );
     });
   });
 });

@@ -58,7 +58,7 @@ class AutomatedTradingController extends GetxController {
   bool get hasActiveProxy => proxyInfo.value?['hasProxy'] == true && proxyInfo.value?['status'] != 'expired';
   String get staticIpAddress => proxyInfo.value?['ip']?.toString() ?? '';
   bool get isBrokerConfigured => linkedBrokers.isNotEmpty;
-  bool get isBrokerSessionActive => isBrokerConfigured && linkedBrokers.first['isSessionActive'] == true;
+  bool get isBrokerSessionActive => linkedBrokers.any((b) => b['isSessionActive'] == true);
   bool get isLotConfigured => userSegments.isNotEmpty && (userSegments.first['baseLot'] ?? 0) > 0;
   bool get isStrategyConfigured => currentStrategyData.value?['strategy'] != null;
   bool get isDailyConsentActive => consentsStatus.value == 'ACTIVE';

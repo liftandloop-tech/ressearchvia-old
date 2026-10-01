@@ -93,10 +93,17 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 }
                 if (!httpsAgent) {
                     const proxy = userBroker.proxyCredential;
-                    if (proxy && proxy.ip && proxy.port && proxy.ip_userid && proxy.ip_password) {
+                    if (proxy &&
+                        proxy.ip &&
+                        proxy.port &&
+                        proxy.ip_userid &&
+                        proxy.ip_password) {
                         networkMode = 'DEDICATED_PROXY';
                         const isExpired = proxy.expiresAt && new Date(proxy.expiresAt) < new Date();
-                        if (isExpired || (proxy.status !== 'ACTIVE' && proxy.status !== 'PENDING' && proxy.status !== 'RENEWING')) {
+                        if (isExpired ||
+                            (proxy.status !== 'ACTIVE' &&
+                                proxy.status !== 'PENDING' &&
+                                proxy.status !== 'RENEWING')) {
                             this.logger.error(`[Proxy Violation] requestId=${requestId} Dedicated proxy for user ${userId} is ${proxy.status} (isExpired=${!!isExpired}). Aborting to prevent direct IP leakage.`);
                             throw new Error(`[Proxy Error] Dedicated proxy is ${proxy.status}${isExpired ? ' (EXPIRED)' : ''}. Aborting broker request to prevent direct IP leakage.`);
                         }
@@ -121,7 +128,9 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         const headers = {
             'Content-Type': 'text/plain',
         };
-        if (token && endpoint !== zebu_endpoints_1.ZebuEndpoints.GEN_ACCESS_TOKEN && endpoint !== zebu_endpoints_1.ZebuEndpoints.REFRESH_TOKEN) {
+        if (token &&
+            endpoint !== zebu_endpoints_1.ZebuEndpoints.GEN_ACCESS_TOKEN &&
+            endpoint !== zebu_endpoints_1.ZebuEndpoints.REFRESH_TOKEN) {
             headers['Authorization'] = `Bearer ${token}`;
         }
         try {
@@ -140,7 +149,11 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 }
             }
             this.logger.log(`[Broker Outbound Response] requestId=${requestId} endpoint=${endpoint} httpStatus=${response.status} stat=${data?.stat || 'N/A'} duration=${durationMs}ms`);
-            if (data && data.stat === 'Not_Ok' && typeof data.emsg === 'string' && (data.emsg.includes('Session Expired') || data.emsg.includes('Invalid Session Key'))) {
+            if (data &&
+                data.stat === 'Not_Ok' &&
+                typeof data.emsg === 'string' &&
+                (data.emsg.includes('Session Expired') ||
+                    data.emsg.includes('Invalid Session Key'))) {
                 this.logger.warn(`[Zebu Auth] Session expired on broker (${data.emsg}). Updating connection status.`);
                 if (token) {
                     await this.prisma.userBroker.updateMany({
@@ -150,10 +163,15 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 }
             }
             if (response.status === 404 && endpoint === zebu_endpoints_1.ZebuEndpoints.REFRESH_TOKEN) {
-                return { stat: 'Not_Ok', emsg: 'RefreshToken endpoint not supported by Zebu server (tokens are 90-day long lived)' };
+                return {
+                    stat: 'Not_Ok',
+                    emsg: 'RefreshToken endpoint not supported by Zebu server (tokens are 90-day long lived)',
+                };
             }
             if (response.status >= 400 && (!data || !data.stat)) {
-                const errMsg = data?.emsg || data?.message || (typeof data === 'string' ? data : `HTTP ${response.status}`);
+                const errMsg = data?.emsg ||
+                    data?.message ||
+                    (typeof data === 'string' ? data : `HTTP ${response.status}`);
                 throw new Error(`Zebu Error (${response.status}): ${errMsg}`);
             }
             return data;
@@ -212,7 +230,7 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         if (!userBroker) {
             throw new common_1.BadRequestException('Please link your Zebu broker details first');
         }
-        let clientId = userBroker.apiKey || userBroker.brokerClientId || '';
+        const clientId = userBroker.apiKey || userBroker.brokerClientId || '';
         return `https://go.mynt.in/OAuthlogin/authorize/oauth?client_id=${clientId}&state=${state}`;
     }
     async completeAuthorization(callbackData) {
@@ -269,11 +287,16 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
             const responseData = await this.executeBrokerPost(null, userBroker.brokerClientId, zebu_endpoints_1.ZebuEndpoints.GEN_ACCESS_TOKEN, body, 10000);
             const accessToken = responseData?.access_token || responseData?.susertoken;
             if (responseData?.stat !== 'Ok' || !accessToken) {
-                const errorMsg = responseData?.emsg || responseData?.message || 'Failed to get access token';
+                const errorMsg = responseData?.emsg ||
+                    responseData?.message ||
+                    'Failed to get access token';
                 throw new Error(errorMsg);
             }
             const refreshToken = responseData?.refresh_token || userBroker.refreshToken || '';
-            const brokerUserId = responseData.actid || responseData.uid || responseData.USERID || userBroker.brokerClientId;
+            const brokerUserId = responseData.actid ||
+                responseData.uid ||
+                responseData.USERID ||
+                userBroker.brokerClientId;
             return {
                 accessToken,
                 refreshToken,
@@ -425,7 +448,11 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.POSITION_BOOK, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getPositions', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const positions = Array.isArray(data) ? data : data?.stat === 'Ok' ? data.data || [] : [];
+                const positions = Array.isArray(data)
+                    ? data
+                    : data?.stat === 'Ok'
+                        ? data.data || []
+                        : [];
                 return positions.map((p) => ({
                     symbol: p.tsym || p.tradingsymbol || '',
                     quantity: parseInt(p.netqty || '0', 10),
@@ -462,7 +489,11 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 const data = await this.executeBrokerPost(token, clientCode, zebu_endpoints_1.ZebuEndpoints.HOLDINGS, body);
                 this.metrics.incrementBrokerCalls('zebu', 'getHoldings', 'success');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                const holdings = Array.isArray(data) ? data : data?.stat === 'Ok' ? data.data || [] : [];
+                const holdings = Array.isArray(data)
+                    ? data
+                    : data?.stat === 'Ok'
+                        ? data.data || []
+                        : [];
                 return holdings.map((h) => ({
                     symbol: h.tsym || h.tradingsymbol || '',
                     quantity: parseInt(h.holdqty || h.quantity || '0', 10),
@@ -482,7 +513,11 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         if (this.isMock) {
             const mockId = `mock_zebu_order_${Math.floor(100000 + Math.random() * 900000)}`;
             this.logger.log(`[SANDBOX MOCK] Placed Zebu order ${mockId} for ${clientCode}: ${order.side} ${order.quantity} x ${order.symbol}`);
-            return { brokerOrderId: mockId, status: 'EXECUTED', message: 'Mock execution successful' };
+            return {
+                brokerOrderId: mockId,
+                status: 'EXECUTED',
+                message: 'Mock execution successful',
+            };
         }
         return this.circuitBreaker.execute('zebu-place-order', async () => {
             await this.rateLimiter.throttle('zebu', 'trading');
@@ -528,21 +563,33 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 if (data && data.stat === 'Ok' && data.norenordno) {
                     return { brokerOrderId: data.norenordno, status: 'PENDING' };
                 }
-                return { brokerOrderId: '', status: 'REJECTED', message: data?.emsg || 'Order rejected by Zebu' };
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: data?.emsg || 'Order rejected by Zebu',
+                };
             }
             catch (error) {
                 this.metrics.incrementBrokerCalls('zebu', 'placeOrder', 'failure');
                 this.metrics.incrementBrokerFailures('zebu', 'placeOrder');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
                 this.logger.error(`[Zebu] placeOrder failed: ${error.message}`);
-                return { brokerOrderId: '', status: 'REJECTED', message: error.message };
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: error.message,
+                };
             }
         });
     }
     async modifyOrder(token, clientCode, orderId, _variety, order) {
         if (this.isMock) {
             this.logger.log(`[SANDBOX MOCK] Modifying Zebu order ${orderId}`);
-            return { brokerOrderId: orderId, status: 'PENDING', message: 'Mock modification successful' };
+            return {
+                brokerOrderId: orderId,
+                status: 'PENDING',
+                message: 'Mock modification successful',
+            };
         }
         return this.circuitBreaker.execute('zebu-modify-order', async () => {
             await this.rateLimiter.throttle('zebu', 'trading');
@@ -563,20 +610,32 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 if (data && data.stat === 'Ok' && data.result) {
                     return { brokerOrderId: data.result, status: 'PENDING' };
                 }
-                return { brokerOrderId: '', status: 'REJECTED', message: data?.emsg || 'Modify rejected by Zebu' };
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: data?.emsg || 'Modify rejected by Zebu',
+                };
             }
             catch (error) {
                 this.metrics.incrementBrokerCalls('zebu', 'modifyOrder', 'failure');
                 this.metrics.incrementBrokerFailures('zebu', 'modifyOrder');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                return { brokerOrderId: '', status: 'REJECTED', message: error.message };
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: error.message,
+                };
             }
         });
     }
     async cancelOrder(token, clientCode, orderId, _variety) {
         if (this.isMock) {
             this.logger.log(`[SANDBOX MOCK] Cancelling Zebu order ${orderId}`);
-            return { brokerOrderId: orderId, status: 'CANCELLED', message: 'Mock cancellation successful' };
+            return {
+                brokerOrderId: orderId,
+                status: 'CANCELLED',
+                message: 'Mock cancellation successful',
+            };
         }
         return this.circuitBreaker.execute('zebu-cancel-order', async () => {
             await this.rateLimiter.throttle('zebu', 'trading');
@@ -590,19 +649,31 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
                 if (data && data.stat === 'Ok' && data.result) {
                     return { brokerOrderId: data.result, status: 'CANCELLED' };
                 }
-                return { brokerOrderId: '', status: 'REJECTED', message: data?.emsg || 'Cancel rejected by Zebu' };
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: data?.emsg || 'Cancel rejected by Zebu',
+                };
             }
             catch (error) {
                 this.metrics.incrementBrokerCalls('zebu', 'cancelOrder', 'failure');
                 this.metrics.incrementBrokerFailures('zebu', 'cancelOrder');
                 this.metrics.observeBrokerLatency('zebu', Date.now() - start);
-                return { brokerOrderId: '', status: 'REJECTED', message: error.message };
+                return {
+                    brokerOrderId: '',
+                    status: 'REJECTED',
+                    message: error.message,
+                };
             }
         });
     }
     async getOrderStatus(token, clientCode, brokerOrderId) {
         if (this.isMock) {
-            return { brokerOrderId, status: 'EXECUTED', message: 'Mock execution successful' };
+            return {
+                brokerOrderId,
+                status: 'EXECUTED',
+                message: 'Mock execution successful',
+            };
         }
         try {
             const body = `jData=${JSON.stringify({ uid: clientCode })}&jKey=${token}`;
@@ -737,7 +808,13 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
     }
     async getLtpData(token, exchange, symbol, symbolToken) {
         if (this.isMock) {
-            return { exchange, symbol, token: symbolToken, ltp: 752.4, timestamp: new Date() };
+            return {
+                exchange,
+                symbol,
+                token: symbolToken,
+                ltp: 752.4,
+                timestamp: new Date(),
+            };
         }
         const cacheKey = `broker:ltp:zebu:${exchange}:${symbolToken}`;
         if (this.redisService.isHealthy()) {
@@ -778,7 +855,9 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
         });
         if (this.redisService.isHealthy()) {
             try {
-                await this.redisService.getClient().set(cacheKey, JSON.stringify(ltpVal), 'EX', 1);
+                await this.redisService
+                    .getClient()
+                    .set(cacheKey, JSON.stringify(ltpVal), 'EX', 1);
             }
             catch (err) {
                 this.logger.error(`[Zebu] Error saving LTP cache: ${err.message}`);
@@ -788,17 +867,26 @@ let ZebuService = ZebuService_1 = class ZebuService extends broker_adapter_inter
     }
     async getOrderDetails(token, clientCode, orderId) {
         if (this.isMock) {
-            return { brokerOrderId: orderId, status: 'EXECUTED', message: 'Mock details successful' };
+            return {
+                brokerOrderId: orderId,
+                status: 'EXECUTED',
+                message: 'Mock details successful',
+            };
         }
         return this.getOrderStatus(token, clientCode, orderId);
     }
     mapOrderType(orderType) {
         switch ((orderType || '').toUpperCase()) {
-            case 'MARKET': return 'MKT';
-            case 'LIMIT': return 'LMT';
-            case 'SL': return 'SL-LMT';
-            case 'SL-M': return 'SL-MKT';
-            default: return 'LMT';
+            case 'MARKET':
+                return 'MKT';
+            case 'LIMIT':
+                return 'LMT';
+            case 'SL':
+                return 'SL-LMT';
+            case 'SL-M':
+                return 'SL-MKT';
+            default:
+                return 'LMT';
         }
     }
     mapOrderStatus(brokerStatus) {

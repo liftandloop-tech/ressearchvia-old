@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { QueueService } from '../../infrastructure/queues/queues.service';
 import { IdempotencyService } from '../../infrastructure/idempotency/idempotency.service';
@@ -11,7 +15,13 @@ import { Queues } from '../../infrastructure/queues/queue.constants';
 import { UserExecutionSnapshot } from '../interfaces/user-execution-snapshot.interface';
 import { ExecutionContext } from '../interfaces/execution-context.interface';
 import type { Signal } from '@prisma/client';
-import { UserSegmentStatus, SubscriptionStatus, ConsentStatus, BrokerStatus, SignalState } from '@prisma/client';
+import {
+  UserSegmentStatus,
+  SubscriptionStatus,
+  ConsentStatus,
+  BrokerStatus,
+  SignalState,
+} from '@prisma/client';
 import pLimit from 'p-limit';
 import { randomUUID } from 'crypto';
 import axios from 'axios';
@@ -48,7 +58,12 @@ export class SignalOrchestratorService {
     const validTransitions: Record<SignalState, SignalState[]> = {
       [SignalState.RECEIVED]: [SignalState.VALIDATED, SignalState.FAILED],
       [SignalState.VALIDATED]: [SignalState.PROCESSING, SignalState.FAILED],
-      [SignalState.PROCESSING]: [SignalState.PROCESSING, SignalState.COMPLETED, SignalState.PARTIALLY_COMPLETED, SignalState.FAILED],
+      [SignalState.PROCESSING]: [
+        SignalState.PROCESSING,
+        SignalState.COMPLETED,
+        SignalState.PARTIALLY_COMPLETED,
+        SignalState.FAILED,
+      ],
       [SignalState.COMPLETED]: [],
       [SignalState.PARTIALLY_COMPLETED]: [],
       [SignalState.FAILED]: [],
@@ -108,24 +123,41 @@ export class SignalOrchestratorService {
     this.redisService.assertHealthy();
 
     // Check global trading kill switch
-    const isTradingDisabled = await this.redisService.getClient().get('trading:global:disabled');
+    const isTradingDisabled = await this.redisService
+      .getClient()
+      .get('trading:global:disabled');
     if (isTradingDisabled === 'true') {
-      this.logger.warn(`[${correlationId}] Signal processing/fan-out blocked due to global trading kill switch`);
-      throw new ServiceUnavailableException('Trading is disabled globally via kill switch');
+      this.logger.warn(
+        `[${correlationId}] Signal processing/fan-out blocked due to global trading kill switch`,
+      );
+      throw new ServiceUnavailableException(
+        'Trading is disabled globally via kill switch',
+      );
     }
 
     // Check global emergency risk lock
-    const isGlobalRiskBlocked = await this.redisService.getClient().get('risk:global:blocked');
+    const isGlobalRiskBlocked = await this.redisService
+      .getClient()
+      .get('risk:global:blocked');
     if (isGlobalRiskBlocked === 'true') {
-      this.logger.warn(`[${correlationId}] Signal processing/fan-out blocked due to global emergency risk lock`);
-      throw new ServiceUnavailableException('Trading is disabled globally via global emergency risk lock');
+      this.logger.warn(
+        `[${correlationId}] Signal processing/fan-out blocked due to global emergency risk lock`,
+      );
+      throw new ServiceUnavailableException(
+        'Trading is disabled globally via global emergency risk lock',
+      );
     }
 
     // 2. Idempotency check — prevent duplicate fan-out for same signal
     const idempotencyKey = `signal:fanout:${signalId}`;
-    const isNew = await this.idempotencyService.tryAcquire(idempotencyKey, 'SIGNAL_FANOUT');
+    const isNew = await this.idempotencyService.tryAcquire(
+      idempotencyKey,
+      'SIGNAL_FANOUT',
+    );
     if (!isNew) {
-      this.logger.warn(`[${correlationId}] Signal ${signalId} already processed (idempotent skip)`);
+      this.logger.warn(
+        `[${correlationId}] Signal ${signalId} already processed (idempotent skip)`,
+      );
       return {
         state: SignalState.COMPLETED,
         totalUsers: 0,
@@ -144,7 +176,13 @@ export class SignalOrchestratorService {
     if (!signal) {
       this.logger.error(`[${correlationId}] Signal ${signalId} not found`);
       await this.idempotencyService.markFailed(idempotencyKey);
-      return { state: SignalState.FAILED, totalUsers: 0, successUsers: 0, rejectedUsers: 0, correlationId };
+      return {
+        state: SignalState.FAILED,
+        totalUsers: 0,
+        successUsers: 0,
+        rejectedUsers: 0,
+        correlationId,
+      };
     }
 
     // 4. Initialize SegmentExecution tracking in RECEIVED state
@@ -163,12 +201,20 @@ export class SignalOrchestratorService {
 
     // Validate that the segment is active / valid
     if (!signal.segmentRelation) {
-      this.logger.error(`[${correlationId}] Signal ${signalId} has no associated segment relation`);
+      this.logger.error(
+        `[${correlationId}] Signal ${signalId} has no associated segment relation`,
+      );
       await this.updateExecutionState(execution.id, SignalState.FAILED, {
         errorSummary: 'No associated segment relation found',
       });
       await this.idempotencyService.markFailed(idempotencyKey);
-      return { state: SignalState.FAILED, totalUsers: 0, successUsers: 0, rejectedUsers: 0, correlationId };
+      return {
+        state: SignalState.FAILED,
+        totalUsers: 0,
+        successUsers: 0,
+        rejectedUsers: 0,
+        correlationId,
+      };
     }
 
     // Transition to VALIDATED
@@ -177,14 +223,13 @@ export class SignalOrchestratorService {
     // Transition to PROCESSING
     await this.updateExecutionState(execution.id, SignalState.PROCESSING);
 
-    this.logger.log(`[${correlationId}] Starting paginated fan-out for signal ${signalId}`);
+    this.logger.log(
+      `[${correlationId}] Starting paginated fan-out for signal ${signalId}`,
+    );
 
     // 5. Fan out in pages — never load all subscribers into memory at once
-    const { successUsers, rejectedUsers, totalUsers, errorSummary } = await this.paginatedFanOut(
-      signal,
-      correlationId,
-      execution.id,
-    );
+    const { successUsers, rejectedUsers, totalUsers, errorSummary } =
+      await this.paginatedFanOut(signal, correlationId, execution.id);
 
     const finalState =
       totalUsers === 0
@@ -196,7 +241,10 @@ export class SignalOrchestratorService {
             : SignalState.PARTIALLY_COMPLETED;
 
     const completedAt = new Date();
-    const processingDurationMs = completedAt.getTime() - execution.startedAt.getTime();
+    const startedAtTime = execution.startedAt
+      ? new Date(execution.startedAt).getTime()
+      : completedAt.getTime();
+    const processingDurationMs = completedAt.getTime() - startedAtTime;
 
     // 6. Complete segment execution summary
     await this.updateExecutionState(execution.id, finalState, {
@@ -218,7 +266,13 @@ export class SignalOrchestratorService {
     );
 
     // Send applied status update to l-l-backend
-    await this.sendAppliedStatusUpdate(signal.id, totalUsers, successUsers, signal.side, signal.symbol);
+    await this.sendAppliedStatusUpdate(
+      signal.id,
+      totalUsers,
+      successUsers,
+      signal.side,
+      signal.symbol,
+    );
 
     return {
       state: finalState,
@@ -257,7 +311,9 @@ export class SignalOrchestratorService {
           timeout: 5000,
         },
       );
-      this.logger.log(`[Integration] Successfully sent applied status update for signal ${signalId} to l-l-backend`);
+      this.logger.log(
+        `[Integration] Successfully sent applied status update for signal ${signalId} to l-l-backend`,
+      );
     } catch (error) {
       this.logger.error(
         `[Integration] Failed to send applied status update to l-l-backend: ${error.message}`,
@@ -277,7 +333,12 @@ export class SignalOrchestratorService {
     signal: Signal & { segmentRelation: any },
     correlationId: string,
     executionId: string,
-  ): Promise<{ totalUsers: number; successUsers: number; rejectedUsers: number; errorSummary?: string }> {
+  ): Promise<{
+    totalUsers: number;
+    successUsers: number;
+    rejectedUsers: number;
+    errorSummary?: string;
+  }> {
     const BATCH_SIZE = 500;
     const limit = pLimit(50);
 
@@ -303,7 +364,11 @@ export class SignalOrchestratorService {
         batch.map((subscriber) =>
           limit(async () => {
             try {
-              const enqueued = await this.enqueueForUser(signal, subscriber, correlationId);
+              const enqueued = await this.enqueueForUser(
+                signal,
+                subscriber,
+                correlationId,
+              );
               return { status: enqueued ? 'success' : 'rejected' };
             } catch (err) {
               const msg = `User ${subscriber.userId}: ${err.message}`;
@@ -346,7 +411,8 @@ export class SignalOrchestratorService {
       if (batch.length < BATCH_SIZE) break;
     }
 
-    const errorSummary = errors.length > 0 ? errors.slice(0, 100).join('; ') : undefined;
+    const errorSummary =
+      errors.length > 0 ? errors.slice(0, 100).join('; ') : undefined;
 
     return { totalUsers, successUsers, rejectedUsers, errorSummary };
   }
@@ -428,7 +494,9 @@ export class SignalOrchestratorService {
       const todayConsent = us.user.consents?.[0];
       const activeUserBroker =
         (todayConsent
-          ? us.user.userBrokers.find((ub) => ub.brokerId === todayConsent.brokerId)
+          ? us.user.userBrokers.find(
+              (ub) => ub.brokerId === todayConsent.brokerId,
+            )
           : null) || us.user.userBrokers[0];
       const activeSub = us.user.subscriptions[0];
       if (!activeUserBroker || !activeSub) continue;
@@ -463,9 +531,13 @@ export class SignalOrchestratorService {
   ): Promise<boolean> {
     // Check user-level risk lock
     if (this.redisService.isHealthy()) {
-      const userBlocked = await this.redisService.getClient().get(`user:risk:blocked:${subscriber.userId}`);
+      const userBlocked = await this.redisService
+        .getClient()
+        .get(`user:risk:blocked:${subscriber.userId}`);
       if (userBlocked === 'true') {
-        this.logger.warn(`[${correlationId}] Skip fanning out to user ${subscriber.userId} due to risk lock`);
+        this.logger.warn(
+          `[${correlationId}] Skip fanning out to user ${subscriber.userId} due to risk lock`,
+        );
         return false;
       }
     }
@@ -524,7 +596,7 @@ export class SignalOrchestratorService {
       segmentId: signal.segmentId,
       symbol: signal.symbol,
       exchange: signal.exchange,
-      side: signal.side as 'BUY' | 'SELL',
+      side: signal.side,
       orderType: (signal as any).orderType,
       entryPrice: Number(signal.entryPrice),
       stopLoss: Number(signal.stopLoss),

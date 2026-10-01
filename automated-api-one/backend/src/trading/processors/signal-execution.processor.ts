@@ -35,7 +35,9 @@ export class SignalExecutionProcessor extends WorkerHost {
     const { signalId } = job.data;
     const jobId = job.id ?? `signal-${signalId}`;
 
-    this.logger.log(`Processing signal execution job: signalId=${signalId} jobId=${jobId}`);
+    this.logger.log(
+      `Processing signal execution job: signalId=${signalId} jobId=${jobId}`,
+    );
 
     try {
       const result = await this.orchestrator.processSignal(signalId);

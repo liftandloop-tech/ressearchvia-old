@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { PublishSignalDto } from './signals.controller';
 import { Signal, SignalStatus } from '@prisma/client';
@@ -22,10 +26,16 @@ export class SignalsService {
   ): Promise<{ success: boolean; signalId: string }> {
     // Check maintenance mode
     if (this.redisService.isHealthy()) {
-      const isGlobalMaint = await this.redisService.getClient().get('system:maintenance:global');
-      const isSignalsMaint = await this.redisService.getClient().get('system:maintenance:signals');
+      const isGlobalMaint = await this.redisService
+        .getClient()
+        .get('system:maintenance:global');
+      const isSignalsMaint = await this.redisService
+        .getClient()
+        .get('system:maintenance:signals');
       if (isGlobalMaint === 'true' || isSignalsMaint === 'true') {
-        throw new ServiceUnavailableException('Signals publishing is currently disabled due to system maintenance');
+        throw new ServiceUnavailableException(
+          'Signals publishing is currently disabled due to system maintenance',
+        );
       }
     }
 
@@ -97,7 +107,9 @@ export class SignalsService {
           timeout: 5000,
         },
       );
-      console.log(`[Integration] Successfully forwarded signal ${signal.id} to l-l-backend`);
+      console.log(
+        `[Integration] Successfully forwarded signal ${signal.id} to l-l-backend`,
+      );
     } catch (error: any) {
       console.error(
         `[Integration] Failed to forward signal ${signal.id} to l-l-backend: ${error.message}`,
@@ -127,4 +139,3 @@ export class SignalsService {
     });
   }
 }
-

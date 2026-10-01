@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var OrderMonitoringService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrderMonitoringService = void 0;
@@ -54,10 +57,18 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
         });
         if (!order) {
             this.logger.warn(`[${correlationId}] Order ${orderId} not found for monitoring`);
-            return { finalStatus: 'PENDING', brokerOrderId: '', reason: 'Order not found' };
+            return {
+                finalStatus: 'PENDING',
+                brokerOrderId: '',
+                reason: 'Order not found',
+            };
         }
         if (!order.brokerOrderId) {
-            return { finalStatus: 'PENDING', brokerOrderId: '', reason: 'No broker order ID' };
+            return {
+                finalStatus: 'PENDING',
+                brokerOrderId: '',
+                reason: 'No broker order ID',
+            };
         }
         const trade = order.trade;
         const userBroker = await this.prisma.userBroker.findFirst({
@@ -65,7 +76,11 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
             include: { broker: true },
         });
         if (!userBroker?.accessToken) {
-            return { finalStatus: 'PENDING', brokerOrderId: order.brokerOrderId, reason: 'No broker session' };
+            return {
+                finalStatus: 'PENDING',
+                brokerOrderId: order.brokerOrderId,
+                reason: 'No broker session',
+            };
         }
         const brokerCode = userBroker.broker.code;
         const adapter = this.brokerFactory.getAdapter(brokerCode);
@@ -85,7 +100,9 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
                 reason: err.message,
             };
         }
-        if (brokerStatus === 'FILLED' || brokerStatus === 'COMPLETE' || brokerStatus === 'EXECUTED') {
+        if (brokerStatus === 'FILLED' ||
+            brokerStatus === 'COMPLETE' ||
+            brokerStatus === 'EXECUTED') {
             await this.reconcileFilled(order.id, trade.id, trade.userId, trade.segmentId, correlationId);
             return { finalStatus: 'FILLED', brokerOrderId: order.brokerOrderId };
         }
@@ -105,14 +122,22 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
         });
         if (!order) {
             this.logger.warn(`[Webhook] Order with brokerOrderId ${brokerOrderId} not found in database`);
-            return { success: false, message: `Order with brokerOrderId ${brokerOrderId} not found` };
+            return {
+                success: false,
+                message: `Order with brokerOrderId ${brokerOrderId} not found`,
+            };
         }
         if (order.status === client_1.OrderStatus.FILLED ||
             order.status === client_1.OrderStatus.CANCELLED ||
             order.status === client_1.OrderStatus.REJECTED ||
             order.status === client_1.OrderStatus.EXPIRED) {
             this.logger.log(`[Webhook] Order ${order.id} is already in terminal state ${order.status}`);
-            return { success: true, message: `Order already in terminal state ${order.status}`, orderId: order.id, status: order.status };
+            return {
+                success: true,
+                message: `Order already in terminal state ${order.status}`,
+                orderId: order.id,
+                status: order.status,
+            };
         }
         const trade = order.trade;
         const normalizedStatus = (status || '').toUpperCase();
@@ -122,26 +147,48 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
             normalizedStatus === 'TRADED') {
             await this.reconcileFilled(order.id, trade.id, trade.userId, trade.segmentId, correlationId);
             this.logger.log(`[Webhook] Order ${order.id} marked as FILLED from broker webhook.`);
-            return { success: true, message: 'Order marked as FILLED', orderId: order.id, status: 'FILLED' };
+            return {
+                success: true,
+                message: 'Order marked as FILLED',
+                orderId: order.id,
+                status: 'FILLED',
+            };
         }
         if (['CANCELLED', 'REJECTED', 'EXPIRED'].includes(normalizedStatus)) {
             const failStatus = normalizedStatus;
             await this.reconcileFailed(order.id, trade.id, trade.userId, trade.segmentId, failStatus, correlationId);
             this.logger.warn(`[Webhook] Order ${order.id} marked as ${failStatus} from broker webhook. Reason: ${rejectionReason || 'N/A'}`);
-            return { success: true, message: `Order marked as ${failStatus}`, orderId: order.id, status: failStatus };
+            return {
+                success: true,
+                message: `Order marked as ${failStatus}`,
+                orderId: order.id,
+                status: failStatus,
+            };
         }
         if (normalizedStatus === 'PARTIALLY_FILLED') {
             await this.prisma.order.update({
                 where: { id: order.id },
                 data: {
                     status: client_1.OrderStatus.PARTIALLY_FILLED,
-                    ...(params.filledQuantity ? { filledQuantity: params.filledQuantity } : {}),
+                    ...(params.filledQuantity
+                        ? { filledQuantity: params.filledQuantity }
+                        : {}),
                     ...(params.averagePrice ? { averagePrice: params.averagePrice } : {}),
                 },
             });
-            return { success: true, message: 'Order marked as PARTIALLY_FILLED', orderId: order.id, status: 'PARTIALLY_FILLED' };
+            return {
+                success: true,
+                message: 'Order marked as PARTIALLY_FILLED',
+                orderId: order.id,
+                status: 'PARTIALLY_FILLED',
+            };
         }
-        return { success: true, message: `Order status acknowledged: ${normalizedStatus}`, orderId: order.id, status: normalizedStatus };
+        return {
+            success: true,
+            message: `Order status acknowledged: ${normalizedStatus}`,
+            orderId: order.id,
+            status: normalizedStatus,
+        };
     }
     async reconcileFilled(orderId, tradeId, userId, segmentId, correlationId) {
         const event = await this.prisma.$transaction(async (tx) => {
@@ -176,7 +223,15 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
                 where: { id: tradeId },
                 data: { status: client_1.TradeStatus.FAILED },
             });
-            const evt = await this.outbox.createEvent('ORDER_FAILED', { version: 1, correlationId, orderId, tradeId, userId, segmentId, failStatus }, tx);
+            const evt = await this.outbox.createEvent('ORDER_FAILED', {
+                version: 1,
+                correlationId,
+                orderId,
+                tradeId,
+                userId,
+                segmentId,
+                failStatus,
+            }, tx);
             return evt;
         });
         await this.outbox.enqueueEvent(event.id);
@@ -189,6 +244,7 @@ let OrderMonitoringService = OrderMonitoringService_1 = class OrderMonitoringSer
 exports.OrderMonitoringService = OrderMonitoringService;
 exports.OrderMonitoringService = OrderMonitoringService = OrderMonitoringService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(1, (0, common_1.Inject)((0, common_1.forwardRef)(() => broker_factory_1.BrokerFactory))),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         broker_factory_1.BrokerFactory,
         circuit_breaker_service_1.CircuitBreakerService,

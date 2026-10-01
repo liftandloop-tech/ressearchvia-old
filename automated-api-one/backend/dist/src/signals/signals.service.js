@@ -34,8 +34,12 @@ let SignalsService = class SignalsService {
     }
     async publishAndEnqueue(dto) {
         if (this.redisService.isHealthy()) {
-            const isGlobalMaint = await this.redisService.getClient().get('system:maintenance:global');
-            const isSignalsMaint = await this.redisService.getClient().get('system:maintenance:signals');
+            const isGlobalMaint = await this.redisService
+                .getClient()
+                .get('system:maintenance:global');
+            const isSignalsMaint = await this.redisService
+                .getClient()
+                .get('system:maintenance:signals');
             if (isGlobalMaint === 'true' || isSignalsMaint === 'true') {
                 throw new common_1.ServiceUnavailableException('Signals publishing is currently disabled due to system maintenance');
             }

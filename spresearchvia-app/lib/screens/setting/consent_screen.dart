@@ -284,7 +284,11 @@ class ConsentScreen extends StatelessWidget {
                                   'Please link a broker first before granting trading consent.');
                               return;
                             }
-                            final bCode = controller.linkedBrokers.first['brokerCode'];
+                            final activeBroker = controller.linkedBrokers.firstWhere(
+                                (b) => b['isSessionActive'] == true,
+                                orElse: () => controller.linkedBrokers.first,
+                            );
+                            final bCode = activeBroker['brokerCode'];
                             controller.grantConsent(bCode);
                           }
                         : null,

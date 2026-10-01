@@ -19,7 +19,12 @@ let AdminModule = class AdminModule {
 exports.AdminModule = AdminModule;
 exports.AdminModule = AdminModule = __decorate([
     (0, common_1.Module)({
-        imports: [infrastructure_module_1.InfrastructureModule, brokers_module_1.BrokersModule, notifications_module_1.NotificationsModule, reconciliation_module_1.ReconciliationModule],
+        imports: [
+            infrastructure_module_1.InfrastructureModule,
+            brokers_module_1.BrokersModule,
+            notifications_module_1.NotificationsModule,
+            reconciliation_module_1.ReconciliationModule,
+        ],
         controllers: [ops_controller_1.OpsController],
         providers: [ops_service_1.OpsService],
         exports: [ops_service_1.OpsService],

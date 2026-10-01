@@ -57,12 +57,20 @@ describe('IdempotencyService', () => {
   describe('checkAndLock', () => {
     it('should lock in Redis and save in DB on success', async () => {
       clientMock.set.mockResolvedValue('OK');
-      const createSpy = jest.spyOn(prismaService.idempotencyKey, 'create').mockResolvedValue({} as any);
+      const createSpy = jest
+        .spyOn(prismaService.idempotencyKey, 'create')
+        .mockResolvedValue({} as any);
 
       const res = await service.checkAndLock('signal_123', 'SIGNAL', 86400);
 
       expect(res).toBe(true);
-      expect(clientMock.set).toHaveBeenCalledWith('trade:idempotency:signal_123', '1', 'EX', 86400, 'NX');
+      expect(clientMock.set).toHaveBeenCalledWith(
+        'trade:idempotency:signal_123',
+        '1',
+        'EX',
+        86400,
+        'NX',
+      );
       expect(createSpy).toHaveBeenCalledWith({
         data: {
           key: 'signal_123',
@@ -85,26 +93,36 @@ describe('IdempotencyService', () => {
       clientMock.set.mockResolvedValue('OK');
       const error: any = new Error('Unique constraint failed');
       error.code = 'P2002';
-      jest.spyOn(prismaService.idempotencyKey, 'create').mockRejectedValue(error);
+      jest
+        .spyOn(prismaService.idempotencyKey, 'create')
+        .mockRejectedValue(error);
 
       const res = await service.checkAndLock('signal_123', 'SIGNAL', 86400);
 
       expect(res).toBe(false);
-      expect(clientMock.del).toHaveBeenCalledWith('trade:idempotency:signal_123');
+      expect(clientMock.del).toHaveBeenCalledWith(
+        'trade:idempotency:signal_123',
+      );
     });
 
     it('should rethrow other DB errors', async () => {
       clientMock.set.mockResolvedValue('OK');
       const error = new Error('Database down');
-      jest.spyOn(prismaService.idempotencyKey, 'create').mockRejectedValue(error);
+      jest
+        .spyOn(prismaService.idempotencyKey, 'create')
+        .mockRejectedValue(error);
 
-      await expect(service.checkAndLock('signal_123', 'SIGNAL', 86400)).rejects.toThrow('Database down');
+      await expect(
+        service.checkAndLock('signal_123', 'SIGNAL', 86400),
+      ).rejects.toThrow('Database down');
     });
   });
 
   describe('updateStatus', () => {
     it('should update status in DB', async () => {
-      const updateSpy = jest.spyOn(prismaService.idempotencyKey, 'update').mockResolvedValue({} as any);
+      const updateSpy = jest
+        .spyOn(prismaService.idempotencyKey, 'update')
+        .mockResolvedValue({} as any);
       await service.updateStatus('signal_123', IdempotencyStatus.SUCCESS);
       expect(updateSpy).toHaveBeenCalledWith({
         where: { key: 'signal_123' },

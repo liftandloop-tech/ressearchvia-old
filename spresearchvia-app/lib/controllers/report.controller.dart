@@ -25,6 +25,32 @@ class ReportController extends GetxController {
   final tradingCallsPage = 1.obs;
   final tradingCallsHasMore = true.obs;
 
+  // Trading Accuracy State (Target Achieved, Partially Booked, Stoploss Hit)
+  final tradingAccuracyStats = Rx<TradingAccuracyStats>(const TradingAccuracyStats());
+  final thisMonthAccuracyStats = Rx<TradingAccuracyStats>(const TradingAccuracyStats());
+  final selectedOutcomeFilter = Rxn<TradingCallOutcome>();
+
+  List<ResearchReport> get filteredTradingCalls {
+    if (selectedOutcomeFilter.value == null) {
+      return tradingCalls;
+    }
+    return tradingCalls
+        .where((r) => r.outcome == selectedOutcomeFilter.value)
+        .toList();
+  }
+
+  TradingAccuracyStats get effectiveAccuracy =>
+      tradingAccuracyStats.value.totalCalls > 0
+          ? tradingAccuracyStats.value
+          : TradingAccuracyStats.fromReports(tradingCalls);
+
+  TradingAccuracyStats get effectiveDashboardAccuracy {
+    if (thisMonthAccuracyStats.value.totalCalls > 0) {
+      return thisMonthAccuracyStats.value;
+    }
+    return effectiveAccuracy;
+  }
+
   // Plan Subscription Status
   final hasActiveSubscription = true.obs;
 
@@ -39,7 +65,7 @@ class ReportController extends GetxController {
   static const int _pageSize = 10;
   
   DateTime? _lastRefreshTime;
-  static const Duration _refreshThreshold = Duration(seconds: 30);
+  static const Duration _refreshThreshold = Duration(seconds: 3);
 
   // This Month Statistics (1st of every month to current day)
   final isMonthlyCountsLoading = false.obs;
@@ -97,6 +123,11 @@ class ReportController extends GetxController {
         final count = innerData?['totalReports'] ?? 0;
         thisMonthTradingCallsCount.value =
             (count is int) ? count : int.tryParse(count.toString()) ?? 0;
+        if (innerData != null && innerData['accuracyStats'] is Map) {
+          thisMonthAccuracyStats.value = TradingAccuracyStats.fromJson(
+            Map<String, dynamic>.from(innerData['accuracyStats']),
+          );
+        }
       }
 
       if (reportsResponse.statusCode == 200) {
@@ -300,6 +331,14 @@ class ReportController extends GetxController {
             if (newReports.isNotEmpty) {
               tradingCallsPage.value++;
             }
+          }
+
+          if (innerData != null && innerData['accuracyStats'] is Map) {
+            tradingAccuracyStats.value = TradingAccuracyStats.fromJson(
+              Map<String, dynamic>.from(innerData['accuracyStats']),
+            );
+          } else {
+            tradingAccuracyStats.value = TradingAccuracyStats.fromReports(tradingCalls);
           }
         }
       }

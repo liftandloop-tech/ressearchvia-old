@@ -102,7 +102,10 @@ describe('TradingGateway', () => {
     it('should authenticate, join rooms, and update presence on successful connection', async () => {
       redisClientMock.incr.mockResolvedValue(1);
       socketMock.handshake.query.token = 'valid-token';
-      jwtServiceMock.verifyAsync.mockResolvedValue({ userId: 'user-456', role: 'ADMIN' });
+      jwtServiceMock.verifyAsync.mockResolvedValue({
+        userId: 'user-456',
+        role: 'ADMIN',
+      });
 
       await gateway.handleConnection(socketMock);
 
@@ -125,7 +128,9 @@ describe('TradingGateway', () => {
       await gateway.handleJoinSegment(socketMock, { segmentId: 'seg-1' });
 
       expect(socketMock.join).toHaveBeenCalledWith('segment:seg-1');
-      expect(socketMock.emit).toHaveBeenCalledWith('joined_segment', { segmentId: 'seg-1' });
+      expect(socketMock.emit).toHaveBeenCalledWith('joined_segment', {
+        segmentId: 'seg-1',
+      });
     });
 
     it('should emit error and reject if segment status is not ACTIVE', async () => {

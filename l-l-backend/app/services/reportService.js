@@ -569,18 +569,84 @@ const reportService = {
                     });
                 }
 
-                // Report is locked if published BEFORE user's plan started
-                const isLocked = earliestPlanStart ? (reportPublishedDate < new Date(earliestPlanStart)) : false;
-
+                // Report lock overlay removed per UX requirement (all entitled reports accessible)
                 return {
                     ...reportObj,
                     accessMetadata: {
-                        isLocked: !!isLocked,
+                        isLocked: false,
                         planStartDate: earliestPlanStart,
                         reportPublishedDate: reportPublishedDate
                     }
                 };
             });
+
+            // 5.5 Calculate Trading Call Accuracy statistics across all accessible reports (target achieved, partially booked, stoploss hit)
+            const getReportCallStatus = (report) => {
+                const updates = report.updates || [];
+                // Check updates in reverse order (latest decisive outcome first)
+                for (let i = updates.length - 1; i >= 0; i--) {
+                    const u = updates[i];
+                    const s = (u.status || '').toLowerCase().trim();
+                    const t = (u.text || '').toLowerCase();
+
+                    if (s === 'target_achieved' || s === 'target' || s === 'target achieved' || s === 'full_profit' || s === 'tgt_achieved' ||
+                        t.includes('target achieved') || t.includes('target hit') || t.includes('tgt achieved') ||
+                        t.includes('full profit') || t.includes('all targets') || t.includes('target met')) {
+                        return 'target_achieved';
+                    }
+                    if (s === 'partial_profit' || s === 'partial' || s === 'partial profit' || s === 'part_profit' ||
+                        t.includes('partial profit') || t.includes('part profit') || t.includes('book partial') || t.includes('partially booked')) {
+                        return 'partial_profit';
+                    }
+                    if (s === 'stoploss_hit' || s === 'stoploss' || s === 'stop_loss' || s === 'sl_hit' || s === 'stop loss hit' ||
+                        t.includes('sl hit') || t.includes('stoploss') || t.includes('stop loss') || t.includes('sl triggered') || t.includes('hit sl')) {
+                        return 'stoploss_hit';
+                    }
+                }
+
+                // Fallback check on title and description
+                const combined = ((report.title || '') + ' ' + (report.description || '')).toLowerCase();
+                if (combined.includes('target achieved') || combined.includes('target hit') || combined.includes('tgt achieved')) {
+                    return 'target_achieved';
+                }
+                if (combined.includes('partial profit') || combined.includes('partially booked') || combined.includes('book partial')) {
+                    return 'partial_profit';
+                }
+                if (combined.includes('stop loss hit') || combined.includes('stoploss hit') || combined.includes('sl hit') || combined.includes('sl triggered')) {
+                    return 'stoploss_hit';
+                }
+
+                return 'active';
+            };
+
+            let targetAchievedCount = 0;
+            let partiallyBookedCount = 0;
+            let stoplossHitCount = 0;
+            let activeCallsCount = 0;
+
+            allFilteredReports.forEach(r => {
+                const status = getReportCallStatus(r);
+                if (status === 'target_achieved') targetAchievedCount++;
+                else if (status === 'partial_profit') partiallyBookedCount++;
+                else if (status === 'stoploss_hit') stoplossHitCount++;
+                else activeCallsCount++;
+            });
+
+            const totalCalls = allFilteredReports.length;
+            const closedCalls = targetAchievedCount + partiallyBookedCount + stoplossHitCount;
+            const accuracyRate = closedCalls > 0
+                ? Math.round(((targetAchievedCount + partiallyBookedCount) / closedCalls) * 1000) / 10
+                : 0;
+
+            const accuracyStats = {
+                totalCalls,
+                closedCalls,
+                targetAchieved: targetAchievedCount,
+                partiallyBooked: partiallyBookedCount,
+                stoplossHit: stoplossHitCount,
+                active: activeCallsCount,
+                accuracyRate
+            };
 
             // 6. Pagination offset calculation
             // Handles both uniform pageSize and mobile variable pageSize (page 1: 20, page 2+: 10)
@@ -609,13 +675,13 @@ const reportService = {
                     hasMore: endIndex < allFilteredReports.length,
                     hasActiveSubscription: true,
                     page,
-                    pageSize
+                    pageSize,
+                    accuracyStats
                 }
             };
         } catch (error) {
             console.error("userReportList Error:", error);
-            return { status: 400, message: error.message, data: {} }
-
+            return { status: 400, message: error.message, data: {} };
         }
     },
     reportList: async ({ query }) => {

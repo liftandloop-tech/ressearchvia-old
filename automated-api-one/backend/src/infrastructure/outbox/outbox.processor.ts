@@ -29,26 +29,17 @@ const EVENT_ROUTING: Record<string, string | string[]> = {
   SUBSCRIPTION_RENEWED: Queues.NOTIFICATION,
   SUBSCRIPTION_CANCELLED: Queues.NOTIFICATION,
 
-  BROKER_DISCONNECTED: [
-    Queues.NOTIFICATION,
-    Queues.WEBSOCKET,
-  ],
+  BROKER_DISCONNECTED: [Queues.NOTIFICATION, Queues.WEBSOCKET],
 
   // Internal/Legacy mappings:
-  TRADE_OPENED: [
-    Queues.NOTIFICATION,
-    Queues.ORDER_MONITORING,
-  ],
+  TRADE_OPENED: [Queues.NOTIFICATION, Queues.ORDER_MONITORING],
   TRADE_CLOSED: Queues.NOTIFICATION,
   TRADE_EXECUTED: Queues.NOTIFICATION,
   ORDER_PLACEMENT: Queues.ORDER_PLACEMENT,
   ORDER_MONITORING: Queues.ORDER_MONITORING,
   SIGNAL_PUBLISHED: Queues.SIGNAL_PROCESSING,
   RISK_VIOLATION: Queues.NOTIFICATION,
-  RECONCILIATION_ISSUE: [
-    Queues.NOTIFICATION,
-    Queues.WEBSOCKET,
-  ],
+  RECONCILIATION_ISSUE: [Queues.NOTIFICATION, Queues.WEBSOCKET],
 };
 
 @Processor(Queues.OUTBOX_DISPATCHER, {
@@ -83,12 +74,16 @@ export class OutboxProcessor extends WorkerHost {
     });
 
     if (!event) {
-      this.logger.warn(`Outbox event ${outboxEventId} not found in database. Skipping.`);
+      this.logger.warn(
+        `Outbox event ${outboxEventId} not found in database. Skipping.`,
+      );
       return;
     }
 
     if (event.status === OutboxStatus.PROCESSED) {
-      this.logger.debug(`Outbox event ${outboxEventId} already processed. Skipping.`);
+      this.logger.debug(
+        `Outbox event ${outboxEventId} already processed. Skipping.`,
+      );
       return;
     }
 
@@ -150,14 +145,18 @@ export class OutboxProcessor extends WorkerHost {
         'TRADE_EXECUTED',
       ];
       if (riskRecalculateEvents.includes(event.eventType)) {
-        const payload = event.payload as any;
+        const payload = event.payload;
         const userId = payload?.userId;
         if (userId) {
           const jobId = `risk-recalc-${userId}`;
           try {
-            await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, { userId });
+            await this.queueService.addJob(Queues.RISK_RECALCULATE, jobId, {
+              userId,
+            });
           } catch (err) {
-            this.logger.error(`Failed to enqueue risk recalculation job for user ${userId}: ${err.message}`);
+            this.logger.error(
+              `Failed to enqueue risk recalculation job for user ${userId}: ${err.message}`,
+            );
           }
         }
       }
@@ -180,7 +179,8 @@ export class OutboxProcessor extends WorkerHost {
     } catch (err) {
       const attempts = job.attemptsMade + 1;
       const maxAttempts = job.opts.attempts || 5;
-      const status = attempts >= maxAttempts ? OutboxStatus.FAILED : OutboxStatus.PENDING;
+      const status =
+        attempts >= maxAttempts ? OutboxStatus.FAILED : OutboxStatus.PENDING;
 
       this.logger.error(
         `Failed to dispatch outbox event ${outboxEventId} (Attempt ${attempts}/${maxAttempts}): ${err.message}`,
@@ -229,7 +229,9 @@ export class OutboxProcessor extends WorkerHost {
       });
 
       for (const event of stuckProcessing) {
-        this.logger.warn(`Outbox event ${event.id} stuck in PROCESSING. Resetting to PENDING.`);
+        this.logger.warn(
+          `Outbox event ${event.id} stuck in PROCESSING. Resetting to PENDING.`,
+        );
         await this.prisma.outboxEvent.update({
           where: { id: event.id },
           data: { status: OutboxStatus.PENDING },
@@ -253,15 +255,11 @@ export class OutboxProcessor extends WorkerHost {
         );
         for (const event of stuckEvents) {
           try {
-            await this.queueService.addJob(
-              Queues.OUTBOX_DISPATCHER,
-              event.id,
-              { 
-                outboxEventId: event.id,
-                eventType: event.eventType,
-                eventKey: event.eventKey || null,
-              },
-            );
+            await this.queueService.addJob(Queues.OUTBOX_DISPATCHER, event.id, {
+              outboxEventId: event.id,
+              eventType: event.eventType,
+              eventKey: event.eventKey || null,
+            });
           } catch (err) {
             this.logger.error(
               `Fallback poller failed to re-enqueue event ${event.id}: ${err.message}`,

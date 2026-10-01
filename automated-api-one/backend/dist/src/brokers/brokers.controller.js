@@ -259,7 +259,9 @@ let BrokersController = BrokersController_1 = class BrokersController {
             results.push({
                 broker: code,
                 status: matched
-                    ? (isSessionActive ? 'CONNECTED' : 'EXPIRED')
+                    ? isSessionActive
+                        ? 'CONNECTED'
+                        : 'EXPIRED'
                     : 'NOT_CONNECTED',
             });
         }
@@ -347,7 +349,9 @@ let BrokersController = BrokersController_1 = class BrokersController {
                 userBroker = await this.prisma.baseClient.userBroker.update({
                     where: { id: userBroker.id },
                     data: {
-                        brokerClientId: brokerClientId !== 'UNKNOWN' ? brokerClientId : userBroker.brokerClientId,
+                        brokerClientId: brokerClientId !== 'UNKNOWN'
+                            ? brokerClientId
+                            : userBroker.brokerClientId,
                         status: client_1.BrokerStatus.ACTIVE,
                         deletedAt: null,
                     },
@@ -553,7 +557,9 @@ let BrokersController = BrokersController_1 = class BrokersController {
         const adapter = this.brokerFactory.getAdapter(code);
         const result = await adapter.getPositions(ub.accessToken, ub.brokerClientId);
         try {
-            await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 3);
+            await this.redisService
+                .getClient()
+                .set(cacheKey, JSON.stringify(result), 'EX', 3);
         }
         catch (_) { }
         return result;
@@ -571,7 +577,9 @@ let BrokersController = BrokersController_1 = class BrokersController {
         const adapter = this.brokerFactory.getAdapter(code);
         const result = await adapter.getHoldings(ub.accessToken, ub.brokerClientId);
         try {
-            await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 5);
+            await this.redisService
+                .getClient()
+                .set(cacheKey, JSON.stringify(result), 'EX', 5);
         }
         catch (_) { }
         return result;
@@ -589,7 +597,9 @@ let BrokersController = BrokersController_1 = class BrokersController {
         const adapter = this.brokerFactory.getAdapter(code);
         const result = await adapter.getOrders(ub.accessToken, ub.brokerClientId);
         try {
-            await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 3);
+            await this.redisService
+                .getClient()
+                .set(cacheKey, JSON.stringify(result), 'EX', 3);
         }
         catch (_) { }
         return result;
@@ -607,7 +617,9 @@ let BrokersController = BrokersController_1 = class BrokersController {
         const adapter = this.brokerFactory.getAdapter(code);
         const result = await adapter.getTradeBook(ub.accessToken, ub.brokerClientId);
         try {
-            await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 3);
+            await this.redisService
+                .getClient()
+                .set(cacheKey, JSON.stringify(result), 'EX', 3);
         }
         catch (_) { }
         return result;
@@ -655,10 +667,13 @@ let BrokersController = BrokersController_1 = class BrokersController {
         this.logger.log(`[Broker Postback] Received webhook from ${brokerCode}: ${JSON.stringify(payload)}`);
         const zebuClientCode = payload.actid || payload.uid;
         const zebuAccessToken = payload.accesstoken || payload.accessToken;
-        if ((brokerCode === 'ZEBU' || payload.source === 'API' || payload.t === 'a') &&
+        if ((brokerCode === 'ZEBU' ||
+            payload.source === 'API' ||
+            payload.t === 'a') &&
             zebuClientCode &&
             zebuAccessToken &&
-            (payload.t === 'a' || (!payload.norenordno && !payload.orderid && !payload.brokerOrderId))) {
+            (payload.t === 'a' ||
+                (!payload.norenordno && !payload.orderid && !payload.brokerOrderId))) {
             this.logger.log(`[Broker Postback] Received Zebu handshake payload for ${zebuClientCode}. Connecting to WebSocket stream wss://go.mynt.in/NorenWSAPI/...`);
             this.zebuWebSocketService.connectUser(zebuClientCode, zebuAccessToken);
             return {

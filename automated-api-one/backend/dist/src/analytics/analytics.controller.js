@@ -42,7 +42,9 @@ let AnalyticsController = class AnalyticsController {
         }
         else {
             await this.analyticsService.handleNightlyAnalyticsRecalculation();
-            return { message: 'Nightly analytics recalculation triggered for all active users' };
+            return {
+                message: 'Nightly analytics recalculation triggered for all active users',
+            };
         }
     }
 };

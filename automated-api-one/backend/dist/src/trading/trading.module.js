@@ -40,7 +40,7 @@ exports.TradingModule = TradingModule = __decorate([
             risk_module_1.RiskModule,
             consents_module_1.ConsentsModule,
             subscriptions_module_1.SubscriptionsModule,
-            brokers_module_1.BrokersModule,
+            (0, common_1.forwardRef)(() => brokers_module_1.BrokersModule),
             audit_module_1.AuditModule,
             infrastructure_module_1.InfrastructureModule,
             strategy_module_1.StrategyModule,
@@ -58,7 +58,13 @@ exports.TradingModule = TradingModule = __decorate([
             order_placement_processor_1.OrderPlacementProcessor,
             order_monitoring_processor_1.OrderMonitoringProcessor,
         ],
-        exports: [trading_service_1.TradingService, signal_orchestrator_service_1.SignalOrchestratorService, position_cache_service_1.PositionCacheService, position_sizing_service_1.PositionSizingService, order_monitoring_service_1.OrderMonitoringService],
+        exports: [
+            trading_service_1.TradingService,
+            signal_orchestrator_service_1.SignalOrchestratorService,
+            position_cache_service_1.PositionCacheService,
+            position_sizing_service_1.PositionSizingService,
+            order_monitoring_service_1.OrderMonitoringService,
+        ],
     })
 ], TradingModule);
 //# sourceMappingURL=trading.module.js.map

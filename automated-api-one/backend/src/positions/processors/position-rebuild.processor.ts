@@ -61,7 +61,9 @@ export class PositionRebuildProcessor extends WorkerHost {
       );
       this.logger.log(`Position rebuild job ${job.id} completed successfully.`);
     } catch (err: any) {
-      this.logger.error(`Position rebuild job ${job.id} failed: ${err.message}`);
+      this.logger.error(
+        `Position rebuild job ${job.id} failed: ${err.message}`,
+      );
       await this.queueService.updateJobStatus(
         Queues.POSITION_REBUILD,
         job.id!,
@@ -72,7 +74,10 @@ export class PositionRebuildProcessor extends WorkerHost {
     }
   }
 
-  private async rebuildSegment(userId: string, segmentId: string): Promise<void> {
+  private async rebuildSegment(
+    userId: string,
+    segmentId: string,
+  ): Promise<void> {
     const openTrade = await this.prisma.trade.findFirst({
       where: {
         userId,
@@ -98,10 +103,14 @@ export class PositionRebuildProcessor extends WorkerHost {
         cachedAt: new Date().toISOString(),
       };
       await this.positionCacheService.set(cacheObj);
-      this.logger.debug(`Rebuilt and cached position for user ${userId} segment ${segmentId}`);
+      this.logger.debug(
+        `Rebuilt and cached position for user ${userId} segment ${segmentId}`,
+      );
     } else {
       await this.positionCacheService.del(userId, segmentId);
-      this.logger.debug(`Cleared cached position for user ${userId} segment ${segmentId} (no open trade found)`);
+      this.logger.debug(
+        `Cleared cached position for user ${userId} segment ${segmentId} (no open trade found)`,
+      );
     }
   }
 }

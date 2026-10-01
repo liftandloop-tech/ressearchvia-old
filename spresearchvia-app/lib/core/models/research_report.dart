@@ -226,3 +226,143 @@ class ReportUpdate {
   }
 }
 
+enum TradingCallOutcome {
+  targetAchieved,
+  partiallyBooked,
+  stoplossHit,
+  active,
+}
+
+extension ResearchReportOutcome on ResearchReport {
+  TradingCallOutcome get outcome {
+    // Check updates in reverse order (latest decisive outcome first)
+    for (int i = updates.length - 1; i >= 0; i--) {
+      final s = updates[i].normalizedStatus;
+      if (s == 'target_achieved') return TradingCallOutcome.targetAchieved;
+      if (s == 'partial_profit') return TradingCallOutcome.partiallyBooked;
+      if (s == 'stoploss_hit') return TradingCallOutcome.stoplossHit;
+    }
+
+    // Fallback: check title and description
+    final combined = '$title $description'.toLowerCase();
+    if (combined.contains('target achieved') ||
+        combined.contains('target hit') ||
+        combined.contains('tgt achieved') ||
+        combined.contains('full profit') ||
+        combined.contains('all targets') ||
+        combined.contains('target met')) {
+      return TradingCallOutcome.targetAchieved;
+    }
+    if (combined.contains('partial profit') ||
+        combined.contains('partially booked') ||
+        combined.contains('book partial')) {
+      return TradingCallOutcome.partiallyBooked;
+    }
+    if (combined.contains('stop loss hit') ||
+        combined.contains('stoploss hit') ||
+        combined.contains('sl hit') ||
+        combined.contains('sl triggered') ||
+        combined.contains('hit sl')) {
+      return TradingCallOutcome.stoplossHit;
+    }
+
+    return TradingCallOutcome.active;
+  }
+}
+
+class TradingAccuracyStats {
+  final int totalCalls;
+  final int closedCalls;
+  final int targetAchieved;
+  final int partiallyBooked;
+  final int stoplossHit;
+  final int active;
+  final double accuracyRate;
+
+  const TradingAccuracyStats({
+    this.totalCalls = 0,
+    this.closedCalls = 0,
+    this.targetAchieved = 0,
+    this.partiallyBooked = 0,
+    this.stoplossHit = 0,
+    this.active = 0,
+    this.accuracyRate = 0.0,
+  });
+
+  factory TradingAccuracyStats.fromJson(Map<String, dynamic> json) {
+    final total = json['totalCalls'] is int
+        ? json['totalCalls'] as int
+        : int.tryParse(json['totalCalls']?.toString() ?? '') ?? 0;
+    final closed = json['closedCalls'] is int
+        ? json['closedCalls'] as int
+        : int.tryParse(json['closedCalls']?.toString() ?? '') ?? 0;
+    final target = json['targetAchieved'] is int
+        ? json['targetAchieved'] as int
+        : int.tryParse(json['targetAchieved']?.toString() ?? '') ?? 0;
+    final partial = json['partiallyBooked'] is int
+        ? json['partiallyBooked'] as int
+        : int.tryParse(json['partiallyBooked']?.toString() ?? '') ?? 0;
+    final sl = json['stoplossHit'] is int
+        ? json['stoplossHit'] as int
+        : int.tryParse(json['stoplossHit']?.toString() ?? '') ?? 0;
+    final act = json['active'] is int
+        ? json['active'] as int
+        : int.tryParse(json['active']?.toString() ?? '') ?? 0;
+    final acc = json['accuracyRate'] is num
+        ? (json['accuracyRate'] as num).toDouble()
+        : double.tryParse(json['accuracyRate']?.toString() ?? '') ?? 0.0;
+
+    return TradingAccuracyStats(
+      totalCalls: total,
+      closedCalls: closed,
+      targetAchieved: target,
+      partiallyBooked: partial,
+      stoplossHit: sl,
+      active: act,
+      accuracyRate: double.parse(acc.toStringAsFixed(1)),
+    );
+  }
+
+  factory TradingAccuracyStats.fromReports(List<ResearchReport> reports) {
+    int target = 0;
+    int partial = 0;
+    int sl = 0;
+    int act = 0;
+
+    for (final r in reports) {
+      switch (r.outcome) {
+        case TradingCallOutcome.targetAchieved:
+          target++;
+          break;
+        case TradingCallOutcome.partiallyBooked:
+          partial++;
+          break;
+        case TradingCallOutcome.stoplossHit:
+          sl++;
+          break;
+        case TradingCallOutcome.active:
+          act++;
+          break;
+      }
+    }
+
+    final closed = target + partial + sl;
+    final total = reports.length;
+    final acc = closed > 0 ? ((target + partial) / closed) * 100 : 0.0;
+
+    return TradingAccuracyStats(
+      totalCalls: total,
+      closedCalls: closed,
+      targetAchieved: target,
+      partiallyBooked: partial,
+      stoplossHit: sl,
+      active: act,
+      accuracyRate: double.parse(acc.toStringAsFixed(1)),
+    );
+  }
+
+  double get targetRate => closedCalls > 0 ? (targetAchieved / closedCalls) * 100 : 0.0;
+  double get partialRate => closedCalls > 0 ? (partiallyBooked / closedCalls) * 100 : 0.0;
+  double get stoplossRate => closedCalls > 0 ? (stoplossHit / closedCalls) * 100 : 0.0;
+}
+

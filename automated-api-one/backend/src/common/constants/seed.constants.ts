@@ -56,7 +56,6 @@ export const SEED_SEGMENTS = {
   },
 };
 
-
 export const SEED_BROKERS = {
   ANGEL_ONE: {
     id: '44444444-e29b-41d4-a716-446655440001',

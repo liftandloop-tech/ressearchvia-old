@@ -42,13 +42,21 @@ export class AnalyticsController {
   @Roles('SUPERADMIN', 'SRE')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @HttpCode(HttpStatus.OK)
-  async forceRecalculate(@Body() dto: { userId?: string; rebuildHistory?: boolean }) {
+  async forceRecalculate(
+    @Body() dto: { userId?: string; rebuildHistory?: boolean },
+  ) {
     if (dto.userId) {
-      await this.analyticsService.enqueueRecalculation(dto.userId, dto.rebuildHistory);
+      await this.analyticsService.enqueueRecalculation(
+        dto.userId,
+        dto.rebuildHistory,
+      );
       return { message: `Recalculation enqueued for user ${dto.userId}` };
     } else {
       await this.analyticsService.handleNightlyAnalyticsRecalculation();
-      return { message: 'Nightly analytics recalculation triggered for all active users' };
+      return {
+        message:
+          'Nightly analytics recalculation triggered for all active users',
+      };
     }
   }
 }

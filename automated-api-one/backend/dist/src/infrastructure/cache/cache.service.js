@@ -39,7 +39,9 @@ let CacheService = CacheService_1 = class CacheService {
         this.redisService.assertHealthy();
         const serialized = JSON.stringify(value);
         if (ttlSeconds) {
-            await this.redisService.getClient().set(key, serialized, 'EX', ttlSeconds);
+            await this.redisService
+                .getClient()
+                .set(key, serialized, 'EX', ttlSeconds);
         }
         else {
             await this.redisService.getClient().set(key, serialized);

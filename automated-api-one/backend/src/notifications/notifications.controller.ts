@@ -23,7 +23,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { NotificationType, NotificationEvent, NotificationChannel } from '@prisma/client';
+import {
+  NotificationType,
+  NotificationEvent,
+  NotificationChannel,
+} from '@prisma/client';
 
 export class GetNotificationsDto {
   @IsOptional()

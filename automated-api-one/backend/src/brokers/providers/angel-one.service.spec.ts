@@ -94,7 +94,7 @@ describe('AngelOneService.placeOrder', () => {
 
       // Capture the config object passed to httpService.post
       const callArgs = httpService.post.mock.calls[0];
-      const axiosConfig = callArgs[2] as any;
+      const axiosConfig = callArgs[2];
       expect(axiosConfig.headers['X-ClientPublicIP']).toBe('10.20.30.40');
     });
 
@@ -111,7 +111,7 @@ describe('AngelOneService.placeOrder', () => {
       await service.placeOrder('TOKEN_ABC', 'CLIENT01', order, undefined);
 
       const callArgs = httpService.post.mock.calls[0];
-      const axiosConfig = callArgs[2] as any;
+      const axiosConfig = callArgs[2];
       // Default fallback IP defined in getHeaders
       expect(axiosConfig.headers['X-ClientPublicIP']).toBe('106.193.147.98');
     });
@@ -129,7 +129,7 @@ describe('AngelOneService.placeOrder', () => {
       await service.placeOrder('TOKEN_ABC', 'CLIENT01', order, fakeAgent);
 
       const callArgs = httpService.post.mock.calls[0];
-      const axiosConfig = callArgs[2] as any;
+      const axiosConfig = callArgs[2];
       expect(axiosConfig.httpsAgent).toBe(fakeAgent);
     });
 
@@ -141,7 +141,7 @@ describe('AngelOneService.placeOrder', () => {
       await service.placeOrder('TOKEN_ABC', 'CLIENT01', order, undefined);
 
       const callArgs = httpService.post.mock.calls[0];
-      const axiosConfig = callArgs[2] as any;
+      const axiosConfig = callArgs[2];
       expect(axiosConfig.httpsAgent).toBeUndefined();
     });
 
@@ -180,7 +180,7 @@ describe('AngelOneService.placeOrder', () => {
       });
 
       const callArgs = httpService.post.mock.calls[0];
-      const payload = callArgs[1] as any;
+      const payload = callArgs[1];
       expect(payload.variety).toBe('NORMAL');
       expect(payload.producttype).toBe('INTRADAY');
       expect(payload.ordertype).toBe('LIMIT');
@@ -205,7 +205,7 @@ describe('AngelOneService.placeOrder', () => {
       });
 
       const callArgs = httpService.post.mock.calls[0];
-      const payload = callArgs[1] as any;
+      const payload = callArgs[1];
       expect(payload.variety).toBe('NORMAL');
       expect(payload.producttype).toBe('INTRADAY');
       expect(payload.ordertype).toBe('MARKET');
@@ -229,7 +229,7 @@ describe('AngelOneService.placeOrder', () => {
       });
 
       const callArgs = httpService.post.mock.calls[0];
-      const payload = callArgs[1] as any;
+      const payload = callArgs[1];
       expect(payload.variety).toBe('STOPLOSS');
       expect(payload.ordertype).toBe('STOPLOSS_LIMIT');
       expect(payload.price).toBe('51200');

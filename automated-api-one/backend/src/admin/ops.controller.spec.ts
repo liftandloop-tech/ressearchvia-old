@@ -13,17 +13,35 @@ describe('OpsController', () => {
         {
           provide: OpsService,
           useValue: {
-            replaySignal: jest.fn().mockResolvedValue({ operationId: 'op-sig-123' }),
-            replayOutboxEvent: jest.fn().mockResolvedValue({ operationId: 'op-out-123' }),
+            replaySignal: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-sig-123' }),
+            replayOutboxEvent: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-out-123' }),
             getDlqMetrics: jest.fn().mockResolvedValue({ waiting: 0 }),
             getDlqJobs: jest.fn().mockResolvedValue([]),
-            replayDlqJob: jest.fn().mockResolvedValue({ operationId: 'op-dlq-123' }),
-            deleteDlqJob: jest.fn().mockResolvedValue({ operationId: 'op-del-123' }),
-            pauseQueue: jest.fn().mockResolvedValue({ operationId: 'op-pause-123' }),
-            resumeQueue: jest.fn().mockResolvedValue({ operationId: 'op-res-123' }),
-            unlockSegment: jest.fn().mockResolvedValue({ operationId: 'op-unlock-123' }),
-            forceBrokerSessionRefresh: jest.fn().mockResolvedValue({ operationId: 'op-ref-123' }),
-            rebuildPositions: jest.fn().mockResolvedValue({ operationId: 'op-reb-123' }),
+            replayDlqJob: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-dlq-123' }),
+            deleteDlqJob: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-del-123' }),
+            pauseQueue: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-pause-123' }),
+            resumeQueue: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-res-123' }),
+            unlockSegment: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-unlock-123' }),
+            forceBrokerSessionRefresh: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-ref-123' }),
+            rebuildPositions: jest
+              .fn()
+              .mockResolvedValue({ operationId: 'op-reb-123' }),
             getAudits: jest.fn().mockResolvedValue([]),
           },
         },
@@ -52,7 +70,12 @@ describe('OpsController', () => {
       const req = { user: { userId: 'operator-1' } };
       const res = await controller.pauseQueue(req, 'order-placement', 'true');
       expect(res).toEqual({ operationId: 'op-pause-123' });
-      expect(service.pauseQueue).toHaveBeenCalledWith('operator-1', 'order-placement', true, undefined);
+      expect(service.pauseQueue).toHaveBeenCalledWith(
+        'operator-1',
+        'order-placement',
+        true,
+        undefined,
+      );
     });
   });
 });

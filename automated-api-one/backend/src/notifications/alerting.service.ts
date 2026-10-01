@@ -44,7 +44,9 @@ export class AlertingService {
             updatedAt: new Date(),
           },
         });
-        this.logger.log(`Incremented alert occurrence: ${fingerprint} (${updated.occurrenceCount})`);
+        this.logger.log(
+          `Incremented alert occurrence: ${fingerprint} (${updated.occurrenceCount})`,
+        );
         return updated;
       }
 
@@ -60,13 +62,17 @@ export class AlertingService {
         },
       });
 
-      this.metrics.setSreAlertOpen(await this.getAlertCountByStatus(AlertStatus.OPEN));
+      this.metrics.setSreAlertOpen(
+        await this.getAlertCountByStatus(AlertStatus.OPEN),
+      );
 
       await this.dispatchSlackAlert(created);
 
       return created;
     } catch (err) {
-      this.logger.error(`Failed to trigger alert for ${fingerprint}: ${err.message}`);
+      this.logger.error(
+        `Failed to trigger alert for ${fingerprint}: ${err.message}`,
+      );
     }
   }
 
@@ -100,7 +106,9 @@ export class AlertingService {
 
     const openCount = await this.getAlertCountByStatus(AlertStatus.OPEN);
     const ackCount = await this.getAlertCountByStatus(AlertStatus.ACKNOWLEDGED);
-    const resolvedCount = await this.getAlertCountByStatus(AlertStatus.RESOLVED);
+    const resolvedCount = await this.getAlertCountByStatus(
+      AlertStatus.RESOLVED,
+    );
     this.metrics.setSreAlertOpen(openCount);
     this.metrics.setSreAlertAcknowledged(ackCount);
     this.metrics.setSreAlertResolved(resolvedCount);
@@ -163,25 +171,35 @@ export class AlertingService {
 
   private async dispatchSlackAlert(alert: any) {
     const webhookUrl = this.config.get<string>('SLACK_WEBHOOK_URL');
-    this.logger.log(`[Slack Mock] Dispatching SRE alert ${alert.fingerprint} to webhook ${webhookUrl || 'not configured'}`);
+    this.logger.log(
+      `[Slack Mock] Dispatching SRE alert ${alert.fingerprint} to webhook ${webhookUrl || 'not configured'}`,
+    );
   }
 
   private async dispatchEmailAlert(alert: any) {
-    this.logger.log(`[Email Mock] Dispatching SRE alert escalation ${alert.fingerprint} to on-call email`);
+    this.logger.log(
+      `[Email Mock] Dispatching SRE alert escalation ${alert.fingerprint} to on-call email`,
+    );
   }
 
   private async dispatchSmsAlert(alert: any) {
-    this.logger.log(`[SMS Mock] Dispatching SRE alert escalation ${alert.fingerprint} to on-call mobile`);
+    this.logger.log(
+      `[SMS Mock] Dispatching SRE alert escalation ${alert.fingerprint} to on-call mobile`,
+    );
   }
 
   private async dispatchPagerDutyAlert(alert: any) {
     try {
       await this.circuitBreaker.execute('pagerduty-alerts', async () => {
         const pdRoutingKey = this.config.get<string>('PAGERDUTY_ROUTING_KEY');
-        this.logger.log(`[PagerDuty Mock] Dispatching SRE alert escalation ${alert.fingerprint} to PagerDuty with routing key ${pdRoutingKey || 'not configured'}`);
+        this.logger.log(
+          `[PagerDuty Mock] Dispatching SRE alert escalation ${alert.fingerprint} to PagerDuty with routing key ${pdRoutingKey || 'not configured'}`,
+        );
       });
     } catch (err) {
-      this.logger.error(`PagerDuty dispatch failed or circuit open: ${err.message}`);
+      this.logger.error(
+        `PagerDuty dispatch failed or circuit open: ${err.message}`,
+      );
     }
   }
 }

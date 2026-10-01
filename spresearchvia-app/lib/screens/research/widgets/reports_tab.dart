@@ -24,6 +24,76 @@ class ReportsTab extends StatelessWidget {
 
       return Column(
         children: [
+          // Compact trading calls accuracy banner
+          Obx(() {
+            final stats = reportController.effectiveAccuracy;
+            if (stats.totalCalls == 0) return const SizedBox.shrink();
+            final hasClosed = stats.closedCalls > 0;
+            final accStr = hasClosed ? '${stats.accuracyRate.toStringAsFixed(0)}%' : 'Active';
+
+            return Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF1F5F9)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF10B981),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Trading Calls Accuracy: $accStr (${stats.targetAchieved} Target • ${stats.partiallyBooked} Partial • ${stats.stoplossHit} SL)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () {
+                      reportController.selectedTabIndex.value = 0;
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'View',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 8,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
           Expanded(
             child: Obx(() {
               final reports = reportController.reports;

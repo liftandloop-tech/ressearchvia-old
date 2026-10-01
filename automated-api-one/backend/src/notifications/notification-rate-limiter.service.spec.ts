@@ -33,7 +33,9 @@ describe('NotificationRateLimiterService', () => {
       ],
     }).compile();
 
-    service = module.get<NotificationRateLimiterService>(NotificationRateLimiterService);
+    service = module.get<NotificationRateLimiterService>(
+      NotificationRateLimiterService,
+    );
   });
 
   it('should return false if Redis is unhealthy (fail open)', async () => {

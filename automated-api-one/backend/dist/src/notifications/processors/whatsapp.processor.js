@@ -44,9 +44,9 @@ let WhatsAppProcessor = WhatsAppProcessor_1 = class WhatsAppProcessor extends bu
                 where: { id: deliveryId },
                 include: { notification: true },
             });
-            const finalParameters = (delivery?.notification?.message && parameters && parameters.length >= 2)
+            const finalParameters = delivery?.notification?.message && parameters && parameters.length >= 2
                 ? [parameters[0], delivery.notification.message]
-                : (parameters || []);
+                : parameters || [];
             await this.prisma.notificationDelivery.update({
                 where: { id: deliveryId },
                 data: { attempts: { increment: 1 } },

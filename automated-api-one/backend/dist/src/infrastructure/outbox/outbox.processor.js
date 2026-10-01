@@ -35,24 +35,15 @@ const EVENT_ROUTING = {
     SUBSCRIPTION_ACTIVATED: queue_constants_1.Queues.NOTIFICATION,
     SUBSCRIPTION_RENEWED: queue_constants_1.Queues.NOTIFICATION,
     SUBSCRIPTION_CANCELLED: queue_constants_1.Queues.NOTIFICATION,
-    BROKER_DISCONNECTED: [
-        queue_constants_1.Queues.NOTIFICATION,
-        queue_constants_1.Queues.WEBSOCKET,
-    ],
-    TRADE_OPENED: [
-        queue_constants_1.Queues.NOTIFICATION,
-        queue_constants_1.Queues.ORDER_MONITORING,
-    ],
+    BROKER_DISCONNECTED: [queue_constants_1.Queues.NOTIFICATION, queue_constants_1.Queues.WEBSOCKET],
+    TRADE_OPENED: [queue_constants_1.Queues.NOTIFICATION, queue_constants_1.Queues.ORDER_MONITORING],
     TRADE_CLOSED: queue_constants_1.Queues.NOTIFICATION,
     TRADE_EXECUTED: queue_constants_1.Queues.NOTIFICATION,
     ORDER_PLACEMENT: queue_constants_1.Queues.ORDER_PLACEMENT,
     ORDER_MONITORING: queue_constants_1.Queues.ORDER_MONITORING,
     SIGNAL_PUBLISHED: queue_constants_1.Queues.SIGNAL_PROCESSING,
     RISK_VIOLATION: queue_constants_1.Queues.NOTIFICATION,
-    RECONCILIATION_ISSUE: [
-        queue_constants_1.Queues.NOTIFICATION,
-        queue_constants_1.Queues.WEBSOCKET,
-    ],
+    RECONCILIATION_ISSUE: [queue_constants_1.Queues.NOTIFICATION, queue_constants_1.Queues.WEBSOCKET],
 };
 let OutboxProcessor = OutboxProcessor_1 = class OutboxProcessor extends bullmq_1.WorkerHost {
     prisma;
@@ -136,7 +127,9 @@ let OutboxProcessor = OutboxProcessor_1 = class OutboxProcessor extends bullmq_1
                 if (userId) {
                     const jobId = `risk-recalc-${userId}`;
                     try {
-                        await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, { userId });
+                        await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, {
+                            userId,
+                        });
                     }
                     catch (err) {
                         this.logger.error(`Failed to enqueue risk recalculation job for user ${userId}: ${err.message}`);

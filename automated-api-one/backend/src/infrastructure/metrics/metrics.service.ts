@@ -529,7 +529,6 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
-
     // --- Initialize Gauges ---
     this.activeSegmentsGauge = new Gauge({
       name: 'active_segments_total',
@@ -727,13 +726,27 @@ export class MetricsService implements OnModuleInit {
   }
 
   // --- Counter Helpers ---
-  incrementSignalsReceived() { this.signalsReceived.inc(); }
-  incrementSignalsProcessed() { this.signalsProcessed.inc(); }
-  incrementSignalsFailed() { this.signalsFailed.inc(); }
-  incrementOrdersPlaced() { this.ordersPlaced.inc(); }
-  incrementOrdersFilled() { this.ordersFilled.inc(); }
-  incrementOrdersRejected() { this.ordersRejected.inc(); }
-  incrementRiskRejected() { this.riskRejected.inc(); }
+  incrementSignalsReceived() {
+    this.signalsReceived.inc();
+  }
+  incrementSignalsProcessed() {
+    this.signalsProcessed.inc();
+  }
+  incrementSignalsFailed() {
+    this.signalsFailed.inc();
+  }
+  incrementOrdersPlaced() {
+    this.ordersPlaced.inc();
+  }
+  incrementOrdersFilled() {
+    this.ordersFilled.inc();
+  }
+  incrementOrdersRejected() {
+    this.ordersRejected.inc();
+  }
+  incrementRiskRejected() {
+    this.riskRejected.inc();
+  }
   incrementBrokerCalls(broker: string, operation?: string, status?: string) {
     this.brokerCalls.inc({
       broker,
@@ -747,89 +760,248 @@ export class MetricsService implements OnModuleInit {
       operation: operation || 'unknown',
     });
   }
-  incrementBrokerTimeouts(broker: string) { this.brokerTimeouts.inc({ broker }); }
-  incrementBrokerCircuitOpen(broker: string) { this.brokerCircuitOpen.inc({ broker }); }
-  incrementDlqReplayed(queue: string) { this.dlqReplayed.inc({ queue }); }
-  incrementDlqPurged(queue: string) { this.dlqPurged.inc({ queue }); }
-  incrementWebsocketAuthFailures() { this.websocketAuthFailures.inc(); }
-  incrementWebsocketRateLimited() { this.websocketRateLimited.inc(); }
-  incrementSignalFanoutUsers(count: number = 1) { this.signalFanoutUsers.inc(count); }
-  incrementOrderPlacementAttempts() { this.orderPlacementAttempts.inc(); }
-  incrementOrderMonitoringAttempts() { this.orderMonitoringAttempts.inc(); }
-  incrementExecutionSuccess() { this.executionSuccess.inc(); }
-  incrementExecutionFailed() { this.executionFailed.inc(); }
-  incrementMultiplierResets() { this.multiplierResets.inc(); }
-  incrementMultiplierEscalations() { this.multiplierEscalations.inc(); }
-  incrementRecoveryJobs() { this.recoveryJobs.inc(); }
-  incrementRecoveryJobsFailed() { this.recoveryJobsFailed.inc(); }
-  incrementRecoveryOrdersRecovered(count: number = 1) { this.recoveryOrdersRecovered.inc(count); }
-  incrementReportsGenerated() { this.reportsGenerated.inc(); }
-  incrementReportCacheHits() { this.reportCacheHits.inc(); }
-  incrementReportCacheMisses() { this.reportCacheMisses.inc(); }
-  incrementReportGenerationFailed() { this.reportGenerationFailed.inc(); }
-  incrementAnalyticsSnapshotsCreated() { this.analyticsSnapshotsCreated.inc(); }
-  incrementOutboxEventsCreated() { this.outboxEventsCreated.inc(); }
-  incrementOutboxEventsProcessed() { this.outboxEventsProcessed.inc(); }
-  incrementOutboxEventsFailed() { this.outboxEventsFailed.inc(); }
-  incrementOutboxEventsDlq() { this.outboxEventsDlq.inc(); }
-  incrementWsConnections() { this.wsConnectionsTotal.inc(); }
-  incrementWsDisconnects() { this.wsDisconnectsTotal.inc(); }
-  incrementWsMessagesSent() { this.wsMessagesSentTotal.inc(); }
-  incrementWsMessagesFailed() { this.wsMessagesFailedTotal.inc(); }
-  incrementWsOrphanedRooms() { this.wsOrphanedRoomsTotal.inc(); }
-  incrementOperationsRequests(action: string) { this.operationsRequests.inc({ action }); }
-  incrementOperationsSuccess(action: string) { this.operationsSuccess.inc({ action }); }
-  incrementOperationsFailed(action: string) { this.operationsFailed.inc({ action }); }
-  incrementOperationsRejected(action: string) { this.operationsRejected.inc({ action }); }
-  incrementQueuePausedTotal(queue: string) { this.queuePausedTotal.inc({ queue }); }
-  incrementOperationsAuditRecords() { this.operationsAuditRecordsTotal.inc(); }
-  incrementOperationsAuditFailures() { this.operationsAuditFailuresTotal.inc(); }
-
+  incrementBrokerTimeouts(broker: string) {
+    this.brokerTimeouts.inc({ broker });
+  }
+  incrementBrokerCircuitOpen(broker: string) {
+    this.brokerCircuitOpen.inc({ broker });
+  }
+  incrementDlqReplayed(queue: string) {
+    this.dlqReplayed.inc({ queue });
+  }
+  incrementDlqPurged(queue: string) {
+    this.dlqPurged.inc({ queue });
+  }
+  incrementWebsocketAuthFailures() {
+    this.websocketAuthFailures.inc();
+  }
+  incrementWebsocketRateLimited() {
+    this.websocketRateLimited.inc();
+  }
+  incrementSignalFanoutUsers(count: number = 1) {
+    this.signalFanoutUsers.inc(count);
+  }
+  incrementOrderPlacementAttempts() {
+    this.orderPlacementAttempts.inc();
+  }
+  incrementOrderMonitoringAttempts() {
+    this.orderMonitoringAttempts.inc();
+  }
+  incrementExecutionSuccess() {
+    this.executionSuccess.inc();
+  }
+  incrementExecutionFailed() {
+    this.executionFailed.inc();
+  }
+  incrementMultiplierResets() {
+    this.multiplierResets.inc();
+  }
+  incrementMultiplierEscalations() {
+    this.multiplierEscalations.inc();
+  }
+  incrementRecoveryJobs() {
+    this.recoveryJobs.inc();
+  }
+  incrementRecoveryJobsFailed() {
+    this.recoveryJobsFailed.inc();
+  }
+  incrementRecoveryOrdersRecovered(count: number = 1) {
+    this.recoveryOrdersRecovered.inc(count);
+  }
+  incrementReportsGenerated() {
+    this.reportsGenerated.inc();
+  }
+  incrementReportCacheHits() {
+    this.reportCacheHits.inc();
+  }
+  incrementReportCacheMisses() {
+    this.reportCacheMisses.inc();
+  }
+  incrementReportGenerationFailed() {
+    this.reportGenerationFailed.inc();
+  }
+  incrementAnalyticsSnapshotsCreated() {
+    this.analyticsSnapshotsCreated.inc();
+  }
+  incrementOutboxEventsCreated() {
+    this.outboxEventsCreated.inc();
+  }
+  incrementOutboxEventsProcessed() {
+    this.outboxEventsProcessed.inc();
+  }
+  incrementOutboxEventsFailed() {
+    this.outboxEventsFailed.inc();
+  }
+  incrementOutboxEventsDlq() {
+    this.outboxEventsDlq.inc();
+  }
+  incrementWsConnections() {
+    this.wsConnectionsTotal.inc();
+  }
+  incrementWsDisconnects() {
+    this.wsDisconnectsTotal.inc();
+  }
+  incrementWsMessagesSent() {
+    this.wsMessagesSentTotal.inc();
+  }
+  incrementWsMessagesFailed() {
+    this.wsMessagesFailedTotal.inc();
+  }
+  incrementWsOrphanedRooms() {
+    this.wsOrphanedRoomsTotal.inc();
+  }
+  incrementOperationsRequests(action: string) {
+    this.operationsRequests.inc({ action });
+  }
+  incrementOperationsSuccess(action: string) {
+    this.operationsSuccess.inc({ action });
+  }
+  incrementOperationsFailed(action: string) {
+    this.operationsFailed.inc({ action });
+  }
+  incrementOperationsRejected(action: string) {
+    this.operationsRejected.inc({ action });
+  }
+  incrementQueuePausedTotal(queue: string) {
+    this.queuePausedTotal.inc({ queue });
+  }
+  incrementOperationsAuditRecords() {
+    this.operationsAuditRecordsTotal.inc();
+  }
+  incrementOperationsAuditFailures() {
+    this.operationsAuditFailuresTotal.inc();
+  }
 
   // --- Gauge Helpers ---
-  setActiveSegments(count: number) { this.activeSegmentsGauge.set(count); }
-  setSubscribersActive(count: number) { this.subscribersActiveGauge.set(count); }
-  setSparkSubscriptions(count: number) { this.sparkSubscriptionsGauge.set(count); }
-  setSplendidSubscriptions(count: number) { this.splendidSubscriptionsGauge.set(count); }
-  setConsentsActiveToday(count: number) { this.consentsActiveTodayGauge.set(count); }
-  setSegmentsActive(count: number) { this.segmentsActiveGauge.set(count); }
-  setSegmentsPaused(count: number) { this.segmentsPausedGauge.set(count); }
-  setSegmentsRiskLocked(count: number) { this.segmentsRiskLockedGauge.set(count); }
-  setQueueDepth(queueName: string, depth: number) { this.queueDepth.set({ queue: queueName }, depth); }
-  setQueueProcessing(queueName: string, count: number) { this.queueProcessing.set({ queue: queueName }, count); }
-  setQueueFailed(queueName: string, count: number) { this.queueFailed.set({ queue: queueName }, count); }
-  setQueueDlqDepth(queueName: string, count: number) { this.queueDlqDepth.set({ queue: queueName }, count); }
-  setRedisMemoryUsage(bytes: number) { this.redisMemoryUsage.set(bytes); }
-  setRedisConnectedClients(count: number) { this.redisConnectedClients.set(count); }
-  setDistributedLocksActive(count: number) { this.distributedLocksActive.set(count); }
-  setRedisIdempotencyKeysActive(count: number) { this.idempotencyKeysTotal.set(count); }
-  setOutboxEventsPending(count: number) { this.outboxEventsPending.set(count); }
-  setOutboxEventsProcessing(count: number) { this.outboxEventsProcessingGauge.set(count); }
-  setOutboxEventsFailed(count: number) { this.outboxEventsFailedGauge.set(count); }
-  setOutboxEventsDlqCount(count: number) { this.outboxEventsDlqGauge.set(count); }
-  setBrokerCircuitState(broker: string, state: number) { this.brokerCircuitState.set({ broker }, state); }
-  setOpenPositions(count: number) { this.openPositionsGauge.set(count); }
-  setWsActiveConnections(count: number) { this.wsActiveConnectionsGauge.set(count); }
-  setWsRoomUsers(count: number) { this.wsRoomUsersGauge.set(count); }
-  setWsRoomSegments(count: number) { this.wsRoomSegmentsGauge.set(count); }
-  setWsRoomAdmin(count: number) { this.wsRoomAdminGauge.set(count); }
+  setActiveSegments(count: number) {
+    this.activeSegmentsGauge.set(count);
+  }
+  setSubscribersActive(count: number) {
+    this.subscribersActiveGauge.set(count);
+  }
+  setSparkSubscriptions(count: number) {
+    this.sparkSubscriptionsGauge.set(count);
+  }
+  setSplendidSubscriptions(count: number) {
+    this.splendidSubscriptionsGauge.set(count);
+  }
+  setConsentsActiveToday(count: number) {
+    this.consentsActiveTodayGauge.set(count);
+  }
+  setSegmentsActive(count: number) {
+    this.segmentsActiveGauge.set(count);
+  }
+  setSegmentsPaused(count: number) {
+    this.segmentsPausedGauge.set(count);
+  }
+  setSegmentsRiskLocked(count: number) {
+    this.segmentsRiskLockedGauge.set(count);
+  }
+  setQueueDepth(queueName: string, depth: number) {
+    this.queueDepth.set({ queue: queueName }, depth);
+  }
+  setQueueProcessing(queueName: string, count: number) {
+    this.queueProcessing.set({ queue: queueName }, count);
+  }
+  setQueueFailed(queueName: string, count: number) {
+    this.queueFailed.set({ queue: queueName }, count);
+  }
+  setQueueDlqDepth(queueName: string, count: number) {
+    this.queueDlqDepth.set({ queue: queueName }, count);
+  }
+  setRedisMemoryUsage(bytes: number) {
+    this.redisMemoryUsage.set(bytes);
+  }
+  setRedisConnectedClients(count: number) {
+    this.redisConnectedClients.set(count);
+  }
+  setDistributedLocksActive(count: number) {
+    this.distributedLocksActive.set(count);
+  }
+  setRedisIdempotencyKeysActive(count: number) {
+    this.idempotencyKeysTotal.set(count);
+  }
+  setOutboxEventsPending(count: number) {
+    this.outboxEventsPending.set(count);
+  }
+  setOutboxEventsProcessing(count: number) {
+    this.outboxEventsProcessingGauge.set(count);
+  }
+  setOutboxEventsFailed(count: number) {
+    this.outboxEventsFailedGauge.set(count);
+  }
+  setOutboxEventsDlqCount(count: number) {
+    this.outboxEventsDlqGauge.set(count);
+  }
+  setBrokerCircuitState(broker: string, state: number) {
+    this.brokerCircuitState.set({ broker }, state);
+  }
+  setOpenPositions(count: number) {
+    this.openPositionsGauge.set(count);
+  }
+  setWsActiveConnections(count: number) {
+    this.wsActiveConnectionsGauge.set(count);
+  }
+  setWsRoomUsers(count: number) {
+    this.wsRoomUsersGauge.set(count);
+  }
+  setWsRoomSegments(count: number) {
+    this.wsRoomSegmentsGauge.set(count);
+  }
+  setWsRoomAdmin(count: number) {
+    this.wsRoomAdminGauge.set(count);
+  }
 
   // --- Histogram Helpers ---
-  observeBrokerLatency(broker: string, ms: number) { this.brokerLatency.observe({ broker }, ms); }
-  observeRedisLatency(ms: number) { this.redisLatency.observe(ms); }
-  observeSignalProcessingDuration(ms: number) { this.signalProcessingDuration.observe(ms); }
-  observeOrderPlacementDuration(ms: number) { this.orderPlacementDuration.observe(ms); }
-  observeAnalyticsSnapshotDuration(ms: number) { this.analyticsSnapshotDuration.observe(ms); }
-  observeReportGenerationDuration(ms: number) { this.reportGenerationDuration.observe(ms); }
-  observeBrokerCircuitOpenDuration(broker: string, ms: number) { this.brokerCircuitOpenDuration.observe({ broker }, ms); }
-  observeReconciliationDuration(ms: number) { this.reconciliationDuration.observe(ms); }
-
-  incrementReconciliationRuns() { this.reconciliationRuns.inc(); }
-  incrementReconciliationIssuesTotal(issueType: string, severity: string, broker: string) {
-    this.reconciliationIssuesTotal.inc({ issue_type: issueType, severity, broker });
+  observeBrokerLatency(broker: string, ms: number) {
+    this.brokerLatency.observe({ broker }, ms);
   }
-  setReconciliationIssuesOpen(issueType: string, severity: string, broker: string, count: number) {
-    this.reconciliationIssuesOpen.set({ issue_type: issueType, severity, broker }, count);
+  observeRedisLatency(ms: number) {
+    this.redisLatency.observe(ms);
+  }
+  observeSignalProcessingDuration(ms: number) {
+    this.signalProcessingDuration.observe(ms);
+  }
+  observeOrderPlacementDuration(ms: number) {
+    this.orderPlacementDuration.observe(ms);
+  }
+  observeAnalyticsSnapshotDuration(ms: number) {
+    this.analyticsSnapshotDuration.observe(ms);
+  }
+  observeReportGenerationDuration(ms: number) {
+    this.reportGenerationDuration.observe(ms);
+  }
+  observeBrokerCircuitOpenDuration(broker: string, ms: number) {
+    this.brokerCircuitOpenDuration.observe({ broker }, ms);
+  }
+  observeReconciliationDuration(ms: number) {
+    this.reconciliationDuration.observe(ms);
+  }
+
+  incrementReconciliationRuns() {
+    this.reconciliationRuns.inc();
+  }
+  incrementReconciliationIssuesTotal(
+    issueType: string,
+    severity: string,
+    broker: string,
+  ) {
+    this.reconciliationIssuesTotal.inc({
+      issue_type: issueType,
+      severity,
+      broker,
+    });
+  }
+  setReconciliationIssuesOpen(
+    issueType: string,
+    severity: string,
+    broker: string,
+    count: number,
+  ) {
+    this.reconciliationIssuesOpen.set(
+      { issue_type: issueType, severity, broker },
+      count,
+    );
   }
   incrementReconciliationAutoResolved(broker: string) {
     this.reconciliationAutoResolved.inc({ broker });
@@ -853,20 +1025,34 @@ export class MetricsService implements OnModuleInit {
   }
 
   // --- Analytics Helper Methods ---
-  incrementAnalyticsRuns() { this.analyticsRuns.inc(); }
-  observeAnalyticsDuration(ms: number) { this.analyticsDuration.observe(ms); }
-  incrementAnalyticsFailures() { this.analyticsFailures.inc(); }
+  incrementAnalyticsRuns() {
+    this.analyticsRuns.inc();
+  }
+  observeAnalyticsDuration(ms: number) {
+    this.analyticsDuration.observe(ms);
+  }
+  incrementAnalyticsFailures() {
+    this.analyticsFailures.inc();
+  }
   incrementAnalyticsRetentionDeleted(sourceType: string, count: number = 1) {
     this.analyticsRetentionDeleted.inc({ source_type: sourceType }, count);
   }
-  setAnalyticsStaleSnapshots(count: number) { this.analyticsStaleSnapshots.set(count); }
-  incrementAnalyticsUsersProcessed(count: number = 1) { this.analyticsUsersProcessed.inc(count); }
+  setAnalyticsStaleSnapshots(count: number) {
+    this.analyticsStaleSnapshots.set(count);
+  }
+  incrementAnalyticsUsersProcessed(count: number = 1) {
+    this.analyticsUsersProcessed.inc(count);
+  }
 
   // --- Notification & SRE Alert Helpers ---
   setNotificationQueueDepth(channel: string, count: number) {
     this.notificationQueueDepth.set({ channel }, count);
   }
-  observeNotificationDeliveryDuration(channel: string, provider: string, ms: number) {
+  observeNotificationDeliveryDuration(
+    channel: string,
+    provider: string,
+    ms: number,
+  ) {
     this.notificationDeliveryDuration.observe({ channel, provider }, ms);
   }
   incrementNotificationRetries(channel: string, provider: string) {
@@ -881,7 +1067,11 @@ export class MetricsService implements OnModuleInit {
   incrementNotificationProviderFailures(provider: string, channel: string) {
     this.notificationProviderFailures.inc({ provider, channel });
   }
-  observeNotificationProviderLatency(provider: string, channel: string, ms: number) {
+  observeNotificationProviderLatency(
+    provider: string,
+    channel: string,
+    ms: number,
+  ) {
     this.notificationProviderLatency.observe({ provider, channel }, ms);
   }
   incrementNotificationScheduled() {

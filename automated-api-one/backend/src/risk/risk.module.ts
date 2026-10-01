@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { RiskController } from './risk.controller';
 import { RiskService } from './risk.service';
 import { PrismaService } from '../prisma.service';
@@ -13,7 +13,7 @@ import { RiskProcessor } from './risk.processor';
   imports: [
     SubscriptionsModule,
     ConsentsModule,
-    BrokersModule,
+    forwardRef(() => BrokersModule),
     AuditModule,
     InfrastructureModule,
   ],
@@ -22,4 +22,3 @@ import { RiskProcessor } from './risk.processor';
   exports: [RiskService],
 })
 export class RiskModule {}
-

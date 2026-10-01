@@ -23,7 +23,9 @@ let ConsentsController = class ConsentsController {
     }
     async grantConsent(req, body) {
         const userId = req.user.userId;
-        const ipAddress = (req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress);
+        const ipAddress = (req.headers['x-forwarded-for'] ||
+            req.ip ||
+            req.socket?.remoteAddress);
         const userAgent = req.headers['user-agent'];
         const consent = await this.consentsService.grantConsentWithStrategy(userId, {
             brokerId: body.brokerId,
@@ -61,7 +63,9 @@ let ConsentsController = class ConsentsController {
     }
     async changeUserStrategy(req, body) {
         const userId = req.user.userId;
-        const ipAddress = (req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress);
+        const ipAddress = (req.headers['x-forwarded-for'] ||
+            req.ip ||
+            req.socket?.remoteAddress);
         const userAgent = req.headers['user-agent'];
         const updated = await this.consentsService.changeUserStrategy(userId, body.strategy, body.agreementVersion ?? 'v1.0', Array.isArray(ipAddress) ? ipAddress[0] : ipAddress, userAgent);
         return {

@@ -14,11 +14,16 @@ export class RiskProcessor extends WorkerHost {
 
   async process(job: Job<{ userId: string }>): Promise<void> {
     const { userId } = job.data;
-    this.logger.log(`Processing risk recalculation job ${job.id} for user: ${userId}`);
+    this.logger.log(
+      `Processing risk recalculation job ${job.id} for user: ${userId}`,
+    );
     try {
       await this.riskService.recalculateRiskSnapshot(userId);
     } catch (err) {
-      this.logger.error(`Failed to recalculate risk snapshot for user ${userId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to recalculate risk snapshot for user ${userId}: ${err.message}`,
+        err.stack,
+      );
       throw err;
     }
   }

@@ -286,9 +286,7 @@ describe('Health Indicators & Controller', () => {
         }),
       };
       prismaServiceMock.user = {
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'user-1' },
-        ]),
+        findMany: jest.fn().mockResolvedValue([{ id: 'user-1' }]),
       };
       prismaServiceMock.dailyPortfolioSnapshot = {
         findFirst: jest.fn().mockResolvedValue({

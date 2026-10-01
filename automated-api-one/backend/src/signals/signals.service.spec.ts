@@ -77,7 +77,9 @@ describe('SignalsService', () => {
     });
 
     it('should successfully save signal and enqueue background job', async () => {
-      prismaMock.segmentMaster.findUnique.mockResolvedValue({ id: 'strategy-1' });
+      prismaMock.segmentMaster.findUnique.mockResolvedValue({
+        id: 'strategy-1',
+      });
       prismaMock.signal.create.mockResolvedValue({
         id: 'signal-1',
         segmentId: 'strategy-1',

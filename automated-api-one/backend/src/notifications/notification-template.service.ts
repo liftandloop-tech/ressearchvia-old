@@ -6,7 +6,10 @@ export class NotificationTemplateService {
   /**
    * Generates email/SMS/WhatsApp subject, body, or formatted template parameters based on event type.
    */
-  generateTemplate(event: NotificationEvent, data: any): { title: string; body: string } {
+  generateTemplate(
+    event: NotificationEvent,
+    data: any,
+  ): { title: string; body: string } {
     let title = '';
     let body = '';
 
@@ -41,7 +44,8 @@ export class NotificationTemplateService {
         break;
       case NotificationEvent.SUBSCRIPTION_EXPIRED:
         title = 'Subscription Expired';
-        body = 'Your subscription plan has expired. Please renew to continue trading.';
+        body =
+          'Your subscription plan has expired. Please renew to continue trading.';
         break;
       case NotificationEvent.BROKER_DISCONNECTED:
         title = 'Broker Connection Disconnected';

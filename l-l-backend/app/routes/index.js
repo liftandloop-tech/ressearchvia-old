@@ -46,5 +46,18 @@ const initRoutes = (app) => {
     app.use('/api/permission-groups', permissionGroupRoutes())
     app.use('/api/departments', departmentRoutes())
     app.use('/api/refund', refundRoutes())
+
+    // Central error handler for upload and security errors
+    app.use((err, req, res, next) => {
+        if (err) {
+            const isSecurity = err.message && err.message.startsWith('Security violation');
+            const status = err.status || (isSecurity ? 403 : 400);
+            return res.status(status).send({
+                status: status,
+                message: err.message || 'An error occurred during request processing'
+            });
+        }
+        next();
+    });
 }
 export default initRoutes;

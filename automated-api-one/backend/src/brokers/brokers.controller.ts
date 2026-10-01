@@ -27,12 +27,7 @@ import { PrismaService } from '../prisma.service';
 import { RedisService } from '../infrastructure/redis/redis.service';
 import { OrderMonitoringService } from '../trading/services/order-monitoring.service';
 import { ZebuWebSocketService } from './services/zebu-websocket.service';
-import {
-  IsNotEmpty,
-  IsString,
-  IsEnum,
-  IsOptional,
-} from 'class-validator';
+import { IsNotEmpty, IsString, IsEnum, IsOptional } from 'class-validator';
 import { BrokerCode, BrokerStatus } from '@prisma/client';
 
 export class LinkBrokerDto {
@@ -84,8 +79,6 @@ export class BrokersController {
     private readonly orderMonitoringService: OrderMonitoringService,
     private readonly zebuWebSocketService: ZebuWebSocketService,
   ) {}
-
-
 
   @UseGuards(JwtAuthGuard)
   @Post('link')
@@ -145,7 +138,6 @@ export class BrokersController {
       },
     });
     return created;
-
   }
 
   @UseGuards(JwtAuthGuard)
@@ -233,7 +225,10 @@ export class BrokersController {
               ub.accessToken,
               ub.brokerClientId,
             );
-            profile = await adapter.getProfile(ub.accessToken, ub.brokerClientId);
+            profile = await adapter.getProfile(
+              ub.accessToken,
+              ub.brokerClientId,
+            );
           } catch (err) {
             // Ignore error or log it
           }
@@ -271,13 +266,18 @@ export class BrokersController {
       const matched = linkedUserBrokers.find((ub) => ub.broker.code === code);
       let isSessionActive = false;
       if (matched) {
-        isSessionActive = await this.brokerSessionService.validateSession(userId, code);
+        isSessionActive = await this.brokerSessionService.validateSession(
+          userId,
+          code,
+        );
       }
 
       results.push({
         broker: code,
-        status: matched 
-          ? (isSessionActive ? 'CONNECTED' : 'EXPIRED') 
+        status: matched
+          ? isSessionActive
+            ? 'CONNECTED'
+            : 'EXPIRED'
           : 'NOT_CONNECTED',
       });
     }
@@ -287,10 +287,7 @@ export class BrokersController {
 
   @UseGuards(JwtAuthGuard)
   @Get(':brokerCode/auth-url')
-  async getAuthUrl(
-    @Request() req,
-    @Param('brokerCode') brokerCodeStr: string,
-  ) {
+  async getAuthUrl(@Request() req, @Param('brokerCode') brokerCodeStr: string) {
     const userId = req.user.userId;
     const brokerCode = brokerCodeStr.toUpperCase() as BrokerCode;
     if (!Object.values(BrokerCode).includes(brokerCode)) {
@@ -319,7 +316,9 @@ export class BrokersController {
       await this.prisma.brokerAuthState.deleteMany({
         where: { broker: brokerCode, state },
       });
-      throw new BadRequestException(`Failed to generate authorization URL: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to generate authorization URL: ${error.message}`,
+      );
     }
   }
 
@@ -331,12 +330,16 @@ export class BrokersController {
   ) {
     const brokerCode = brokerCodeStr.toUpperCase() as BrokerCode;
     if (!Object.values(BrokerCode).includes(brokerCode)) {
-      return res.redirect(`/brokers/${brokerCodeStr}/callback/failure?error=Invalid+broker+code`);
+      return res.redirect(
+        `/brokers/${brokerCodeStr}/callback/failure?error=Invalid+broker+code`,
+      );
     }
 
     const state = queryParams.state;
     if (!state) {
-      return res.redirect(`/brokers/${brokerCodeStr}/callback/failure?error=Missing+state+parameter`);
+      return res.redirect(
+        `/brokers/${brokerCodeStr}/callback/failure?error=Missing+state+parameter`,
+      );
     }
 
     // Verify and consume the state
@@ -345,7 +348,9 @@ export class BrokersController {
     });
 
     if (!dbState) {
-      return res.redirect(`/brokers/${brokerCodeStr}/callback/failure?error=Invalid+or+expired+session`);
+      return res.redirect(
+        `/brokers/${brokerCodeStr}/callback/failure?error=Invalid+or+expired+session`,
+      );
     }
 
     // Consume the token immediately
@@ -355,7 +360,9 @@ export class BrokersController {
 
     // Check expiration
     if (new Date() > dbState.expiresAt) {
-      return res.redirect(`/brokers/${brokerCodeStr}/callback/failure?error=Session+expired`);
+      return res.redirect(
+        `/brokers/${brokerCodeStr}/callback/failure?error=Session+expired`,
+      );
     }
 
     try {
@@ -397,7 +404,10 @@ export class BrokersController {
         userBroker = await this.prisma.baseClient.userBroker.update({
           where: { id: userBroker.id },
           data: {
-            brokerClientId: brokerClientId !== 'UNKNOWN' ? brokerClientId : userBroker.brokerClientId,
+            brokerClientId:
+              brokerClientId !== 'UNKNOWN'
+                ? brokerClientId
+                : userBroker.brokerClientId,
             status: BrokerStatus.ACTIVE,
             deletedAt: null,
           },
@@ -419,19 +429,25 @@ export class BrokersController {
         {
           accessToken: session.accessToken,
           refreshToken: session.refreshToken,
-          tokenExpiry: session.expiresAt || new Date(Date.now() + 18 * 60 * 60 * 1000),
+          tokenExpiry:
+            session.expiresAt || new Date(Date.now() + 18 * 60 * 60 * 1000),
         },
         userBroker.id,
       );
 
       return res.redirect(`/brokers/${brokerCodeStr}/callback/success`);
     } catch (error: any) {
-      return res.redirect(`/brokers/${brokerCodeStr}/callback/failure?error=${encodeURIComponent(error.message)}`);
+      return res.redirect(
+        `/brokers/${brokerCodeStr}/callback/failure?error=${encodeURIComponent(error.message)}`,
+      );
     }
   }
 
   @Get(':brokerCode/callback/success')
-  async showSuccessPage(@Param('brokerCode') brokerCode: string, @Res() res: any) {
+  async showSuccessPage(
+    @Param('brokerCode') brokerCode: string,
+    @Res() res: any,
+  ) {
     res.setHeader('Content-Type', 'text/html');
     return res.status(200).send(`
       <!DOCTYPE html>
@@ -558,7 +574,10 @@ export class BrokersController {
 
   @UseGuards(JwtAuthGuard)
   @Delete(':brokerCode/unlink')
-  async unlinkBroker(@Request() req, @Param('brokerCode') brokerCodeStr: string) {
+  async unlinkBroker(
+    @Request() req,
+    @Param('brokerCode') brokerCodeStr: string,
+  ) {
     const userId = req.user.userId;
     const brokerCode = brokerCodeStr.toUpperCase() as BrokerCode;
 
@@ -632,11 +651,16 @@ export class BrokersController {
     } catch (_) {}
 
     const { ub, code } = await this.getActiveBroker(userId);
-    const adapter = this.brokerFactory.getAdapter(code as unknown as BrokerType);
-    const result = await adapter.getPositions(ub.accessToken!, ub.brokerClientId);
+    const adapter = this.brokerFactory.getAdapter(code);
+    const result = await adapter.getPositions(
+      ub.accessToken,
+      ub.brokerClientId,
+    );
 
     try {
-      await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 3);
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(result), 'EX', 3);
     } catch (_) {}
 
     return result;
@@ -653,11 +677,13 @@ export class BrokersController {
     } catch (_) {}
 
     const { ub, code } = await this.getActiveBroker(userId);
-    const adapter = this.brokerFactory.getAdapter(code as unknown as BrokerType);
-    const result = await adapter.getHoldings(ub.accessToken!, ub.brokerClientId);
+    const adapter = this.brokerFactory.getAdapter(code);
+    const result = await adapter.getHoldings(ub.accessToken, ub.brokerClientId);
 
     try {
-      await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 5);
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(result), 'EX', 5);
     } catch (_) {}
 
     return result;
@@ -674,11 +700,13 @@ export class BrokersController {
     } catch (_) {}
 
     const { ub, code } = await this.getActiveBroker(userId);
-    const adapter = this.brokerFactory.getAdapter(code as unknown as BrokerType);
-    const result = await adapter.getOrders(ub.accessToken!, ub.brokerClientId);
+    const adapter = this.brokerFactory.getAdapter(code);
+    const result = await adapter.getOrders(ub.accessToken, ub.brokerClientId);
 
     try {
-      await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 3);
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(result), 'EX', 3);
     } catch (_) {}
 
     return result;
@@ -695,11 +723,16 @@ export class BrokersController {
     } catch (_) {}
 
     const { ub, code } = await this.getActiveBroker(userId);
-    const adapter = this.brokerFactory.getAdapter(code as unknown as BrokerType);
-    const result = await adapter.getTradeBook(ub.accessToken!, ub.brokerClientId);
+    const adapter = this.brokerFactory.getAdapter(code);
+    const result = await adapter.getTradeBook(
+      ub.accessToken,
+      ub.brokerClientId,
+    );
 
     try {
-      await this.redisService.getClient().set(cacheKey, JSON.stringify(result), 'EX', 3);
+      await this.redisService
+        .getClient()
+        .set(cacheKey, JSON.stringify(result), 'EX', 3);
     } catch (_) {}
 
     return result;
@@ -739,7 +772,10 @@ export class BrokersController {
     return this.processIncomingPostback('ZEBU', payload);
   }
 
-  private async processIncomingPostback(brokerCodeStr: string, rawPayload: any) {
+  private async processIncomingPostback(
+    brokerCodeStr: string,
+    rawPayload: any,
+  ) {
     let payload = rawPayload;
     if (typeof payload === 'string') {
       try {
@@ -766,17 +802,22 @@ export class BrokersController {
     }
 
     const brokerCode = (brokerCodeStr || '').toUpperCase().replace('-', '_');
-    this.logger.log(`[Broker Postback] Received webhook from ${brokerCode}: ${JSON.stringify(payload)}`);
+    this.logger.log(
+      `[Broker Postback] Received webhook from ${brokerCode}: ${JSON.stringify(payload)}`,
+    );
 
     // Check if this is a Zebu WebSocket connection/activation handshake payload:
     // e.g. {"accesstoken":"...","t":"a","actid":"ZP00285","uid":"ZP00285","source":"API"}
     const zebuClientCode = payload.actid || payload.uid;
     const zebuAccessToken = payload.accesstoken || payload.accessToken;
     if (
-      (brokerCode === 'ZEBU' || payload.source === 'API' || payload.t === 'a') &&
+      (brokerCode === 'ZEBU' ||
+        payload.source === 'API' ||
+        payload.t === 'a') &&
       zebuClientCode &&
       zebuAccessToken &&
-      (payload.t === 'a' || (!payload.norenordno && !payload.orderid && !payload.brokerOrderId))
+      (payload.t === 'a' ||
+        (!payload.norenordno && !payload.orderid && !payload.brokerOrderId))
     ) {
       this.logger.log(
         `[Broker Postback] Received Zebu handshake payload for ${zebuClientCode}. Connecting to WebSocket stream wss://go.mynt.in/NorenWSAPI/...`,
@@ -810,7 +851,10 @@ export class BrokersController {
         averagePrice = parseFloat(payload.averageprice || payload.avgPrice);
       }
       if (payload.filledshares || payload.filledQuantity) {
-        filledQuantity = parseInt(payload.filledshares || payload.filledQuantity, 10);
+        filledQuantity = parseInt(
+          payload.filledshares || payload.filledQuantity,
+          10,
+        );
       }
       rejectionReason = payload.text || payload.reason || payload.message;
     } else if (brokerCode === 'ZEBU') {
@@ -826,7 +870,10 @@ export class BrokersController {
         averagePrice = parseFloat(payload.avgprc || payload.averageprice);
       }
       if (payload.fillshares || payload.filledshares) {
-        filledQuantity = parseInt(payload.fillshares || payload.filledshares, 10);
+        filledQuantity = parseInt(
+          payload.fillshares || payload.filledshares,
+          10,
+        );
       }
       rejectionReason = payload.rejreason || payload.text || payload.reason;
     } else {
@@ -840,7 +887,9 @@ export class BrokersController {
     }
 
     if (!brokerOrderId) {
-      this.logger.warn(`[Broker Postback] No brokerOrderId could be extracted from payload: ${JSON.stringify(rawPayload)}`);
+      this.logger.warn(
+        `[Broker Postback] No brokerOrderId could be extracted from payload: ${JSON.stringify(rawPayload)}`,
+      );
       return {
         success: false,
         message: 'No brokerOrderId found in postback payload',

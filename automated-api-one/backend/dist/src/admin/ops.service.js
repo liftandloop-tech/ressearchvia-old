@@ -82,7 +82,9 @@ let OpsService = OpsService_1 = class OpsService {
         this.metrics.incrementOperationsRequests(action);
         const idempotencyKey = `ops:idempotency:${action}:${resourceId}`;
         if (this.redisService.isHealthy()) {
-            const acquired = await this.redisService.getClient().set(idempotencyKey, '1', 'EX', 60, 'NX');
+            const acquired = await this.redisService
+                .getClient()
+                .set(idempotencyKey, '1', 'EX', 60, 'NX');
             if (acquired !== 'OK') {
                 this.metrics.incrementOperationsRejected(action);
                 throw new common_1.BadRequestException(`Operation ${action} on resource ${resourceId} is already being processed. Try again in 60 seconds.`);
@@ -122,7 +124,9 @@ let OpsService = OpsService_1 = class OpsService {
                 }
             }
             const isRejected = err instanceof common_1.BadRequestException;
-            const status = isRejected ? client_1.OperationStatus.REJECTED : client_1.OperationStatus.FAILED;
+            const status = isRejected
+                ? client_1.OperationStatus.REJECTED
+                : client_1.OperationStatus.FAILED;
             if (audit) {
                 try {
                     await this.prisma.operationsAudit.update({
@@ -213,7 +217,9 @@ let OpsService = OpsService_1 = class OpsService {
                 throw new common_1.BadRequestException('Signal is currently processing');
             }
             const jobId = `signal-${signalId}-${operationId}`;
-            await this.queueService.addJob(queue_constants_1.Queues.SIGNAL_PROCESSING, jobId, { signalId });
+            await this.queueService.addJob(queue_constants_1.Queues.SIGNAL_PROCESSING, jobId, {
+                signalId,
+            });
         });
     }
     async replayOutboxEvent(operatorId, eventId) {
@@ -227,7 +233,9 @@ let OpsService = OpsService_1 = class OpsService {
             const newEvent = await this.prisma.outboxEvent.create({
                 data: {
                     eventType: original.eventType,
-                    eventKey: original.eventKey ? `${original.eventKey}:replay:${operationId}` : null,
+                    eventKey: original.eventKey
+                        ? `${original.eventKey}:replay:${operationId}`
+                        : null,
                     aggregateId: original.aggregateId,
                     version: original.version,
                     correlationId: original.correlationId,
@@ -236,7 +244,9 @@ let OpsService = OpsService_1 = class OpsService {
                     attempts: 0,
                 },
             });
-            await this.queueService.addJob(queue_constants_1.Queues.OUTBOX_DISPATCHER, newEvent.id, { outboxEventId: newEvent.id });
+            await this.queueService.addJob(queue_constants_1.Queues.OUTBOX_DISPATCHER, newEvent.id, {
+                outboxEventId: newEvent.id,
+            });
         });
     }
     async getDlqMetrics(operatorId) {
@@ -316,7 +326,8 @@ let OpsService = OpsService_1 = class OpsService {
             operatorId,
             timestamp: new Date().toISOString(),
         }, async () => {
-            const isOrderQueue = queueName === queue_constants_1.Queues.ORDER_PLACEMENT || queueName === queue_constants_1.Queues.ORDER_MONITORING;
+            const isOrderQueue = queueName === queue_constants_1.Queues.ORDER_PLACEMENT ||
+                queueName === queue_constants_1.Queues.ORDER_MONITORING;
             if (isOrderQueue && this.isMarketHours() && !force) {
                 throw new common_1.BadRequestException(`Cannot pause ${queueName} queue during market hours without force=true`);
             }
@@ -406,7 +417,9 @@ let OpsService = OpsService_1 = class OpsService {
             }
             if (this.redisService.isHealthy()) {
                 const rateLimitKey = `ops:broker-refresh:${userBrokerId}`;
-                const isRateLimited = await this.redisService.getClient().exists(rateLimitKey);
+                const isRateLimited = await this.redisService
+                    .getClient()
+                    .exists(rateLimitKey);
                 if (isRateLimited === 1) {
                     throw new common_1.BadRequestException(`Rate limit exceeded: session refresh for broker connection ${userBrokerId} is restricted to once per 60 seconds.`);
                 }
@@ -456,7 +469,9 @@ let OpsService = OpsService_1 = class OpsService {
     }
     async stopTrading(operatorId, permanent, reason) {
         const defaultReason = reason || 'Emergency emergency market event';
-        const expiresAt = permanent ? 'never' : new Date(Date.now() + 900 * 1000).toISOString();
+        const expiresAt = permanent
+            ? 'never'
+            : new Date(Date.now() + 900 * 1000).toISOString();
         const payload = JSON.stringify({
             enabled: true,
             reason: defaultReason,
@@ -466,10 +481,14 @@ let OpsService = OpsService_1 = class OpsService {
         return this.runOperation(operatorId, client_1.OperationsAction.TRADING_STOP, 'TradingEngine', 'GLOBAL', { permanent, reason: defaultReason, expiresAt }, async () => {
             if (this.redisService.isHealthy()) {
                 if (permanent) {
-                    await this.redisService.getClient().set('trading:global:disabled', payload);
+                    await this.redisService
+                        .getClient()
+                        .set('trading:global:disabled', payload);
                 }
                 else {
-                    await this.redisService.getClient().set('trading:global:disabled', payload, 'EX', 900);
+                    await this.redisService
+                        .getClient()
+                        .set('trading:global:disabled', payload, 'EX', 900);
                 }
             }
             else {
@@ -510,7 +529,9 @@ let OpsService = OpsService_1 = class OpsService {
             ...(query.action ? { action: query.action } : {}),
             ...(query.operatorId ? { operatorId: query.operatorId } : {}),
             ...(query.status ? { status: query.status } : {}),
-            ...(query.from && !isNaN(Date.parse(query.from)) ? { createdAt: { gte: new Date(query.from) } } : {}),
+            ...(query.from && !isNaN(Date.parse(query.from))
+                ? { createdAt: { gte: new Date(query.from) } }
+                : {}),
         };
         return this.prisma.operationsAudit.paginate({
             page,
@@ -528,7 +549,11 @@ let OpsService = OpsService_1 = class OpsService {
     async getReconciliationIssues(resolved) {
         return this.prisma.reconciliationIssue.findMany({
             where: resolved !== undefined
-                ? { status: resolved ? client_1.ReconciliationIssueStatus.RESOLVED : { not: client_1.ReconciliationIssueStatus.RESOLVED } }
+                ? {
+                    status: resolved
+                        ? client_1.ReconciliationIssueStatus.RESOLVED
+                        : { not: client_1.ReconciliationIssueStatus.RESOLVED },
+                }
                 : undefined,
             orderBy: { createdAt: 'desc' },
             include: { user: true, broker: true },
@@ -539,10 +564,16 @@ let OpsService = OpsService_1 = class OpsService {
             where: { status: client_1.ReconciliationIssueStatus.OPEN },
         });
         const criticalCount = await this.prisma.reconciliationIssue.count({
-            where: { severity: client_1.Severity.CRITICAL, status: { not: client_1.ReconciliationIssueStatus.RESOLVED } },
+            where: {
+                severity: client_1.Severity.CRITICAL,
+                status: { not: client_1.ReconciliationIssueStatus.RESOLVED },
+            },
         });
         const warningCount = await this.prisma.reconciliationIssue.count({
-            where: { severity: client_1.Severity.WARNING, status: { not: client_1.ReconciliationIssueStatus.RESOLVED } },
+            where: {
+                severity: client_1.Severity.WARNING,
+                status: { not: client_1.ReconciliationIssueStatus.RESOLVED },
+            },
         });
         const escalatedCount = await this.prisma.reconciliationIssue.count({
             where: { status: client_1.ReconciliationIssueStatus.ESCALATED },
@@ -579,13 +610,26 @@ let OpsService = OpsService_1 = class OpsService {
                 where: {
                     userId: issue.userId,
                     brokerId: issue.brokerId,
-                    status: { in: [client_1.ReconciliationIssueStatus.OPEN, client_1.ReconciliationIssueStatus.INVESTIGATING, client_1.ReconciliationIssueStatus.ESCALATED] },
+                    status: {
+                        in: [
+                            client_1.ReconciliationIssueStatus.OPEN,
+                            client_1.ReconciliationIssueStatus.INVESTIGATING,
+                            client_1.ReconciliationIssueStatus.ESCALATED,
+                        ],
+                    },
                 },
             });
             await this.prisma.reconciliationSnapshot.upsert({
-                where: { userId_brokerId: { userId: issue.userId, brokerId: issue.brokerId } },
+                where: {
+                    userId_brokerId: { userId: issue.userId, brokerId: issue.brokerId },
+                },
                 update: { openIssues },
-                create: { userId: issue.userId, brokerId: issue.brokerId, openIssues, lastReconciledAt: new Date() },
+                create: {
+                    userId: issue.userId,
+                    brokerId: issue.brokerId,
+                    openIssues,
+                    lastReconciledAt: new Date(),
+                },
             });
             if (this.redisService.isHealthy()) {
                 const keys = [
@@ -638,13 +682,17 @@ let OpsService = OpsService_1 = class OpsService {
     async recalculateRiskSnapshot(operatorId, userId) {
         return this.runOperation(operatorId, client_1.OperationsAction.RISK_RECALCULATE, 'RiskSnapshot', userId, { userId }, async (operationId) => {
             const jobId = `risk-recalc-${userId}-manual-${operationId}`;
-            await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, { userId });
+            await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, {
+                userId,
+            });
         });
     }
     async unblockUserRisk(operatorId, userId) {
         return this.runOperation(operatorId, client_1.OperationsAction.RISK_UNBLOCK, 'UserRiskLock', userId, { userId }, async () => {
             if (this.redisService.isHealthy()) {
-                await this.redisService.getClient().del(`user:risk:blocked:${userId}`);
+                await this.redisService
+                    .getClient()
+                    .del(`user:risk:blocked:${userId}`);
             }
             await this.prisma.riskSnapshot.updateMany({
                 where: { userId },
@@ -670,7 +718,9 @@ let OpsService = OpsService_1 = class OpsService {
                 throw new common_1.BadRequestException('Redis is not available');
             }
             if (blocked) {
-                await this.redisService.getClient().set('risk:global:blocked', 'true');
+                await this.redisService
+                    .getClient()
+                    .set('risk:global:blocked', 'true');
                 this.logger.warn(`Global emergency risk lock activated by operator ${operatorId}. Reason: ${reason}`);
             }
             else {
@@ -719,10 +769,18 @@ let OpsService = OpsService_1 = class OpsService {
         const brokerType = userBroker.broker.code;
         const adapter = this.brokerFactory.getAdapter(brokerType);
         const [positions, holdings, orders, trades] = await Promise.all([
-            adapter.getPositions(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
-            adapter.getHoldings(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
-            adapter.getOrders(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
-            adapter.getTradeBook(userBroker.accessToken, userBroker.brokerClientId).catch(() => []),
+            adapter
+                .getPositions(userBroker.accessToken, userBroker.brokerClientId)
+                .catch(() => []),
+            adapter
+                .getHoldings(userBroker.accessToken, userBroker.brokerClientId)
+                .catch(() => []),
+            adapter
+                .getOrders(userBroker.accessToken, userBroker.brokerClientId)
+                .catch(() => []),
+            adapter
+                .getTradeBook(userBroker.accessToken, userBroker.brokerClientId)
+                .catch(() => []),
         ]);
         return {
             user: {
@@ -766,11 +824,18 @@ let OpsService = OpsService_1 = class OpsService {
                 where: { id: existing.id },
                 data: {
                     isFixed1xEnabled: data.isFixed1xEnabled ?? existing.isFixed1xEnabled,
-                    isLossMultiplier2xEnabled: data.isLossMultiplier2xEnabled ?? existing.isLossMultiplier2xEnabled,
+                    isLossMultiplier2xEnabled: data.isLossMultiplier2xEnabled ??
+                        existing.isLossMultiplier2xEnabled,
                     maxAllowedMultiplier: data.maxAllowedMultiplier ?? existing.maxAllowedMultiplier,
-                    maxGlobalQuantity: data.maxGlobalQuantity !== undefined ? data.maxGlobalQuantity : existing.maxGlobalQuantity,
-                    maxGlobalExposureInr: data.maxGlobalExposureInr !== undefined ? data.maxGlobalExposureInr : existing.maxGlobalExposureInr,
-                    maxDailyLossInr: data.maxDailyLossInr !== undefined ? data.maxDailyLossInr : existing.maxDailyLossInr,
+                    maxGlobalQuantity: data.maxGlobalQuantity !== undefined
+                        ? data.maxGlobalQuantity
+                        : existing.maxGlobalQuantity,
+                    maxGlobalExposureInr: data.maxGlobalExposureInr !== undefined
+                        ? data.maxGlobalExposureInr
+                        : existing.maxGlobalExposureInr,
+                    maxDailyLossInr: data.maxDailyLossInr !== undefined
+                        ? data.maxDailyLossInr
+                        : existing.maxDailyLossInr,
                     maxConsecutiveLosses: data.maxConsecutiveLosses ?? existing.maxConsecutiveLosses,
                     updatedByAdminId: operatorId,
                 },
@@ -829,14 +894,20 @@ let OpsService = OpsService_1 = class OpsService {
         const isTradingActive = user.segments.length > 0 && latestConsent?.status === 'ACTIVE';
         const card = {
             automatedTrading: isTradingActive ? 'Active' : 'Inactive',
-            strategy: currentStrategy ? (currentStrategy.strategyType === 'LOSS_MULTIPLIER_2X' ? '2× Loss Multiplier' : 'Fixed 1×') : 'Fixed 1×',
+            strategy: currentStrategy
+                ? currentStrategy.strategyType === 'LOSS_MULTIPLIER_2X'
+                    ? '2× Loss Multiplier'
+                    : 'Fixed 1×'
+                : 'Fixed 1×',
             strategyType: currentStrategy?.strategyType ?? 'FIXED_1X',
             baseMultiplier: `${currentStrategy?.baseMultiplier ?? 1}×`,
             currentMultiplier: `${currentStrategy?.currentMultiplier ?? 1}×`,
             lastTradeResult: currentStrategy?.lastTradeResult ?? 'None',
             consecutiveLosses: currentStrategy?.consecutiveLosses ?? 0,
             nextTradeMultiplier: `${currentStrategy?.nextTradeMultiplier ?? 1}×`,
-            strategySelectedOn: currentStrategy?.strategySelectedAt ?? currentStrategy?.createdAt ?? null,
+            strategySelectedOn: currentStrategy?.strategySelectedAt ??
+                currentStrategy?.createdAt ??
+                null,
             agreementVersion: currentStrategy?.agreementVersion ?? 'v1.0',
             consentStatus: latestConsent?.status === 'ACTIVE' ? 'Accepted' : 'Pending',
             status: currentStrategy?.status ?? 'ACTIVE',
@@ -845,7 +916,11 @@ let OpsService = OpsService_1 = class OpsService {
         const history = user.strategyChangeHistories.map((h) => ({
             id: h.id,
             dateTime: h.createdAt,
-            previous: h.previousStrategy ? (h.previousStrategy === 'LOSS_MULTIPLIER_2X' ? '2×' : '1×') : '—',
+            previous: h.previousStrategy
+                ? h.previousStrategy === 'LOSS_MULTIPLIER_2X'
+                    ? '2×'
+                    : '1×'
+                : '—',
             new: h.newStrategy === 'LOSS_MULTIPLIER_2X' ? '2×' : '1×',
             previousMultiplier: `${h.previousMultiplier}×`,
             newMultiplier: `${h.newMultiplier}×`,
@@ -901,7 +976,9 @@ let OpsService = OpsService_1 = class OpsService {
                 mobile: u.mobile,
                 clientId: broker?.brokerClientId ?? '—',
                 brokerCode: broker?.broker?.code ?? '—',
-                strategy: strat?.strategyType === 'LOSS_MULTIPLIER_2X' ? '2× Loss Multiplier' : 'Fixed 1×',
+                strategy: strat?.strategyType === 'LOSS_MULTIPLIER_2X'
+                    ? '2× Loss Multiplier'
+                    : 'Fixed 1×',
                 strategyType: strat?.strategyType ?? 'FIXED_1X',
                 currentMultiplier: `${mult}×`,
                 consecutiveLosses: strat?.consecutiveLosses ?? 0,

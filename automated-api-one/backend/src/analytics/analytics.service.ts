@@ -28,12 +28,17 @@ export class AnalyticsService {
    * Recalculates EOD DailyPortfolioSnapshot for the user (today) and records equity curve point.
    */
   async recalculateAnalyticsSnapshot(userId: string): Promise<void> {
-    this.logger.log(`Recalculating daily portfolio snapshot for user: ${userId}`);
+    this.logger.log(
+      `Recalculating daily portfolio snapshot for user: ${userId}`,
+    );
 
     const segments = await this.prisma.userSegment.findMany({
       where: { userId, deletedAt: null },
     });
-    let initialCapital = segments.reduce((sum, seg) => sum + Number(seg.capital), 0);
+    let initialCapital = segments.reduce(
+      (sum, seg) => sum + Number(seg.capital),
+      0,
+    );
     if (initialCapital <= 0) {
       const firstSnap = await this.prisma.dailyPortfolioSnapshot.findFirst({
         where: { userId },
@@ -45,7 +50,13 @@ export class AnalyticsService {
     const closedTrades = await this.prisma.trade.findMany({
       where: {
         userId,
-        status: { in: [TradeStatus.CLOSED, TradeStatus.TARGET_HIT, TradeStatus.STOPLOSS_HIT] },
+        status: {
+          in: [
+            TradeStatus.CLOSED,
+            TradeStatus.TARGET_HIT,
+            TradeStatus.STOPLOSS_HIT,
+          ],
+        },
       },
     });
 
@@ -56,9 +67,16 @@ export class AnalyticsService {
       },
     });
 
-    const totalRealizedPnl = closedTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
-    const totalUnrealizedPnl = openPositions.reduce((sum, p) => sum + Number(p.unrealizedPnl || 0), 0);
-    const currentEquity = initialCapital + totalRealizedPnl + totalUnrealizedPnl;
+    const totalRealizedPnl = closedTrades.reduce(
+      (sum, t) => sum + Number(t.pnl || 0),
+      0,
+    );
+    const totalUnrealizedPnl = openPositions.reduce(
+      (sum, p) => sum + Number(p.unrealizedPnl || 0),
+      0,
+    );
+    const currentEquity =
+      initialCapital + totalRealizedPnl + totalUnrealizedPnl;
 
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
@@ -67,7 +85,10 @@ export class AnalyticsService {
     const pastSnapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
       where: { userId, date: { lt: todayDate } },
     });
-    const allEquities = [...pastSnapshots.map((s) => Number(s.equity)), currentEquity];
+    const allEquities = [
+      ...pastSnapshots.map((s) => Number(s.equity)),
+      currentEquity,
+    ];
     const peakEquity = Math.max(initialCapital, ...allEquities);
     const drawdown = peakEquity - currentEquity;
 
@@ -131,12 +152,17 @@ export class AnalyticsService {
    * Performs a complete historical rebuild of daily snapshots from trades.
    */
   async rebuildHistoricalSnapshots(userId: string): Promise<void> {
-    this.logger.log(`Performing full historical rebuild of daily snapshots for user: ${userId}`);
+    this.logger.log(
+      `Performing full historical rebuild of daily snapshots for user: ${userId}`,
+    );
 
     const segments = await this.prisma.userSegment.findMany({
       where: { userId, deletedAt: null },
     });
-    let initialCapital = segments.reduce((sum, seg) => sum + Number(seg.capital), 0);
+    let initialCapital = segments.reduce(
+      (sum, seg) => sum + Number(seg.capital),
+      0,
+    );
     if (initialCapital <= 0) {
       initialCapital = 100000;
     }
@@ -144,7 +170,13 @@ export class AnalyticsService {
     const closedTrades = await this.prisma.trade.findMany({
       where: {
         userId,
-        status: { in: [TradeStatus.CLOSED, TradeStatus.TARGET_HIT, TradeStatus.STOPLOSS_HIT] },
+        status: {
+          in: [
+            TradeStatus.CLOSED,
+            TradeStatus.TARGET_HIT,
+            TradeStatus.STOPLOSS_HIT,
+          ],
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -177,12 +209,20 @@ export class AnalyticsService {
       const endOfDay = new Date(currentDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const tradesUpToD = closedTrades.filter((t) => new Date(t.createdAt) <= endOfDay);
-      const realizedPnl = tradesUpToD.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+      const tradesUpToD = closedTrades.filter(
+        (t) => new Date(t.createdAt) <= endOfDay,
+      );
+      const realizedPnl = tradesUpToD.reduce(
+        (sum, t) => sum + Number(t.pnl || 0),
+        0,
+      );
 
       const isToday = currentDate.getTime() === today.getTime();
       const unrealizedPnl = isToday
-        ? openPositions.reduce((sum, p) => sum + Number(p.unrealizedPnl || 0), 0)
+        ? openPositions.reduce(
+            (sum, p) => sum + Number(p.unrealizedPnl || 0),
+            0,
+          )
         : 0;
 
       const equity = initialCapital + realizedPnl + unrealizedPnl;
@@ -231,7 +271,9 @@ export class AnalyticsService {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    this.logger.log(`Full historical rebuild of daily snapshots completed for user: ${userId}`);
+    this.logger.log(
+      `Full historical rebuild of daily snapshots completed for user: ${userId}`,
+    );
     await this.invalidateUserCache(userId);
   }
 
@@ -244,7 +286,10 @@ export class AnalyticsService {
     const segments = await this.prisma.userSegment.findMany({
       where: { userId, deletedAt: null },
     });
-    let initialCapital = segments.reduce((sum, seg) => sum + Number(seg.capital), 0);
+    let initialCapital = segments.reduce(
+      (sum, seg) => sum + Number(seg.capital),
+      0,
+    );
     if (initialCapital <= 0) {
       initialCapital = 100000;
     }
@@ -252,7 +297,13 @@ export class AnalyticsService {
     const closedTrades = await this.prisma.trade.findMany({
       where: {
         userId,
-        status: { in: [TradeStatus.CLOSED, TradeStatus.TARGET_HIT, TradeStatus.STOPLOSS_HIT] },
+        status: {
+          in: [
+            TradeStatus.CLOSED,
+            TradeStatus.TARGET_HIT,
+            TradeStatus.STOPLOSS_HIT,
+          ],
+        },
       },
     });
 
@@ -262,15 +313,35 @@ export class AnalyticsService {
     });
 
     const totalTrades = closedTrades.length;
-    const totalPnl = closedTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
-    const grossProfit = closedTrades.reduce((sum, t) => sum + (Number(t.pnl || 0) > 0 ? Number(t.pnl || 0) : 0), 0);
-    const grossLoss = closedTrades.reduce((sum, t) => sum + (Number(t.pnl || 0) < 0 ? Number(t.pnl || 0) : 0), 0);
-    const winningTrades = closedTrades.filter((t) => Number(t.pnl || 0) > 0).length;
-    const losingTrades = closedTrades.filter((t) => Number(t.pnl || 0) <= 0).length;
-    const maxDrawdown = snapshots.reduce((max, s) => Math.max(max, Number(s.drawdown)), 0);
+    const totalPnl = closedTrades.reduce(
+      (sum, t) => sum + Number(t.pnl || 0),
+      0,
+    );
+    const grossProfit = closedTrades.reduce(
+      (sum, t) => sum + (Number(t.pnl || 0) > 0 ? Number(t.pnl || 0) : 0),
+      0,
+    );
+    const grossLoss = closedTrades.reduce(
+      (sum, t) => sum + (Number(t.pnl || 0) < 0 ? Number(t.pnl || 0) : 0),
+      0,
+    );
+    const winningTrades = closedTrades.filter(
+      (t) => Number(t.pnl || 0) > 0,
+    ).length;
+    const losingTrades = closedTrades.filter(
+      (t) => Number(t.pnl || 0) <= 0,
+    ).length;
+    const maxDrawdown = snapshots.reduce(
+      (max, s) => Math.max(max, Number(s.drawdown)),
+      0,
+    );
 
-    const firstTradeAt = closedTrades.length > 0 ? closedTrades[0].createdAt : null;
-    const lastTradeAt = closedTrades.length > 0 ? closedTrades[closedTrades.length - 1].createdAt : null;
+    const firstTradeAt =
+      closedTrades.length > 0 ? closedTrades[0].createdAt : null;
+    const lastTradeAt =
+      closedTrades.length > 0
+        ? closedTrades[closedTrades.length - 1].createdAt
+        : null;
 
     // 1. Update UserPerformance
     await this.prisma.userPerformance.upsert({
@@ -305,13 +376,20 @@ export class AnalyticsService {
     });
 
     // 2. Update SegmentPerformance for each segment
-    const segmentIds = Array.from(new Set(closedTrades.map((t) => t.segmentId)));
+    const segmentIds = Array.from(
+      new Set(closedTrades.map((t) => t.segmentId)),
+    );
     for (const segmentId of segmentIds) {
       const segTrades = closedTrades.filter((t) => t.segmentId === segmentId);
       const totalTradesForSegment = segTrades.length;
       const netPnL = segTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
-      const winningTradesSegment = segTrades.filter((t) => Number(t.pnl || 0) > 0).length;
-      const winRate = totalTradesForSegment > 0 ? (winningTradesSegment / totalTradesForSegment) * 100 : 0;
+      const winningTradesSegment = segTrades.filter(
+        (t) => Number(t.pnl || 0) > 0,
+      ).length;
+      const winRate =
+        totalTradesForSegment > 0
+          ? (winningTradesSegment / totalTradesForSegment) * 100
+          : 0;
 
       const userSeg = segments.find((s) => s.segmentId === segmentId);
       const capitalUsed = userSeg ? Number(userSeg.capital) : 0;
@@ -320,7 +398,9 @@ export class AnalyticsService {
       let runningEquity = capitalUsed;
       let peak = capitalUsed;
       let maxDrawdownSegment = 0;
-      const sortedSegTrades = [...segTrades].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      const sortedSegTrades = [...segTrades].sort(
+        (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+      );
       for (const t of sortedSegTrades) {
         runningEquity += Number(t.pnl || 0);
         if (runningEquity > peak) peak = runningEquity;
@@ -328,7 +408,8 @@ export class AnalyticsService {
         if (dd > maxDrawdownSegment) maxDrawdownSegment = dd;
       }
 
-      const contributionPercent = totalPnl !== 0 ? (netPnL / Math.abs(totalPnl)) * 100 : 0;
+      const contributionPercent =
+        totalPnl !== 0 ? (netPnL / Math.abs(totalPnl)) * 100 : 0;
 
       await this.prisma.segmentPerformance.upsert({
         where: { userId_segmentId: { userId, segmentId } },
@@ -376,9 +457,13 @@ export class AnalyticsService {
     const segments = await this.prisma.userSegment.findMany({
       where: { userId, deletedAt: null },
     });
-    let initialCapital = segments.reduce((sum, seg) => sum + Number(seg.capital), 0);
+    let initialCapital = segments.reduce(
+      (sum, seg) => sum + Number(seg.capital),
+      0,
+    );
     if (initialCapital <= 0) {
-      initialCapital = snapshots.length > 0 ? Number(snapshots[0].equity) : 100000;
+      initialCapital =
+        snapshots.length > 0 ? Number(snapshots[0].equity) : 100000;
     }
 
     if (!userPerf || snapshots.length === 0) {
@@ -409,19 +494,28 @@ export class AnalyticsService {
     const dailyRf = annualRf / 100 / 252;
     const meanR = R.reduce((sum, r) => sum + r, 0) / R.length;
 
-    const variance = R.reduce((sum, r) => sum + Math.pow(r - meanR, 2), 0) / R.length;
+    const variance =
+      R.reduce((sum, r) => sum + Math.pow(r - meanR, 2), 0) / R.length;
     const stdDevR = Math.sqrt(variance);
-    const sharpeRatio = stdDevR > 0 ? ((meanR - dailyRf) / stdDevR) * Math.sqrt(252) : 0;
+    const sharpeRatio =
+      stdDevR > 0 ? ((meanR - dailyRf) / stdDevR) * Math.sqrt(252) : 0;
 
     const downsideDiffs = R.map((r) => Math.min(0, r - dailyRf));
-    const downsideVariance = downsideDiffs.reduce((sum, d) => sum + Math.pow(d, 2), 0) / R.length;
+    const downsideVariance =
+      downsideDiffs.reduce((sum, d) => sum + Math.pow(d, 2), 0) / R.length;
     const downsideStdDev = Math.sqrt(downsideVariance);
-    const sortinoRatio = downsideStdDev > 0 ? ((meanR - dailyRf) / downsideStdDev) * Math.sqrt(252) : 0;
+    const sortinoRatio =
+      downsideStdDev > 0
+        ? ((meanR - dailyRf) / downsideStdDev) * Math.sqrt(252)
+        : 0;
 
     // 3. CAGR Calculation
     const firstDate = new Date(snapshots[0].date);
     const latestDate = new Date(snapshots[snapshots.length - 1].date);
-    const diffMs = Math.max(1000 * 60 * 60 * 24, latestDate.getTime() - firstDate.getTime());
+    const diffMs = Math.max(
+      1000 * 60 * 60 * 24,
+      latestDate.getTime() - firstDate.getTime(),
+    );
     const days = diffMs / (1000 * 60 * 60 * 24);
     const years = days / 365.25;
 
@@ -433,7 +527,8 @@ export class AnalyticsService {
     }
 
     // 4. Alpha Calculation vs Benchmarks
-    const portfolioReturn = beginningValue > 0 ? (endingValue - beginningValue) / beginningValue : 0;
+    const portfolioReturn =
+      beginningValue > 0 ? (endingValue - beginningValue) / beginningValue : 0;
     const alpha: Record<string, number> = {};
 
     const benchmarks = ['NIFTY50', 'BANKNIFTY', 'MIDCAP150'];
@@ -450,17 +545,22 @@ export class AnalyticsService {
       if (startB && endB) {
         const startVal = Number(startB.value);
         const endVal = Number(endB.value);
-        const benchmarkReturn = startVal > 0 ? (endVal - startVal) / startVal : 0;
+        const benchmarkReturn =
+          startVal > 0 ? (endVal - startVal) / startVal : 0;
         alpha[bName] = portfolioReturn - benchmarkReturn;
       } else {
         alpha[bName] = 0;
       }
     }
 
-    const winRate = Number(userPerf.totalTrades) > 0 ? Number(userPerf.winningTrades) / Number(userPerf.totalTrades) : 0;
-    const profitFactor = Math.abs(Number(userPerf.grossLoss)) > 0
-      ? Number(userPerf.grossProfit) / Math.abs(Number(userPerf.grossLoss))
-      : Number(userPerf.grossProfit);
+    const winRate =
+      Number(userPerf.totalTrades) > 0
+        ? Number(userPerf.winningTrades) / Number(userPerf.totalTrades)
+        : 0;
+    const profitFactor =
+      Math.abs(Number(userPerf.grossLoss)) > 0
+        ? Number(userPerf.grossProfit) / Math.abs(Number(userPerf.grossLoss))
+        : Number(userPerf.grossProfit);
 
     const equityCurvePoints = await this.prisma.equityCurvePoint.findMany({
       where: { userId },
@@ -548,10 +648,15 @@ export class AnalyticsService {
 
     const result = Object.values(brokerGroup).map((g) => {
       const fillRate = g.totalOrders > 0 ? g.filledOrders / g.totalOrders : 0;
-      const rejectionRate = g.totalOrders > 0 ? g.rejectedOrders / g.totalOrders : 0;
-      const averageSlippage = g.slippages.length > 0
-        ? g.slippages.reduce((sum: number, val: number) => sum + Math.abs(val), 0) / g.slippages.length
-        : 0;
+      const rejectionRate =
+        g.totalOrders > 0 ? g.rejectedOrders / g.totalOrders : 0;
+      const averageSlippage =
+        g.slippages.length > 0
+          ? g.slippages.reduce(
+              (sum: number, val: number) => sum + Math.abs(val),
+              0,
+            ) / g.slippages.length
+          : 0;
 
       return {
         brokerId: g.brokerId,
@@ -581,7 +686,9 @@ export class AnalyticsService {
       try {
         await this.cacheService.del(key);
       } catch (err) {
-        this.logger.warn(`Failed to invalidate cache key: ${key}. Error: ${err.message}`);
+        this.logger.warn(
+          `Failed to invalidate cache key: ${key}. Error: ${err.message}`,
+        );
       }
     }
   }
@@ -608,7 +715,9 @@ export class AnalyticsService {
       },
     });
 
-    this.logger.log(`Nightly analytics job run ${run.id} started. Enqueuing ${totalUsers} sharded recalculation tasks.`);
+    this.logger.log(
+      `Nightly analytics job run ${run.id} started. Enqueuing ${totalUsers} sharded recalculation tasks.`,
+    );
 
     for (const user of activeUsers) {
       try {
@@ -618,7 +727,9 @@ export class AnalyticsService {
           { userId: user.id, runId: run.id, totalUsers },
         );
       } catch (err) {
-        this.logger.error(`Failed to enqueue recalculate job for user ${user.id}: ${err.message}`);
+        this.logger.error(
+          `Failed to enqueue recalculate job for user ${user.id}: ${err.message}`,
+        );
         await this.handleJobCompletion(run.id, totalUsers, false);
       }
     }
@@ -627,10 +738,16 @@ export class AnalyticsService {
   /**
    * Processes the completion of a user recalculation job.
    */
-  async handleJobCompletion(runId: string, totalUsers: number, success: boolean): Promise<void> {
+  async handleJobCompletion(
+    runId: string,
+    totalUsers: number,
+    success: boolean,
+  ): Promise<void> {
     try {
       // Find and update run in a transaction / update statement
-      const run = await this.prisma.analyticsJobRun.findUnique({ where: { id: runId } });
+      const run = await this.prisma.analyticsJobRun.findUnique({
+        where: { id: runId },
+      });
       if (!run) return;
 
       const usersProcessed = run.usersProcessed + (success ? 1 : 0);
@@ -639,7 +756,9 @@ export class AnalyticsService {
 
       const completedAt = isDone ? new Date() : null;
       const status = isDone
-        ? (failures === totalUsers ? AnalyticsRunStatus.FAILED : AnalyticsRunStatus.SUCCESS)
+        ? failures === totalUsers
+          ? AnalyticsRunStatus.FAILED
+          : AnalyticsRunStatus.SUCCESS
         : AnalyticsRunStatus.RUNNING;
 
       await this.prisma.analyticsJobRun.update({
@@ -649,7 +768,9 @@ export class AnalyticsService {
           failures,
           status,
           completedAt,
-          durationMs: completedAt ? completedAt.getTime() - run.startedAt.getTime() : null,
+          durationMs: completedAt
+            ? completedAt.getTime() - run.startedAt.getTime()
+            : null,
         },
       });
 
@@ -661,10 +782,14 @@ export class AnalyticsService {
       if (isDone && completedAt) {
         const duration = completedAt.getTime() - run.startedAt.getTime();
         this.metrics.observeAnalyticsDuration(duration);
-        this.logger.log(`Nightly analytics job run ${runId} finished. Status: ${status}. Processed: ${usersProcessed}, Failures: ${failures}`);
+        this.logger.log(
+          `Nightly analytics job run ${runId} finished. Status: ${status}. Processed: ${usersProcessed}, Failures: ${failures}`,
+        );
       }
     } catch (err) {
-      this.logger.error(`Failed to handle job completion update for run ${runId}: ${err.message}`);
+      this.logger.error(
+        `Failed to handle job completion update for run ${runId}: ${err.message}`,
+      );
     }
   }
 
@@ -705,17 +830,29 @@ export class AnalyticsService {
         `Retention cleanup finished. Deleted ${deletedIntraday.count} intraday points, ${deletedHourly.count} hourly points.`,
       );
 
-      this.metrics.incrementAnalyticsRetentionDeleted('INTRADAY', deletedIntraday.count);
-      this.metrics.incrementAnalyticsRetentionDeleted('HOURLY', deletedHourly.count);
+      this.metrics.incrementAnalyticsRetentionDeleted(
+        'INTRADAY',
+        deletedIntraday.count,
+      );
+      this.metrics.incrementAnalyticsRetentionDeleted(
+        'HOURLY',
+        deletedHourly.count,
+      );
     } catch (err) {
-      this.logger.error(`Failed to execute retention cleanup: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to execute retention cleanup: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
   /**
    * Enqueues a manual recalculation job for a user.
    */
-  async enqueueRecalculation(userId: string, rebuildHistory?: boolean): Promise<void> {
+  async enqueueRecalculation(
+    userId: string,
+    rebuildHistory?: boolean,
+  ): Promise<void> {
     await this.queueService.addJob(
       Queues.ANALYTICS_RECALCULATE,
       `recalculate-manual-${Date.now()}-${userId}`,

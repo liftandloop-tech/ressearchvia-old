@@ -11,4 +11,3 @@ import { InfrastructureModule } from '../infrastructure/infrastructure.module';
   exports: [SubscriptionsService],
 })
 export class SubscriptionsModule {}
-

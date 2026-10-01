@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CircuitBreakerService, CircuitState, BrokerUnavailableException } from './circuit-breaker.service';
+import {
+  CircuitBreakerService,
+  CircuitState,
+  BrokerUnavailableException,
+} from './circuit-breaker.service';
 import { RedisService } from '../redis/redis.service';
 import { ConfigService } from '@nestjs/config';
 import { MetricsService } from '../metrics/metrics.service';
@@ -78,13 +82,31 @@ describe('CircuitBreakerService', () => {
       const op = jest.fn().mockRejectedValue(new Error('Broker timeout'));
 
       // 1st failure
-      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow('Broker timeout');
+      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow(
+        'Broker timeout',
+      );
       // 2nd failure
-      clientMock.get.mockResolvedValue(JSON.stringify({ state: CircuitState.CLOSED, failures: 1, lastChange: Date.now() }));
-      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow('Broker timeout');
+      clientMock.get.mockResolvedValue(
+        JSON.stringify({
+          state: CircuitState.CLOSED,
+          failures: 1,
+          lastChange: Date.now(),
+        }),
+      );
+      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow(
+        'Broker timeout',
+      );
       // 3rd failure (trips)
-      clientMock.get.mockResolvedValue(JSON.stringify({ state: CircuitState.CLOSED, failures: 2, lastChange: Date.now() }));
-      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow('Broker timeout');
+      clientMock.get.mockResolvedValue(
+        JSON.stringify({
+          state: CircuitState.CLOSED,
+          failures: 2,
+          lastChange: Date.now(),
+        }),
+      );
+      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow(
+        'Broker timeout',
+      );
 
       expect(clientMock.set).toHaveBeenLastCalledWith(
         'circuit:ANGEL_ONE',
@@ -96,24 +118,30 @@ describe('CircuitBreakerService', () => {
 
     it('should block requests in OPEN state', async () => {
       // Set circuit as OPEN
-      clientMock.get.mockResolvedValue(JSON.stringify({
-        state: CircuitState.OPEN,
-        failures: 3,
-        lastChange: Date.now(),
-      }));
+      clientMock.get.mockResolvedValue(
+        JSON.stringify({
+          state: CircuitState.OPEN,
+          failures: 3,
+          lastChange: Date.now(),
+        }),
+      );
 
       const op = jest.fn();
-      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow(BrokerUnavailableException);
+      await expect(service.execute('ANGEL_ONE', op)).rejects.toThrow(
+        BrokerUnavailableException,
+      );
       expect(op).not.toHaveBeenCalled();
     });
 
     it('should transition to HALF_OPEN after cooldown expires', async () => {
       const startTime = Date.now();
-      clientMock.get.mockResolvedValue(JSON.stringify({
-        state: CircuitState.OPEN,
-        failures: 3,
-        lastChange: startTime,
-      }));
+      clientMock.get.mockResolvedValue(
+        JSON.stringify({
+          state: CircuitState.OPEN,
+          failures: 3,
+          lastChange: startTime,
+        }),
+      );
 
       // Fast forward time by 60 seconds (60000ms)
       jest.advanceTimersByTime(60000);

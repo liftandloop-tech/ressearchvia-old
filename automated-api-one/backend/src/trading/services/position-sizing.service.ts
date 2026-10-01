@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { RedisKeys } from '../../infrastructure/redis/redis-keys';
-import { StrategyType, StrategyChangeSource, UserTradingStrategy } from '@prisma/client';
+import {
+  StrategyType,
+  StrategyChangeSource,
+  UserTradingStrategy,
+} from '@prisma/client';
 
 export interface SizingResult {
   strategyType: StrategyType;
@@ -56,12 +60,16 @@ export class PositionSizingService {
           return JSON.parse(raw) as SystemConfigSnapshot;
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to read system strategy config from Redis: ${err.message}`);
+        this.logger.warn(
+          `Failed to read system strategy config from Redis: ${err.message}`,
+        );
       }
     }
 
     try {
-      const dbConfig = await (this.prisma as any).systemStrategyConfig.findFirst({
+      const dbConfig = await (
+        this.prisma as any
+      ).systemStrategyConfig.findFirst({
         orderBy: { updatedAt: 'desc' },
       });
 
@@ -71,22 +79,30 @@ export class PositionSizingService {
             isLossMultiplier2xEnabled: dbConfig.isLossMultiplier2xEnabled,
             maxAllowedMultiplier: dbConfig.maxAllowedMultiplier ?? 16,
             maxGlobalQuantity: dbConfig.maxGlobalQuantity,
-            maxGlobalExposureInr: dbConfig.maxGlobalExposureInr ? Number(dbConfig.maxGlobalExposureInr) : null,
+            maxGlobalExposureInr: dbConfig.maxGlobalExposureInr
+              ? Number(dbConfig.maxGlobalExposureInr)
+              : null,
             maxConsecutiveLosses: dbConfig.maxConsecutiveLosses ?? 5,
           }
         : DEFAULT_SYSTEM_CONFIG;
 
       if (this.redisService.isHealthy()) {
         try {
-          await this.redisService.getClient().set(cacheKey, JSON.stringify(config), 'EX', 300); // 5 min TTL
+          await this.redisService
+            .getClient()
+            .set(cacheKey, JSON.stringify(config), 'EX', 300); // 5 min TTL
         } catch (err: any) {
-          this.logger.warn(`Failed to cache system strategy config: ${err.message}`);
+          this.logger.warn(
+            `Failed to cache system strategy config: ${err.message}`,
+          );
         }
       }
 
       return config;
     } catch (err: any) {
-      this.logger.warn(`Failed to load system config from DB, using defaults: ${err.message}`);
+      this.logger.warn(
+        `Failed to load system config from DB, using defaults: ${err.message}`,
+      );
       return DEFAULT_SYSTEM_CONFIG;
     }
   }
@@ -95,7 +111,10 @@ export class PositionSizingService {
    * Retrieves user's active strategy configuration and streak state.
    * Redis cache first, falling back to PostgreSQL.
    */
-  async getUserStrategy(userId: string, segmentId?: string): Promise<UserTradingStrategy> {
+  async getUserStrategy(
+    userId: string,
+    segmentId?: string,
+  ): Promise<UserTradingStrategy> {
     const cacheKey = RedisKeys.strategy(userId, segmentId);
 
     if (this.redisService.isHealthy()) {
@@ -105,7 +124,9 @@ export class PositionSizingService {
           return JSON.parse(raw) as UserTradingStrategy;
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to read strategy from Redis [${cacheKey}]: ${err.message}`);
+        this.logger.warn(
+          `Failed to read strategy from Redis [${cacheKey}]: ${err.message}`,
+        );
       }
     }
 
@@ -113,10 +134,7 @@ export class PositionSizingService {
     let strategy = await (this.prisma as any).userTradingStrategy.findFirst({
       where: {
         userId,
-        OR: [
-          { segmentId: segmentId ?? null },
-          { segmentId: null },
-        ],
+        OR: [{ segmentId: segmentId ?? null }, { segmentId: null }],
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -143,7 +161,9 @@ export class PositionSizingService {
 
     if (this.redisService.isHealthy()) {
       try {
-        await this.redisService.getClient().set(cacheKey, JSON.stringify(strategy), 'EX', 86400);
+        await this.redisService
+          .getClient()
+          .set(cacheKey, JSON.stringify(strategy), 'EX', 86400);
       } catch (err: any) {
         this.logger.warn(`Failed to cache strategy in Redis: ${err.message}`);
       }
@@ -170,14 +190,20 @@ export class PositionSizingService {
       multiplier = 1;
     } else if (strategy.strategyType === StrategyType.LOSS_MULTIPLIER_2X) {
       // Respect configured system max allowed multiplier (e.g., 16x cap)
-      multiplier = Math.min(strategy.currentMultiplier, systemConfig.maxAllowedMultiplier);
+      multiplier = Math.min(
+        strategy.currentMultiplier,
+        systemConfig.maxAllowedMultiplier,
+      );
       if (multiplier < 1) multiplier = 1;
     }
 
     let actualQuantity = baseLot * multiplier;
 
     // Apply global quantity ceiling if configured
-    if (systemConfig.maxGlobalQuantity && actualQuantity > systemConfig.maxGlobalQuantity) {
+    if (
+      systemConfig.maxGlobalQuantity &&
+      actualQuantity > systemConfig.maxGlobalQuantity
+    ) {
       this.logger.warn(
         `Quantity capped by maxGlobalQuantity (${actualQuantity} -> ${systemConfig.maxGlobalQuantity}) for user ${userId}`,
       );
@@ -210,7 +236,8 @@ export class PositionSizingService {
     const systemConfig = await this.getSystemConfig();
 
     if (strategy.strategyType === StrategyType.FIXED_1X) {
-      const nextConsecutive = outcome === 'LOSS' ? strategy.consecutiveLosses + 1 : 0;
+      const nextConsecutive =
+        outcome === 'LOSS' ? strategy.consecutiveLosses + 1 : 0;
       await this.updateStrategyState(userId, segmentId, {
         currentMultiplier: 1,
         consecutiveLosses: nextConsecutive,
@@ -309,7 +336,8 @@ export class PositionSizingService {
         currentMultiplier: 1,
         consecutiveLosses: 0,
         lastTradeResult: 'NONE',
-        nextTradeMultiplier: newStrategy === StrategyType.LOSS_MULTIPLIER_2X ? 2 : 1,
+        nextTradeMultiplier:
+          newStrategy === StrategyType.LOSS_MULTIPLIER_2X ? 2 : 1,
         version: current.version + 1,
         agreementVersion,
         consentAccepted: true,
@@ -321,7 +349,8 @@ export class PositionSizingService {
         currentMultiplier: 1,
         consecutiveLosses: 0,
         lastTradeResult: 'NONE',
-        nextTradeMultiplier: newStrategy === StrategyType.LOSS_MULTIPLIER_2X ? 2 : 1,
+        nextTradeMultiplier:
+          newStrategy === StrategyType.LOSS_MULTIPLIER_2X ? 2 : 1,
         version: { increment: 1 },
         agreementVersion,
         consentAccepted: true,
@@ -332,11 +361,17 @@ export class PositionSizingService {
     // 3. Invalidate Redis cache
     if (this.redisService.isHealthy()) {
       try {
-        await this.redisService.getClient().del(RedisKeys.strategy(userId, segmentId ?? undefined));
+        await this.redisService
+          .getClient()
+          .del(RedisKeys.strategy(userId, segmentId ?? undefined));
         await this.redisService.getClient().del(RedisKeys.strategy(userId));
-        await this.redisService.getClient().del(RedisKeys.multiplier(userId, segmentId ?? ''));
+        await this.redisService
+          .getClient()
+          .del(RedisKeys.multiplier(userId, segmentId ?? ''));
       } catch (err: any) {
-        this.logger.warn(`Failed to clear strategy cache on switch: ${err.message}`);
+        this.logger.warn(
+          `Failed to clear strategy cache on switch: ${err.message}`,
+        );
       }
     }
 
@@ -359,10 +394,7 @@ export class PositionSizingService {
     const updated = await (this.prisma as any).userTradingStrategy.updateMany({
       where: {
         userId,
-        OR: [
-          { segmentId },
-          { segmentId: null },
-        ],
+        OR: [{ segmentId }, { segmentId: null }],
       },
       data,
     });
@@ -398,10 +430,15 @@ export class PositionSizingService {
           orderBy: { updatedAt: 'desc' },
         });
         if (fresh) {
-          await this.redisService.getClient().set(cacheKey, JSON.stringify(fresh), 'EX', 86400);
+          await this.redisService
+            .getClient()
+            .set(cacheKey, JSON.stringify(fresh), 'EX', 86400);
           await this.redisService.getClient().set(
             legacyKey,
-            JSON.stringify({ index: fresh.consecutiveLosses, current: fresh.currentMultiplier }),
+            JSON.stringify({
+              index: fresh.consecutiveLosses,
+              current: fresh.currentMultiplier,
+            }),
             'EX',
             86400,
           );
@@ -415,7 +452,10 @@ export class PositionSizingService {
   // ==========================================
   // Legacy MultiplierService interface support
   // ==========================================
-  async getState(userId: string, segmentId: string): Promise<{ index: number; current: number }> {
+  async getState(
+    userId: string,
+    segmentId: string,
+  ): Promise<{ index: number; current: number }> {
     const strategy = await this.getUserStrategy(userId, segmentId);
     return {
       index: strategy.consecutiveLosses,
@@ -423,7 +463,10 @@ export class PositionSizingService {
     };
   }
 
-  async advanceOnLoss(userId: string, segmentId: string): Promise<{ index: number; current: number }> {
+  async advanceOnLoss(
+    userId: string,
+    segmentId: string,
+  ): Promise<{ index: number; current: number }> {
     await this.handleTradeOutcome(userId, segmentId, 'LOSS');
     return this.getState(userId, segmentId);
   }

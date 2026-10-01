@@ -7,7 +7,12 @@ import { QueueService } from '../infrastructure/queues/queues.service';
 import { MetricsService } from '../infrastructure/metrics/metrics.service';
 import { BrokerRegistry } from '../brokers/registry/broker.registry';
 import { OutboxService } from '../infrastructure/outbox/outbox.service';
-import { ReconciliationStatus, OrderStatus, Severity, ReconciliationIssueType } from '@prisma/client';
+import {
+  ReconciliationStatus,
+  OrderStatus,
+  Severity,
+  ReconciliationIssueType,
+} from '@prisma/client';
 
 describe('Reconciliation Engine Tests', () => {
   let reconciliationService: ReconciliationService;
@@ -36,9 +41,7 @@ describe('Reconciliation Engine Tests', () => {
       update: jest.fn().mockResolvedValue({}),
       findUnique: jest.fn().mockResolvedValue({
         id: 'run-123',
-        shards: [
-          { status: ReconciliationStatus.COMPLETED, issuesFound: 0 },
-        ],
+        shards: [{ status: ReconciliationStatus.COMPLETED, issuesFound: 0 }],
       }),
     },
     reconciliationShard: {
@@ -97,7 +100,9 @@ describe('Reconciliation Engine Tests', () => {
 
   const mockBrokerAdapter = {
     getTradeBook: jest.fn().mockResolvedValue([]),
-    getOrderDetails: jest.fn().mockResolvedValue({ status: 'complete', orderid: 'ord-123' }),
+    getOrderDetails: jest
+      .fn()
+      .mockResolvedValue({ status: 'complete', orderid: 'ord-123' }),
     getPositions: jest.fn().mockResolvedValue([]),
   };
 
@@ -125,13 +130,18 @@ describe('Reconciliation Engine Tests', () => {
       ],
     }).compile();
 
-    reconciliationService = module.get<ReconciliationService>(ReconciliationService);
-    reconciliationProcessor = module.get<ReconciliationProcessor>(ReconciliationProcessor);
+    reconciliationService = module.get<ReconciliationService>(
+      ReconciliationService,
+    );
+    reconciliationProcessor = module.get<ReconciliationProcessor>(
+      ReconciliationProcessor,
+    );
   });
 
   describe('ReconciliationService', () => {
     it('should successfully trigger reconciliation and enqueue shards', async () => {
-      const runId = await reconciliationService.triggerReconciliation('operator-1');
+      const runId =
+        await reconciliationService.triggerReconciliation('operator-1');
       expect(runId).toBeDefined();
       expect(mockPrismaService.reconciliationRun.create).toHaveBeenCalled();
       expect(mockPrismaService.reconciliationShard.create).toHaveBeenCalled();
@@ -141,7 +151,14 @@ describe('Reconciliation Engine Tests', () => {
     it('should reconcile user broker and register issues on mismatches', async () => {
       // Setup some trade mismatches
       mockBrokerAdapter.getTradeBook.mockResolvedValueOnce([
-        { tradeId: 't-123', orderId: 'ord-123', symbol: 'SBIN-EQ', quantity: 10, price: 750, side: 'BUY' },
+        {
+          tradeId: 't-123',
+          orderId: 'ord-123',
+          symbol: 'SBIN-EQ',
+          quantity: 10,
+          price: 750,
+          side: 'BUY',
+        },
       ]);
       mockPrismaService.trade.findMany.mockResolvedValueOnce([]); // DB empty -> mismatch expected
 
@@ -160,9 +177,17 @@ describe('Reconciliation Engine Tests', () => {
     it('should perform safe auto-resolution on order status mismatched details', async () => {
       // Pending order in DB, complete in Broker
       mockPrismaService.order.findMany.mockResolvedValueOnce([
-        { id: 'o-pending', brokerOrderId: 'ord-123', status: OrderStatus.PENDING, tradeId: 'tr-123' },
+        {
+          id: 'o-pending',
+          brokerOrderId: 'ord-123',
+          status: OrderStatus.PENDING,
+          tradeId: 'tr-123',
+        },
       ]);
-      mockBrokerAdapter.getOrderDetails.mockResolvedValueOnce({ status: 'complete', orderid: 'ord-123' });
+      mockBrokerAdapter.getOrderDetails.mockResolvedValueOnce({
+        status: 'complete',
+        orderid: 'ord-123',
+      });
 
       await reconciliationService.reconcileUserBroker('user-123', 'run-123');
 
@@ -178,8 +203,13 @@ describe('Reconciliation Engine Tests', () => {
 
   describe('ReconciliationProcessor', () => {
     it('should invoke reconcileUserBroker on processor execution', async () => {
-      const job: any = { id: 'job-1', data: { userId: 'user-123', runId: 'run-123' } };
-      const reconcileSpy = jest.spyOn(reconciliationService, 'reconcileUserBroker').mockResolvedValue(undefined);
+      const job: any = {
+        id: 'job-1',
+        data: { userId: 'user-123', runId: 'run-123' },
+      };
+      const reconcileSpy = jest
+        .spyOn(reconciliationService, 'reconcileUserBroker')
+        .mockResolvedValue(undefined);
 
       await reconciliationProcessor.process(job);
 

@@ -229,35 +229,51 @@ class StaffService extends ApiService {
     }
   }
 
-  Future<({bool success, String? message})> uploadStaffDocument(String id, String type, List<int> bytes, String filename) async {
+  Future<({bool success, String? message, StaffModel? staff})> uploadStaffDocument(String id, String type, List<int> bytes, String filename) async {
     try {
       final formData = FormData({
         'file': MultipartFile(bytes, filename: filename),
       });
       final response = await post('/staff/upload-doc/$id?type=$type', formData);
       if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
+        StaffModel? staff;
+        if (response.body != null && response.body['data'] != null && response.body['data']['staff'] != null) {
+          try {
+            staff = StaffModel.fromJson(response.body['data']['staff'] as Map<String, dynamic>);
+          } catch (e) {
+            debugPrint('Error parsing staff from upload response: $e');
+          }
+        }
+        return (success: true, message: response.body?['message']?.toString(), staff: staff);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'Upload failed');
+      return (success: false, message: response.body?['message']?.toString() ?? 'Upload failed', staff: null);
     } catch (e) {
       debugPrint('Error uploading document: $e');
-      return (success: false, message: e.toString());
+      return (success: false, message: e.toString(), staff: null);
     }
   }
 
-  Future<({bool success, String? message})> uploadStaffVideo(String id, List<int> bytes, String filename) async {
+  Future<({bool success, String? message, StaffModel? staff})> uploadStaffVideo(String id, List<int> bytes, String filename) async {
     try {
       final formData = FormData({
         'file': MultipartFile(bytes, filename: filename),
       });
       final response = await post('/staff/upload-video/$id', formData);
       if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
+        StaffModel? staff;
+        if (response.body != null && response.body['data'] != null && response.body['data']['staff'] != null) {
+          try {
+            staff = StaffModel.fromJson(response.body['data']['staff'] as Map<String, dynamic>);
+          } catch (e) {
+            debugPrint('Error parsing staff from video response: $e');
+          }
+        }
+        return (success: true, message: response.body?['message']?.toString(), staff: staff);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'Video upload failed');
+      return (success: false, message: response.body?['message']?.toString() ?? 'Video upload failed', staff: null);
     } catch (e) {
       debugPrint('Error uploading video: $e');
-      return (success: false, message: e.toString());
+      return (success: false, message: e.toString(), staff: null);
     }
   }
 

@@ -47,4 +47,3 @@ import { TradingModule } from '../trading/trading.module';
   ],
 })
 export class BrokersModule {}
-

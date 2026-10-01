@@ -217,7 +217,9 @@ class KycController extends GetxController {
 
       if (response.statusCode == 200) {
         SnackbarService.showSuccess('Video verification uploaded successfully');
-
+        if (Get.isRegistered<UserController>()) {
+          Get.find<UserController>().refreshUserData();
+        }
         return true;
       }
 

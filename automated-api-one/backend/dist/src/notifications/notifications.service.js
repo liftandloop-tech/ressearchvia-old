@@ -150,17 +150,26 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
             },
         });
         const isCritical = BYPASS_QUIET_HOURS.includes(event);
-        const inQuietHours = user.quietHoursEnabled && (0, quiet_hours_utility_1.isWithinQuietHours)(new Date(), user.quietTimezone || 'Asia/Kolkata', user.quietStart || '22:00', user.quietEnd || '08:00');
-        const targetScheduledTime = (inQuietHours && !isCritical)
+        const inQuietHours = user.quietHoursEnabled &&
+            (0, quiet_hours_utility_1.isWithinQuietHours)(new Date(), user.quietTimezone || 'Asia/Kolkata', user.quietStart || '22:00', user.quietEnd || '08:00');
+        const targetScheduledTime = inQuietHours && !isCritical
             ? (0, quiet_hours_utility_1.getNextActiveTime)(new Date(), user.quietTimezone || 'Asia/Kolkata', user.quietEnd || '08:00')
-            : (batchKey ? new Date(Date.now() + 60000) : new Date());
+            : batchKey
+                ? new Date(Date.now() + 60000)
+                : new Date();
         const isDeferred = inQuietHours && !isCritical;
         if (isDeferred) {
             this.metrics.incrementNotificationQuietHourDeferrals();
         }
-        const channels = ['EMAIL', 'SMS', 'WHATSAPP', 'PUSH', 'WEBSOCKET'];
+        const channels = [
+            'EMAIL',
+            'SMS',
+            'WHATSAPP',
+            'PUSH',
+            'WEBSOCKET',
+        ];
         for (const channel of channels) {
-            const pref = user.notificationPreferences.find(p => p.eventType === event && p.channel === channel);
+            const pref = user.notificationPreferences.find((p) => p.eventType === event && p.channel === channel);
             const isEnabled = pref ? pref.enabled : true;
             if (!isEnabled)
                 continue;
@@ -261,7 +270,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         return user;
     }
     async updatePreferences(userId, dto) {
-        const { preferences, quietHoursEnabled, quietStart, quietEnd, quietTimezone } = dto;
+        const { preferences, quietHoursEnabled, quietStart, quietEnd, quietTimezone, } = dto;
         await this.prisma.$transaction(async (tx) => {
             await tx.user.update({
                 where: { id: userId },
@@ -297,37 +306,59 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     mapEventToType(event) {
         switch (event) {
-            case client_1.NotificationEvent.ORDER_PLACED: return client_1.NotificationType.TRADE_EXECUTED;
-            case client_1.NotificationEvent.ORDER_FILLED: return client_1.NotificationType.TRADE_EXECUTED;
-            case client_1.NotificationEvent.ORDER_REJECTED: return client_1.NotificationType.TRADE_EXECUTED;
-            case client_1.NotificationEvent.RISK_BLOCKED: return client_1.NotificationType.TRADE_EXECUTED;
-            case client_1.NotificationEvent.TARGET_HIT: return client_1.NotificationType.TARGET_HIT;
-            case client_1.NotificationEvent.STOP_LOSS_HIT: return client_1.NotificationType.SL_HIT;
-            default: return client_1.NotificationType.TRADE_EXECUTED;
+            case client_1.NotificationEvent.ORDER_PLACED:
+                return client_1.NotificationType.TRADE_EXECUTED;
+            case client_1.NotificationEvent.ORDER_FILLED:
+                return client_1.NotificationType.TRADE_EXECUTED;
+            case client_1.NotificationEvent.ORDER_REJECTED:
+                return client_1.NotificationType.TRADE_EXECUTED;
+            case client_1.NotificationEvent.RISK_BLOCKED:
+                return client_1.NotificationType.TRADE_EXECUTED;
+            case client_1.NotificationEvent.TARGET_HIT:
+                return client_1.NotificationType.TARGET_HIT;
+            case client_1.NotificationEvent.STOP_LOSS_HIT:
+                return client_1.NotificationType.SL_HIT;
+            default:
+                return client_1.NotificationType.TRADE_EXECUTED;
         }
     }
     getChannelProvider(channel) {
         switch (channel) {
-            case 'EMAIL': return 'resend';
-            case 'SMS': return 'twilio';
-            case 'WHATSAPP': return 'whatsapp-cloud';
-            case 'PUSH': return 'fcm';
-            default: return 'mock';
+            case 'EMAIL':
+                return 'resend';
+            case 'SMS':
+                return 'twilio';
+            case 'WHATSAPP':
+                return 'whatsapp-cloud';
+            case 'PUSH':
+                return 'fcm';
+            default:
+                return 'mock';
         }
     }
     getChannelQueueName(channel) {
         switch (channel) {
-            case 'EMAIL': return queue_constants_1.Queues.EMAIL;
-            case 'SMS': return queue_constants_1.Queues.SMS;
-            case 'WHATSAPP': return queue_constants_1.Queues.WHATSAPP;
-            case 'PUSH': return queue_constants_1.Queues.PUSH;
-            default: return queue_constants_1.Queues.NOTIFICATION;
+            case 'EMAIL':
+                return queue_constants_1.Queues.EMAIL;
+            case 'SMS':
+                return queue_constants_1.Queues.SMS;
+            case 'WHATSAPP':
+                return queue_constants_1.Queues.WHATSAPP;
+            case 'PUSH':
+                return queue_constants_1.Queues.PUSH;
+            default:
+                return queue_constants_1.Queues.NOTIFICATION;
         }
     }
     getDeliveryPayload(channel, user, title, body, deliveryId, event, data) {
         switch (channel) {
             case 'EMAIL':
-                return { deliveryId, to: user.email || 'test@example.com', subject: title, body };
+                return {
+                    deliveryId,
+                    to: user.email || 'test@example.com',
+                    subject: title,
+                    body,
+                };
             case 'SMS':
                 return { deliveryId, to: user.mobile, message: body };
             case 'WHATSAPP':
@@ -345,15 +376,24 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     mapEventToWebsocketEvent(event) {
         switch (event) {
-            case client_1.NotificationEvent.ORDER_PLACED: return websocket_event_enum_1.WebsocketEvent.SIGNAL_RECEIVED;
-            case client_1.NotificationEvent.ORDER_FILLED: return websocket_event_enum_1.WebsocketEvent.ORDER_EXECUTED;
-            case client_1.NotificationEvent.ORDER_REJECTED: return websocket_event_enum_1.WebsocketEvent.ORDER_REJECTED;
-            case client_1.NotificationEvent.RISK_BLOCKED: return websocket_event_enum_1.WebsocketEvent.RISK_LOCKED;
-            case client_1.NotificationEvent.TARGET_HIT: return websocket_event_enum_1.WebsocketEvent.TARGET_HIT;
-            case client_1.NotificationEvent.STOP_LOSS_HIT: return websocket_event_enum_1.WebsocketEvent.STOPLOSS_HIT;
-            case client_1.NotificationEvent.SUBSCRIPTION_EXPIRED: return websocket_event_enum_1.WebsocketEvent.SUBSCRIPTION_EXPIRED;
-            case client_1.NotificationEvent.BROKER_DISCONNECTED: return websocket_event_enum_1.WebsocketEvent.BROKER_DISCONNECTED;
-            default: return null;
+            case client_1.NotificationEvent.ORDER_PLACED:
+                return websocket_event_enum_1.WebsocketEvent.SIGNAL_RECEIVED;
+            case client_1.NotificationEvent.ORDER_FILLED:
+                return websocket_event_enum_1.WebsocketEvent.ORDER_EXECUTED;
+            case client_1.NotificationEvent.ORDER_REJECTED:
+                return websocket_event_enum_1.WebsocketEvent.ORDER_REJECTED;
+            case client_1.NotificationEvent.RISK_BLOCKED:
+                return websocket_event_enum_1.WebsocketEvent.RISK_LOCKED;
+            case client_1.NotificationEvent.TARGET_HIT:
+                return websocket_event_enum_1.WebsocketEvent.TARGET_HIT;
+            case client_1.NotificationEvent.STOP_LOSS_HIT:
+                return websocket_event_enum_1.WebsocketEvent.STOPLOSS_HIT;
+            case client_1.NotificationEvent.SUBSCRIPTION_EXPIRED:
+                return websocket_event_enum_1.WebsocketEvent.SUBSCRIPTION_EXPIRED;
+            case client_1.NotificationEvent.BROKER_DISCONNECTED:
+                return websocket_event_enum_1.WebsocketEvent.BROKER_DISCONNECTED;
+            default:
+                return null;
         }
     }
     aggregateMessage(existingMsg, newEvent) {
@@ -378,12 +418,18 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     getEventLabel(event) {
         switch (event) {
-            case client_1.NotificationEvent.TARGET_HIT: return 'targets hit';
-            case client_1.NotificationEvent.ORDER_FILLED: return 'orders filled';
-            case client_1.NotificationEvent.ORDER_PLACED: return 'orders placed';
-            case client_1.NotificationEvent.ORDER_REJECTED: return 'orders rejected';
-            case client_1.NotificationEvent.RISK_BLOCKED: return 'risk violations';
-            default: return 'alerts';
+            case client_1.NotificationEvent.TARGET_HIT:
+                return 'targets hit';
+            case client_1.NotificationEvent.ORDER_FILLED:
+                return 'orders filled';
+            case client_1.NotificationEvent.ORDER_PLACED:
+                return 'orders placed';
+            case client_1.NotificationEvent.ORDER_REJECTED:
+                return 'orders rejected';
+            case client_1.NotificationEvent.RISK_BLOCKED:
+                return 'risk violations';
+            default:
+                return 'alerts';
         }
     }
 };

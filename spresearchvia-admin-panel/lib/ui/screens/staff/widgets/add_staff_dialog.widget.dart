@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
+import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 import 'dart:ui';
 
 class AddStaffDialog extends StatelessWidget {
@@ -584,7 +586,7 @@ class AddStaffDialog extends StatelessWidget {
                     if (!controller.isEditing.value) {
                       return const SizedBox.shrink();
                     }
-                    final staff = controller.staffList.firstWhereOrNull((s) => s.id == controller.editingStaffId.value);
+                    final staff = controller.editingStaff.value ?? controller.staffList.firstWhereOrNull((s) => s.id == controller.editingStaffId.value);
                     if (staff == null) {
                       return const SizedBox.shrink();
                     }
@@ -776,53 +778,121 @@ class AddStaffDialog extends StatelessWidget {
     else if (type == 'video') fileUrl = staff.kycVideoUrl;
 
     final isUploaded = fileUrl != null && fileUrl.isNotEmpty;
+    final isUploading = controller.uploadingDocType.value == type;
+    final isVideo = type == 'video';
+    final cleanFileName = isUploaded ? fileUrl.split('/').last : '';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        border: Border.all(color: const Color(0xFFDEE2E6)),
-        borderRadius: BorderRadius.circular(6),
+        color: isUploaded ? const Color(0xFFF8FAFC) : Colors.white,
+        border: Border.all(color: isUploaded ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(
-            type == 'video' ? Icons.video_library : Icons.description,
-            color: isUploaded ? Colors.green : const Color(0xFF6C757D),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isUploaded ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: isUploaded ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0)),
+            ),
+            child: Icon(
+              isVideo ? Icons.videocam_outlined : Icons.description_outlined,
+              color: isUploaded ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isUploaded ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isUploaded ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isUploaded) ...[
+                            const Icon(Icons.check_circle, size: 10, color: Color(0xFF059669)),
+                            const SizedBox(width: 3),
+                          ],
+                          Text(
+                            isUploaded ? 'Uploaded' : 'Pending',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isUploaded ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                if (isUploaded)
-                  Text(
-                    'File: $fileUrl',
-                    style: const TextStyle(fontSize: 11, color: Colors.green),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                else
-                  const Text(
-                    'No document uploaded',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF6C757D)),
-                  ),
+                const SizedBox(height: 2),
+                Text(
+                  isUploaded ? cleanFileName : (isVideo ? 'Supports MP4, MOV, AVI' : 'Supports PDF, JPG, PNG'),
+                  style: TextStyle(fontSize: 11, color: isUploaded ? const Color(0xFF059669) : const Color(0xFF94A3B8)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
+          if (isUploaded) ...[
+            OutlinedButton.icon(
+              onPressed: () {
+                final fullUrl = AppConfig.buildImageUrl(fileUrl);
+                final ext = isVideo ? '.mp4' : ((fileUrl?.toLowerCase().endsWith('.pdf') ?? false) ? '.pdf' : '.png');
+                showDialog(
+                  context: context,
+                  builder: (ctx) => FilePreviewDialog(
+                    fileName: '$title$ext',
+                    fileUrl: fullUrl,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.visibility_outlined, size: 14),
+              label: const Text('Preview', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF334155),
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           ElevatedButton.icon(
-            onPressed: () => controller.pickAndUploadDoc(staff.id, type),
-            icon: const Icon(Icons.upload, size: 14),
-            label: Text(isUploaded ? 'Re-upload' : 'Upload'),
+            onPressed: isUploading ? null : () => controller.promptUploadChoice(context, staff.id, type),
+            icon: isUploading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+                  )
+                : Icon(isUploaded ? Icons.swap_horiz : Icons.file_upload_outlined, size: 14),
+            label: Text(isUploading ? 'Uploading...' : (isUploaded ? 'Replace' : 'Upload'), style: const TextStyle(fontSize: 12)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isUploaded ? const Color(0xFF6C757D) : const Color(0xFF0D6EFD),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              backgroundColor: isUploaded ? const Color(0xFFF1F5F9) : const Color(0xFF1E3A5F),
+              foregroundColor: isUploaded ? const Color(0xFF334155) : Colors.white,
               elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             ),
           ),
         ],

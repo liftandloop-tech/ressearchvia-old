@@ -53,9 +53,13 @@ export class BrokerSessionService {
     if (this.egressService) {
       try {
         egressCreds = await this.egressService.getOrCreateUserEgress(userId);
-        this.logger.log(`[BrokerSession] Egress IP ${egressCreds.publicIp} verified for user ${userId}`);
+        this.logger.log(
+          `[BrokerSession] Egress IP ${egressCreds.publicIp} verified for user ${userId}`,
+        );
       } catch (eErr: any) {
-        this.logger.warn(`[BrokerSession] Egress preparation notice for user ${userId}: ${eErr.message}`);
+        this.logger.warn(
+          `[BrokerSession] Egress preparation notice for user ${userId}: ${eErr.message}`,
+        );
       }
     }
 
@@ -66,24 +70,39 @@ export class BrokerSessionService {
           where: { id: userBrokerId },
         });
 
-        const sessionKey = RedisKeys.brokerSession(userId, updatedBroker.brokerId);
+        const sessionKey = RedisKeys.brokerSession(
+          userId,
+          updatedBroker.brokerId,
+        );
         const payload = JSON.stringify({
           accessToken: session.accessToken,
           proxyIp: egressCreds?.publicIp || fullBroker?.proxyIp || null,
           proxyPort: egressCreds?.proxyPort || fullBroker?.proxyPort || null,
-          proxyUsername: egressCreds?.proxyUsername || fullBroker?.proxyUsername || null,
-          proxyPassword: egressCreds?.token || fullBroker?.proxyPassword || null,
-          proxyHostname: egressCreds?.proxyHost || fullBroker?.proxyHostname || null,
+          proxyUsername:
+            egressCreds?.proxyUsername || fullBroker?.proxyUsername || null,
+          proxyPassword:
+            egressCreds?.token || fullBroker?.proxyPassword || null,
+          proxyHostname:
+            egressCreds?.proxyHost || fullBroker?.proxyHostname || null,
         });
         // TTL: seconds until midnight IST (expires with session)
         const midnightIst = new Date();
         midnightIst.setUTCHours(18, 30, 0, 0); // midnight IST = 18:30 UTC
-        if (midnightIst < new Date()) midnightIst.setUTCDate(midnightIst.getUTCDate() + 1);
-        const ttlSeconds = Math.floor((midnightIst.getTime() - Date.now()) / 1000);
-        await this.redisService.getClient().set(sessionKey, payload, 'EX', ttlSeconds);
-        this.logger.log(`[BrokerSession] Cached token and proxy credentials for user ${userId} in Redis (TTL: ${ttlSeconds}s)`);
+        if (midnightIst < new Date())
+          midnightIst.setUTCDate(midnightIst.getUTCDate() + 1);
+        const ttlSeconds = Math.floor(
+          (midnightIst.getTime() - Date.now()) / 1000,
+        );
+        await this.redisService
+          .getClient()
+          .set(sessionKey, payload, 'EX', ttlSeconds);
+        this.logger.log(
+          `[BrokerSession] Cached token and proxy credentials for user ${userId} in Redis (TTL: ${ttlSeconds}s)`,
+        );
       } catch (err) {
-        this.logger.warn(`[BrokerSession] Redis write failed for user ${userId}: ${err.message}`);
+        this.logger.warn(
+          `[BrokerSession] Redis write failed for user ${userId}: ${err.message}`,
+        );
       }
     }
 
@@ -100,17 +119,28 @@ export class BrokerSessionService {
     );
 
     // Auto-connect real-time WebSocket stream for Zebu
-    if (brokerCode === BrokerCode.ZEBU && session.accessToken && this.zebuWebSocketService) {
+    if (
+      brokerCode === BrokerCode.ZEBU &&
+      session.accessToken &&
+      this.zebuWebSocketService
+    ) {
       try {
         const fullBroker = await this.prisma.userBroker.findUnique({
           where: { id: userBrokerId },
         });
         if (fullBroker?.brokerClientId) {
-          this.logger.log(`[BrokerSession] Initializing Zebu real-time WebSocket for ${fullBroker.brokerClientId}`);
-          this.zebuWebSocketService.connectUser(fullBroker.brokerClientId, session.accessToken);
+          this.logger.log(
+            `[BrokerSession] Initializing Zebu real-time WebSocket for ${fullBroker.brokerClientId}`,
+          );
+          this.zebuWebSocketService.connectUser(
+            fullBroker.brokerClientId,
+            session.accessToken,
+          );
         }
       } catch (wsErr: any) {
-        this.logger.warn(`[BrokerSession] Zebu WebSocket auto-connect error: ${wsErr.message}`);
+        this.logger.warn(
+          `[BrokerSession] Zebu WebSocket auto-connect error: ${wsErr.message}`,
+        );
       }
     }
   }
@@ -206,9 +236,13 @@ export class BrokerSessionService {
       try {
         const sessionKey = RedisKeys.brokerSession(userId, broker.id);
         await this.redisService.getClient().del(sessionKey);
-        this.logger.log(`[BrokerSession] Cleared Redis cache for user ${userId} broker ${brokerCode}`);
+        this.logger.log(
+          `[BrokerSession] Cleared Redis cache for user ${userId} broker ${brokerCode}`,
+        );
       } catch (err) {
-        this.logger.warn(`[BrokerSession] Redis clear failed for user ${userId}: ${err.message}`);
+        this.logger.warn(
+          `[BrokerSession] Redis clear failed for user ${userId}: ${err.message}`,
+        );
       }
     }
 
@@ -232,7 +266,11 @@ export class BrokerSessionService {
       },
     );
 
-    if (brokerCode === BrokerCode.ZEBU && userBroker.brokerClientId && this.zebuWebSocketService) {
+    if (
+      brokerCode === BrokerCode.ZEBU &&
+      userBroker.brokerClientId &&
+      this.zebuWebSocketService
+    ) {
       try {
         this.zebuWebSocketService.disconnectUser(userBroker.brokerClientId);
       } catch (_) {}

@@ -14,7 +14,10 @@ async function bootstrap() {
 
   app.use((req: any, res: any, next: any) => {
     if (req.method === 'POST' && req.url.includes('/signals/publish')) {
-      console.log('=== INCOMING PUBLISH PAYLOAD ===', JSON.stringify(req.body, null, 2));
+      console.log(
+        '=== INCOMING PUBLISH PAYLOAD ===',
+        JSON.stringify(req.body, null, 2),
+      );
     }
     next();
   });

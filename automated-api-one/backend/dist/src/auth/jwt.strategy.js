@@ -35,14 +35,16 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         const userId = payload.sub || payload._id;
         let mobile = payload.mobile || payload.phone;
         const userType = payload.userType;
-        const isAdminType = userType && ['super_admin', 'admin', 'researcher'].includes(String(userType).toLowerCase());
+        const isAdminType = userType &&
+            ['super_admin', 'admin', 'researcher'].includes(String(userType).toLowerCase());
         if (!mobile && isAdminType) {
             mobile = '0000000000';
         }
         if (!userId && !mobile) {
             throw new common_1.UnauthorizedException('Token payload does not contain a valid user ID or mobile number');
         }
-        const isUuid = userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+        const isUuid = userId &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
         if (isUuid) {
             const admin = await this.prisma.adminUser.findUnique({
                 where: { id: userId },

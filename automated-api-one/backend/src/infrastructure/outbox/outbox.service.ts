@@ -31,7 +31,8 @@ export class OutboxService {
     },
   ): Promise<OutboxEvent> {
     const db = tx || this.prisma;
-    const correlationId = options?.correlationId || payload?.correlationId || null;
+    const correlationId =
+      options?.correlationId || payload?.correlationId || null;
     const version = options?.version || payload?.version || 1;
     const eventKey = options?.eventKey || null;
     const aggregateId = options?.aggregateId || null;
@@ -64,11 +65,9 @@ export class OutboxService {
    */
   async enqueueEvent(eventId: string): Promise<void> {
     try {
-      await this.queueService.addJob(
-        Queues.OUTBOX_DISPATCHER,
-        eventId,
-        { outboxEventId: eventId },
-      );
+      await this.queueService.addJob(Queues.OUTBOX_DISPATCHER, eventId, {
+        outboxEventId: eventId,
+      });
     } catch (err) {
       this.logger.error(
         `Failed to enqueue outbox dispatcher job for event ${eventId}: ${err.message}`,

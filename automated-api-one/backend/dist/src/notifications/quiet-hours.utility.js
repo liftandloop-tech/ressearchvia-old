@@ -28,7 +28,12 @@ function getNextActiveTime(date, timezone = 'Asia/Kolkata', endStr = '08:00') {
     try {
         const dt = luxon_1.DateTime.fromJSDate(date).setZone(timezone);
         const [endHour, endMin] = endStr.split(':').map(Number);
-        let target = dt.set({ hour: endHour, minute: endMin, second: 0, millisecond: 0 });
+        let target = dt.set({
+            hour: endHour,
+            minute: endMin,
+            second: 0,
+            millisecond: 0,
+        });
         if (dt >= target) {
             target = target.plus({ days: 1 });
         }

@@ -44,7 +44,8 @@ let NotificationTemplateService = class NotificationTemplateService {
                 break;
             case client_1.NotificationEvent.SUBSCRIPTION_EXPIRED:
                 title = 'Subscription Expired';
-                body = 'Your subscription plan has expired. Please renew to continue trading.';
+                body =
+                    'Your subscription plan has expired. Please renew to continue trading.';
                 break;
             case client_1.NotificationEvent.BROKER_DISCONNECTED:
                 title = 'Broker Connection Disconnected';

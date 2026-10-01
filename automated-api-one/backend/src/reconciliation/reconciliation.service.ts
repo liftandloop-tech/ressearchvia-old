@@ -123,7 +123,9 @@ export class ReconciliationService {
     });
 
     if (!ub || !ub.accessToken) {
-      this.logger.warn(`No active UserBroker session for user ${userId}. Shard skipped.`);
+      this.logger.warn(
+        `No active UserBroker session for user ${userId}. Shard skipped.`,
+      );
       await this.prisma.reconciliationShard.update({
         where: { runId_userId: { runId, userId } },
         data: {
@@ -144,9 +146,13 @@ export class ReconciliationService {
     const userLockKey = `reconciliation:user:${userId}:${brokerId}`;
     if (this.redisService.isHealthy()) {
       try {
-        const locked = await this.redisService.getClient().set(userLockKey, '1', 'EX', 7200, 'NX');
+        const locked = await this.redisService
+          .getClient()
+          .set(userLockKey, '1', 'EX', 7200, 'NX');
         if (locked !== 'OK') {
-          this.logger.warn(`User broker reconciliation already running for lock: ${userLockKey}`);
+          this.logger.warn(
+            `User broker reconciliation already running for lock: ${userLockKey}`,
+          );
           await this.prisma.reconciliationShard.update({
             where: { runId_userId: { runId, userId } },
             data: {
@@ -158,7 +164,9 @@ export class ReconciliationService {
           return;
         }
       } catch (err) {
-        this.logger.error(`Redis error acquiring lock ${userLockKey}: ${err.message}`);
+        this.logger.error(
+          `Redis error acquiring lock ${userLockKey}: ${err.message}`,
+        );
       }
     }
 
@@ -168,14 +176,18 @@ export class ReconciliationService {
       // Resolve broker adapter
       let adapter: any;
       try {
-        adapter = this.brokerRegistry.get(brokerCode as unknown as BrokerType);
+        adapter = this.brokerRegistry.get(brokerCode);
       } catch (err) {
-        throw new Error(`Failed to resolve broker adapter for ${brokerCode}: ${err.message}`);
+        throw new Error(
+          `Failed to resolve broker adapter for ${brokerCode}: ${err.message}`,
+        );
       }
 
       // Read Tolerance Configurations
-      const reconPnlTolerance = parseFloat(process.env.RECON_PNL_TOLERANCE_PERCENT || '0.50') / 100;
-      const reconPriceTolerance = parseFloat(process.env.RECON_PRICE_TOLERANCE_PERCENT || '0.10') / 100;
+      const reconPnlTolerance =
+        parseFloat(process.env.RECON_PNL_TOLERANCE_PERCENT || '0.50') / 100;
+      const reconPriceTolerance =
+        parseFloat(process.env.RECON_PRICE_TOLERANCE_PERCENT || '0.10') / 100;
 
       // ----------------------------------------------------
       // PHASE 1: TRADES RECONCILIATION
@@ -202,9 +214,15 @@ export class ReconciliationService {
           );
         }
 
-        if (matchedIndex === -1 && dbTrade.orders && dbTrade.orders.length > 0) {
+        if (
+          matchedIndex === -1 &&
+          dbTrade.orders &&
+          dbTrade.orders.length > 0
+        ) {
           // Fallback to match by order id
-          const brokerOrderIds = dbTrade.orders.map((o: any) => o.brokerOrderId).filter(Boolean);
+          const brokerOrderIds = dbTrade.orders
+            .map((o: any) => o.brokerOrderId)
+            .filter(Boolean);
           matchedIndex = brokerTrades.findIndex((bt: any) =>
             brokerOrderIds.includes(bt.orderId),
           );
@@ -216,9 +234,15 @@ export class ReconciliationService {
             if (brokerMatchedIndices.has(index)) return false;
             const matchesSymbol = bt.symbol === dbTrade.signal?.symbol; // check symbol
             const matchesQty = bt.quantity === dbTrade.quantity;
-            const priceDiff = Math.abs(bt.price - Number(dbTrade.entryPrice || 0));
-            const maxPrice = Math.max(bt.price, Number(dbTrade.entryPrice || 0));
-            const matchesPrice = maxPrice === 0 || priceDiff / maxPrice <= reconPriceTolerance;
+            const priceDiff = Math.abs(
+              bt.price - Number(dbTrade.entryPrice || 0),
+            );
+            const maxPrice = Math.max(
+              bt.price,
+              Number(dbTrade.entryPrice || 0),
+            );
+            const matchesPrice =
+              maxPrice === 0 || priceDiff / maxPrice <= reconPriceTolerance;
             return matchesSymbol && matchesQty && matchesPrice;
           });
         }
@@ -229,8 +253,13 @@ export class ReconciliationService {
 
           // Check for price difference warning
           const brokerTrade = brokerTrades[matchedIndex];
-          const priceDiff = Math.abs(brokerTrade.price - Number(dbTrade.entryPrice || 0));
-          const maxPrice = Math.max(brokerTrade.price, Number(dbTrade.entryPrice || 0));
+          const priceDiff = Math.abs(
+            brokerTrade.price - Number(dbTrade.entryPrice || 0),
+          );
+          const maxPrice = Math.max(
+            brokerTrade.price,
+            Number(dbTrade.entryPrice || 0),
+          );
           if (maxPrice > 0 && priceDiff / maxPrice > reconPriceTolerance) {
             // Price Mismatch
             await this.registerIssue(
@@ -277,7 +306,11 @@ export class ReconciliationService {
             Severity.CRITICAL,
             dbTrade.id,
             {},
-            { id: dbTrade.id, quantity: dbTrade.quantity, price: dbTrade.entryPrice },
+            {
+              id: dbTrade.id,
+              quantity: dbTrade.quantity,
+              price: dbTrade.entryPrice,
+            },
           );
           issuesFoundCount++;
         }
@@ -289,7 +322,13 @@ export class ReconciliationService {
       const dbOrders = await this.prisma.order.findMany({
         where: {
           trade: { userId },
-          status: { in: [OrderStatus.PENDING, OrderStatus.PLACED, OrderStatus.PARTIALLY_FILLED] },
+          status: {
+            in: [
+              OrderStatus.PENDING,
+              OrderStatus.PLACED,
+              OrderStatus.PARTIALLY_FILLED,
+            ],
+          },
         },
         include: { trade: true },
       });
@@ -298,16 +337,28 @@ export class ReconciliationService {
         if (!order.brokerOrderId) continue;
 
         try {
-          const brokerDetails = await adapter.getOrderDetails(token, clientCode, order.brokerOrderId);
+          const brokerDetails = await adapter.getOrderDetails(
+            token,
+            clientCode,
+            order.brokerOrderId,
+          );
           const brokerMappedStatus = this.mapOrderStatus(brokerDetails.status);
 
           if (brokerMappedStatus !== order.status) {
             // Check for safe auto-resolution (e.g. PENDING/PLACED -> FILLED/REJECTED/CANCELLED)
             if (
-              (order.status === OrderStatus.PENDING || order.status === OrderStatus.PLACED || order.status === OrderStatus.PARTIALLY_FILLED) &&
-              (brokerMappedStatus === OrderStatus.FILLED || brokerMappedStatus === OrderStatus.REJECTED || brokerMappedStatus === OrderStatus.CANCELLED)
+              (order.status === OrderStatus.PENDING ||
+                order.status === OrderStatus.PLACED ||
+                order.status === OrderStatus.PARTIALLY_FILLED) &&
+              (brokerMappedStatus === OrderStatus.FILLED ||
+                brokerMappedStatus === OrderStatus.REJECTED ||
+                brokerMappedStatus === OrderStatus.CANCELLED)
             ) {
-              await this.applyAutoResolution(order.id, brokerMappedStatus, userId);
+              await this.applyAutoResolution(
+                order.id,
+                brokerMappedStatus,
+                userId,
+              );
               await this.registerIssue(
                 runId,
                 userId,
@@ -336,7 +387,9 @@ export class ReconciliationService {
             }
           }
         } catch (err) {
-          this.logger.error(`Failed to fetch order details for ${order.brokerOrderId}: ${err.message}`);
+          this.logger.error(
+            `Failed to fetch order details for ${order.brokerOrderId}: ${err.message}`,
+          );
         }
       }
 
@@ -431,7 +484,9 @@ export class ReconciliationService {
         },
       });
     } catch (error) {
-      this.logger.error(`Reconciliation shard failed for user ${userId}: ${error.message}`);
+      this.logger.error(
+        `Reconciliation shard failed for user ${userId}: ${error.message}`,
+      );
       await this.prisma.reconciliationShard.update({
         where: { runId_userId: { runId, userId } },
         data: {
@@ -445,7 +500,9 @@ export class ReconciliationService {
         try {
           await this.redisService.getClient().del(userLockKey);
         } catch (err) {
-          this.logger.warn(`Failed to release user lock ${userLockKey}: ${err.message}`);
+          this.logger.warn(
+            `Failed to release user lock ${userLockKey}: ${err.message}`,
+          );
         }
       }
 
@@ -454,7 +511,13 @@ export class ReconciliationService {
         where: {
           userId,
           brokerId,
-          status: { in: [ReconciliationIssueStatus.OPEN, ReconciliationIssueStatus.INVESTIGATING, ReconciliationIssueStatus.ESCALATED] },
+          status: {
+            in: [
+              ReconciliationIssueStatus.OPEN,
+              ReconciliationIssueStatus.INVESTIGATING,
+              ReconciliationIssueStatus.ESCALATED,
+            ],
+          },
         },
       });
 
@@ -473,7 +536,12 @@ export class ReconciliationService {
       });
 
       // Update Open issues Gauge
-      this.metrics.setReconciliationIssuesOpen('unknown', Severity.CRITICAL, brokerCode, openIssues);
+      this.metrics.setReconciliationIssuesOpen(
+        'unknown',
+        Severity.CRITICAL,
+        brokerCode,
+        openIssues,
+      );
 
       // Check run completion status
       await this.checkRunCompletion(runId);
@@ -483,7 +551,8 @@ export class ReconciliationService {
 
   private mapOrderStatus(brokerStatus: string): OrderStatus {
     const status = brokerStatus.toUpperCase();
-    if (status === 'COMPLETE' || status === 'EXECUTED' || status === 'FILLED') return OrderStatus.FILLED;
+    if (status === 'COMPLETE' || status === 'EXECUTED' || status === 'FILLED')
+      return OrderStatus.FILLED;
     if (status === 'REJECTED') return OrderStatus.REJECTED;
     if (status === 'CANCELLED') return OrderStatus.CANCELLED;
     if (status === 'PARTIALLY_FILLED') return OrderStatus.PARTIALLY_FILLED;
@@ -493,7 +562,11 @@ export class ReconciliationService {
   /**
    * Applies safe database status updates for auto-resolving order states.
    */
-  private async applyAutoResolution(orderId: string, newStatus: OrderStatus, userId: string): Promise<void> {
+  private async applyAutoResolution(
+    orderId: string,
+    newStatus: OrderStatus,
+    userId: string,
+  ): Promise<void> {
     const order = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: newStatus },
@@ -534,17 +607,23 @@ export class ReconciliationService {
     if (!run) return;
 
     const allFinished = run.shards.every(
-      (s) => s.status === ReconciliationStatus.COMPLETED || s.status === ReconciliationStatus.FAILED,
+      (s) =>
+        s.status === ReconciliationStatus.COMPLETED ||
+        s.status === ReconciliationStatus.FAILED,
     );
 
     if (allFinished) {
-      const failedShards = run.shards.some((s) => s.status === ReconciliationStatus.FAILED);
+      const failedShards = run.shards.some(
+        (s) => s.status === ReconciliationStatus.FAILED,
+      );
       const totalIssues = run.shards.reduce((acc, s) => acc + s.issuesFound, 0);
 
       await this.prisma.reconciliationRun.update({
         where: { id: runId },
         data: {
-          status: failedShards ? ReconciliationStatus.FAILED : ReconciliationStatus.COMPLETED,
+          status: failedShards
+            ? ReconciliationStatus.FAILED
+            : ReconciliationStatus.COMPLETED,
           completedAt: new Date(),
           mismatchesFound: totalIssues,
         },
@@ -553,13 +632,17 @@ export class ReconciliationService {
       // Clean up run lock
       if (this.redisService.isHealthy()) {
         try {
-          await this.redisService.getClient().del(`reconciliation:run:${runId}`);
+          await this.redisService
+            .getClient()
+            .del(`reconciliation:run:${runId}`);
         } catch (err) {
           this.logger.warn(`Failed to release run lock: ${err.message}`);
         }
       }
 
-      this.logger.log(`Reconciliation run ${runId} finished. Mismatches: ${totalIssues}`);
+      this.logger.log(
+        `Reconciliation run ${runId} finished. Mismatches: ${totalIssues}`,
+      );
     }
   }
 
@@ -579,13 +662,19 @@ export class ReconciliationService {
   ): Promise<void> {
     // Generate deterministic sha256 fingerprint to avoid duplicate records
     const fingerprintRaw = `${userId}:${brokerId}:${issueType}:${resourceId}`;
-    const fingerprint = crypto.createHash('sha256').update(fingerprintRaw).digest('hex');
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(fingerprintRaw)
+      .digest('hex');
 
     const existingIssue = await this.prisma.reconciliationIssue.findUnique({
       where: { fingerprint },
     });
 
-    if (existingIssue && existingIssue.status !== ReconciliationIssueStatus.RESOLVED) {
+    if (
+      existingIssue &&
+      existingIssue.status !== ReconciliationIssueStatus.RESOLVED
+    ) {
       // Deduplicate: update last seen, occurrence count, and runId
       await this.prisma.reconciliationIssue.update({
         where: { id: existingIssue.id },
@@ -621,7 +710,11 @@ export class ReconciliationService {
         include: { broker: true },
       });
       const brokerCode = ub?.broker.code || 'unknown';
-      this.metrics.incrementReconciliationIssuesTotal(issueType, severity, brokerCode);
+      this.metrics.incrementReconciliationIssuesTotal(
+        issueType,
+        severity,
+        brokerCode,
+      );
 
       // Create outbox event for dashboard notification/WebSockets
       await this.outboxService.createEvent('RECONCILIATION_ISSUE', {

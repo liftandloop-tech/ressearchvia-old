@@ -15,8 +15,12 @@ import { MetricsService } from '../../infrastructure/metrics/metrics.service';
 import { RiskService } from '../../risk/risk.service';
 
 const mockAdapter = { placeOrder: jest.fn() };
-const mockBrokerFactory = { getAdapter: jest.fn().mockReturnValue(mockAdapter) };
-const mockCircuitBreaker = { execute: jest.fn().mockImplementation((_broker, fn) => fn()) };
+const mockBrokerFactory = {
+  getAdapter: jest.fn().mockReturnValue(mockAdapter),
+};
+const mockCircuitBreaker = {
+  execute: jest.fn().mockImplementation((_broker, fn) => fn()),
+};
 const mockRateLimiter = { throttle: jest.fn().mockResolvedValue(true) };
 const mockOutbox = {
   createEvent: jest.fn().mockResolvedValue({}),
@@ -25,7 +29,9 @@ const mockOutbox = {
 const mockAuditService = { logEvent: jest.fn().mockResolvedValue(undefined) };
 const mockPositionCache = { set: jest.fn().mockResolvedValue(undefined) };
 const mockConfigService = { get: jest.fn().mockReturnValue(5000) };
-const mockRiskService = { evaluateRisk: jest.fn().mockResolvedValue({ approved: true }) };
+const mockRiskService = {
+  evaluateRisk: jest.fn().mockResolvedValue({ approved: true }),
+};
 const mockMetrics = {
   incrementSignalsReceived: jest.fn(),
   incrementSignalsProcessed: jest.fn(),
@@ -130,7 +136,9 @@ describe('OrderPlacementService', () => {
 
     it('should use Redis-cached token and skip DB when Redis is healthy', async () => {
       mockRedisService.isHealthy.mockReturnValue(true);
-      mockRedisClient.get.mockResolvedValue(JSON.stringify({ accessToken: 'redis-token-999' }));
+      mockRedisClient.get.mockResolvedValue(
+        JSON.stringify({ accessToken: 'redis-token-999' }),
+      );
       mockCircuitBreaker.execute.mockRejectedValue(new Error('Circuit open'));
 
       await service.placeEntryOrder(ctx);
@@ -142,7 +150,9 @@ describe('OrderPlacementService', () => {
     it('should fall back to DB when Redis returns null', async () => {
       mockRedisService.isHealthy.mockReturnValue(true);
       mockRedisClient.get.mockResolvedValue(null);
-      mockPrisma.userBroker.findFirst.mockResolvedValue({ accessToken: 'db-token-456' });
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'db-token-456',
+      });
       mockCircuitBreaker.execute.mockRejectedValue(new Error('Broker error'));
 
       await service.placeEntryOrder(ctx);
@@ -153,7 +163,9 @@ describe('OrderPlacementService', () => {
     it('should fall back to DB when Redis read throws', async () => {
       mockRedisService.isHealthy.mockReturnValue(true);
       mockRedisClient.get.mockRejectedValue(new Error('Redis timeout'));
-      mockPrisma.userBroker.findFirst.mockResolvedValue({ accessToken: 'db-token-789' });
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'db-token-789',
+      });
       mockCircuitBreaker.execute.mockRejectedValue(new Error('Broker error'));
 
       await service.placeEntryOrder(ctx);
@@ -164,7 +176,9 @@ describe('OrderPlacementService', () => {
 
     it('should use DB directly when Redis is unhealthy', async () => {
       mockRedisService.isHealthy.mockReturnValue(false);
-      mockPrisma.userBroker.findFirst.mockResolvedValue({ accessToken: 'db-token-direct' });
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'db-token-direct',
+      });
       mockCircuitBreaker.execute.mockRejectedValue(new Error('Broker error'));
 
       await service.placeEntryOrder(ctx);
@@ -177,7 +191,9 @@ describe('OrderPlacementService', () => {
   describe('order placement flow', () => {
     it('should return failure if broker API throws', async () => {
       mockRedisService.isHealthy.mockReturnValue(false);
-      mockPrisma.userBroker.findFirst.mockResolvedValue({ accessToken: 'token-123' });
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'token-123',
+      });
       mockCircuitBreaker.execute.mockRejectedValue(new Error('Network error'));
 
       const result = await service.placeEntryOrder(ctx);
@@ -188,7 +204,9 @@ describe('OrderPlacementService', () => {
 
     it('should call rateLimiter.throttle before broker call', async () => {
       mockRedisService.isHealthy.mockReturnValue(false);
-      mockPrisma.userBroker.findFirst.mockResolvedValue({ accessToken: 'token-123' });
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'token-123',
+      });
       mockCircuitBreaker.execute.mockRejectedValue(new Error('Broker error'));
 
       await service.placeEntryOrder(ctx);
@@ -198,11 +216,23 @@ describe('OrderPlacementService', () => {
 
     it('should write Trade + Order + Outbox atomically in $transaction', async () => {
       mockRedisService.isHealthy.mockReturnValue(false);
-      mockPrisma.userBroker.findFirst.mockResolvedValue({ accessToken: 'token-123' });
+      mockPrisma.userBroker.findFirst.mockResolvedValue({
+        accessToken: 'token-123',
+      });
       // Adapter must return a brokerOrderId to proceed to $transaction
-      mockAdapter.placeOrder.mockResolvedValue({ brokerOrderId: 'BROKER-ORDER-001' });
+      mockAdapter.placeOrder.mockResolvedValue({
+        brokerOrderId: 'BROKER-ORDER-001',
+      });
       mockCircuitBreaker.execute.mockImplementation((_b, fn) => fn());
-      mockPrisma.$transaction.mockResolvedValue({ trade: mockTrade, order: mockOrder, outboxEvent: { id: 'outbox-abc', eventType: 'TRADE_OPENED', eventKey: null } });
+      mockPrisma.$transaction.mockResolvedValue({
+        trade: mockTrade,
+        order: mockOrder,
+        outboxEvent: {
+          id: 'outbox-abc',
+          eventType: 'TRADE_OPENED',
+          eventKey: null,
+        },
+      });
 
       await service.placeEntryOrder(ctx);
 
@@ -214,8 +244,12 @@ describe('OrderPlacementService', () => {
   // ─── Proxy agent construction (resolveBrokerToken) ────────────────────────
   describe('proxy agent construction in resolveBrokerToken', () => {
     // Access the private method via type-casting
-    const resolve = (svc: OrderPlacementService, uid: string, bid: string, cid: string) =>
-      (svc as any).resolveBrokerToken(uid, bid, cid);
+    const resolve = (
+      svc: OrderPlacementService,
+      uid: string,
+      bid: string,
+      cid: string,
+    ) => (svc as any).resolveBrokerToken(uid, bid, cid);
 
     it('should build an HttpsProxyAgent when Redis cache has proxy fields', async () => {
       mockRedisService.isHealthy.mockReturnValue(true);
@@ -302,7 +336,9 @@ describe('OrderPlacementService', () => {
         proxyUsername: 'pu',
         proxyPassword: 'pp',
       });
-      mockAdapter.placeOrder.mockResolvedValue({ brokerOrderId: 'PROXY-ORDER-001' });
+      mockAdapter.placeOrder.mockResolvedValue({
+        brokerOrderId: 'PROXY-ORDER-001',
+      });
       mockCircuitBreaker.execute.mockImplementation((_b, fn) => fn());
       mockPrisma.$transaction.mockResolvedValue({
         trade: mockTrade,
@@ -329,7 +365,9 @@ describe('OrderPlacementService', () => {
         proxyUsername: null,
         proxyPassword: null,
       });
-      mockAdapter.placeOrder.mockResolvedValue({ brokerOrderId: 'NO-PROXY-ORDER' });
+      mockAdapter.placeOrder.mockResolvedValue({
+        brokerOrderId: 'NO-PROXY-ORDER',
+      });
       mockCircuitBreaker.execute.mockImplementation((_b, fn) => fn());
       mockPrisma.$transaction.mockResolvedValue({
         trade: mockTrade,

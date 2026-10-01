@@ -76,10 +76,16 @@ export class SubscriptionsService {
 
   async subscribe(userId: string, planId: string): Promise<Subscription> {
     if (this.redisService.isHealthy()) {
-      const isGlobalMaint = await this.redisService.getClient().get('system:maintenance:global');
-      const isSubsMaint = await this.redisService.getClient().get('system:maintenance:subscriptions');
+      const isGlobalMaint = await this.redisService
+        .getClient()
+        .get('system:maintenance:global');
+      const isSubsMaint = await this.redisService
+        .getClient()
+        .get('system:maintenance:subscriptions');
       if (isGlobalMaint === 'true' || isSubsMaint === 'true') {
-        throw new ServiceUnavailableException('Subscriptions are currently disabled due to system maintenance');
+        throw new ServiceUnavailableException(
+          'Subscriptions are currently disabled due to system maintenance',
+        );
       }
     }
 

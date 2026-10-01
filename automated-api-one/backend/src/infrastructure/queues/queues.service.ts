@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, FlowProducer } from 'bullmq';
 import { PrismaService } from '../../prisma.service';
@@ -22,31 +26,51 @@ export class QueueService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     @InjectQueue(Queues.SIGNAL_PROCESSING) private readonly signalQueue: Queue,
-    @InjectQueue(Queues.ORDER_PLACEMENT) private readonly orderPlacementQueue: Queue,
-    @InjectQueue(Queues.ORDER_MONITORING) private readonly orderMonitoringQueue: Queue,
+    @InjectQueue(Queues.ORDER_PLACEMENT)
+    private readonly orderPlacementQueue: Queue,
+    @InjectQueue(Queues.ORDER_MONITORING)
+    private readonly orderMonitoringQueue: Queue,
     @InjectQueue(Queues.NOTIFICATION) private readonly notificationQueue: Queue,
     @InjectQueue(Queues.SIGNAL_DLQ) private readonly signalDlq: Queue,
     @InjectQueue(Queues.ORDER_DLQ) private readonly orderDlq: Queue,
-    @InjectQueue(Queues.ORDER_MONITORING_DLQ) private readonly orderMonitoringDlq: Queue,
-    @InjectQueue(Queues.NOTIFICATION_DLQ) private readonly notificationDlq: Queue,
-    @InjectQueue(Queues.OUTBOX_DISPATCHER) private readonly outboxDispatcherQueue: Queue,
-    @InjectQueue(Queues.OUTBOX_DISPATCHER_DLQ) private readonly outboxDispatcherDlq: Queue,
+    @InjectQueue(Queues.ORDER_MONITORING_DLQ)
+    private readonly orderMonitoringDlq: Queue,
+    @InjectQueue(Queues.NOTIFICATION_DLQ)
+    private readonly notificationDlq: Queue,
+    @InjectQueue(Queues.OUTBOX_DISPATCHER)
+    private readonly outboxDispatcherQueue: Queue,
+    @InjectQueue(Queues.OUTBOX_DISPATCHER_DLQ)
+    private readonly outboxDispatcherDlq: Queue,
     @InjectQueue(Queues.WEBSOCKET) private readonly websocketQueue: Queue,
     @InjectQueue(Queues.WEBSOCKET_DLQ) private readonly websocketDlq: Queue,
-    @InjectQueue(Queues.REPORT_GENERATION) private readonly reportGenerationQueue: Queue,
-    @InjectQueue(Queues.REPORT_GENERATION_DLQ) private readonly reportGenerationDlq: Queue,
-    @InjectQueue(Queues.REPORT_EXPORT) private readonly reportExportQueue: Queue,
-    @InjectQueue(Queues.REPORT_EXPORT_DLQ) private readonly reportExportDlq: Queue,
-    @InjectQueue(Queues.ANALYTICS_SNAPSHOT) private readonly analyticsSnapshotQueue: Queue,
-    @InjectQueue(Queues.ANALYTICS_SNAPSHOT_DLQ) private readonly analyticsSnapshotDlq: Queue,
-    @InjectQueue(Queues.POSITION_REBUILD) private readonly positionRebuildQueue: Queue,
-    @InjectQueue(Queues.POSITION_REBUILD_DLQ) private readonly positionRebuildDlq: Queue,
-    @InjectQueue(Queues.RECONCILIATION) private readonly reconciliationQueue: Queue,
-    @InjectQueue(Queues.RECONCILIATION_DLQ) private readonly reconciliationDlq: Queue,
-    @InjectQueue(Queues.RISK_RECALCULATE) private readonly riskRecalculateQueue: Queue,
-    @InjectQueue(Queues.RISK_RECALCULATE_DLQ) private readonly riskRecalculateDlq: Queue,
-    @InjectQueue(Queues.ANALYTICS_RECALCULATE) private readonly analyticsRecalculateQueue: Queue,
-    @InjectQueue(Queues.ANALYTICS_RECALCULATE_DLQ) private readonly analyticsRecalculateDlq: Queue,
+    @InjectQueue(Queues.REPORT_GENERATION)
+    private readonly reportGenerationQueue: Queue,
+    @InjectQueue(Queues.REPORT_GENERATION_DLQ)
+    private readonly reportGenerationDlq: Queue,
+    @InjectQueue(Queues.REPORT_EXPORT)
+    private readonly reportExportQueue: Queue,
+    @InjectQueue(Queues.REPORT_EXPORT_DLQ)
+    private readonly reportExportDlq: Queue,
+    @InjectQueue(Queues.ANALYTICS_SNAPSHOT)
+    private readonly analyticsSnapshotQueue: Queue,
+    @InjectQueue(Queues.ANALYTICS_SNAPSHOT_DLQ)
+    private readonly analyticsSnapshotDlq: Queue,
+    @InjectQueue(Queues.POSITION_REBUILD)
+    private readonly positionRebuildQueue: Queue,
+    @InjectQueue(Queues.POSITION_REBUILD_DLQ)
+    private readonly positionRebuildDlq: Queue,
+    @InjectQueue(Queues.RECONCILIATION)
+    private readonly reconciliationQueue: Queue,
+    @InjectQueue(Queues.RECONCILIATION_DLQ)
+    private readonly reconciliationDlq: Queue,
+    @InjectQueue(Queues.RISK_RECALCULATE)
+    private readonly riskRecalculateQueue: Queue,
+    @InjectQueue(Queues.RISK_RECALCULATE_DLQ)
+    private readonly riskRecalculateDlq: Queue,
+    @InjectQueue(Queues.ANALYTICS_RECALCULATE)
+    private readonly analyticsRecalculateQueue: Queue,
+    @InjectQueue(Queues.ANALYTICS_RECALCULATE_DLQ)
+    private readonly analyticsRecalculateDlq: Queue,
     @InjectQueue(Queues.EMAIL) private readonly emailQueue: Queue,
     @InjectQueue(Queues.EMAIL_DLQ) private readonly emailDlq: Queue,
     @InjectQueue(Queues.SMS) private readonly smsQueue: Queue,
@@ -58,6 +82,9 @@ export class QueueService {
   ) {
     this.flowProducer = new FlowProducer({
       connection: this.redisService.getClient() as any,
+    });
+    this.flowProducer.on('error', (err) => {
+      this.logger.warn(`BullMQ FlowProducer error: ${err.message}`);
     });
   }
 
@@ -139,7 +166,9 @@ export class QueueService {
         if (queueName.startsWith('analytics-snapshot-dlq-')) {
           let q = this.shardedSnapshotQueues.get(queueName);
           if (!q) {
-            q = new Queue(queueName, { connection: this.redisService.getClient() as any });
+            q = new Queue(queueName, {
+              connection: this.redisService.getClient() as any,
+            });
             this.shardedSnapshotQueues.set(queueName, q);
           }
           return q;
@@ -147,7 +176,9 @@ export class QueueService {
         if (queueName.startsWith('analytics-snapshot-')) {
           let q = this.shardedSnapshotQueues.get(queueName);
           if (!q) {
-            q = new Queue(queueName, { connection: this.redisService.getClient() as any });
+            q = new Queue(queueName, {
+              connection: this.redisService.getClient() as any,
+            });
             this.shardedSnapshotQueues.set(queueName, q);
           }
           return q;
@@ -173,8 +204,12 @@ export class QueueService {
     if (limit !== undefined) {
       const waiting = await queue.getWaitingCount();
       if (waiting >= limit) {
-        this.logger.warn(`Queue '${queueName}' backpressure limit exceeded: waiting=${waiting}, limit=${limit}`);
-        throw new ServiceUnavailableException(`Queue '${queueName}' is overloaded`);
+        this.logger.warn(
+          `Queue '${queueName}' backpressure limit exceeded: waiting=${waiting}, limit=${limit}`,
+        );
+        throw new ServiceUnavailableException(
+          `Queue '${queueName}' is overloaded`,
+        );
       }
     }
 
@@ -211,9 +246,13 @@ export class QueueService {
         },
       });
 
-      this.logger.log(`Enqueued job ${jobId} to queue ${queueName} (Priority: ${priority || 'none'}, Delay: ${delay || 'none'})`);
+      this.logger.log(
+        `Enqueued job ${jobId} to queue ${queueName} (Priority: ${priority || 'none'}, Delay: ${delay || 'none'})`,
+      );
     } catch (err) {
-      this.logger.error(`Failed to add job ${jobId} to queue ${queueName}: ${err.message}`);
+      this.logger.error(
+        `Failed to add job ${jobId} to queue ${queueName}: ${err.message}`,
+      );
       throw err;
     }
   }
@@ -239,7 +278,9 @@ export class QueueService {
         },
       });
     } catch (err) {
-      this.logger.error(`Failed to update DB status for job ${jobId} in queue ${queueName}: ${err.message}`);
+      this.logger.error(
+        `Failed to update DB status for job ${jobId} in queue ${queueName}: ${err.message}`,
+      );
     }
   }
 
@@ -279,7 +320,9 @@ export class QueueService {
         active += await q.getActiveCount();
         failed += await q.getFailedCount();
       } catch (err) {
-        this.logger.warn(`Failed to count metrics for queue ${name}: ${err.message}`);
+        this.logger.warn(
+          `Failed to count metrics for queue ${name}: ${err.message}`,
+        );
       }
     }
 
@@ -306,9 +349,16 @@ export class QueueService {
     for (const name of dlqQueues) {
       try {
         const q = this.getQueue(name);
-        dlq += await q.getJobCountByTypes('waiting', 'active', 'failed', 'completed');
+        dlq += await q.getJobCountByTypes(
+          'waiting',
+          'active',
+          'failed',
+          'completed',
+        );
       } catch (err) {
-        this.logger.warn(`Failed to count metrics for DLQ ${name}: ${err.message}`);
+        this.logger.warn(
+          `Failed to count metrics for DLQ ${name}: ${err.message}`,
+        );
       }
     }
 
@@ -321,7 +371,12 @@ export class QueueService {
   async getDlqMetrics() {
     const getCount = async (queue: Queue) => {
       try {
-        return await queue.getJobCountByTypes('waiting', 'active', 'failed', 'completed');
+        return await queue.getJobCountByTypes(
+          'waiting',
+          'active',
+          'failed',
+          'completed',
+        );
       } catch {
         return 0;
       }

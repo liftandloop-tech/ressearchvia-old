@@ -58,7 +58,10 @@ export class ConsentsService {
 
   async grantConsent(userId: string, brokerId: string): Promise<Consent> {
     // 1. Resolve brokerId (could be UUID, code, or BROKER_ prefixed code)
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(brokerId);
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        brokerId,
+      );
     let broker = isUuid
       ? await this.prisma.broker.findUnique({
           where: { id: brokerId },
@@ -163,7 +166,9 @@ export class ConsentsService {
 
     if (params.strategy) {
       // 1. Log statutory consent in TradingStrategyConsent
-      const stratConsent = await (this.prisma as any).tradingStrategyConsent.create({
+      const stratConsent = await (
+        this.prisma as any
+      ).tradingStrategyConsent.create({
         data: {
           userId,
           brokerId: consent.brokerId,
@@ -179,7 +184,8 @@ export class ConsentsService {
       });
 
       // 2. Check current strategy
-      const currentStrategy = await this.positionSizingService.getUserStrategy(userId);
+      const currentStrategy =
+        await this.positionSizingService.getUserStrategy(userId);
       if (currentStrategy.strategyType !== params.strategy) {
         // Strategy changed -> switch to new with fresh 1x cycle
         await this.positionSizingService.switchStrategy(
@@ -273,7 +279,12 @@ export class ConsentsService {
     });
 
     if (!activeUserBroker) {
-      return { active: false, broker: null, consentDate: null, status: 'NOT_GRANTED' };
+      return {
+        active: false,
+        broker: null,
+        consentDate: null,
+        status: 'NOT_GRANTED',
+      };
     }
 
     const todayStr = getTodayISTString();

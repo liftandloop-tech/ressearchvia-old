@@ -5,23 +5,18 @@ export const RedisKeys = {
   brokerSession: (userId: string, brokerId: string) =>
     `broker:session:${userId}:${brokerId}`,
 
-  riskSegment: (segmentId: string) =>
-    `risk:segment:${segmentId}`,
+  riskSegment: (segmentId: string) => `risk:segment:${segmentId}`,
 
   multiplier: (userId: string, segmentId: string) =>
     `multiplier:${userId}:${segmentId}`,
 
-  idempotency: (signalId: string) =>
-    `trade:idempotency:${signalId}`,
+  idempotency: (signalId: string) => `trade:idempotency:${signalId}`,
 
-  userLock: (userId: string) =>
-    `lock:user:${userId}`,
+  userLock: (userId: string) => `lock:user:${userId}`,
 
-  segmentLock: (segmentId: string) =>
-    `lock:segment:${segmentId}`,
+  segmentLock: (segmentId: string) => `lock:segment:${segmentId}`,
 
-  signalLock: (signalId: string) =>
-    `lock:signal:${signalId}`,
+  signalLock: (signalId: string) => `lock:signal:${signalId}`,
 
   reportDaily: (userId: string, date: string) =>
     `report:daily:${userId}:${date}`,
@@ -29,21 +24,19 @@ export const RedisKeys = {
   reportMonthly: (userId: string, month: string) =>
     `report:monthly:${userId}:${month}`,
 
-  circuitBreaker: (broker: string) =>
-    `circuit:${broker}`,
+  circuitBreaker: (broker: string) => `circuit:${broker}`,
 
   position: (userId: string, segmentId: string) =>
     `position:${userId}:${segmentId}`,
 
-  userEgress: (userId: string) =>
-    `egress:user:${userId}`,
+  userEgress: (userId: string) => `egress:user:${userId}`,
 
-  userEgressLock: (userId: string) =>
-    `lock:egress:${userId}`,
+  userEgressLock: (userId: string) => `lock:egress:${userId}`,
 
   strategy: (userId: string, segmentId?: string) =>
-    segmentId ? `strategy:${userId}:${segmentId}` : `strategy:${userId}:default`,
+    segmentId
+      ? `strategy:${userId}:${segmentId}`
+      : `strategy:${userId}:default`,
 
-  systemStrategyConfig: () =>
-    `system:strategy:config`,
+  systemStrategyConfig: () => `system:strategy:config`,
 };

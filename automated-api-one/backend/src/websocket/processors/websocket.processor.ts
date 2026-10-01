@@ -35,7 +35,9 @@ export class WebsocketProcessor extends WorkerHost {
     const { event, room, payload } = job.data;
     const eventId = job.data.eventId || job.id || `ws-${event}-${Date.now()}`;
 
-    this.logger.log(`Processing WebSocket job: event=${event} room=${room} jobId=${job.id}`);
+    this.logger.log(
+      `Processing WebSocket job: event=${event} room=${room} jobId=${job.id}`,
+    );
 
     try {
       await this.websocketService.broadcast(
@@ -52,7 +54,9 @@ export class WebsocketProcessor extends WorkerHost {
         job.attemptsMade,
       );
     } catch (err: any) {
-      this.logger.error(`WebSocket processor job ${job.id} failed: ${err.message}`);
+      this.logger.error(
+        `WebSocket processor job ${job.id} failed: ${err.message}`,
+      );
 
       await this.queueService.updateJobStatus(
         Queues.WEBSOCKET,

@@ -69,7 +69,9 @@ let BrokerRateLimiterService = BrokerRateLimiterService_1 = class BrokerRateLimi
             return true;
         }
         const defaultLimit = operationType === 'trading' ? 120 : 60;
-        const limit = this.configService.get(operationType === 'trading' ? 'BROKER_RATE_LIMIT_TRADING_PER_MINUTE' : 'BROKER_RATE_LIMIT_MARKET_PER_MINUTE', defaultLimit);
+        const limit = this.configService.get(operationType === 'trading'
+            ? 'BROKER_RATE_LIMIT_TRADING_PER_MINUTE'
+            : 'BROKER_RATE_LIMIT_MARKET_PER_MINUTE', defaultLimit);
         const key = `broker:ratelimit:${broker}:${operationType}`;
         const now = Date.now();
         const clearBefore = now - 60000;

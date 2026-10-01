@@ -20,9 +20,12 @@ export class BrokerUnavailableException extends Error {
 @Injectable()
 export class CircuitBreakerService {
   private readonly logger = new Logger(CircuitBreakerService.name);
-  
+
   // Local memory fallback in case Redis connection is lost/degraded
-  private memStates = new Map<string, { state: CircuitState; failures: number; lastChange: number }>();
+  private memStates = new Map<
+    string,
+    { state: CircuitState; failures: number; lastChange: number }
+  >();
 
   private readonly cooldownMs: number;
   private readonly failureThreshold: number;
@@ -32,8 +35,14 @@ export class CircuitBreakerService {
     private readonly configService: ConfigService,
     private readonly metrics: MetricsService,
   ) {
-    this.cooldownMs = this.configService.get<number>('CIRCUIT_BREAKER_RESET_TIMEOUT_MS', 60000);
-    this.failureThreshold = this.configService.get<number>('CIRCUIT_BREAKER_FAILURE_THRESHOLD', 3);
+    this.cooldownMs = this.configService.get<number>(
+      'CIRCUIT_BREAKER_RESET_TIMEOUT_MS',
+      60000,
+    );
+    this.failureThreshold = this.configService.get<number>(
+      'CIRCUIT_BREAKER_FAILURE_THRESHOLD',
+      3,
+    );
   }
 
   private setCircuitStateGauge(broker: string, state: CircuitState) {
@@ -44,11 +53,19 @@ export class CircuitBreakerService {
     this.metrics.setBrokerCircuitState(broker, val);
   }
 
-  private async getCircuitInfo(broker: string): Promise<{ state: CircuitState; failures: number; lastChange: number }> {
-    const defaultInfo = { state: CircuitState.CLOSED, failures: 0, lastChange: Date.now() };
+  private async getCircuitInfo(
+    broker: string,
+  ): Promise<{ state: CircuitState; failures: number; lastChange: number }> {
+    const defaultInfo = {
+      state: CircuitState.CLOSED,
+      failures: 0,
+      lastChange: Date.now(),
+    };
 
     if (!this.redisService.isHealthy()) {
-      this.logger.warn(`Redis is unhealthy. Using local memory circuit state for broker: ${broker}`);
+      this.logger.warn(
+        `Redis is unhealthy. Using local memory circuit state for broker: ${broker}`,
+      );
       if (!this.memStates.has(broker)) {
         this.memStates.set(broker, defaultInfo);
       }
@@ -64,7 +81,9 @@ export class CircuitBreakerService {
       }
       return JSON.parse(data);
     } catch (err) {
-      this.logger.error(`Failed to read circuit info from Redis: ${err.message}`);
+      this.logger.error(
+        `Failed to read circuit info from Redis: ${err.message}`,
+      );
       return this.memStates.get(broker) || defaultInfo;
     }
   }
@@ -80,7 +99,9 @@ export class CircuitBreakerService {
 
     try {
       const redisKey = RedisKeys.circuitBreaker(broker);
-      await this.redisService.getClient().set(redisKey, JSON.stringify(info), 'EX', 86400); // 24 hour expiration
+      await this.redisService
+        .getClient()
+        .set(redisKey, JSON.stringify(info), 'EX', 86400); // 24 hour expiration
     } catch (err) {
       this.logger.error(`Failed to save circuit info to Redis: ${err.message}`);
     }
@@ -95,8 +116,13 @@ export class CircuitBreakerService {
     let lastChange = info.lastChange;
 
     // Transition from OPEN to HALF_OPEN after cooldown expires
-    if (state === CircuitState.OPEN && Date.now() - lastChange >= this.cooldownMs) {
-      this.logger.log(`Circuit for broker ${broker} transitioning from OPEN to HALF_OPEN (cooldown expired)`);
+    if (
+      state === CircuitState.OPEN &&
+      Date.now() - lastChange >= this.cooldownMs
+    ) {
+      this.logger.log(
+        `Circuit for broker ${broker} transitioning from OPEN to HALF_OPEN (cooldown expired)`,
+      );
       state = CircuitState.HALF_OPEN;
       const duration = Date.now() - lastChange;
       this.metrics.observeBrokerCircuitOpenDuration(broker, duration);
@@ -105,7 +131,9 @@ export class CircuitBreakerService {
     }
 
     if (state === CircuitState.OPEN) {
-      throw new BrokerUnavailableException(`Broker ${broker} API is unavailable (circuit open)`);
+      throw new BrokerUnavailableException(
+        `Broker ${broker} API is unavailable (circuit open)`,
+      );
     }
 
     try {
@@ -124,7 +152,9 @@ export class CircuitBreakerService {
     info: { state: CircuitState; failures: number; lastChange: number },
   ) {
     if (currentState === CircuitState.HALF_OPEN) {
-      this.logger.log(`Circuit for broker ${broker} is now CLOSED (pilot request succeeded)`);
+      this.logger.log(
+        `Circuit for broker ${broker} is now CLOSED (pilot request succeeded)`,
+      );
       await this.setCircuitInfo(broker, {
         state: CircuitState.CLOSED,
         failures: 0,
@@ -145,10 +175,17 @@ export class CircuitBreakerService {
     error: any,
   ) {
     const failures = info.failures + 1;
-    this.logger.warn(`Failure recorded for broker ${broker}. Consecutive failures: ${failures}. Error: ${error.message}`);
+    this.logger.warn(
+      `Failure recorded for broker ${broker}. Consecutive failures: ${failures}. Error: ${error.message}`,
+    );
 
-    if (currentState === CircuitState.HALF_OPEN || failures >= this.failureThreshold) {
-      this.logger.error(`Circuit for broker ${broker} is now OPEN. Requests will be blocked for 60 seconds.`);
+    if (
+      currentState === CircuitState.HALF_OPEN ||
+      failures >= this.failureThreshold
+    ) {
+      this.logger.error(
+        `Circuit for broker ${broker} is now OPEN. Requests will be blocked for 60 seconds.`,
+      );
       this.metrics.incrementBrokerCircuitOpen(broker);
       await this.setCircuitInfo(broker, {
         state: CircuitState.OPEN,

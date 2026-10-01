@@ -12,9 +12,14 @@ export class NotificationDeduplicationService {
    * If not, stores the fingerprint in Redis with the given TTL (in seconds) and returns false.
    * If it has, returns true (deduplicated).
    */
-  async shouldDeduplicate(fingerprint: string, ttlSeconds = 60): Promise<boolean> {
+  async shouldDeduplicate(
+    fingerprint: string,
+    ttlSeconds = 60,
+  ): Promise<boolean> {
     if (!this.redisService.isHealthy()) {
-      this.logger.warn(`Redis is unhealthy. Bypassing deduplication for fingerprint: ${fingerprint}`);
+      this.logger.warn(
+        `Redis is unhealthy. Bypassing deduplication for fingerprint: ${fingerprint}`,
+      );
       return false;
     }
 
@@ -26,10 +31,14 @@ export class NotificationDeduplicationService {
       if (result === 'OK') {
         return false;
       }
-      this.logger.log(`Deduplicated notification with fingerprint: ${fingerprint}`);
+      this.logger.log(
+        `Deduplicated notification with fingerprint: ${fingerprint}`,
+      );
       return true;
     } catch (err) {
-      this.logger.error(`Error in notification deduplication check for ${fingerprint}: ${err.message}`);
+      this.logger.error(
+        `Error in notification deduplication check for ${fingerprint}: ${err.message}`,
+      );
       return false; // Fail open
     }
   }

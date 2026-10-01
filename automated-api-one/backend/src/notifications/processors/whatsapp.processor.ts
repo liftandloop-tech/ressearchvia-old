@@ -27,7 +27,9 @@ export class WhatsAppProcessor extends WorkerHost {
     const { deliveryId, to, templateName, parameters } = job.data;
     const startTime = Date.now();
 
-    this.logger.log(`Processing WhatsApp job ${job.id} for delivery ${deliveryId} to ${to}`);
+    this.logger.log(
+      `Processing WhatsApp job ${job.id} for delivery ${deliveryId} to ${to}`,
+    );
 
     try {
       const delivery = await this.prisma.notificationDelivery.findUnique({
@@ -35,9 +37,10 @@ export class WhatsAppProcessor extends WorkerHost {
         include: { notification: true },
       });
 
-      const finalParameters = (delivery?.notification?.message && parameters && parameters.length >= 2)
-        ? [parameters[0], delivery.notification.message]
-        : (parameters || []);
+      const finalParameters =
+        delivery?.notification?.message && parameters && parameters.length >= 2
+          ? [parameters[0], delivery.notification.message]
+          : parameters || [];
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -49,10 +52,21 @@ export class WhatsAppProcessor extends WorkerHost {
       }
 
       const pStart = Date.now();
-      const providerId = await this.circuitBreaker.execute('whatsapp-notifications', async () => {
-        return await this.whatsappProvider.sendWhatsApp(to, templateName, finalParameters);
-      });
-      this.metrics.observeNotificationProviderLatency('whatsapp-cloud', 'WHATSAPP', Date.now() - pStart);
+      const providerId = await this.circuitBreaker.execute(
+        'whatsapp-notifications',
+        async () => {
+          return await this.whatsappProvider.sendWhatsApp(
+            to,
+            templateName,
+            finalParameters,
+          );
+        },
+      );
+      this.metrics.observeNotificationProviderLatency(
+        'whatsapp-cloud',
+        'WHATSAPP',
+        Date.now() - pStart,
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -65,12 +79,27 @@ export class WhatsAppProcessor extends WorkerHost {
         },
       });
 
-      this.metrics.observeNotificationDeliveryDuration('WHATSAPP', 'whatsapp-cloud', Date.now() - startTime);
+      this.metrics.observeNotificationDeliveryDuration(
+        'WHATSAPP',
+        'whatsapp-cloud',
+        Date.now() - startTime,
+      );
 
-      await this.queueService.updateJobStatus(Queues.WHATSAPP, job.id!, QueueJobStatus.COMPLETED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.WHATSAPP,
+        job.id!,
+        QueueJobStatus.COMPLETED,
+        job.attemptsMade,
+      );
     } catch (err) {
-      this.metrics.incrementNotificationProviderFailures('whatsapp-cloud', 'WHATSAPP');
-      this.logger.error(`WhatsApp delivery ${deliveryId} failed: ${err.message}`, err.stack);
+      this.metrics.incrementNotificationProviderFailures(
+        'whatsapp-cloud',
+        'WHATSAPP',
+      );
+      this.logger.error(
+        `WhatsApp delivery ${deliveryId} failed: ${err.message}`,
+        err.stack,
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -81,7 +110,12 @@ export class WhatsAppProcessor extends WorkerHost {
         },
       });
 
-      await this.queueService.updateJobStatus(Queues.WHATSAPP, job.id!, QueueJobStatus.FAILED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.WHATSAPP,
+        job.id!,
+        QueueJobStatus.FAILED,
+        job.attemptsMade,
+      );
       throw err;
     }
   }

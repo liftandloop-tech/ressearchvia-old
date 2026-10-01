@@ -553,8 +553,31 @@ class StaffModel {
       identical(this, other) ||
       other is StaffModel &&
           runtimeType == other.runtimeType &&
-          id == other.id;
+          id == other.id &&
+          panUrl == other.panUrl &&
+          aadhaarUrl == other.aadhaarUrl &&
+          nismUrl == other.nismUrl &&
+          highestEducationUrl == other.highestEducationUrl &&
+          kycVideoUrl == other.kycVideoUrl &&
+          photoUrl == other.photoUrl &&
+          resumeUrl == other.resumeUrl &&
+          onboardingStatus == other.onboardingStatus &&
+          stage == other.stage &&
+          status == other.status &&
+          role == other.role &&
+          department == other.department;
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => Object.hash(
+        id,
+        panUrl,
+        aadhaarUrl,
+        nismUrl,
+        highestEducationUrl,
+        kycVideoUrl,
+        photoUrl,
+        resumeUrl,
+        onboardingStatus,
+        stage,
+      );
 }

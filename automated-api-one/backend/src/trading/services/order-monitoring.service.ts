@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { BrokerFactory } from '../../brokers/factory/broker.factory';
 import { BrokerType } from '../../brokers/interfaces/broker-type.enum';
@@ -26,6 +26,7 @@ export class OrderMonitoringService {
 
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => BrokerFactory))
     private readonly brokerFactory: BrokerFactory,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly outbox: OutboxService,
@@ -35,7 +36,10 @@ export class OrderMonitoringService {
     private readonly configService: ConfigService,
     private readonly metrics: MetricsService,
   ) {
-    this.brokerTimeoutMs = this.configService.get<number>('BROKER_TIMEOUT_MS', 5000);
+    this.brokerTimeoutMs = this.configService.get<number>(
+      'BROKER_TIMEOUT_MS',
+      5000,
+    );
   }
 
   /**
@@ -54,12 +58,22 @@ export class OrderMonitoringService {
     });
 
     if (!order) {
-      this.logger.warn(`[${correlationId}] Order ${orderId} not found for monitoring`);
-      return { finalStatus: 'PENDING', brokerOrderId: '', reason: 'Order not found' };
+      this.logger.warn(
+        `[${correlationId}] Order ${orderId} not found for monitoring`,
+      );
+      return {
+        finalStatus: 'PENDING',
+        brokerOrderId: '',
+        reason: 'Order not found',
+      };
     }
 
     if (!order.brokerOrderId) {
-      return { finalStatus: 'PENDING', brokerOrderId: '', reason: 'No broker order ID' };
+      return {
+        finalStatus: 'PENDING',
+        brokerOrderId: '',
+        reason: 'No broker order ID',
+      };
     }
 
     const trade = order.trade;
@@ -71,7 +85,11 @@ export class OrderMonitoringService {
     });
 
     if (!userBroker?.accessToken) {
-      return { finalStatus: 'PENDING', brokerOrderId: order.brokerOrderId!, reason: 'No broker session' };
+      return {
+        finalStatus: 'PENDING',
+        brokerOrderId: order.brokerOrderId!,
+        reason: 'No broker session',
+      };
     }
 
     const brokerCode = userBroker.broker.code as unknown as BrokerType;
@@ -85,13 +103,18 @@ export class OrderMonitoringService {
         () =>
           Promise.race([
             adapter.getOrderStatus(
-              userBroker.accessToken!,
+              userBroker.accessToken,
               userBroker.brokerClientId,
-              order.brokerOrderId!,
+              order.brokerOrderId,
             ),
             new Promise<never>((_, reject) =>
               setTimeout(
-                () => reject(new Error(`Status poll timeout after ${this.brokerTimeoutMs}ms`)),
+                () =>
+                  reject(
+                    new Error(
+                      `Status poll timeout after ${this.brokerTimeoutMs}ms`,
+                    ),
+                  ),
                 this.brokerTimeoutMs,
               ),
             ),
@@ -110,14 +133,31 @@ export class OrderMonitoringService {
     }
 
     // Reconcile terminal states
-    if (brokerStatus === 'FILLED' || brokerStatus === 'COMPLETE' || brokerStatus === 'EXECUTED') {
-      await this.reconcileFilled(order.id, trade.id, trade.userId, trade.segmentId, correlationId);
+    if (
+      brokerStatus === 'FILLED' ||
+      brokerStatus === 'COMPLETE' ||
+      brokerStatus === 'EXECUTED'
+    ) {
+      await this.reconcileFilled(
+        order.id,
+        trade.id,
+        trade.userId,
+        trade.segmentId,
+        correlationId,
+      );
       return { finalStatus: 'FILLED', brokerOrderId: order.brokerOrderId! };
     }
 
     if (['CANCELLED', 'REJECTED', 'EXPIRED'].includes(brokerStatus)) {
       const mapped = brokerStatus as 'CANCELLED' | 'REJECTED' | 'EXPIRED';
-      await this.reconcileFailed(order.id, trade.id, trade.userId, trade.segmentId, mapped, correlationId);
+      await this.reconcileFailed(
+        order.id,
+        trade.id,
+        trade.userId,
+        trade.segmentId,
+        mapped,
+        correlationId,
+      );
       return { finalStatus: mapped, brokerOrderId: order.brokerOrderId! };
     }
 
@@ -137,9 +177,15 @@ export class OrderMonitoringService {
     filledQuantity?: number;
     rejectionReason?: string;
     correlationId?: string;
-  }): Promise<{ success: boolean; message: string; orderId?: string; status?: string }> {
+  }): Promise<{
+    success: boolean;
+    message: string;
+    orderId?: string;
+    status?: string;
+  }> {
     const { brokerOrderId, status, rejectionReason } = params;
-    const correlationId = params.correlationId || `wh_${Date.now().toString(36)}`;
+    const correlationId =
+      params.correlationId || `wh_${Date.now().toString(36)}`;
 
     const order = await this.prisma.order.findFirst({
       where: { brokerOrderId },
@@ -147,8 +193,13 @@ export class OrderMonitoringService {
     });
 
     if (!order) {
-      this.logger.warn(`[Webhook] Order with brokerOrderId ${brokerOrderId} not found in database`);
-      return { success: false, message: `Order with brokerOrderId ${brokerOrderId} not found` };
+      this.logger.warn(
+        `[Webhook] Order with brokerOrderId ${brokerOrderId} not found in database`,
+      );
+      return {
+        success: false,
+        message: `Order with brokerOrderId ${brokerOrderId} not found`,
+      };
     }
 
     // Idempotency: If order is already in a terminal state, ignore duplicate webhook
@@ -158,8 +209,15 @@ export class OrderMonitoringService {
       order.status === OrderStatus.REJECTED ||
       order.status === OrderStatus.EXPIRED
     ) {
-      this.logger.log(`[Webhook] Order ${order.id} is already in terminal state ${order.status}`);
-      return { success: true, message: `Order already in terminal state ${order.status}`, orderId: order.id, status: order.status };
+      this.logger.log(
+        `[Webhook] Order ${order.id} is already in terminal state ${order.status}`,
+      );
+      return {
+        success: true,
+        message: `Order already in terminal state ${order.status}`,
+        orderId: order.id,
+        status: order.status,
+      };
     }
 
     const trade = order.trade;
@@ -171,16 +229,46 @@ export class OrderMonitoringService {
       normalizedStatus === 'FILLED' ||
       normalizedStatus === 'TRADED'
     ) {
-      await this.reconcileFilled(order.id, trade.id, trade.userId, trade.segmentId, correlationId);
-      this.logger.log(`[Webhook] Order ${order.id} marked as FILLED from broker webhook.`);
-      return { success: true, message: 'Order marked as FILLED', orderId: order.id, status: 'FILLED' };
+      await this.reconcileFilled(
+        order.id,
+        trade.id,
+        trade.userId,
+        trade.segmentId,
+        correlationId,
+      );
+      this.logger.log(
+        `[Webhook] Order ${order.id} marked as FILLED from broker webhook.`,
+      );
+      return {
+        success: true,
+        message: 'Order marked as FILLED',
+        orderId: order.id,
+        status: 'FILLED',
+      };
     }
 
     if (['CANCELLED', 'REJECTED', 'EXPIRED'].includes(normalizedStatus)) {
-      const failStatus = normalizedStatus as 'CANCELLED' | 'REJECTED' | 'EXPIRED';
-      await this.reconcileFailed(order.id, trade.id, trade.userId, trade.segmentId, failStatus, correlationId);
-      this.logger.warn(`[Webhook] Order ${order.id} marked as ${failStatus} from broker webhook. Reason: ${rejectionReason || 'N/A'}`);
-      return { success: true, message: `Order marked as ${failStatus}`, orderId: order.id, status: failStatus };
+      const failStatus = normalizedStatus as
+        | 'CANCELLED'
+        | 'REJECTED'
+        | 'EXPIRED';
+      await this.reconcileFailed(
+        order.id,
+        trade.id,
+        trade.userId,
+        trade.segmentId,
+        failStatus,
+        correlationId,
+      );
+      this.logger.warn(
+        `[Webhook] Order ${order.id} marked as ${failStatus} from broker webhook. Reason: ${rejectionReason || 'N/A'}`,
+      );
+      return {
+        success: true,
+        message: `Order marked as ${failStatus}`,
+        orderId: order.id,
+        status: failStatus,
+      };
     }
 
     if (normalizedStatus === 'PARTIALLY_FILLED') {
@@ -188,14 +276,26 @@ export class OrderMonitoringService {
         where: { id: order.id },
         data: {
           status: OrderStatus.PARTIALLY_FILLED,
-          ...(params.filledQuantity ? { filledQuantity: params.filledQuantity } : {}),
+          ...(params.filledQuantity
+            ? { filledQuantity: params.filledQuantity }
+            : {}),
           ...(params.averagePrice ? { averagePrice: params.averagePrice } : {}),
         },
       });
-      return { success: true, message: 'Order marked as PARTIALLY_FILLED', orderId: order.id, status: 'PARTIALLY_FILLED' };
+      return {
+        success: true,
+        message: 'Order marked as PARTIALLY_FILLED',
+        orderId: order.id,
+        status: 'PARTIALLY_FILLED',
+      };
     }
 
-    return { success: true, message: `Order status acknowledged: ${normalizedStatus}`, orderId: order.id, status: normalizedStatus };
+    return {
+      success: true,
+      message: `Order status acknowledged: ${normalizedStatus}`,
+      orderId: order.id,
+      status: normalizedStatus,
+    };
   }
 
   private async reconcileFilled(
@@ -267,7 +367,15 @@ export class OrderMonitoringService {
 
       const evt = await this.outbox.createEvent(
         'ORDER_FAILED',
-        { version: 1, correlationId, orderId, tradeId, userId, segmentId, failStatus },
+        {
+          version: 1,
+          correlationId,
+          orderId,
+          tradeId,
+          userId,
+          segmentId,
+          failStatus,
+        },
         tx,
       );
       return evt;

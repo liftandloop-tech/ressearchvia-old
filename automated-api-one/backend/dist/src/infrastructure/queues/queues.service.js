@@ -106,6 +106,9 @@ let QueueService = QueueService_1 = class QueueService {
         this.flowProducer = new bullmq_2.FlowProducer({
             connection: this.redisService.getClient(),
         });
+        this.flowProducer.on('error', (err) => {
+            this.logger.warn(`BullMQ FlowProducer error: ${err.message}`);
+        });
     }
     getFlowProducer() {
         return this.flowProducer;
@@ -184,7 +187,9 @@ let QueueService = QueueService_1 = class QueueService {
                 if (queueName.startsWith('analytics-snapshot-dlq-')) {
                     let q = this.shardedSnapshotQueues.get(queueName);
                     if (!q) {
-                        q = new bullmq_2.Queue(queueName, { connection: this.redisService.getClient() });
+                        q = new bullmq_2.Queue(queueName, {
+                            connection: this.redisService.getClient(),
+                        });
                         this.shardedSnapshotQueues.set(queueName, q);
                     }
                     return q;
@@ -192,7 +197,9 @@ let QueueService = QueueService_1 = class QueueService {
                 if (queueName.startsWith('analytics-snapshot-')) {
                     let q = this.shardedSnapshotQueues.get(queueName);
                     if (!q) {
-                        q = new bullmq_2.Queue(queueName, { connection: this.redisService.getClient() });
+                        q = new bullmq_2.Queue(queueName, {
+                            connection: this.redisService.getClient(),
+                        });
                         this.shardedSnapshotQueues.set(queueName, q);
                     }
                     return q;

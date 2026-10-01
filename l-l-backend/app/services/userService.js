@@ -2497,7 +2497,7 @@ const userService = {
       let profileImage = null;
       if (fileDoc?.filesObj?.path) {
         // Normalize path: 'app/uploads/...' -> 'uploads/...' matching static serve route
-        profileImage = fileDoc.filesObj.path.replace(/^\/app\//, '');
+        profileImage = fileDoc.filesObj.path.replace(/^(\/)?app\//, '');
       }
 
       let userResponse = user.toObject();

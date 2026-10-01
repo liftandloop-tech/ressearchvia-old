@@ -139,7 +139,10 @@ describe('Brokers Module Tests', () => {
         { provide: CircuitBreakerService, useValue: mockCircuitBreakerService },
         { provide: BrokerRateLimiterService, useValue: mockRateLimiter },
         { provide: InstrumentsService, useValue: {} },
-        { provide: OrderMonitoringService, useValue: mockOrderMonitoringService },
+        {
+          provide: OrderMonitoringService,
+          useValue: mockOrderMonitoringService,
+        },
         { provide: ZebuWebSocketService, useValue: mockZebuWebSocketService },
       ],
     }).compile();
@@ -429,15 +432,20 @@ describe('Brokers Module Tests', () => {
       mockConfigService.get.mockImplementation((key, defaultValue) => {
         if (key === 'MOCK_BROKERS') return true;
         if (key === 'ANGEL_ONE_API_KEY') return 'test_api_key';
-        if (key === 'ANGEL_ONE_REDIRECT_URL') return 'https://example.com/callback';
+        if (key === 'ANGEL_ONE_REDIRECT_URL')
+          return 'https://example.com/callback';
         return defaultValue;
       });
 
-      const authUrl = await angelOneService.getAuthorizationUrl('my-random-state-123');
+      const authUrl = await angelOneService.getAuthorizationUrl(
+        'my-random-state-123',
+      );
       expect(authUrl).toContain('smartapi.angelone.in/publisher-login');
       expect(authUrl).toContain('api_key=test_api_key');
       expect(authUrl).toContain('state=my-random-state-123');
-      expect(authUrl).toContain(encodeURIComponent('https://example.com/callback'));
+      expect(authUrl).toContain(
+        encodeURIComponent('https://example.com/callback'),
+      );
     });
 
     it('should complete authorization and return mock session', async () => {
@@ -465,7 +473,9 @@ describe('Brokers Module Tests', () => {
 
       const result = await controller.handleAngelOnePostback(payload);
 
-      expect(mockOrderMonitoringService.processBrokerWebhookOrderUpdate).toHaveBeenCalledWith({
+      expect(
+        mockOrderMonitoringService.processBrokerWebhookOrderUpdate,
+      ).toHaveBeenCalledWith({
         brokerOrderId: 'ANGEL_ORD_98765',
         status: 'complete',
         averagePrice: 752.5,
@@ -486,7 +496,9 @@ describe('Brokers Module Tests', () => {
 
       const result = await controller.handleZebuPostback(payload);
 
-      expect(mockOrderMonitoringService.processBrokerWebhookOrderUpdate).toHaveBeenCalledWith({
+      expect(
+        mockOrderMonitoringService.processBrokerWebhookOrderUpdate,
+      ).toHaveBeenCalledWith({
         brokerOrderId: 'ZEBU_ORD_54321',
         status: 'COMPLETE',
         averagePrice: 3450.0,
@@ -498,7 +510,8 @@ describe('Brokers Module Tests', () => {
 
     it('should initialize Zebu WebSocket stream on receiving Zebu handshake payload', async () => {
       const payload = {
-        accesstoken: '59c1539ffc60453a0fba7fe74a9f9d4a260b7fa932fed2fda07aa75f06ed0c4e',
+        accesstoken:
+          '59c1539ffc60453a0fba7fe74a9f9d4a260b7fa932fed2fda07aa75f06ed0c4e',
         t: 'a',
         actid: 'ZP00285',
         uid: 'ZP00285',

@@ -49,20 +49,32 @@ describe('MultiplierService', () => {
 
   describe('getState()', () => {
     it('should delegate getState to PositionSizingService', async () => {
-      mockPositionSizingService.getState.mockResolvedValueOnce({ index: 1, current: 2 });
+      mockPositionSizingService.getState.mockResolvedValueOnce({
+        index: 1,
+        current: 2,
+      });
       const result = await service.getState('user-1', 'seg-1');
 
-      expect(mockPositionSizingService.getState).toHaveBeenCalledWith('user-1', 'seg-1');
+      expect(mockPositionSizingService.getState).toHaveBeenCalledWith(
+        'user-1',
+        'seg-1',
+      );
       expect(result).toEqual({ index: 1, current: 2 });
     });
   });
 
   describe('advanceOnLoss()', () => {
     it('should delegate advanceOnLoss to PositionSizingService', async () => {
-      mockPositionSizingService.advanceOnLoss.mockResolvedValueOnce({ index: 2, current: 4 });
+      mockPositionSizingService.advanceOnLoss.mockResolvedValueOnce({
+        index: 2,
+        current: 4,
+      });
       const result = await service.advanceOnLoss('user-1', 'seg-1');
 
-      expect(mockPositionSizingService.advanceOnLoss).toHaveBeenCalledWith('user-1', 'seg-1');
+      expect(mockPositionSizingService.advanceOnLoss).toHaveBeenCalledWith(
+        'user-1',
+        'seg-1',
+      );
       expect(result).toEqual({ index: 2, current: 4 });
     });
   });
@@ -72,7 +84,10 @@ describe('MultiplierService', () => {
       mockPositionSizingService.resetOnWin.mockResolvedValueOnce(undefined);
       await service.resetOnWin('user-1', 'seg-1');
 
-      expect(mockPositionSizingService.resetOnWin).toHaveBeenCalledWith('user-1', 'seg-1');
+      expect(mockPositionSizingService.resetOnWin).toHaveBeenCalledWith(
+        'user-1',
+        'seg-1',
+      );
     });
   });
 });

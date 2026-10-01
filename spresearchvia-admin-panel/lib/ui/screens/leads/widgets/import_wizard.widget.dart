@@ -414,6 +414,9 @@ class _ImportWizardState extends State<ImportWizard> {
             if (_jobStatus == 'processing') {
               Get.snackbar('Wait', 'Import is processing in background. You can close this safety dialog.');
             }
+            _leadsController.fetchLeads();
+            _leadsController.fetchLeadPools();
+            _leadsController.fetchPullStats();
             Get.back();
           },
         ),
@@ -1040,6 +1043,8 @@ class _ImportWizardState extends State<ImportWizard> {
             onPressed: isFinished
                 ? () {
                     _leadsController.fetchLeads();
+                    _leadsController.fetchLeadPools();
+                    _leadsController.fetchPullStats();
                     Get.back();
                   }
                 : null,

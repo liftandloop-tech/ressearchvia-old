@@ -53,7 +53,9 @@ export class PositionCacheService {
       const raw = await this.redisService.getClient().get(key);
       return raw ? (JSON.parse(raw) as PositionCache) : null;
     } catch (err) {
-      this.logger.error(`Failed to read position cache [${key}]: ${err.message}`);
+      this.logger.error(
+        `Failed to read position cache [${key}]: ${err.message}`,
+      );
       return null;
     }
   }
@@ -68,7 +70,9 @@ export class PositionCacheService {
       await this.redisService.getClient().del(key);
       this.logger.debug(`Position cache cleared: ${key}`);
     } catch (err) {
-      this.logger.error(`Failed to delete position cache [${key}]: ${err.message}`);
+      this.logger.error(
+        `Failed to delete position cache [${key}]: ${err.message}`,
+      );
     }
   }
 }

@@ -62,13 +62,16 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
         this.brokerTimeoutMs = this.configService.get('BROKER_TIMEOUT_MS', 5000);
     }
     async placeEntryOrder(ctx) {
-        const { snapshot, correlationId, signalId, symbol, exchange, side, entryPrice, stopLoss, targetPrice } = ctx;
+        const { snapshot, correlationId, signalId, symbol, exchange, side, entryPrice, stopLoss, targetPrice, } = ctx;
         const { userId, brokerId, brokerCode, brokerClientId, effectiveLot } = snapshot;
         this.logger.log(`[${correlationId}] Placing entry order: user=${userId} symbol=${symbol} lot=${effectiveLot}`);
         const riskDecision = await this.riskService.evaluateRisk(userId, symbol, effectiveLot, entryPrice, brokerId, snapshot.segmentId);
         if (!riskDecision.approved) {
             this.logger.warn(`[${correlationId}] Blocked by Risk Engine: ${riskDecision.reason}`);
-            return { success: false, reason: `Risk Engine block: ${riskDecision.reason}` };
+            return {
+                success: false,
+                reason: `Risk Engine block: ${riskDecision.reason}`,
+            };
         }
         await this.rateLimiter.throttle(brokerCode);
         const tokenInfo = await this.resolveBrokerToken(userId, brokerId, brokerClientId);
@@ -92,7 +95,9 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
                     orderType: ctx.orderType,
                     price: entryPrice,
                     triggerPrice: stopLoss,
-                    squareoff: targetPrice ? Math.abs(entryPrice - targetPrice) : undefined,
+                    squareoff: targetPrice
+                        ? Math.abs(entryPrice - targetPrice)
+                        : undefined,
                     stoploss: stopLoss ? Math.abs(entryPrice - stopLoss) : undefined,
                 }, tokenInfo.proxyAgent),
                 new Promise((_, reject) => setTimeout(() => reject(new Error(`Broker API timeout after ${this.brokerTimeoutMs}ms`)), this.brokerTimeoutMs)),
@@ -187,13 +192,20 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
             side,
             cachedAt: new Date().toISOString(),
         });
-        await this.auditService.logEvent(userId, audit_event_enum_1.AuditEventType.TRADE_OPENED, 'Trade', tradeId, { correlationId, brokerOrderId, symbol, side, quantity: effectiveLot, entryPrice });
+        await this.auditService.logEvent(userId, audit_event_enum_1.AuditEventType.TRADE_OPENED, 'Trade', tradeId, {
+            correlationId,
+            brokerOrderId,
+            symbol,
+            side,
+            quantity: effectiveLot,
+            entryPrice,
+        });
         this.logger.log(`[${correlationId}] Entry order placed: tradeId=${tradeId} orderId=${orderId} brokerOrderId=${brokerOrderId}`);
         return { success: true, tradeId, orderId, brokerOrderId };
     }
     async resolveBrokerToken(userId, brokerId, brokerClientId) {
         this.logger.log(`[resolveBrokerToken] Resolving token & proxy for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
-        const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+        const { createProxyAgent, } = require('../../infrastructure/proxy-agent.util');
         let proxyAgent = undefined;
         if (this.egressService) {
             try {
@@ -213,7 +225,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
                     if (session?.accessToken) {
                         this.logger.debug(`Broker session for user ${userId} resolved from Redis cache`);
                         if (!proxyAgent) {
-                            const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+                            const { createProxyAgent, } = require('../../infrastructure/proxy-agent.util');
                             proxyAgent = createProxyAgent({
                                 proxyIp: session.proxyIp || null,
                                 proxyPort: session.proxyPort || null,
@@ -239,7 +251,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
         this.logger.log(`[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`);
         if (userBroker) {
             if (!proxyAgent) {
-                const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+                const { createProxyAgent, } = require('../../infrastructure/proxy-agent.util');
                 proxyAgent = createProxyAgent({
                     proxyIp: userBroker.proxyIp,
                     proxyPort: userBroker.proxyPort,
@@ -256,6 +268,7 @@ let OrderPlacementService = OrderPlacementService_1 = class OrderPlacementServic
 exports.OrderPlacementService = OrderPlacementService;
 exports.OrderPlacementService = OrderPlacementService = OrderPlacementService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(1, (0, common_1.Inject)((0, common_1.forwardRef)(() => broker_factory_1.BrokerFactory))),
     __param(11, (0, common_2.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         broker_factory_1.BrokerFactory,

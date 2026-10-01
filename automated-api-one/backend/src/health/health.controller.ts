@@ -61,17 +61,25 @@ export class HealthController {
   @ApiOperation({ summary: 'Get aggregated queue and DLQ metrics' })
   async checkQueues() {
     const metrics = await this.queueService.getAggregatedMetrics();
-    
+
     const signalQueue = this.queueService.getQueue('trade-execution');
     const orderQueue = this.queueService.getQueue('order-placement');
     const reportQueue = this.queueService.getQueue('report-generation');
 
-    const signalProcessingDepth = signalQueue ? await signalQueue.getWaitingCount() : 0;
-    const orderPlacementDepth = orderQueue ? await orderQueue.getWaitingCount() : 0;
+    const signalProcessingDepth = signalQueue
+      ? await signalQueue.getWaitingCount()
+      : 0;
+    const orderPlacementDepth = orderQueue
+      ? await orderQueue.getWaitingCount()
+      : 0;
     const reportDepth = reportQueue ? await reportQueue.getWaitingCount() : 0;
 
     let status = 'up';
-    if (signalProcessingDepth > 5000 || orderPlacementDepth > 5000 || reportDepth > 10000) {
+    if (
+      signalProcessingDepth > 5000 ||
+      orderPlacementDepth > 5000 ||
+      reportDepth > 10000
+    ) {
       status = 'degraded';
     }
 
@@ -88,7 +96,8 @@ export class HealthController {
   @ApiOperation({ summary: 'Check WebSocket Gateway health' })
   async checkWebsocket() {
     const isInitialized = !!this.tradingGateway.server;
-    const activeConnections = this.tradingGateway.server?.engine?.clientsCount || 0;
+    const activeConnections =
+      this.tradingGateway.server?.engine?.clientsCount || 0;
     return {
       status: isInitialized ? 'up' : 'down',
       gateway: isInitialized ? 'initialized' : 'uninitialized',
@@ -103,7 +112,7 @@ export class HealthController {
       const pendingCount = await this.prisma.outboxEvent.count({
         where: { status: 'PENDING' },
       });
-      
+
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       const stuckCount = await this.prisma.outboxEvent.count({
         where: {
@@ -114,7 +123,7 @@ export class HealthController {
 
       const q = this.queueService.getQueue('outbox-dispatcher');
       const queueDepth = q ? await q.getWaitingCount() : 0;
-      
+
       const isDegraded = stuckCount > 10;
       return {
         status: isDegraded ? 'degraded' : 'up',

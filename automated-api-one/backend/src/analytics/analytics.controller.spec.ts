@@ -35,11 +35,15 @@ describe('AnalyticsController', () => {
   describe('getPortfolio', () => {
     it('should call getPortfolioPerformance with user id', async () => {
       const req = { user: { userId: 'user-id-123' } };
-      serviceMock.getPortfolioPerformance.mockResolvedValue({ status: 'success' });
+      serviceMock.getPortfolioPerformance.mockResolvedValue({
+        status: 'success',
+      });
 
       const result = await controller.getPortfolio(req);
       expect(result).toEqual({ status: 'success' });
-      expect(serviceMock.getPortfolioPerformance).toHaveBeenCalledWith('user-id-123');
+      expect(serviceMock.getPortfolioPerformance).toHaveBeenCalledWith(
+        'user-id-123',
+      );
     });
   });
 
@@ -50,7 +54,9 @@ describe('AnalyticsController', () => {
 
       const result = await controller.getSegments(req);
       expect(result).toEqual([]);
-      expect(serviceMock.getSegmentPerformance).toHaveBeenCalledWith('user-id-123');
+      expect(serviceMock.getSegmentPerformance).toHaveBeenCalledWith(
+        'user-id-123',
+      );
     });
   });
 
@@ -61,7 +67,9 @@ describe('AnalyticsController', () => {
 
       const result = await controller.getBrokers(req);
       expect(result).toEqual([]);
-      expect(serviceMock.getBrokerPerformance).toHaveBeenCalledWith('user-id-123');
+      expect(serviceMock.getBrokerPerformance).toHaveBeenCalledWith(
+        'user-id-123',
+      );
     });
   });
 
@@ -69,17 +77,32 @@ describe('AnalyticsController', () => {
     it('should call enqueueRecalculation if userId is passed', async () => {
       serviceMock.enqueueRecalculation.mockResolvedValue(undefined);
 
-      const result = await controller.forceRecalculate({ userId: 'user-id-123', rebuildHistory: true });
-      expect(result).toEqual({ message: 'Recalculation enqueued for user user-id-123' });
-      expect(serviceMock.enqueueRecalculation).toHaveBeenCalledWith('user-id-123', true);
+      const result = await controller.forceRecalculate({
+        userId: 'user-id-123',
+        rebuildHistory: true,
+      });
+      expect(result).toEqual({
+        message: 'Recalculation enqueued for user user-id-123',
+      });
+      expect(serviceMock.enqueueRecalculation).toHaveBeenCalledWith(
+        'user-id-123',
+        true,
+      );
     });
 
     it('should call handleNightlyAnalyticsRecalculation if no userId is passed', async () => {
-      serviceMock.handleNightlyAnalyticsRecalculation.mockResolvedValue(undefined);
+      serviceMock.handleNightlyAnalyticsRecalculation.mockResolvedValue(
+        undefined,
+      );
 
       const result = await controller.forceRecalculate({});
-      expect(result).toEqual({ message: 'Nightly analytics recalculation triggered for all active users' });
-      expect(serviceMock.handleNightlyAnalyticsRecalculation).toHaveBeenCalled();
+      expect(result).toEqual({
+        message:
+          'Nightly analytics recalculation triggered for all active users',
+      });
+      expect(
+        serviceMock.handleNightlyAnalyticsRecalculation,
+      ).toHaveBeenCalled();
     });
   });
 });

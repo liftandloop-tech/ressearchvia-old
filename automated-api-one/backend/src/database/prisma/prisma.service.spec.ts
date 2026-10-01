@@ -105,11 +105,8 @@ describe('PrismaService', () => {
 
   describe('helper methods', () => {
     it('should query findActiveUsers and findTradesByUser', async () => {
-      const findActiveSpy = jest.spyOn(
-        service.client.user as any,
-        'findActive',
-      );
-      const findManySpy = jest.spyOn(service.client.trade as any, 'findMany');
+      const findActiveSpy = jest.spyOn(service.client.user, 'findActive');
+      const findManySpy = jest.spyOn(service.client.trade, 'findMany');
 
       await service.findActiveUsers();
       expect(findActiveSpy).toHaveBeenCalled();

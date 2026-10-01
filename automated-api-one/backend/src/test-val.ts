@@ -4,7 +4,7 @@ import { BrokerCode } from '@prisma/client';
 
 async function main() {
   const dto = new LinkBrokerDto();
-  dto.brokerCode = 'ANGEL_ONE' as BrokerCode;
+  dto.brokerCode = 'ANGEL_ONE';
   dto.brokerClientId = 'M320967';
 
   const errors = await validate(dto);

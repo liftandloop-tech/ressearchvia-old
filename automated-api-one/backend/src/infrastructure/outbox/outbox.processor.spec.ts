@@ -92,13 +92,23 @@ describe('OutboxProcessor', () => {
         eventKey: null,
       };
 
-      jest.spyOn(prismaService.outboxEvent, 'findUnique').mockResolvedValue(mockEvent as any);
-      const updateSpy = jest.spyOn(prismaService.outboxEvent, 'update').mockResolvedValue({} as any);
+      jest
+        .spyOn(prismaService.outboxEvent, 'findUnique')
+        .mockResolvedValue(mockEvent as any);
+      const updateSpy = jest
+        .spyOn(prismaService.outboxEvent, 'update')
+        .mockResolvedValue({} as any);
 
       await processor.process(mockJob);
 
-      expect(prismaService.outboxEvent.findUnique).toHaveBeenCalledWith({ where: { id: 'event-123' } });
-      expect(queueService.addJob).toHaveBeenCalledWith(Queues.NOTIFICATION, 'event-123', { orderId: 'ord-1' });
+      expect(prismaService.outboxEvent.findUnique).toHaveBeenCalledWith({
+        where: { id: 'event-123' },
+      });
+      expect(queueService.addJob).toHaveBeenCalledWith(
+        Queues.NOTIFICATION,
+        'event-123',
+        { orderId: 'ord-1' },
+      );
       expect(updateSpy).toHaveBeenCalledWith({
         where: { id: 'event-123' },
         data: { status: OutboxStatus.PROCESSING },
@@ -123,13 +133,23 @@ describe('OutboxProcessor', () => {
         eventKey: 'ORDER_FILLED:ord-1',
       };
 
-      jest.spyOn(prismaService.outboxEvent, 'findUnique').mockResolvedValue(mockEvent as any);
+      jest
+        .spyOn(prismaService.outboxEvent, 'findUnique')
+        .mockResolvedValue(mockEvent as any);
       redisClientMock.set.mockResolvedValue(null); // Already exists
-      const updateSpy = jest.spyOn(prismaService.outboxEvent, 'update').mockResolvedValue({} as any);
+      const updateSpy = jest
+        .spyOn(prismaService.outboxEvent, 'update')
+        .mockResolvedValue({} as any);
 
       await processor.process(mockJob);
 
-      expect(redisClientMock.set).toHaveBeenCalledWith('outbox:idempotency:ORDER_FILLED:ord-1', '1', 'PX', 604800000, 'NX');
+      expect(redisClientMock.set).toHaveBeenCalledWith(
+        'outbox:idempotency:ORDER_FILLED:ord-1',
+        '1',
+        'PX',
+        604800000,
+        'NX',
+      );
       expect(queueService.addJob).not.toHaveBeenCalled();
       expect(updateSpy).toHaveBeenCalledWith({
         where: { id: 'event-123' },
@@ -150,11 +170,19 @@ describe('OutboxProcessor', () => {
         eventKey: null,
       };
 
-      jest.spyOn(prismaService.outboxEvent, 'findUnique').mockResolvedValue(mockEvent as any);
-      jest.spyOn(queueService, 'addJob').mockRejectedValue(new Error('BullMQ connection lost'));
-      const updateSpy = jest.spyOn(prismaService.outboxEvent, 'update').mockResolvedValue({} as any);
+      jest
+        .spyOn(prismaService.outboxEvent, 'findUnique')
+        .mockResolvedValue(mockEvent as any);
+      jest
+        .spyOn(queueService, 'addJob')
+        .mockRejectedValue(new Error('BullMQ connection lost'));
+      const updateSpy = jest
+        .spyOn(prismaService.outboxEvent, 'update')
+        .mockResolvedValue({} as any);
 
-      await expect(processor.process(mockJob)).rejects.toThrow('BullMQ connection lost');
+      await expect(processor.process(mockJob)).rejects.toThrow(
+        'BullMQ connection lost',
+      );
 
       expect(updateSpy).toHaveBeenCalledWith({
         where: { id: 'event-123' },
@@ -180,11 +208,19 @@ describe('OutboxProcessor', () => {
         attemptsMade: 4,
       };
 
-      jest.spyOn(prismaService.outboxEvent, 'findUnique').mockResolvedValue(mockEvent as any);
-      jest.spyOn(queueService, 'addJob').mockRejectedValue(new Error('BullMQ connection lost'));
-      const updateSpy = jest.spyOn(prismaService.outboxEvent, 'update').mockResolvedValue({} as any);
+      jest
+        .spyOn(prismaService.outboxEvent, 'findUnique')
+        .mockResolvedValue(mockEvent as any);
+      jest
+        .spyOn(queueService, 'addJob')
+        .mockRejectedValue(new Error('BullMQ connection lost'));
+      const updateSpy = jest
+        .spyOn(prismaService.outboxEvent, 'update')
+        .mockResolvedValue({} as any);
 
-      await expect(processor.process(failingJob)).rejects.toThrow('BullMQ connection lost');
+      await expect(processor.process(failingJob)).rejects.toThrow(
+        'BullMQ connection lost',
+      );
 
       expect(updateSpy).toHaveBeenCalledWith({
         where: { id: 'event-123' },
@@ -199,10 +235,17 @@ describe('OutboxProcessor', () => {
   describe('fallbackPoll', () => {
     it('should retrieve stuck pending events and re-enqueue them', async () => {
       const mockStuckEvents = [
-        { id: 'stuck-1', eventType: 'ORDER_FILLED', status: OutboxStatus.PENDING, eventKey: null },
+        {
+          id: 'stuck-1',
+          eventType: 'ORDER_FILLED',
+          status: OutboxStatus.PENDING,
+          eventKey: null,
+        },
       ];
 
-      jest.spyOn(prismaService.outboxEvent, 'findMany').mockResolvedValue(mockStuckEvents as any);
+      jest
+        .spyOn(prismaService.outboxEvent, 'findMany')
+        .mockResolvedValue(mockStuckEvents as any);
 
       await processor.fallbackPoll();
 
@@ -210,7 +253,7 @@ describe('OutboxProcessor', () => {
       expect(queueService.addJob).toHaveBeenCalledWith(
         Queues.OUTBOX_DISPATCHER,
         'stuck-1',
-        { 
+        {
           outboxEventId: 'stuck-1',
           eventType: 'ORDER_FILLED',
           eventKey: null,

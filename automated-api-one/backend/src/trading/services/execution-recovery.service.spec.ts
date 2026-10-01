@@ -17,7 +17,10 @@ const mockQueueService = { addJob: mockAddJob };
 const mockRedisService = { isHealthy: mockIsHealthy };
 const mockConfigService = { get: mockConfigGet };
 
-async function buildService(overrides?: { batchSize?: number; maxOrders?: number }): Promise<ExecutionRecoveryService> {
+async function buildService(overrides?: {
+  batchSize?: number;
+  maxOrders?: number;
+}): Promise<ExecutionRecoveryService> {
   mockConfigGet.mockImplementation((key: string, def: number) => {
     if (key === 'RECOVERY_BATCH_SIZE') return overrides?.batchSize ?? def;
     if (key === 'RECOVERY_MAX_ORDERS') return overrides?.maxOrders ?? def;
@@ -96,7 +99,11 @@ describe('ExecutionRecoveryService', () => {
     expect(mockAddJob).toHaveBeenCalledWith(
       'order-monitoring',
       'recovery-order-2',
-      expect.objectContaining({ orderId: 'order-2', correlationId: 'recovery-order-2', isRecovery: true }),
+      expect.objectContaining({
+        orderId: 'order-2',
+        correlationId: 'recovery-order-2',
+        isRecovery: true,
+      }),
     );
   });
 
@@ -131,8 +138,8 @@ describe('ExecutionRecoveryService', () => {
       ])
       .mockResolvedValueOnce([]);
     mockAddJob
-      .mockResolvedValueOnce(undefined)                   // order-1 succeeds
-      .mockRejectedValueOnce(new Error('Queue error'));   // order-2 fails
+      .mockResolvedValueOnce(undefined) // order-1 succeeds
+      .mockRejectedValueOnce(new Error('Queue error')); // order-2 fails
     const service = await buildService();
 
     // Must not throw even when individual enqueues fail

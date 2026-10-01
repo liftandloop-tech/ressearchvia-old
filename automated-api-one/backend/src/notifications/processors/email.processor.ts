@@ -28,7 +28,9 @@ export class EmailProcessor extends WorkerHost {
     const { deliveryId, to, subject, body } = job.data;
     const startTime = Date.now();
 
-    this.logger.log(`Processing email job ${job.id} for delivery ${deliveryId} to ${to}`);
+    this.logger.log(
+      `Processing email job ${job.id} for delivery ${deliveryId} to ${to}`,
+    );
 
     let providerUsed = 'resend';
     let providerId = '';
@@ -53,19 +55,40 @@ export class EmailProcessor extends WorkerHost {
 
       const pStart = Date.now();
       try {
-        providerId = await this.circuitBreaker.execute('resend-notifications', async () => {
-          return await this.resendProvider.sendEmail(to, finalSubject, finalBody);
-        });
-        this.metrics.observeNotificationProviderLatency('resend', 'EMAIL', Date.now() - pStart);
+        providerId = await this.circuitBreaker.execute(
+          'resend-notifications',
+          async () => {
+            return await this.resendProvider.sendEmail(
+              to,
+              finalSubject,
+              finalBody,
+            );
+          },
+        );
+        this.metrics.observeNotificationProviderLatency(
+          'resend',
+          'EMAIL',
+          Date.now() - pStart,
+        );
       } catch (resendErr) {
         this.metrics.incrementNotificationProviderFailures('resend', 'EMAIL');
-        this.logger.warn(`Resend failed or circuit open. Failing over to SMTP. Error: ${resendErr.message}`);
+        this.logger.warn(
+          `Resend failed or circuit open. Failing over to SMTP. Error: ${resendErr.message}`,
+        );
         this.metrics.incrementNotificationFailover('resend', 'smtp', 'EMAIL');
 
         const smtpStart = Date.now();
         providerUsed = 'smtp';
-        providerId = await this.smtpProvider.sendEmail(to, finalSubject, finalBody);
-        this.metrics.observeNotificationProviderLatency('smtp', 'EMAIL', Date.now() - smtpStart);
+        providerId = await this.smtpProvider.sendEmail(
+          to,
+          finalSubject,
+          finalBody,
+        );
+        this.metrics.observeNotificationProviderLatency(
+          'smtp',
+          'EMAIL',
+          Date.now() - smtpStart,
+        );
       }
 
       await this.prisma.notificationDelivery.update({
@@ -79,11 +102,23 @@ export class EmailProcessor extends WorkerHost {
         },
       });
 
-      this.metrics.observeNotificationDeliveryDuration('EMAIL', providerUsed, Date.now() - startTime);
+      this.metrics.observeNotificationDeliveryDuration(
+        'EMAIL',
+        providerUsed,
+        Date.now() - startTime,
+      );
 
-      await this.queueService.updateJobStatus(Queues.EMAIL, job.id!, QueueJobStatus.COMPLETED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.EMAIL,
+        job.id!,
+        QueueJobStatus.COMPLETED,
+        job.attemptsMade,
+      );
     } catch (err) {
-      this.logger.error(`Email delivery ${deliveryId} failed: ${err.message}`, err.stack);
+      this.logger.error(
+        `Email delivery ${deliveryId} failed: ${err.message}`,
+        err.stack,
+      );
 
       await this.prisma.notificationDelivery.update({
         where: { id: deliveryId },
@@ -94,7 +129,12 @@ export class EmailProcessor extends WorkerHost {
         },
       });
 
-      await this.queueService.updateJobStatus(Queues.EMAIL, job.id!, QueueJobStatus.FAILED, job.attemptsMade);
+      await this.queueService.updateJobStatus(
+        Queues.EMAIL,
+        job.id!,
+        QueueJobStatus.FAILED,
+        job.attemptsMade,
+      );
       throw err;
     }
   }

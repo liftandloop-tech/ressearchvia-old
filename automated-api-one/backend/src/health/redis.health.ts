@@ -23,7 +23,7 @@ export class RedisHealthIndicator extends HealthIndicator {
       if (status === 'PONG') {
         return this.getStatus(key, true);
       }
-      
+
       throw new Error(`Redis ping returned: ${status}`);
     } catch (error) {
       throw new HealthCheckError(

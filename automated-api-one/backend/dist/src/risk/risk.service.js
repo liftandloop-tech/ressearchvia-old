@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var RiskService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RiskService = void 0;
@@ -269,8 +272,7 @@ let RiskService = RiskService_1 = class RiskService {
             }
             const currentLoss = dailyPnl < 0 ? Math.abs(dailyPnl) : 0;
             const dailyLossLimit = Number(us.dailyLossLimit);
-            const isLocked = currentLoss >= dailyLossLimit ||
-                us.status === client_1.UserSegmentStatus.PAUSED;
+            const isLocked = currentLoss >= dailyLossLimit || us.status === client_1.UserSegmentStatus.PAUSED;
             statusList.push({
                 segmentId: us.segmentId,
                 segmentName: us.segment.name,
@@ -432,17 +434,29 @@ let RiskService = RiskService_1 = class RiskService {
     async evaluateRisk(userId, symbol, quantity, price, brokerId, segmentId) {
         const orderValue = Number(quantity) * Number(price);
         if (this.redisService.isHealthy()) {
-            const globalBlocked = await this.redisService.getClient().get('risk:global:blocked');
+            const globalBlocked = await this.redisService
+                .getClient()
+                .get('risk:global:blocked');
             if (globalBlocked === 'true') {
                 this.logger.warn(`Order blocked due to global emergency risk lock: user=${userId}`);
                 await this.logViolation(userId, client_1.RiskRule.STALE_SNAPSHOT, client_1.Severity.CRITICAL, { reason: 'Global emergency risk lock' });
-                return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Global emergency risk lock is active' };
+                return {
+                    approved: false,
+                    code: risk_code_enum_1.RiskCode.UNKNOWN,
+                    reason: 'Global emergency risk lock is active',
+                };
             }
-            const userBlocked = await this.redisService.getClient().get(`user:risk:blocked:${userId}`);
+            const userBlocked = await this.redisService
+                .getClient()
+                .get(`user:risk:blocked:${userId}`);
             if (userBlocked === 'true') {
                 this.logger.warn(`Order blocked due to user risk lock: user=${userId}`);
                 await this.logViolation(userId, client_1.RiskRule.STALE_SNAPSHOT, client_1.Severity.CRITICAL, { reason: 'User risk lock' });
-                return { approved: false, code: risk_code_enum_1.RiskCode.DAILY_LOSS_LIMIT, reason: 'User risk circuit breaker is active' };
+                return {
+                    approved: false,
+                    code: risk_code_enum_1.RiskCode.DAILY_LOSS_LIMIT,
+                    reason: 'User risk circuit breaker is active',
+                };
             }
         }
         const defaultMode = process.env.RISK_DEFAULT_MODE || 'BLOCK';
@@ -454,10 +468,16 @@ let RiskService = RiskService_1 = class RiskService {
             if (freshnessMs > 300000) {
                 this.logger.warn(`Stale risk snapshot for user ${userId}. Age: ${freshnessMs}ms`);
                 const jobId = `risk-recalc-${userId}`;
-                await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, { userId });
+                await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, {
+                    userId,
+                });
                 if (defaultMode === 'BLOCK') {
                     await this.logViolation(userId, client_1.RiskRule.STALE_SNAPSHOT, client_1.Severity.CRITICAL, { freshnessMs });
-                    return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Risk snapshot is stale' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.UNKNOWN,
+                        reason: 'Risk snapshot is stale',
+                    };
                 }
                 else {
                     this.logger.log(`Stale risk snapshot allowed by default mode ALLOW for user ${userId}`);
@@ -471,34 +491,45 @@ let RiskService = RiskService_1 = class RiskService {
                     { segmentId, userId: null, brokerId: null },
                     { brokerId, userId: null, segmentId: null },
                     { userId: null, segmentId: null, brokerId: null },
-                ]
+                ],
             },
-            orderBy: [
-                { priority: 'desc' },
-                { version: 'desc' },
-            ],
+            orderBy: [{ priority: 'desc' }, { version: 'desc' }],
         });
         if (applicableProfiles.length === 0) {
             if (defaultMode === 'BLOCK') {
                 this.logger.warn(`No risk profile found for user ${userId} and RISK_DEFAULT_MODE=BLOCK`);
                 await this.logViolation(userId, client_1.RiskRule.NO_PROFILE, client_1.Severity.CRITICAL, { reason: 'No risk profile' });
-                return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'No active risk profile found' };
+                return {
+                    approved: false,
+                    code: risk_code_enum_1.RiskCode.UNKNOWN,
+                    reason: 'No active risk profile found',
+                };
             }
             else {
-                await this.logEvaluation(userId, true, 0, orderValue, { info: 'No profile, allowed by default' });
+                await this.logEvaluation(userId, true, 0, orderValue, {
+                    info: 'No profile, allowed by default',
+                });
                 return { approved: true };
             }
         }
         if (!snapshot) {
             this.logger.warn(`No risk snapshot found for user ${userId}`);
-            const jobId = `risk:recalc:${userId}`;
-            await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, { userId });
+            const jobId = `risk-recalc-${userId}`;
+            await this.queueService.addJob(queue_constants_1.Queues.RISK_RECALCULATE, jobId, {
+                userId,
+            });
             if (defaultMode === 'BLOCK') {
                 await this.logViolation(userId, client_1.RiskRule.NO_PROFILE, client_1.Severity.CRITICAL, { reason: 'No risk snapshot' });
-                return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'No risk snapshot found' };
+                return {
+                    approved: false,
+                    code: risk_code_enum_1.RiskCode.UNKNOWN,
+                    reason: 'No risk snapshot found',
+                };
             }
             else {
-                await this.logEvaluation(userId, true, 0, orderValue, { info: 'No snapshot, allowed by default' });
+                await this.logEvaluation(userId, true, 0, orderValue, {
+                    info: 'No snapshot, allowed by default',
+                });
                 return { approved: true };
             }
         }
@@ -511,17 +542,28 @@ let RiskService = RiskService_1 = class RiskService {
                 if (potentialCapital > maxCap) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_CAPITAL_USER, client_1.Severity.CRITICAL, { potentialCapital, maxCap });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.INSUFFICIENT_CAPITAL, reason: 'Exceeded Max Capital Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.INSUFFICIENT_CAPITAL,
+                        reason: 'Exceeded Max Capital Limit',
+                    };
                 }
             }
             const maxCapSeg = Number(profile.maxCapitalPerSegment);
             if (maxCapSeg > 0 && profile.segmentId === segmentId) {
                 const potentialSegmentCapital = orderValue;
-                evaluatedRulesResult['MAX_CAPITAL_SEGMENT'] = { potentialSegmentCapital, maxCapSeg };
+                evaluatedRulesResult['MAX_CAPITAL_SEGMENT'] = {
+                    potentialSegmentCapital,
+                    maxCapSeg,
+                };
                 if (potentialSegmentCapital > maxCapSeg) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_CAPITAL_SEGMENT, client_1.Severity.WARNING, { potentialSegmentCapital, maxCapSeg });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.INSUFFICIENT_CAPITAL, reason: 'Exceeded Max Capital Per Segment' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.INSUFFICIENT_CAPITAL,
+                        reason: 'Exceeded Max Capital Per Segment',
+                    };
                 }
             }
             const maxLoss = Number(profile.maxDailyLoss);
@@ -532,19 +574,32 @@ let RiskService = RiskService_1 = class RiskService {
                     await this.logViolation(userId, client_1.RiskRule.MAX_DAILY_LOSS, client_1.Severity.CRITICAL, { currentLoss, maxLoss });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
                     if (this.redisService.isHealthy()) {
-                        await this.redisService.getClient().set(`user:risk:blocked:${userId}`, 'true');
+                        await this.redisService
+                            .getClient()
+                            .set(`user:risk:blocked:${userId}`, 'true');
                     }
-                    return { approved: false, code: risk_code_enum_1.RiskCode.DAILY_LOSS_LIMIT, reason: 'Exceeded Max Daily Loss Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.DAILY_LOSS_LIMIT,
+                        reason: 'Exceeded Max Daily Loss Limit',
+                    };
                 }
             }
             const maxPositions = profile.maxOpenPositions;
             if (maxPositions > 0) {
                 const currentOpenPositions = snapshot.openPositionsCount;
-                evaluatedRulesResult['MAX_OPEN_POSITIONS'] = { currentOpenPositions, maxPositions };
+                evaluatedRulesResult['MAX_OPEN_POSITIONS'] = {
+                    currentOpenPositions,
+                    maxPositions,
+                };
                 if (currentOpenPositions >= maxPositions) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_OPEN_POSITIONS, client_1.Severity.WARNING, { currentOpenPositions, maxPositions });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Exceeded Max Open Positions Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.UNKNOWN,
+                        reason: 'Exceeded Max Open Positions Limit',
+                    };
                 }
             }
             const maxPosSize = profile.maxPositionSize;
@@ -552,11 +607,18 @@ let RiskService = RiskService_1 = class RiskService {
                 const symbolExposures = snapshot.exposurePerSymbol;
                 const currentSymbolQty = symbolExposures[symbol]?.quantity || 0;
                 const potentialQty = currentSymbolQty + quantity;
-                evaluatedRulesResult['MAX_POSITION_SIZE'] = { potentialQty, maxPosSize };
+                evaluatedRulesResult['MAX_POSITION_SIZE'] = {
+                    potentialQty,
+                    maxPosSize,
+                };
                 if (potentialQty > maxPosSize) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_POSITION_SIZE, client_1.Severity.WARNING, { potentialQty, maxPosSize });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Exceeded Max Position Size Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.UNKNOWN,
+                        reason: 'Exceeded Max Position Size Limit',
+                    };
                 }
             }
             const maxSymbolExposure = Number(profile.maxExposurePerSymbol);
@@ -564,11 +626,18 @@ let RiskService = RiskService_1 = class RiskService {
                 const symbolExposures = snapshot.exposurePerSymbol;
                 const currentExposure = symbolExposures[symbol]?.exposure || 0;
                 const potentialExposure = currentExposure + orderValue;
-                evaluatedRulesResult['MAX_EXPOSURE_SYMBOL'] = { potentialExposure, maxSymbolExposure };
+                evaluatedRulesResult['MAX_EXPOSURE_SYMBOL'] = {
+                    potentialExposure,
+                    maxSymbolExposure,
+                };
                 if (potentialExposure > maxSymbolExposure) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_EXPOSURE_SYMBOL, client_1.Severity.CRITICAL, { potentialExposure, maxSymbolExposure });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Exceeded Max Exposure Per Symbol Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.UNKNOWN,
+                        reason: 'Exceeded Max Exposure Per Symbol Limit',
+                    };
                 }
             }
             const maxBrokerExposure = Number(profile.maxExposurePerBroker);
@@ -576,21 +645,35 @@ let RiskService = RiskService_1 = class RiskService {
                 const brokerExposures = snapshot.exposurePerBroker;
                 const currentExposure = brokerExposures[brokerId] || 0;
                 const potentialExposure = currentExposure + orderValue;
-                evaluatedRulesResult['MAX_EXPOSURE_BROKER'] = { potentialExposure, maxBrokerExposure };
+                evaluatedRulesResult['MAX_EXPOSURE_BROKER'] = {
+                    potentialExposure,
+                    maxBrokerExposure,
+                };
                 if (potentialExposure > maxBrokerExposure) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_EXPOSURE_BROKER, client_1.Severity.CRITICAL, { potentialExposure, maxBrokerExposure });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Exceeded Max Exposure Per Broker Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.UNKNOWN,
+                        reason: 'Exceeded Max Exposure Per Broker Limit',
+                    };
                 }
             }
             const maxOrders = profile.maxConcurrentOrders;
             if (maxOrders > 0) {
                 const currentOrders = snapshot.concurrentOrdersCount;
-                evaluatedRulesResult['MAX_CONCURRENT_ORDERS'] = { currentOrders, maxOrders };
+                evaluatedRulesResult['MAX_CONCURRENT_ORDERS'] = {
+                    currentOrders,
+                    maxOrders,
+                };
                 if (currentOrders >= maxOrders) {
                     await this.logViolation(userId, client_1.RiskRule.MAX_CONCURRENT_ORDERS, client_1.Severity.INFO, { currentOrders, maxOrders });
                     await this.logEvaluation(userId, false, profile.version, orderValue, evaluatedRulesResult);
-                    return { approved: false, code: risk_code_enum_1.RiskCode.UNKNOWN, reason: 'Exceeded Max Concurrent Orders Limit' };
+                    return {
+                        approved: false,
+                        code: risk_code_enum_1.RiskCode.UNKNOWN,
+                        reason: 'Exceeded Max Concurrent Orders Limit',
+                    };
                 }
             }
         }
@@ -609,7 +692,9 @@ let RiskService = RiskService_1 = class RiskService {
         });
         this.metrics.incrementRiskViolations(rule, severity);
         if (severity === client_1.Severity.CRITICAL && this.redisService.isHealthy()) {
-            await this.redisService.getClient().set(`user:risk:blocked:${userId}`, 'true');
+            await this.redisService
+                .getClient()
+                .set(`user:risk:blocked:${userId}`, 'true');
             this.metrics.incrementRiskUsersBlocked();
         }
         await this.outboxService.createEvent('RISK_VIOLATION', {
@@ -656,7 +741,8 @@ let RiskService = RiskService_1 = class RiskService {
                 exposurePerSymbol[symbol].quantity += qty;
                 exposurePerSymbol[symbol].exposure += qty * currPrice;
                 const brokerId = pos.trade.brokerId;
-                exposurePerBroker[brokerId] = (exposurePerBroker[brokerId] || 0) + (qty * currPrice);
+                exposurePerBroker[brokerId] =
+                    (exposurePerBroker[brokerId] || 0) + qty * currPrice;
             }
             const concurrentOrdersCount = await this.prisma.order.count({
                 where: {
@@ -691,7 +777,7 @@ let RiskService = RiskService_1 = class RiskService {
                         { segmentId: { not: null }, userId: null, brokerId: null },
                         { brokerId: { not: null }, userId: null, segmentId: null },
                         { userId: null, segmentId: null, brokerId: null },
-                    ]
+                    ],
                 },
                 orderBy: { priority: 'desc' },
             });
@@ -704,7 +790,8 @@ let RiskService = RiskService_1 = class RiskService {
                     if (currentCapitalUsed >= maxCap) {
                         state = 'BLOCKED';
                     }
-                    else if (currentCapitalUsed >= maxCap * 0.8 && state !== 'BLOCKED') {
+                    else if (currentCapitalUsed >= maxCap * 0.8 &&
+                        state !== 'BLOCKED') {
                         state = 'WARNING';
                     }
                 }
@@ -722,7 +809,8 @@ let RiskService = RiskService_1 = class RiskService {
                     if (openPositions.length >= maxOpenPos) {
                         state = 'BLOCKED';
                     }
-                    else if (openPositions.length >= maxOpenPos * 0.8 && state !== 'BLOCKED') {
+                    else if (openPositions.length >= maxOpenPos * 0.8 &&
+                        state !== 'BLOCKED') {
                         state = 'WARNING';
                     }
                 }
@@ -731,7 +819,8 @@ let RiskService = RiskService_1 = class RiskService {
                     if (concurrentOrdersCount >= maxConcurrent) {
                         state = 'BLOCKED';
                     }
-                    else if (concurrentOrdersCount >= maxConcurrent * 0.8 && state !== 'BLOCKED') {
+                    else if (concurrentOrdersCount >= maxConcurrent * 0.8 &&
+                        state !== 'BLOCKED') {
                         state = 'WARNING';
                     }
                 }
@@ -910,6 +999,8 @@ __decorate([
 ], RiskService.prototype, "cleanupEvaluations", null);
 exports.RiskService = RiskService = RiskService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => broker_session_service_1.BrokerSessionService))),
+    __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => broker_factory_1.BrokerFactory))),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         subscriptions_service_1.SubscriptionsService,
         consents_service_1.ConsentsService,

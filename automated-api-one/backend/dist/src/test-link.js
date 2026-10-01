@@ -10,16 +10,16 @@ async function main() {
         const token = jwt.sign({
             _id: '65d49a71b12d3c001f3e792c',
             phone: '+919770784982',
-            type: 'ACCESS'
+            type: 'ACCESS',
         }, 'no_1$32@4');
         console.log('Using token:', token);
         const response = await axios_1.default.post('http://localhost:3000/brokers/link', {
             brokerCode: 'ANGEL_ONE',
-            brokerClientId: 'M320967'
+            brokerClientId: 'M320967',
         }, {
             headers: {
-                Authorization: `Bearer ${token}`
-            }
+                Authorization: `Bearer ${token}`,
+            },
         });
         console.log('Response status:', response.status);
         console.log('Response data:', response.data);

@@ -48,7 +48,9 @@ let ReportGenerationProcessor = ReportGenerationProcessor_1 = class ReportGenera
         const idempotencyKey = `report:idempotency:${userId}:${type}:${period}${segmentId ? `:${segmentId}` : ''}`;
         this.logger.log(`Processing report generation job ${job.id} for report ${reportId}`);
         try {
-            const lockAcquired = await this.redisService.getClient().set(lockKey, '1', 'EX', 60, 'NX');
+            const lockAcquired = await this.redisService
+                .getClient()
+                .set(lockKey, '1', 'EX', 60, 'NX');
             if (lockAcquired !== 'OK') {
                 this.logger.warn(`Stampede lock active for report ${reportId}. Worker exiting.`);
                 return;
@@ -160,18 +162,26 @@ let ReportGenerationProcessor = ReportGenerationProcessor_1 = class ReportGenera
         catch (err) {
             this.logger.error(`Failed to generate report ${reportId}: ${err.message}`, err.stack);
             this.metrics.incrementReportGenerationFailed();
-            await this.prisma.report.update({
+            await this.prisma.report
+                .update({
                 where: { id: reportId },
                 data: {
                     status: client_1.ReportState.FAILED,
                     error: err.message,
                 },
-            }).catch(dbErr => this.logger.error(`Failed to save report error state to DB: ${dbErr.message}`));
+            })
+                .catch((dbErr) => this.logger.error(`Failed to save report error state to DB: ${dbErr.message}`));
             throw err;
         }
         finally {
-            await this.redisService.getClient().del(lockKey).catch(() => { });
-            await this.redisService.getClient().del(idempotencyKey).catch(() => { });
+            await this.redisService
+                .getClient()
+                .del(lockKey)
+                .catch(() => { });
+            await this.redisService
+                .getClient()
+                .del(idempotencyKey)
+                .catch(() => { });
         }
     }
 };
@@ -219,8 +229,12 @@ let ReportExportProcessor = ReportExportProcessor_1 = class ReportExportProcesso
                     const stat = audit.status;
                     const resType = audit.resourceType;
                     const resId = audit.resourceId;
-                    const errMsg = audit.errorMessage ? audit.errorMessage.replace(/"/g, '""') : '';
-                    const metaStr = audit.metadata ? JSON.stringify(audit.metadata).replace(/"/g, '""') : '';
+                    const errMsg = audit.errorMessage
+                        ? audit.errorMessage.replace(/"/g, '""')
+                        : '';
+                    const metaStr = audit.metadata
+                        ? JSON.stringify(audit.metadata).replace(/"/g, '""')
+                        : '';
                     csvContent += `"${opId}","${created}","${operator}","${act}","${stat}","${resType}","${resId}","${errMsg}","${metaStr}"\n`;
                 }
                 const fileName = `export-${exportId}.csv`;
@@ -276,13 +290,15 @@ let ReportExportProcessor = ReportExportProcessor_1 = class ReportExportProcesso
         }
         catch (err) {
             this.logger.error(`Failed to export CSV ${exportId}: ${err.message}`);
-            await this.prisma.reportExport.update({
+            await this.prisma.reportExport
+                .update({
                 where: { id: exportId },
                 data: {
                     status: client_1.ExportState.FAILED,
                     error: err.message,
                 },
-            }).catch(() => { });
+            })
+                .catch(() => { });
             throw err;
         }
     }

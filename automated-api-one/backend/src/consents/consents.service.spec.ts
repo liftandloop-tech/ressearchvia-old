@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConsentsService, getTodayISTString } from './consents.service';
 import { PrismaService } from '../prisma.service';
@@ -8,6 +7,7 @@ import { BadRequestException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { PositionSizingService } from '../trading/services/position-sizing.service';
 
 describe('ConsentsService', () => {
   let service: ConsentsService;
@@ -15,6 +15,7 @@ describe('ConsentsService', () => {
   let auditMock: any;
   let notificationsMock: any;
   let subscriptionsMock: any;
+  let positionSizingMock: any;
 
   beforeEach(async () => {
     prismaMock = mockPrismaService();
@@ -27,6 +28,13 @@ describe('ConsentsService', () => {
     subscriptionsMock = {
       validateSubscription: jest.fn().mockResolvedValue({ active: true }),
     };
+    positionSizingMock = {
+      getUserStrategy: jest
+        .fn()
+        .mockResolvedValue({ strategyType: 'FIXED_1X' }),
+      switchStrategy: jest.fn().mockResolvedValue({}),
+      getSystemConfig: jest.fn().mockResolvedValue({}),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,6 +43,7 @@ describe('ConsentsService', () => {
         { provide: AuditService, useValue: auditMock },
         { provide: NotificationsService, useValue: notificationsMock },
         { provide: SubscriptionsService, useValue: subscriptionsMock },
+        { provide: PositionSizingService, useValue: positionSizingMock },
       ],
     }).compile();
 
@@ -96,8 +105,9 @@ describe('ConsentsService', () => {
       });
     });
 
-    it('should grant consent by creating/upserting a record', async () => {
-      prismaMock.consent.upsert.mockResolvedValue({
+    it('should grant consent by creating a record if not exists', async () => {
+      prismaMock.consent.findFirst.mockResolvedValue(null);
+      prismaMock.consent.create.mockResolvedValue({
         id: 'consent-1',
         status: ConsentStatus.ACTIVE,
         consentDate: new Date(),
@@ -105,7 +115,7 @@ describe('ConsentsService', () => {
 
       const result = await service.grantConsent(testUserId, testBrokerId);
       expect(result.status).toBe(ConsentStatus.ACTIVE);
-      expect(prismaMock.consent.upsert).toHaveBeenCalled();
+      expect(prismaMock.consent.create).toHaveBeenCalled();
       expect(auditMock.logEvent).toHaveBeenCalledWith(
         testUserId,
         'CONSENT_GRANTED',
@@ -121,13 +131,37 @@ describe('ConsentsService', () => {
       );
     });
 
+    it('should grant consent by updating existing record if exists', async () => {
+      prismaMock.consent.findFirst.mockResolvedValue({
+        id: 'consent-existing-1',
+        status: ConsentStatus.REVOKED,
+      });
+      prismaMock.consent.update.mockResolvedValue({
+        id: 'consent-existing-1',
+        status: ConsentStatus.ACTIVE,
+        consentDate: new Date(),
+      });
+
+      const result = await service.grantConsent(testUserId, testBrokerId);
+      expect(result.status).toBe(ConsentStatus.ACTIVE);
+      expect(prismaMock.consent.update).toHaveBeenCalled();
+      expect(auditMock.logEvent).toHaveBeenCalledWith(
+        testUserId,
+        'CONSENT_GRANTED',
+        'Consent',
+        'consent-existing-1',
+        expect.any(Object),
+      );
+    });
+
     it('should resolve brokerId using code or prefixed code if UUID unique lookup fails', async () => {
       prismaMock.broker.findUnique.mockResolvedValue(null);
       prismaMock.broker.findFirst.mockResolvedValue({
         id: testBrokerId,
         code: 'ANGEL_ONE',
       });
-      prismaMock.consent.upsert.mockResolvedValue({
+      prismaMock.consent.findFirst.mockResolvedValue(null);
+      prismaMock.consent.create.mockResolvedValue({
         id: 'consent-1',
         status: ConsentStatus.ACTIVE,
         consentDate: new Date(),
@@ -163,7 +197,12 @@ describe('ConsentsService', () => {
       prismaMock.userBroker.findFirst.mockResolvedValue(null);
 
       const status = await service.getConsentStatus('user-1');
-      expect(status).toEqual({ active: false, broker: null, consentDate: null, status: 'NOT_GRANTED' });
+      expect(status).toEqual({
+        active: false,
+        broker: null,
+        consentDate: null,
+        status: 'NOT_GRANTED',
+      });
     });
 
     it('should return pending status if broker linked but no consent today', async () => {

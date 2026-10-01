@@ -72,8 +72,15 @@ describe('EmailProcessor', () => {
       where: { id: 'del-1' },
       include: { notification: true },
     });
-    expect(resendMock.sendEmail).toHaveBeenCalledWith('user@test.com', 'Fresh Title', 'Fresh Message');
-    expect(circuitMock.execute).toHaveBeenCalledWith('resend-notifications', expect.any(Function));
+    expect(resendMock.sendEmail).toHaveBeenCalledWith(
+      'user@test.com',
+      'Fresh Title',
+      'Fresh Message',
+    );
+    expect(circuitMock.execute).toHaveBeenCalledWith(
+      'resend-notifications',
+      expect.any(Function),
+    );
     expect(queueMock.updateJobStatus).toHaveBeenCalledWith(
       expect.any(String),
       'job-1',
@@ -100,8 +107,16 @@ describe('EmailProcessor', () => {
     await processor.process(job);
 
     expect(resendMock.sendEmail).not.toHaveBeenCalled(); // since execution fails in circuit breaker
-    expect(smtpMock.sendEmail).toHaveBeenCalledWith('user@test.com', 'Static Title', 'Static Message');
-    expect(metricsMock.incrementNotificationFailover).toHaveBeenCalledWith('resend', 'smtp', 'EMAIL');
+    expect(smtpMock.sendEmail).toHaveBeenCalledWith(
+      'user@test.com',
+      'Static Title',
+      'Static Message',
+    );
+    expect(metricsMock.incrementNotificationFailover).toHaveBeenCalledWith(
+      'resend',
+      'smtp',
+      'EMAIL',
+    );
   });
 
   it('should fail job and update delivery status to FAILED if both primary and secondary fail', async () => {

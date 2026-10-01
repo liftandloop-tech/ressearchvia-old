@@ -44,7 +44,10 @@ export class ExecutionRecoveryService implements OnApplicationBootstrap {
     private readonly metrics: MetricsService,
   ) {
     this.batchSize = this.configService.get<number>('RECOVERY_BATCH_SIZE', 500);
-    this.maxOrders = this.configService.get<number>('RECOVERY_MAX_ORDERS', 50_000);
+    this.maxOrders = this.configService.get<number>(
+      'RECOVERY_MAX_ORDERS',
+      50_000,
+    );
   }
 
   async onApplicationBootstrap(): Promise<void> {

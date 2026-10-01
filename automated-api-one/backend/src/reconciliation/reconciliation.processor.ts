@@ -15,11 +15,15 @@ export class ReconciliationProcessor extends WorkerHost {
 
   async process(job: Job<any, any, string>): Promise<any> {
     const { userId, runId } = job.data;
-    this.logger.log(`Processing sharded reconciliation job ${job.id} for user ${userId} in run ${runId}`);
+    this.logger.log(
+      `Processing sharded reconciliation job ${job.id} for user ${userId} in run ${runId}`,
+    );
     try {
       await this.reconciliationService.reconcileUserBroker(userId, runId);
     } catch (err) {
-      this.logger.error(`Failed to execute sharded reconciliation for user ${userId}: ${err.message}`);
+      this.logger.error(
+        `Failed to execute sharded reconciliation for user ${userId}: ${err.message}`,
+      );
       throw err;
     }
   }

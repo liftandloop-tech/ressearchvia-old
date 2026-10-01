@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { BrokerFactory } from '../../brokers/factory/broker.factory';
 import { BrokerType } from '../../brokers/interfaces/broker-type.enum';
@@ -34,6 +34,7 @@ export class OrderPlacementService {
 
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => BrokerFactory))
     private readonly brokerFactory: BrokerFactory,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly rateLimiter: BrokerRateLimiterService,
@@ -46,7 +47,10 @@ export class OrderPlacementService {
     private readonly riskService: RiskService,
     @Optional() private readonly egressService?: EgressService,
   ) {
-    this.brokerTimeoutMs = this.configService.get<number>('BROKER_TIMEOUT_MS', 5000);
+    this.brokerTimeoutMs = this.configService.get<number>(
+      'BROKER_TIMEOUT_MS',
+      5000,
+    );
   }
 
   /**
@@ -63,8 +67,19 @@ export class OrderPlacementService {
    *   5. Position cached in Redis on success
    */
   async placeEntryOrder(ctx: ExecutionContext): Promise<PlacementResult> {
-    const { snapshot, correlationId, signalId, symbol, exchange, side, entryPrice, stopLoss, targetPrice } = ctx;
-    const { userId, brokerId, brokerCode, brokerClientId, effectiveLot } = snapshot;
+    const {
+      snapshot,
+      correlationId,
+      signalId,
+      symbol,
+      exchange,
+      side,
+      entryPrice,
+      stopLoss,
+      targetPrice,
+    } = ctx;
+    const { userId, brokerId, brokerCode, brokerClientId, effectiveLot } =
+      snapshot;
 
     this.logger.log(
       `[${correlationId}] Placing entry order: user=${userId} symbol=${symbol} lot=${effectiveLot}`,
@@ -80,17 +95,28 @@ export class OrderPlacementService {
       snapshot.segmentId,
     );
     if (!riskDecision.approved) {
-      this.logger.warn(`[${correlationId}] Blocked by Risk Engine: ${riskDecision.reason}`);
-      return { success: false, reason: `Risk Engine block: ${riskDecision.reason}` };
+      this.logger.warn(
+        `[${correlationId}] Blocked by Risk Engine: ${riskDecision.reason}`,
+      );
+      return {
+        success: false,
+        reason: `Risk Engine block: ${riskDecision.reason}`,
+      };
     }
 
     // 1. Rate limiter — never place orders if broker is being hammered
     await this.rateLimiter.throttle(brokerCode);
 
     // 2. Resolve broker access token — Redis first, DB fallback
-    const tokenInfo = await this.resolveBrokerToken(userId, brokerId, brokerClientId);
+    const tokenInfo = await this.resolveBrokerToken(
+      userId,
+      brokerId,
+      brokerClientId,
+    );
     if (!tokenInfo || !tokenInfo.accessToken) {
-      this.logger.warn(`[${correlationId}] No active broker session for user ${userId}`);
+      this.logger.warn(
+        `[${correlationId}] No active broker session for user ${userId}`,
+      );
       return { success: false, reason: 'No active broker session' };
     }
 
@@ -103,11 +129,12 @@ export class OrderPlacementService {
       this.metrics.incrementOrdersPlaced();
       this.metrics.incrementBrokerCalls(brokerCode);
       this.metrics.incrementOrderPlacementAttempts();
-      const orderResult = await this.circuitBreaker.execute(
-        brokerCode,
-        () =>
-          Promise.race([
-            adapter.placeOrder(tokenInfo.accessToken!, brokerClientId, {
+      const orderResult = await this.circuitBreaker.execute(brokerCode, () =>
+        Promise.race([
+          adapter.placeOrder(
+            tokenInfo.accessToken!,
+            brokerClientId,
+            {
               symbol,
               exchange,
               side,
@@ -115,16 +142,25 @@ export class OrderPlacementService {
               orderType: ctx.orderType,
               price: entryPrice,
               triggerPrice: stopLoss,
-              squareoff: targetPrice ? Math.abs(entryPrice - targetPrice) : undefined,
+              squareoff: targetPrice
+                ? Math.abs(entryPrice - targetPrice)
+                : undefined,
               stoploss: stopLoss ? Math.abs(entryPrice - stopLoss) : undefined,
-            }, tokenInfo.proxyAgent),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new Error(`Broker API timeout after ${this.brokerTimeoutMs}ms`)),
-                this.brokerTimeoutMs,
-              ),
+            },
+            tokenInfo.proxyAgent,
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `Broker API timeout after ${this.brokerTimeoutMs}ms`,
+                  ),
+                ),
+              this.brokerTimeoutMs,
             ),
-          ]),
+          ),
+        ]),
       );
       if (orderResult.status === 'REJECTED' || !orderResult.brokerOrderId) {
         throw new Error(orderResult.message || 'Order rejected by broker');
@@ -242,7 +278,14 @@ export class OrderPlacementService {
       AuditEventType.TRADE_OPENED,
       'Trade',
       tradeId,
-      { correlationId, brokerOrderId, symbol, side, quantity: effectiveLot, entryPrice },
+      {
+        correlationId,
+        brokerOrderId,
+        symbol,
+        side,
+        quantity: effectiveLot,
+        entryPrice,
+      },
     );
 
     this.logger.log(
@@ -267,10 +310,14 @@ export class OrderPlacementService {
     brokerId: string,
     brokerClientId: string,
   ): Promise<{ accessToken: string | null; proxyAgent?: any }> {
-    this.logger.log(`[resolveBrokerToken] Resolving token & proxy for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`);
-    
+    this.logger.log(
+      `[resolveBrokerToken] Resolving token & proxy for user=${userId}, brokerId=${brokerId}, clientId=${brokerClientId}`,
+    );
+
     // Create HttpsProxyAgent helper inside this file or import it
-    const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+    const {
+      createProxyAgent,
+    } = require('../../infrastructure/proxy-agent.util');
 
     // Resolve dedicated egress proxy agent
     let proxyAgent: any = undefined;
@@ -278,7 +325,9 @@ export class OrderPlacementService {
       try {
         proxyAgent = await this.egressService.getProxyAgentForUser(userId);
       } catch (err: any) {
-        this.logger.warn(`[resolveBrokerToken] EgressService proxy resolution note for user ${userId}: ${err.message}`);
+        this.logger.warn(
+          `[resolveBrokerToken] EgressService proxy resolution note for user ${userId}: ${err.message}`,
+        );
       }
     }
 
@@ -287,13 +336,25 @@ export class OrderPlacementService {
       try {
         const sessionKey = RedisKeys.brokerSession(userId, brokerId);
         const cachedRaw = await this.redisService.getClient().get(sessionKey);
-        this.logger.log(`[resolveBrokerToken] Redis check for key=${sessionKey}: exists=${!!cachedRaw}`);
+        this.logger.log(
+          `[resolveBrokerToken] Redis check for key=${sessionKey}: exists=${!!cachedRaw}`,
+        );
         if (cachedRaw) {
-          const session = JSON.parse(cachedRaw) as { accessToken: string; proxyIp?: string; proxyPort?: number; proxyUsername?: string; proxyPassword?: string };
+          const session = JSON.parse(cachedRaw) as {
+            accessToken: string;
+            proxyIp?: string;
+            proxyPort?: number;
+            proxyUsername?: string;
+            proxyPassword?: string;
+          };
           if (session?.accessToken) {
-            this.logger.debug(`Broker session for user ${userId} resolved from Redis cache`);
+            this.logger.debug(
+              `Broker session for user ${userId} resolved from Redis cache`,
+            );
             if (!proxyAgent) {
-              const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+              const {
+                createProxyAgent,
+              } = require('../../infrastructure/proxy-agent.util');
               proxyAgent = createProxyAgent({
                 proxyIp: session.proxyIp || null,
                 proxyPort: session.proxyPort || null,
@@ -306,7 +367,9 @@ export class OrderPlacementService {
           }
         }
       } catch (err) {
-        this.logger.warn(`Redis broker session read failed for user ${userId}: ${err.message}. Falling back to DB.`);
+        this.logger.warn(
+          `Redis broker session read failed for user ${userId}: ${err.message}. Falling back to DB.`,
+        );
       }
     } else {
       this.logger.log(`[resolveBrokerToken] Redis is NOT healthy`);
@@ -316,11 +379,15 @@ export class OrderPlacementService {
     const userBroker = await this.prisma.userBroker.findFirst({
       where: { userId, brokerId },
     });
-    this.logger.log(`[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`);
+    this.logger.log(
+      `[resolveBrokerToken] DB fallback result: ${JSON.stringify(userBroker)}`,
+    );
 
     if (userBroker) {
       if (!proxyAgent) {
-        const { createProxyAgent } = require('../../infrastructure/proxy-agent.util');
+        const {
+          createProxyAgent,
+        } = require('../../infrastructure/proxy-agent.util');
         proxyAgent = createProxyAgent({
           proxyIp: userBroker.proxyIp,
           proxyPort: userBroker.proxyPort,

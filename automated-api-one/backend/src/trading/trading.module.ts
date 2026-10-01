@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
 
@@ -35,7 +35,7 @@ import { Queues } from '../infrastructure/queues/queue.constants';
     RiskModule,
     ConsentsModule,
     SubscriptionsModule,
-    BrokersModule,
+    forwardRef(() => BrokersModule),
     AuditModule,
     InfrastructureModule,
     StrategyModule,
@@ -55,6 +55,12 @@ import { Queues } from '../infrastructure/queues/queue.constants';
     OrderPlacementProcessor,
     OrderMonitoringProcessor,
   ],
-  exports: [TradingService, SignalOrchestratorService, PositionCacheService, PositionSizingService, OrderMonitoringService],
+  exports: [
+    TradingService,
+    SignalOrchestratorService,
+    PositionCacheService,
+    PositionSizingService,
+    OrderMonitoringService,
+  ],
 })
 export class TradingModule {}

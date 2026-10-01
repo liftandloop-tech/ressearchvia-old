@@ -16,12 +16,14 @@ async function main() {
     console.log(`Trades:     ${tradeCount}`);
     console.log(`Brokers:    ${brokerCount}`);
     console.log(`Signals:    ${signalCount}`);
-    
+
     if (userCount > 0) {
       const sampleUsers = await prisma.user.findMany({ take: 3 });
       console.log('\nSample Users:');
-      sampleUsers.forEach(u => {
-        console.log(`- ID: ${u.id} | Mobile: ${u.mobile} | Status: ${u.status}`);
+      sampleUsers.forEach((u) => {
+        console.log(
+          `- ID: ${u.id} | Mobile: ${u.mobile} | Status: ${u.status}`,
+        );
       });
     } else {
       console.log('\nNo users found in database.');

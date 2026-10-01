@@ -82,7 +82,7 @@ class AddStaffScreen extends StatelessWidget {
                   // Section 8: Compliance & KYC Documents (Visible when Editing)
                   Obx(() {
                     if (!controller.isEditing.value) return const SizedBox.shrink();
-                    final staff = controller.staffList.firstWhereOrNull(
+                    final staff = controller.editingStaff.value ?? controller.staffList.firstWhereOrNull(
                       (s) => s.id == controller.editingStaffId.value,
                     );
                     if (staff == null) return const SizedBox.shrink();
@@ -1483,6 +1483,8 @@ class AddStaffScreen extends StatelessWidget {
   ) {
     final hasFile = fileUrl != null && fileUrl.trim().isNotEmpty;
     final isVideo = type == 'video';
+    final isUploading = controller.uploadingDocType.value == type;
+    final cleanFileName = hasFile ? fileUrl.split('/').last : '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1498,11 +1500,12 @@ class AddStaffScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: hasFile ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: hasFile ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0)),
             ),
             child: Icon(
               isVideo ? Icons.videocam_outlined : Icons.description_outlined,
               size: 20,
-              color: hasFile ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+              color: hasFile ? const Color(0xFF2563EB) : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(width: 14),
@@ -1522,26 +1525,36 @@ class AddStaffScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
-                        color: hasFile ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(4),
+                        color: hasFile ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: hasFile ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0)),
                       ),
-                      child: Text(
-                        hasFile ? 'Uploaded' : 'Pending',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: hasFile ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasFile) ...[
+                            const Icon(Icons.check_circle, size: 10, color: Color(0xFF059669)),
+                            const SizedBox(width: 3),
+                          ],
+                          Text(
+                            hasFile ? 'Uploaded' : 'Pending',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: hasFile ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  hasFile ? fileUrl : 'No document attached yet.',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  hasFile ? cleanFileName : (isVideo ? 'Supports MP4, MOV, AVI' : 'Supports PDF, JPG, PNG'),
+                  style: TextStyle(fontSize: 11, color: hasFile ? const Color(0xFF059669) : const Color(0xFF64748B)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1549,7 +1562,7 @@ class AddStaffScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          if (hasFile)
+          if (hasFile) ...[
             OutlinedButton.icon(
               onPressed: () {
                 final fullUrl = AppConfig.buildImageUrl(fileUrl);
@@ -1566,15 +1579,23 @@ class AddStaffScreen extends StatelessWidget {
               label: const Text('Preview', style: TextStyle(fontSize: 12)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF334155),
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
               ),
             ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
           ElevatedButton.icon(
-            onPressed: () => controller.pickAndUploadDoc(staff.id, type),
-            icon: Icon(hasFile ? Icons.sync : Icons.upload_file, size: 14),
-            label: Text(hasFile ? 'Replace' : 'Upload', style: const TextStyle(fontSize: 12)),
+            onPressed: isUploading ? null : () => controller.promptUploadChoice(context, staff.id, type),
+            icon: isUploading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+                  )
+                : Icon(hasFile ? Icons.swap_horiz : Icons.file_upload_outlined, size: 14),
+            label: Text(isUploading ? 'Uploading...' : (hasFile ? 'Replace' : 'Upload'), style: const TextStyle(fontSize: 12)),
             style: ElevatedButton.styleFrom(
               backgroundColor: hasFile ? const Color(0xFFF1F5F9) : const Color(0xFF2563EB),
               foregroundColor: hasFile ? const Color(0xFF334155) : Colors.white,

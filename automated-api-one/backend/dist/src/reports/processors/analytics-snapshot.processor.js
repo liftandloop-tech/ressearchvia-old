@@ -44,7 +44,7 @@ let AnalyticsSnapshotProcessor = AnalyticsSnapshotProcessor_1 = class AnalyticsS
         this.logger.log('Started 10 sharded analytics snapshot workers.');
     }
     async onModuleDestroy() {
-        await Promise.all(this.workers.map(w => w.close()));
+        await Promise.all(this.workers.map((w) => w.close()));
         this.logger.log('Closed 10 sharded analytics snapshot workers.');
     }
     async process(job) {
@@ -58,7 +58,9 @@ let AnalyticsSnapshotProcessor = AnalyticsSnapshotProcessor_1 = class AnalyticsS
         }
         const end = endDate ? new Date(endDate) : new Date(start.getTime());
         const queueName = job.queueName || job.queue?.name || '';
-        const shardIndex = queueName.includes('-') && queueName.startsWith('analytics-snapshot-') ? parseInt(queueName.split('analytics-snapshot-')[1], 10) : null;
+        const shardIndex = queueName.includes('-') && queueName.startsWith('analytics-snapshot-')
+            ? parseInt(queueName.split('analytics-snapshot-')[1], 10)
+            : null;
         this.logger.log(`Processing analytics snapshots rebuild/compilation from ${start.toISOString()} to ${end.toISOString()} on queue ${queueName}`);
         const getShard = (uId) => {
             let hash = 0;

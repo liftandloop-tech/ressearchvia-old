@@ -58,11 +58,17 @@ let HealthController = class HealthController {
         const signalQueue = this.queueService.getQueue('trade-execution');
         const orderQueue = this.queueService.getQueue('order-placement');
         const reportQueue = this.queueService.getQueue('report-generation');
-        const signalProcessingDepth = signalQueue ? await signalQueue.getWaitingCount() : 0;
-        const orderPlacementDepth = orderQueue ? await orderQueue.getWaitingCount() : 0;
+        const signalProcessingDepth = signalQueue
+            ? await signalQueue.getWaitingCount()
+            : 0;
+        const orderPlacementDepth = orderQueue
+            ? await orderQueue.getWaitingCount()
+            : 0;
         const reportDepth = reportQueue ? await reportQueue.getWaitingCount() : 0;
         let status = 'up';
-        if (signalProcessingDepth > 5000 || orderPlacementDepth > 5000 || reportDepth > 10000) {
+        if (signalProcessingDepth > 5000 ||
+            orderPlacementDepth > 5000 ||
+            reportDepth > 10000) {
             status = 'degraded';
         }
         return {

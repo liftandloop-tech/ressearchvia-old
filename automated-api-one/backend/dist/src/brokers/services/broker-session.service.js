@@ -80,7 +80,9 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
                 if (midnightIst < new Date())
                     midnightIst.setUTCDate(midnightIst.getUTCDate() + 1);
                 const ttlSeconds = Math.floor((midnightIst.getTime() - Date.now()) / 1000);
-                await this.redisService.getClient().set(sessionKey, payload, 'EX', ttlSeconds);
+                await this.redisService
+                    .getClient()
+                    .set(sessionKey, payload, 'EX', ttlSeconds);
                 this.logger.log(`[BrokerSession] Cached token and proxy credentials for user ${userId} in Redis (TTL: ${ttlSeconds}s)`);
             }
             catch (err) {
@@ -92,7 +94,9 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
             userBrokerId,
             tokenExpiry: session.tokenExpiry,
         });
-        if (brokerCode === client_1.BrokerCode.ZEBU && session.accessToken && this.zebuWebSocketService) {
+        if (brokerCode === client_1.BrokerCode.ZEBU &&
+            session.accessToken &&
+            this.zebuWebSocketService) {
             try {
                 const fullBroker = await this.prisma.userBroker.findUnique({
                     where: { id: userBrokerId },
@@ -182,7 +186,9 @@ let BrokerSessionService = BrokerSessionService_1 = class BrokerSessionService {
             brokerCode,
             userBrokerId: userBroker.id,
         });
-        if (brokerCode === client_1.BrokerCode.ZEBU && userBroker.brokerClientId && this.zebuWebSocketService) {
+        if (brokerCode === client_1.BrokerCode.ZEBU &&
+            userBroker.brokerClientId &&
+            this.zebuWebSocketService) {
             try {
                 this.zebuWebSocketService.disconnectUser(userBroker.brokerClientId);
             }

@@ -13,7 +13,12 @@ export class AnalyticsProcessor extends WorkerHost {
   }
 
   async process(
-    job: Job<{ userId: string; runId?: string; totalUsers?: number; rebuildHistory?: boolean }>,
+    job: Job<{
+      userId: string;
+      runId?: string;
+      totalUsers?: number;
+      rebuildHistory?: boolean;
+    }>,
   ): Promise<void> {
     const { userId, runId, totalUsers, rebuildHistory } = job.data;
     this.logger.log(
@@ -29,12 +34,23 @@ export class AnalyticsProcessor extends WorkerHost {
       await this.analyticsService.updatePerformanceRollups(userId);
 
       if (runId && totalUsers) {
-        await this.analyticsService.handleJobCompletion(runId, totalUsers, true);
+        await this.analyticsService.handleJobCompletion(
+          runId,
+          totalUsers,
+          true,
+        );
       }
     } catch (err) {
-      this.logger.error(`Failed processing analytics job for user ${userId}: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed processing analytics job for user ${userId}: ${err.message}`,
+        err.stack,
+      );
       if (runId && totalUsers) {
-        await this.analyticsService.handleJobCompletion(runId, totalUsers, false);
+        await this.analyticsService.handleJobCompletion(
+          runId,
+          totalUsers,
+          false,
+        );
       }
       throw err;
     }

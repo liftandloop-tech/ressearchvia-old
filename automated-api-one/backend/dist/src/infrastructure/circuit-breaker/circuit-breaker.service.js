@@ -55,7 +55,11 @@ let CircuitBreakerService = CircuitBreakerService_1 = class CircuitBreakerServic
         this.metrics.setBrokerCircuitState(broker, val);
     }
     async getCircuitInfo(broker) {
-        const defaultInfo = { state: CircuitState.CLOSED, failures: 0, lastChange: Date.now() };
+        const defaultInfo = {
+            state: CircuitState.CLOSED,
+            failures: 0,
+            lastChange: Date.now(),
+        };
         if (!this.redisService.isHealthy()) {
             this.logger.warn(`Redis is unhealthy. Using local memory circuit state for broker: ${broker}`);
             if (!this.memStates.has(broker)) {
@@ -84,7 +88,9 @@ let CircuitBreakerService = CircuitBreakerService_1 = class CircuitBreakerServic
             return;
         try {
             const redisKey = redis_keys_1.RedisKeys.circuitBreaker(broker);
-            await this.redisService.getClient().set(redisKey, JSON.stringify(info), 'EX', 86400);
+            await this.redisService
+                .getClient()
+                .set(redisKey, JSON.stringify(info), 'EX', 86400);
         }
         catch (err) {
             this.logger.error(`Failed to save circuit info to Redis: ${err.message}`);
@@ -94,7 +100,8 @@ let CircuitBreakerService = CircuitBreakerService_1 = class CircuitBreakerServic
         const info = await this.getCircuitInfo(broker);
         let state = info.state;
         let lastChange = info.lastChange;
-        if (state === CircuitState.OPEN && Date.now() - lastChange >= this.cooldownMs) {
+        if (state === CircuitState.OPEN &&
+            Date.now() - lastChange >= this.cooldownMs) {
             this.logger.log(`Circuit for broker ${broker} transitioning from OPEN to HALF_OPEN (cooldown expired)`);
             state = CircuitState.HALF_OPEN;
             const duration = Date.now() - lastChange;
@@ -134,7 +141,8 @@ let CircuitBreakerService = CircuitBreakerService_1 = class CircuitBreakerServic
     async onFailure(broker, currentState, info, error) {
         const failures = info.failures + 1;
         this.logger.warn(`Failure recorded for broker ${broker}. Consecutive failures: ${failures}. Error: ${error.message}`);
-        if (currentState === CircuitState.HALF_OPEN || failures >= this.failureThreshold) {
+        if (currentState === CircuitState.HALF_OPEN ||
+            failures >= this.failureThreshold) {
             this.logger.error(`Circuit for broker ${broker} is now OPEN. Requests will be blocked for 60 seconds.`);
             this.metrics.incrementBrokerCircuitOpen(broker);
             await this.setCircuitInfo(broker, {

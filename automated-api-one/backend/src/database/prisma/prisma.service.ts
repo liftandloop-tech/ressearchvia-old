@@ -175,7 +175,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // Delegate transactions and raw queries
   get $transaction() {
-    return (this.client.$transaction as any).bind(this.client);
+    return this.client.$transaction.bind(this.client);
   }
   get $executeRaw() {
     return this.client.$executeRaw.bind(this.client);

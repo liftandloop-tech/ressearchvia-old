@@ -15,7 +15,9 @@ export class FcmProvider implements PushProvider {
     if (token.includes('push-fail')) {
       throw new Error('FCM failed to send push notification');
     }
-    this.logger.log(`[Fcm Mock] Sending push to token ${token}: ${title} - ${body}`);
+    this.logger.log(
+      `[Fcm Mock] Sending push to token ${token}: ${title} - ${body}`,
+    );
     return `fcm-${Date.now()}`;
   }
 }

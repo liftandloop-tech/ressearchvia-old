@@ -63,6 +63,9 @@ dependencies {
     // Play Feature Delivery for Flutter's deferred components support (Android 14 compatible)
     implementation("com.google.android.play:feature-delivery:2.1.0")
     implementation("com.google.android.play:feature-delivery-ktx:2.1.0")
+    // Play App Update for Google Play In-App Updates
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     implementation("com.github.digio-tech:protean-esign:v3.2")
     implementation(platform("com.google.firebase:firebase-bom:34.8.0"))

@@ -28,16 +28,14 @@ export class IdempotencyService {
 
     try {
       // 1. Redis-first SETNX check
-      const result = await this.redisService.getClient().set(
-        redisKey,
-        '1',
-        'EX',
-        ttlSeconds,
-        'NX',
-      );
+      const result = await this.redisService
+        .getClient()
+        .set(redisKey, '1', 'EX', ttlSeconds, 'NX');
 
       if (result !== 'OK') {
-        this.logger.warn(`Duplicate request detected via Redis for key: ${key}`);
+        this.logger.warn(
+          `Duplicate request detected via Redis for key: ${key}`,
+        );
         return false;
       }
 
@@ -54,15 +52,22 @@ export class IdempotencyService {
       } catch (dbErr) {
         // Handle Prisma unique constraint violation (P2002)
         if (dbErr.code === 'P2002') {
-          this.logger.warn(`Duplicate request detected via Database for key: ${key}`);
+          this.logger.warn(
+            `Duplicate request detected via Database for key: ${key}`,
+          );
           // Rollback Redis lock since DB already recorded completion/attempt
-          await this.redisService.getClient().del(redisKey).catch(() => {});
+          await this.redisService
+            .getClient()
+            .del(redisKey)
+            .catch(() => {});
           return false;
         }
         throw dbErr;
       }
     } catch (err) {
-      this.logger.error(`Idempotency check failed for key: ${key}. Error: ${err.message}`);
+      this.logger.error(
+        `Idempotency check failed for key: ${key}. Error: ${err.message}`,
+      );
       throw err;
     }
   }
@@ -77,7 +82,9 @@ export class IdempotencyService {
         data: { status },
       });
     } catch (err) {
-      this.logger.error(`Failed to update idempotency status for key: ${key}. Error: ${err.message}`);
+      this.logger.error(
+        `Failed to update idempotency status for key: ${key}. Error: ${err.message}`,
+      );
     }
   }
 

@@ -20,7 +20,10 @@ export class TradingService {
    * Triggers the trading engine for an incoming signal.
    * This is the primary entry point called by SignalsService on signal publication.
    */
-  async executeSignal(signalId: string, segmentId: string): Promise<{
+  async executeSignal(
+    signalId: string,
+    segmentId: string,
+  ): Promise<{
     success: boolean;
     state: SignalState;
     correlationId: string;
@@ -28,7 +31,9 @@ export class TradingService {
     successUsers: number;
     rejectedUsers: number;
   }> {
-    this.logger.log(`Trading engine triggered: signalId=${signalId} segmentId=${segmentId}`);
+    this.logger.log(
+      `Trading engine triggered: signalId=${signalId} segmentId=${segmentId}`,
+    );
 
     const result = await this.orchestrator.processSignal(signalId);
 

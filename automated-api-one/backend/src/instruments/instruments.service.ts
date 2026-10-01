@@ -33,7 +33,9 @@ export class InstrumentsService implements OnModuleInit {
           `Loaded ${this.instruments.length} instruments successfully.`,
         );
       } else {
-        this.logger.error('Invalid response format from Angel One scrip master');
+        this.logger.error(
+          'Invalid response format from Angel One scrip master',
+        );
       }
     } catch (err) {
       this.logger.error(`Failed to load instruments list: ${err.message}`);
@@ -48,7 +50,8 @@ export class InstrumentsService implements OnModuleInit {
     return this.instruments
       .filter((inst) => {
         const matchesQuery =
-          (inst.symbol && inst.symbol.toLowerCase().includes(normalizedQuery)) ||
+          (inst.symbol &&
+            inst.symbol.toLowerCase().includes(normalizedQuery)) ||
           (inst.name && inst.name.toLowerCase().includes(normalizedQuery));
         const matchesExchange = exchange
           ? inst.exch_seg === exchange.toUpperCase()
@@ -58,14 +61,18 @@ export class InstrumentsService implements OnModuleInit {
       .slice(0, 50); // Limit to 50 results for performance
   }
 
-  findInstrument(symbol: string, exchange: string): { token: string; symbol: string } | null {
+  findInstrument(
+    symbol: string,
+    exchange: string,
+  ): { token: string; symbol: string } | null {
     if (!this.isLoaded || !symbol) return null;
     const upperSymbol = symbol.trim().toUpperCase();
     const upperExchange = (exchange || 'NSE').trim().toUpperCase();
 
     // 1. Direct exact symbol match (e.g. "SBIN-EQ", "NIFTY24OCT24000CE")
     let inst = this.instruments.find(
-      (i) => i.symbol?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange,
+      (i) =>
+        i.symbol?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange,
     );
     if (inst) {
       return { token: inst.token, symbol: inst.symbol };
@@ -75,7 +82,8 @@ export class InstrumentsService implements OnModuleInit {
     if (upperExchange === 'NSE' || upperExchange === 'BSE') {
       const eqSymbol = `${upperSymbol}-EQ`;
       inst = this.instruments.find(
-        (i) => i.symbol?.toUpperCase() === eqSymbol && i.exch_seg === upperExchange,
+        (i) =>
+          i.symbol?.toUpperCase() === eqSymbol && i.exch_seg === upperExchange,
       );
       if (inst) {
         return { token: inst.token, symbol: inst.symbol };
@@ -83,7 +91,10 @@ export class InstrumentsService implements OnModuleInit {
 
       // Check by name if symbol has -EQ
       inst = this.instruments.find(
-        (i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange && i.symbol?.endsWith('-EQ'),
+        (i) =>
+          i.name?.toUpperCase() === upperSymbol &&
+          i.exch_seg === upperExchange &&
+          i.symbol?.endsWith('-EQ'),
       );
       if (inst) {
         return { token: inst.token, symbol: inst.symbol };
@@ -92,7 +103,8 @@ export class InstrumentsService implements OnModuleInit {
 
     // 3. Fallback: match by name
     inst = this.instruments.find(
-      (i) => i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange,
+      (i) =>
+        i.name?.toUpperCase() === upperSymbol && i.exch_seg === upperExchange,
     );
     if (inst) {
       return { token: inst.token, symbol: inst.symbol };
@@ -106,7 +118,11 @@ export class InstrumentsService implements OnModuleInit {
     return inst ? inst.token : null;
   }
 
-  async getLtp(symbol: string, exchange: string, symbolToken?: string): Promise<any> {
+  async getLtp(
+    symbol: string,
+    exchange: string,
+    symbolToken?: string,
+  ): Promise<any> {
     if (!this.angelOneService) {
       this.logger.warn('AngelOneService not available for LTP fetch');
       return { error: 'Market data service not ready' };
@@ -115,10 +131,17 @@ export class InstrumentsService implements OnModuleInit {
     const resolvedInst = this.findInstrument(symbol, exchange);
     const resolvedToken = symbolToken || resolvedInst?.token || '';
     const tradingSymbol = resolvedInst?.symbol || symbol;
-    const result = await this.angelOneService.getLtp(exchange, tradingSymbol, undefined, resolvedToken);
+    const result = await this.angelOneService.getLtp(
+      exchange,
+      tradingSymbol,
+      undefined,
+      resolvedToken,
+    );
 
     if (!result) {
-      return { error: 'Could not fetch LTP. Symbol may not exist or market is closed.' };
+      return {
+        error: 'Could not fetch LTP. Symbol may not exist or market is closed.',
+      };
     }
 
     return {

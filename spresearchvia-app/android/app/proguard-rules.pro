@@ -11,9 +11,13 @@
 -keep class io.flutter.plugins.** { *; }
 -keep class com.google.firebase.** { *; }
 
-## Play Core for Flutter deferred components
+## Play Core for Flutter deferred components & App Update
 -keep class com.google.android.play.core.** { *; }
+-keep class com.google.android.play.core.appupdate.** { *; }
+-keep class com.google.android.play.core.install.** { *; }
 -dontwarn com.google.android.play.core.**
+-dontwarn com.google.android.play.core.appupdate.**
+-dontwarn com.google.android.play.core.install.**
 
 ## Razorpay
 -keepclassmembers class * {

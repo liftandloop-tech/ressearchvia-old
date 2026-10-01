@@ -34,7 +34,9 @@ describe('NotificationsService', () => {
       shouldDeduplicate: jest.fn().mockResolvedValue(false),
     };
     templateServiceMock = {
-      generateTemplate: jest.fn().mockReturnValue({ title: 'Test Title', body: 'Test Body' }),
+      generateTemplate: jest
+        .fn()
+        .mockReturnValue({ title: 'Test Title', body: 'Test Body' }),
     };
     websocketServiceMock = {
       broadcast: jest.fn().mockResolvedValue(true),
@@ -54,7 +56,10 @@ describe('NotificationsService', () => {
         NotificationsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: NotificationRateLimiterService, useValue: rateLimiterMock },
-        { provide: NotificationDeduplicationService, useValue: deduplicationMock },
+        {
+          provide: NotificationDeduplicationService,
+          useValue: deduplicationMock,
+        },
         { provide: NotificationTemplateService, useValue: templateServiceMock },
         { provide: WebsocketService, useValue: websocketServiceMock },
         { provide: QueueService, useValue: queueServiceMock },
@@ -144,7 +149,11 @@ describe('NotificationsService', () => {
     });
 
     it('should deliver notifications immediately when quiet hours are disabled', async () => {
-      await service.sendNotification('user-123', NotificationEvent.ORDER_PLACED, { symbol: 'AAPL' });
+      await service.sendNotification(
+        'user-123',
+        NotificationEvent.ORDER_PLACED,
+        { symbol: 'AAPL' },
+      );
 
       expect(prismaMock.notification.create).toHaveBeenCalled();
       expect(prismaMock.notificationDelivery.create).toHaveBeenCalled();
@@ -156,7 +165,11 @@ describe('NotificationsService', () => {
     it('should skip rate-limited channels', async () => {
       rateLimiterMock.isRateLimited.mockResolvedValue(true);
 
-      await service.sendNotification('user-123', NotificationEvent.ORDER_PLACED, { symbol: 'AAPL' });
+      await service.sendNotification(
+        'user-123',
+        NotificationEvent.ORDER_PLACED,
+        { symbol: 'AAPL' },
+      );
 
       expect(queueServiceMock.addJob).not.toHaveBeenCalled();
       expect(metricsMock.incrementNotificationRateLimited).toHaveBeenCalled();
@@ -165,10 +178,14 @@ describe('NotificationsService', () => {
     it('should skip deduplicated notifications', async () => {
       deduplicationMock.shouldDeduplicate.mockResolvedValue(true);
 
-      const result = await service.sendNotification('user-123', NotificationEvent.ORDER_PLACED, {
-        symbol: 'AAPL',
-        fingerprint: 'dup-key',
-      });
+      const result = await service.sendNotification(
+        'user-123',
+        NotificationEvent.ORDER_PLACED,
+        {
+          symbol: 'AAPL',
+          fingerprint: 'dup-key',
+        },
+      );
 
       expect(result).toEqual({});
       expect(prismaMock.notification.create).not.toHaveBeenCalled();
@@ -191,7 +208,11 @@ describe('NotificationsService', () => {
       jest.useFakeTimers().setSystemTime(mockDate);
 
       // Non-critical alert
-      await service.sendNotification('user-123', NotificationEvent.PAYMENT_RECEIVED, { amount: 500 });
+      await service.sendNotification(
+        'user-123',
+        NotificationEvent.PAYMENT_RECEIVED,
+        { amount: 500 },
+      );
 
       // Delivery should be created with scheduledFor in the future
       expect(prismaMock.notificationDelivery.create).toHaveBeenCalledWith(
@@ -204,7 +225,9 @@ describe('NotificationsService', () => {
 
       // Should NOT enqueue to BullMQ queues immediately
       expect(queueServiceMock.addJob).not.toHaveBeenCalled();
-      expect(metricsMock.incrementNotificationQuietHourDeferrals).toHaveBeenCalled();
+      expect(
+        metricsMock.incrementNotificationQuietHourDeferrals,
+      ).toHaveBeenCalled();
 
       jest.useRealTimers();
     });
@@ -223,7 +246,11 @@ describe('NotificationsService', () => {
       jest.useFakeTimers().setSystemTime(mockDate);
 
       // RISK_BLOCKED is critical and bypasses quiet hours
-      await service.sendNotification('user-123', NotificationEvent.RISK_BLOCKED, { reason: 'Violation' });
+      await service.sendNotification(
+        'user-123',
+        NotificationEvent.RISK_BLOCKED,
+        { reason: 'Violation' },
+      );
 
       // Should enqueue to queues immediately
       expect(queueServiceMock.addJob).toHaveBeenCalled();
@@ -234,17 +261,36 @@ describe('NotificationsService', () => {
     it('should aggregate notifications with the same batchKey', async () => {
       // 1. Create first notification
       prismaMock.notification.findFirst.mockResolvedValue(null);
-      await service.sendNotification('user-123', NotificationEvent.TARGET_HIT, { symbol: 'AAPL' }, 'batch-key');
+      await service.sendNotification(
+        'user-123',
+        NotificationEvent.TARGET_HIT,
+        { symbol: 'AAPL' },
+        'batch-key',
+      );
 
       // 2. Mock existing notification for second trigger
       prismaMock.notification.findFirst.mockResolvedValue({
         id: 'notif-555',
         message: '1 targets hit',
-        deliveries: [{ id: 'del-1', status: DeliveryStatus.PENDING, scheduledFor: new Date(Date.now() + 30000) }],
+        deliveries: [
+          {
+            id: 'del-1',
+            status: DeliveryStatus.PENDING,
+            scheduledFor: new Date(Date.now() + 30000),
+          },
+        ],
       });
-      prismaMock.notification.update.mockResolvedValue({ id: 'notif-555', message: '2 targets hit' });
+      prismaMock.notification.update.mockResolvedValue({
+        id: 'notif-555',
+        message: '2 targets hit',
+      });
 
-      await service.sendNotification('user-123', NotificationEvent.TARGET_HIT, { symbol: 'AAPL' }, 'batch-key');
+      await service.sendNotification(
+        'user-123',
+        NotificationEvent.TARGET_HIT,
+        { symbol: 'AAPL' },
+        'batch-key',
+      );
 
       expect(prismaMock.notification.update).toHaveBeenCalledWith(
         expect.objectContaining({

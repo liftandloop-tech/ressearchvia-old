@@ -36,35 +36,51 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<({bool success, String? message})> uploadApplicantFile(String id, String type, List<int> bytes, String filename) async {
+  Future<({bool success, String? message, StaffModel? applicant})> uploadApplicantFile(String id, String type, List<int> bytes, String filename) async {
     try {
       final formData = FormData({
         'file': MultipartFile(bytes, filename: filename),
       });
       final response = await post('/staff/applicant/upload-doc/$id?type=$type', formData);
       if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
+        StaffModel? applicant;
+        if (response.body != null && response.body['data'] != null && response.body['data']['applicant'] != null) {
+          try {
+            applicant = StaffModel.fromJson(response.body['data']['applicant'] as Map<String, dynamic>);
+          } catch (e) {
+            debugPrint('Error parsing applicant from upload response: $e');
+          }
+        }
+        return (success: true, message: response.body?['message']?.toString(), applicant: applicant);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'File upload failed');
+      return (success: false, message: response.body?['message']?.toString() ?? 'File upload failed', applicant: null);
     } catch (e) {
       debugPrint('Error uploading applicant file: $e');
-      return (success: false, message: e.toString());
+      return (success: false, message: e.toString(), applicant: null);
     }
   }
 
-  Future<({bool success, String? message})> uploadApplicantVideo(String id, List<int> bytes, String filename) async {
+  Future<({bool success, String? message, StaffModel? applicant})> uploadApplicantVideo(String id, List<int> bytes, String filename) async {
     try {
       final formData = FormData({
         'file': MultipartFile(bytes, filename: filename),
       });
       final response = await post('/staff/applicant/upload-video/$id', formData);
       if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
+        StaffModel? applicant;
+        if (response.body != null && response.body['data'] != null && response.body['data']['applicant'] != null) {
+          try {
+            applicant = StaffModel.fromJson(response.body['data']['applicant'] as Map<String, dynamic>);
+          } catch (e) {
+            debugPrint('Error parsing applicant from video response: $e');
+          }
+        }
+        return (success: true, message: response.body?['message']?.toString(), applicant: applicant);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'Video upload failed');
+      return (success: false, message: response.body?['message']?.toString() ?? 'Video upload failed', applicant: null);
     } catch (e) {
       debugPrint('Error uploading applicant video: $e');
-      return (success: false, message: e.toString());
+      return (success: false, message: e.toString(), applicant: null);
     }
   }
 

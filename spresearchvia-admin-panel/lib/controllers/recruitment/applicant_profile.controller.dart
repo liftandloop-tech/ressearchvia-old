@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import '../../services/applicant.service.dart';
 import '../../services/staff.service.dart';
 import '../../services/role_permission.service.dart';
@@ -8,6 +9,7 @@ import '../../models/staff.model.dart';
 import '../../models/role.model.dart';
 import '../staff/staff.controller.dart';
 import '../staff/staff_management.controller.dart';
+import 'applicants_list.controller.dart';
 
 class ApplicantProfileController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
@@ -15,8 +17,15 @@ class ApplicantProfileController extends GetxController {
   final RolePermissionService _rolePermissionService = Get.put(RolePermissionService());
 
   var isLoading = false.obs;
+  var uploadingDocType = ''.obs;
   var applicantId = ''.obs;
   var applicant = Rxn<StaffModel>();
+
+  // Approval validation errors & state
+  final roleError = ''.obs;
+  final supervisorError = ''.obs;
+  final mpinError = ''.obs;
+  final isApproving = false.obs;
 
   // OTP field controllers
   final mobileOtpController = TextEditingController();
@@ -31,7 +40,7 @@ class ApplicantProfileController extends GetxController {
     super.onInit();
     applicantId.value = Get.parameters['id'] ?? '';
     if (applicantId.value.isNotEmpty) {
-      fetchDetails();
+      fetchDetails(showLoading: true);
     }
     fetchRolesAndSupervisors();
   }
@@ -58,23 +67,24 @@ class ApplicantProfileController extends GetxController {
     }
   }
 
-  Future<void> fetchDetails() async {
-    isLoading.value = true;
+  Future<void> fetchDetails({bool showLoading = false}) async {
+    if (showLoading) isLoading.value = true;
     try {
       final res = await _applicantService.getApplicantDetails(applicantId.value);
       if (res.error == null) {
         applicant.value = res.applicant;
+        applicant.refresh();
       } else {
-        Get.snackbar('Error', res.error!, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', res.error!, backgroundColor: Colors.red.withValues(alpha: 0.1));
       }
     } finally {
-      isLoading.value = false;
+      if (showLoading) isLoading.value = false;
     }
   }
 
   Future<void> verifyOtps() async {
     if (mobileOtpController.text.trim().isEmpty || emailOtpController.text.trim().isEmpty) {
-      Get.snackbar('Alert', 'Please enter both OTPs', backgroundColor: Colors.orange.withOpacity(0.1));
+      Get.snackbar('Alert', 'Please enter both OTPs', backgroundColor: Colors.orange.withValues(alpha: 0.1));
       return;
     }
 
@@ -87,41 +97,239 @@ class ApplicantProfileController extends GetxController {
       );
 
       if (res.success) {
-        fetchDetails();
-        Get.snackbar('Success', 'Verification complete', backgroundColor: Colors.green.withOpacity(0.1));
+        await fetchDetails(showLoading: false);
+        applicant.refresh();
+        Get.snackbar('Success', 'Verification complete', backgroundColor: Colors.green.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Verification Failed', res.message ?? 'Invalid OTPs', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Verification Failed', res.message ?? 'Invalid OTPs', backgroundColor: Colors.red.withValues(alpha: 0.1));
       }
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> uploadDoc(String type) async {
+  Future<void> uploadDoc(String type, {bool fromCamera = false}) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: type == 'video' ? ['mp4', 'mov', 'avi'] : ['jpg', 'jpeg', 'png', 'pdf'],
-      );
+      FilePickerResult? result;
+      if (type == 'video') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.video,
+          withData: true,
+        );
+      } else if (fromCamera || type == 'photo') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          withData: true,
+        );
+      } else {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'webp'],
+          withData: true,
+        );
+      }
 
-      if (result != null && result.files.single.bytes != null) {
-        isLoading.value = true;
-        final res = type == 'video'
-            ? await _applicantService.uploadApplicantVideo(applicantId.value, result.files.single.bytes!, result.files.single.name)
-            : await _applicantService.uploadApplicantFile(applicantId.value, type, result.files.single.bytes!, result.files.single.name);
+      if (result != null && result.files.isNotEmpty) {
+        final pickedFile = result.files.single;
+        final bytes = pickedFile.bytes;
 
-        isLoading.value = false;
+        if (bytes == null || bytes.isEmpty) {
+          Get.snackbar('Upload Failed', 'Could not read file data. Please try again.', backgroundColor: Colors.red.withValues(alpha: 0.1));
+          return;
+        }
+
+        // Sanitize filename to avoid 'blob' or missing extension camera issues
+        String fileName = pickedFile.name.trim();
+        final isVideo = type == 'video';
+        final hasExt = fileName.contains('.') && fileName.split('.').last.trim().isNotEmpty;
+        if (!hasExt || fileName.toLowerCase() == 'blob' || fileName.toLowerCase() == 'image') {
+          final defaultExt = isVideo ? 'mp4' : 'jpg';
+          fileName = '${type}_${DateTime.now().millisecondsSinceEpoch}.$defaultExt';
+        }
+
+        uploadingDocType.value = type;
+        final res = isVideo
+            ? await _applicantService.uploadApplicantVideo(applicantId.value, bytes, fileName)
+            : await _applicantService.uploadApplicantFile(applicantId.value, type, bytes, fileName);
+
+        uploadingDocType.value = '';
         if (res.success) {
-          fetchDetails();
-          Get.snackbar('Upload Success', '${type.toUpperCase()} file uploaded', backgroundColor: Colors.green.withOpacity(0.1));
+          if (res.applicant != null) {
+            applicant.value = res.applicant;
+          }
+          applicant.refresh();
+          // Update details in background to sync completeness status
+          fetchDetails(showLoading: false);
+          Get.snackbar('Upload Success', '${type.toUpperCase()} file uploaded', backgroundColor: Colors.green.withValues(alpha: 0.1));
         } else {
-          Get.snackbar('Upload Failed', res.message ?? 'An error occurred', backgroundColor: Colors.red.withOpacity(0.1));
+          Get.snackbar('Upload Failed', res.message ?? 'An error occurred during upload', backgroundColor: Colors.red.withValues(alpha: 0.1));
         }
       }
     } catch (e) {
-      isLoading.value = false;
-      Get.snackbar('Error', 'Failed to upload document: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      uploadingDocType.value = '';
+      Get.snackbar('Error', 'Failed to upload document: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
     }
+  }
+
+  void promptUploadChoice(BuildContext context, String type) {
+    final title = switch (type) {
+      'photo' => 'Profile Photo',
+      'video' => 'KYC Video Verification',
+      'pan' => 'PAN Card',
+      'aadhaar' => 'Aadhaar Card',
+      'nism' => 'NISM Certificate',
+      'education' => 'Highest Education Certificate',
+      'resume' => 'Resume / CV',
+      _ => type.toUpperCase(),
+    };
+
+    if (type == 'video') {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 6),
+                const Text('Choose how you would like to submit your verification video:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.videocam_rounded, color: Color(0xFF2563EB)),
+                  ),
+                  title: const Text('Record Video with Camera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Use direct camera to record video', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    uploadDoc(type, fromCamera: true);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.file_upload_outlined, color: Color(0xFF475569)),
+                  ),
+                  title: const Text('Choose Video File from Device', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Upload MP4, MOV, or AVI video', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    uploadDoc(type, fromCamera: false);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (type == 'photo') {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 6),
+                const Text('Take a live selfie or upload an existing photo:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF2563EB)),
+                  ),
+                  title: const Text('Take Photo with Camera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Capture direct photo with camera', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    uploadDoc(type, fromCamera: true);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.photo_library_outlined, color: Color(0xFF475569)),
+                  ),
+                  title: const Text('Select from Gallery / Files', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Upload JPG or PNG image', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    uploadDoc(type, fromCamera: false);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Documents (PAN, Aadhaar, NISM, Education, Resume)
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Upload $title', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+              const SizedBox(height: 6),
+              const Text('Take a photo of the document or select a file:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF2563EB)),
+                ),
+                title: const Text('Take Photo with Camera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Direct camera capture of document', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  uploadDoc(type, fromCamera: true);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.file_present_outlined, color: Color(0xFF475569)),
+                ),
+                title: const Text('Choose PDF or Image File', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Browse device for PDF, JPG, or PNG', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  uploadDoc(type, fromCamera: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // Approval Controllers and Methods
@@ -160,7 +368,23 @@ class ApplicantProfileController extends GetxController {
         .toList();
   }
 
+  void resetApproveForm() {
+    roleError.value = '';
+    supervisorError.value = '';
+    mpinError.value = '';
+    isApproving.value = false;
+    mpinController.clear();
+    selectedRoleId.value = null;
+    selectedRole.value = '';
+    selectedDepartment.value = '';
+    selectedSupervisorId.value = null;
+    selectedSupervisorName.value = null;
+    isViewOnly.value = false;
+    joiningDateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  }
+
   void updateRole(String roleId) {
+    roleError.value = '';
     selectedRoleId.value = roleId;
     final match = availableRoles.firstWhereOrNull((r) => r.id == roleId);
     if (match != null) {
@@ -170,6 +394,7 @@ class ApplicantProfileController extends GetxController {
   }
 
   void updateSupervisor(String? supervisorId) {
+    supervisorError.value = '';
     if (supervisorId == null) {
       selectedSupervisorId.value = null;
       selectedSupervisorName.value = null;
@@ -185,26 +410,36 @@ class ApplicantProfileController extends GetxController {
   }
 
   Future<bool> approveApplicant() async {
+    roleError.value = '';
+    supervisorError.value = '';
+    mpinError.value = '';
+
+    bool hasErrors = false;
     final hasRole = (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty) ||
         selectedRole.value.isNotEmpty;
     if (!hasRole) {
-      Get.snackbar('Validation Alert', 'Please select a Role for the new staff member', backgroundColor: Colors.orange.withOpacity(0.1));
-      return false;
+      roleError.value = 'Please select a role for the new staff member';
+      hasErrors = true;
     }
 
     final hasSupervisor = selectedSupervisorId.value != null && selectedSupervisorId.value!.isNotEmpty;
     if (!hasSupervisor) {
-      Get.snackbar('Validation Alert', 'Please select who this staff member will report to', backgroundColor: Colors.orange.withOpacity(0.1));
-      return false;
+      supervisorError.value = 'Please select reporting supervisor';
+      hasErrors = true;
     }
 
     final mpin = mpinController.text.trim();
-    if (mpin.isEmpty || mpin.length != 4) {
-      Get.snackbar('Validation Alert', 'Please enter a valid 4-digit MPIN', backgroundColor: Colors.orange.withOpacity(0.1));
+    if (mpin.isEmpty || mpin.length != 4 || int.tryParse(mpin) == null) {
+      mpinError.value = 'Enter a valid 4-digit numeric MPIN';
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      Get.snackbar('Validation Alert', 'Please fill all required fields marked with *', backgroundColor: Colors.orange.withValues(alpha: 0.1));
       return false;
     }
 
-    isLoading.value = true;
+    isApproving.value = true;
     try {
       final isDirectAdmin = selectedSupervisorId.value == 'admin';
       final data = {
@@ -222,22 +457,24 @@ class ApplicantProfileController extends GetxController {
 
       final success = await _applicantService.approveApplicant(applicantId.value, data);
       if (success) {
-        await fetchDetails();
+        await fetchDetails(showLoading: false);
+        applicant.refresh();
+        if (Get.isRegistered<ApplicantsListController>()) {
+          Get.find<ApplicantsListController>().fetchApplicants();
+        }
         if (Get.isRegistered<StaffController>()) {
           Get.find<StaffController>().fetchStaffList();
         }
         if (Get.isRegistered<StaffManagementController>()) {
           Get.find<StaffManagementController>().fetchStaff();
         }
-        Get.snackbar('Success', 'Applicant approved and promoted to staff member', backgroundColor: Colors.green.withOpacity(0.1));
         return true;
       } else {
-        Get.snackbar('Error', 'Failed to approve applicant', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', 'Failed to approve applicant', backgroundColor: Colors.red.withValues(alpha: 0.1));
         return false;
       }
     } finally {
-      isLoading.value = false;
+      isApproving.value = false;
     }
   }
 }
-

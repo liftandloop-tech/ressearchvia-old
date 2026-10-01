@@ -47,7 +47,13 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const closedTrades = await this.prisma.trade.findMany({
             where: {
                 userId,
-                status: { in: [client_1.TradeStatus.CLOSED, client_1.TradeStatus.TARGET_HIT, client_1.TradeStatus.STOPLOSS_HIT] },
+                status: {
+                    in: [
+                        client_1.TradeStatus.CLOSED,
+                        client_1.TradeStatus.TARGET_HIT,
+                        client_1.TradeStatus.STOPLOSS_HIT,
+                    ],
+                },
             },
         });
         const openPositions = await this.prisma.position.findMany({
@@ -64,7 +70,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const pastSnapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
             where: { userId, date: { lt: todayDate } },
         });
-        const allEquities = [...pastSnapshots.map((s) => Number(s.equity)), currentEquity];
+        const allEquities = [
+            ...pastSnapshots.map((s) => Number(s.equity)),
+            currentEquity,
+        ];
         const peakEquity = Math.max(initialCapital, ...allEquities);
         const drawdown = peakEquity - currentEquity;
         const openPositionsCount = openPositions.length;
@@ -124,7 +133,13 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const closedTrades = await this.prisma.trade.findMany({
             where: {
                 userId,
-                status: { in: [client_1.TradeStatus.CLOSED, client_1.TradeStatus.TARGET_HIT, client_1.TradeStatus.STOPLOSS_HIT] },
+                status: {
+                    in: [
+                        client_1.TradeStatus.CLOSED,
+                        client_1.TradeStatus.TARGET_HIT,
+                        client_1.TradeStatus.STOPLOSS_HIT,
+                    ],
+                },
             },
             orderBy: { createdAt: 'asc' },
         });
@@ -209,7 +224,13 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const closedTrades = await this.prisma.trade.findMany({
             where: {
                 userId,
-                status: { in: [client_1.TradeStatus.CLOSED, client_1.TradeStatus.TARGET_HIT, client_1.TradeStatus.STOPLOSS_HIT] },
+                status: {
+                    in: [
+                        client_1.TradeStatus.CLOSED,
+                        client_1.TradeStatus.TARGET_HIT,
+                        client_1.TradeStatus.STOPLOSS_HIT,
+                    ],
+                },
             },
         });
         const snapshots = await this.prisma.dailyPortfolioSnapshot.findMany({
@@ -224,7 +245,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const losingTrades = closedTrades.filter((t) => Number(t.pnl || 0) <= 0).length;
         const maxDrawdown = snapshots.reduce((max, s) => Math.max(max, Number(s.drawdown)), 0);
         const firstTradeAt = closedTrades.length > 0 ? closedTrades[0].createdAt : null;
-        const lastTradeAt = closedTrades.length > 0 ? closedTrades[closedTrades.length - 1].createdAt : null;
+        const lastTradeAt = closedTrades.length > 0
+            ? closedTrades[closedTrades.length - 1].createdAt
+            : null;
         await this.prisma.userPerformance.upsert({
             where: { userId },
             update: {
@@ -261,7 +284,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             const totalTradesForSegment = segTrades.length;
             const netPnL = segTrades.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
             const winningTradesSegment = segTrades.filter((t) => Number(t.pnl || 0) > 0).length;
-            const winRate = totalTradesForSegment > 0 ? (winningTradesSegment / totalTradesForSegment) * 100 : 0;
+            const winRate = totalTradesForSegment > 0
+                ? (winningTradesSegment / totalTradesForSegment) * 100
+                : 0;
             const userSeg = segments.find((s) => s.segmentId === segmentId);
             const capitalUsed = userSeg ? Number(userSeg.capital) : 0;
             let runningEquity = capitalUsed;
@@ -318,7 +343,8 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         });
         let initialCapital = segments.reduce((sum, seg) => sum + Number(seg.capital), 0);
         if (initialCapital <= 0) {
-            initialCapital = snapshots.length > 0 ? Number(snapshots[0].equity) : 100000;
+            initialCapital =
+                snapshots.length > 0 ? Number(snapshots[0].equity) : 100000;
         }
         if (!userPerf || snapshots.length === 0) {
             return {
@@ -349,7 +375,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const downsideDiffs = R.map((r) => Math.min(0, r - dailyRf));
         const downsideVariance = downsideDiffs.reduce((sum, d) => sum + Math.pow(d, 2), 0) / R.length;
         const downsideStdDev = Math.sqrt(downsideVariance);
-        const sortinoRatio = downsideStdDev > 0 ? ((meanR - dailyRf) / downsideStdDev) * Math.sqrt(252) : 0;
+        const sortinoRatio = downsideStdDev > 0
+            ? ((meanR - dailyRf) / downsideStdDev) * Math.sqrt(252)
+            : 0;
         const firstDate = new Date(snapshots[0].date);
         const latestDate = new Date(snapshots[snapshots.length - 1].date);
         const diffMs = Math.max(1000 * 60 * 60 * 24, latestDate.getTime() - firstDate.getTime());
@@ -383,7 +411,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 alpha[bName] = 0;
             }
         }
-        const winRate = Number(userPerf.totalTrades) > 0 ? Number(userPerf.winningTrades) / Number(userPerf.totalTrades) : 0;
+        const winRate = Number(userPerf.totalTrades) > 0
+            ? Number(userPerf.winningTrades) / Number(userPerf.totalTrades)
+            : 0;
         const profitFactor = Math.abs(Number(userPerf.grossLoss)) > 0
             ? Number(userPerf.grossProfit) / Math.abs(Number(userPerf.grossLoss))
             : Number(userPerf.grossProfit);
@@ -517,7 +547,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async handleJobCompletion(runId, totalUsers, success) {
         try {
-            const run = await this.prisma.analyticsJobRun.findUnique({ where: { id: runId } });
+            const run = await this.prisma.analyticsJobRun.findUnique({
+                where: { id: runId },
+            });
             if (!run)
                 return;
             const usersProcessed = run.usersProcessed + (success ? 1 : 0);
@@ -525,7 +557,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             const isDone = usersProcessed + failures >= totalUsers;
             const completedAt = isDone ? new Date() : null;
             const status = isDone
-                ? (failures === totalUsers ? client_1.AnalyticsRunStatus.FAILED : client_1.AnalyticsRunStatus.SUCCESS)
+                ? failures === totalUsers
+                    ? client_1.AnalyticsRunStatus.FAILED
+                    : client_1.AnalyticsRunStatus.SUCCESS
                 : client_1.AnalyticsRunStatus.RUNNING;
             await this.prisma.analyticsJobRun.update({
                 where: { id: runId },
@@ -534,7 +568,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                     failures,
                     status,
                     completedAt,
-                    durationMs: completedAt ? completedAt.getTime() - run.startedAt.getTime() : null,
+                    durationMs: completedAt
+                        ? completedAt.getTime() - run.startedAt.getTime()
+                        : null,
                 },
             });
             this.metrics.incrementAnalyticsUsersProcessed();

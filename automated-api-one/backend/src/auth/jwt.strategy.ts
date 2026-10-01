@@ -22,23 +22,38 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub?: string; _id?: string; mobile?: string; phone?: string }) {
+  async validate(payload: {
+    sub?: string;
+    _id?: string;
+    mobile?: string;
+    phone?: string;
+  }) {
     console.log('JWT Strategy Payload:', payload);
     const userId = payload.sub || payload._id;
     let mobile = payload.mobile || payload.phone;
 
     const userType = (payload as any).userType;
-    const isAdminType = userType && ['super_admin', 'admin', 'researcher'].includes(String(userType).toLowerCase());
+    const isAdminType =
+      userType &&
+      ['super_admin', 'admin', 'researcher'].includes(
+        String(userType).toLowerCase(),
+      );
 
     if (!mobile && isAdminType) {
       mobile = '0000000000';
     }
 
     if (!userId && !mobile) {
-      throw new UnauthorizedException('Token payload does not contain a valid user ID or mobile number');
+      throw new UnauthorizedException(
+        'Token payload does not contain a valid user ID or mobile number',
+      );
     }
 
-    const isUuid = userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+    const isUuid =
+      userId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        userId,
+      );
 
     if (isUuid) {
       // 1. Check if the ID belongs to an AdminUser first
@@ -90,6 +105,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       };
     }
 
-    throw new UnauthorizedException('Token payload does not contain a valid user ID or mobile number');
+    throw new UnauthorizedException(
+      'Token payload does not contain a valid user ID or mobile number',
+    );
   }
 }

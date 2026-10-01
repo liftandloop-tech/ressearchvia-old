@@ -18,7 +18,7 @@ async function main() {
         if (userCount > 0) {
             const sampleUsers = await prisma.user.findMany({ take: 3 });
             console.log('\nSample Users:');
-            sampleUsers.forEach(u => {
+            sampleUsers.forEach((u) => {
                 console.log(`- ID: ${u.id} | Mobile: ${u.mobile} | Status: ${u.status}`);
             });
         }

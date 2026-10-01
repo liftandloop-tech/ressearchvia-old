@@ -17,9 +17,13 @@ export class ReconciliationScheduler {
     this.logger.log('Triggering daily scheduled broker reconciliation run...');
     try {
       const runId = await this.reconciliationService.triggerReconciliation();
-      this.logger.log(`Scheduled reconciliation run triggered successfully: ${runId}`);
+      this.logger.log(
+        `Scheduled reconciliation run triggered successfully: ${runId}`,
+      );
     } catch (err) {
-      this.logger.error(`Failed to trigger scheduled reconciliation: ${err.message}`);
+      this.logger.error(
+        `Failed to trigger scheduled reconciliation: ${err.message}`,
+      );
     }
   }
 }

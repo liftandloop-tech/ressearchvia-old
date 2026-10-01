@@ -7,7 +7,10 @@ import { RedisService } from '../../infrastructure/redis/redis.service';
 import { Queues } from '../../infrastructure/queues/queue.constants';
 
 @Processor(Queues.ANALYTICS_SNAPSHOT)
-export class AnalyticsSnapshotProcessor extends WorkerHost implements OnModuleInit, OnModuleDestroy {
+export class AnalyticsSnapshotProcessor
+  extends WorkerHost
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(AnalyticsSnapshotProcessor.name);
   private workers: Worker[] = [];
 
@@ -26,7 +29,9 @@ export class AnalyticsSnapshotProcessor extends WorkerHost implements OnModuleIn
       const worker = new Worker(
         qName,
         async (job) => {
-          this.logger.log(`Dynamic worker processing sharded job ${job.id} on queue ${qName}`);
+          this.logger.log(
+            `Dynamic worker processing sharded job ${job.id} on queue ${qName}`,
+          );
           return this.processJob(job);
         },
         {
@@ -39,7 +44,7 @@ export class AnalyticsSnapshotProcessor extends WorkerHost implements OnModuleIn
   }
 
   async onModuleDestroy() {
-    await Promise.all(this.workers.map(w => w.close()));
+    await Promise.all(this.workers.map((w) => w.close()));
     this.logger.log('Closed 10 sharded analytics snapshot workers.');
   }
 
@@ -59,7 +64,10 @@ export class AnalyticsSnapshotProcessor extends WorkerHost implements OnModuleIn
 
     const end = endDate ? new Date(endDate) : new Date(start.getTime());
     const queueName = job.queueName || (job as any).queue?.name || '';
-    const shardIndex = queueName.includes('-') && queueName.startsWith('analytics-snapshot-') ? parseInt(queueName.split('analytics-snapshot-')[1], 10) : null;
+    const shardIndex =
+      queueName.includes('-') && queueName.startsWith('analytics-snapshot-')
+        ? parseInt(queueName.split('analytics-snapshot-')[1], 10)
+        : null;
 
     this.logger.log(
       `Processing analytics snapshots rebuild/compilation from ${start.toISOString()} to ${end.toISOString()} on queue ${queueName}`,
@@ -77,19 +85,35 @@ export class AnalyticsSnapshotProcessor extends WorkerHost implements OnModuleIn
     const currentDate = new Date(start.getTime());
     while (currentDate <= end) {
       const utcDate = new Date(
-        Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate(), 0, 0, 0, 0),
+        Date.UTC(
+          currentDate.getUTCFullYear(),
+          currentDate.getUTCMonth(),
+          currentDate.getUTCDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
       );
 
       if (userId && segmentId) {
         // Specific user and segment
-        await this.reportsService.calculateAndUpsertSnapshot(userId, segmentId, utcDate);
+        await this.reportsService.calculateAndUpsertSnapshot(
+          userId,
+          segmentId,
+          utcDate,
+        );
       } else if (userId) {
         // Specific user, all active segments
         const segments = await this.prisma.userSegment.findMany({
           where: { userId, status: 'ACTIVE' },
         });
         for (const us of segments) {
-          await this.reportsService.calculateAndUpsertSnapshot(userId, us.segmentId, utcDate);
+          await this.reportsService.calculateAndUpsertSnapshot(
+            userId,
+            us.segmentId,
+            utcDate,
+          );
         }
       } else {
         // Cursor-paginated batch of active user segments (take: 500)
@@ -117,7 +141,11 @@ export class AnalyticsSnapshotProcessor extends WorkerHost implements OnModuleIn
             }
 
             try {
-              await this.reportsService.calculateAndUpsertSnapshot(us.userId, us.segmentId, utcDate);
+              await this.reportsService.calculateAndUpsertSnapshot(
+                us.userId,
+                us.segmentId,
+                utcDate,
+              );
             } catch (err) {
               this.logger.error(
                 `Failed to calculate snapshot for user ${us.userId} segment ${us.segmentId} on ${utcDate.toISOString()}: ${err.message}`,
