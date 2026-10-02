@@ -57,9 +57,10 @@ class _AssignEntitlementsDialogState extends State<AssignEntitlementsDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(24),
+      child: SelectionArea(
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,8 +233,9 @@ class _AssignEntitlementsDialogState extends State<AssignEntitlementsDialog> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _handleSave() async {
     if (_selectedRegType == null && _selectedPlanIds.isEmpty) {

@@ -354,6 +354,14 @@ class StaffModel {
   final bool isEmailVerified;
   final bool isMobileVerified;
   final bool hasSignedAgreement;
+  final String agreementStatus;
+  final String? agreementRejectionReason;
+  final DateTime? agreementVerifiedAt;
+  final String? agreementVerifiedBy;
+  final DateTime? agreementRejectedAt;
+  final String? applicantId;
+  final String? serviceAgreementDocUrl;
+  final String? digioDocId;
   final String? agreementSignedAt;
   final String? agreementSignature;
   final String? photoUrl;
@@ -368,6 +376,7 @@ class StaffModel {
   final String? permanentAddress;
   final EmergencyContactModel? emergencyContact;
   final WalkInFormModel? walkInForm;
+  final String? telephonyExtension;
   final Map<String, dynamic>? rawJson;
 
   StaffModel({
@@ -396,6 +405,14 @@ class StaffModel {
     this.isEmailVerified = false,
     this.isMobileVerified = false,
     this.hasSignedAgreement = false,
+    this.agreementStatus = 'NOT_INITIATED',
+    this.agreementRejectionReason,
+    this.agreementVerifiedAt,
+    this.agreementVerifiedBy,
+    this.agreementRejectedAt,
+    this.applicantId,
+    this.serviceAgreementDocUrl,
+    this.digioDocId,
     this.agreementSignedAt,
     this.agreementSignature,
     this.photoUrl,
@@ -410,6 +427,7 @@ class StaffModel {
     this.permanentAddress,
     this.emergencyContact,
     this.walkInForm,
+    this.telephonyExtension,
     this.rawJson,
   });
 
@@ -485,6 +503,14 @@ class StaffModel {
       isEmailVerified: json['isEmailVerified'] ?? false,
       isMobileVerified: json['isMobileVerified'] ?? false,
       hasSignedAgreement: json['hasSignedAgreement'] == true || json['hasSignedAgreement'] == 'true',
+      agreementStatus: _safeString(json['agreementStatus']) ?? (json['hasSignedAgreement'] == true ? 'VERIFIED' : 'NOT_INITIATED'),
+      agreementRejectionReason: _safeString(json['agreementRejectionReason']),
+      agreementVerifiedAt: json['agreementVerifiedAt'] != null ? DateTime.tryParse(json['agreementVerifiedAt'].toString()) : null,
+      agreementVerifiedBy: _safeString(json['agreementVerifiedBy']),
+      agreementRejectedAt: json['agreementRejectedAt'] != null ? DateTime.tryParse(json['agreementRejectedAt'].toString()) : null,
+      applicantId: _safeString(json['applicantId']),
+      serviceAgreementDocUrl: _safeString(json['serviceAgreementDocUrl']) ?? _safeString(json['agreementPdfUrl']),
+      digioDocId: _safeString(json['digioDocId']),
       agreementSignedAt: _safeString(json['agreementSignedAt']),
       agreementSignature: _safeString(json['agreementSignature']),
       photoUrl: _safeString(json['photoUrl']),
@@ -501,12 +527,14 @@ class StaffModel {
       permanentAddress: _safeString(json['permanentAddress']),
       emergencyContact: contact,
       walkInForm: walkIn,
+      telephonyExtension: _safeString(json['telephonyExtension']),
       rawJson: json,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      if (telephonyExtension != null) 'telephonyExtension': telephonyExtension,
       'id': id,
       'staffId': staffId,
       'name': name,
@@ -523,6 +551,14 @@ class StaffModel {
       'mpin': mpin,
       'isViewOnly': isViewOnly,
       'hasSignedAgreement': hasSignedAgreement,
+      'agreementStatus': agreementStatus,
+      if (agreementRejectionReason != null) 'agreementRejectionReason': agreementRejectionReason,
+      if (agreementVerifiedAt != null) 'agreementVerifiedAt': agreementVerifiedAt!.toIso8601String(),
+      if (agreementVerifiedBy != null) 'agreementVerifiedBy': agreementVerifiedBy,
+      if (agreementRejectedAt != null) 'agreementRejectedAt': agreementRejectedAt!.toIso8601String(),
+      if (applicantId != null) 'applicantId': applicantId,
+      if (serviceAgreementDocUrl != null) 'serviceAgreementDocUrl': serviceAgreementDocUrl,
+      if (digioDocId != null) 'digioDocId': digioDocId,
       if (agreementSignedAt != null) 'agreementSignedAt': agreementSignedAt,
       if (agreementSignature != null) 'agreementSignature': agreementSignature,
       'panUrl': panUrl,

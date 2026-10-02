@@ -23,12 +23,15 @@ import 'package:spresearch_web/services/notification.service.dart';
 import 'package:spresearch_web/services/acquisition.service.dart';
 import 'package:spresearch_web/services/settings.service.dart';
 import 'package:spresearch_web/services/lead.service.dart';
+import 'package:spresearch_web/services/telephony.service.dart';
 import 'package:spresearch_web/services/permission_service.dart';
 import 'package:spresearch_web/services/refund.service.dart';
 
 import 'package:spresearch_web/services/api.service.dart';
 import 'package:spresearch_web/controllers/notifications/research_notification.controller.dart';
 import 'package:spresearch_web/controllers/dashboard/main_dashboard.controller.dart';
+import 'package:spresearch_web/controllers/users/user.controller.dart';
+import 'package:spresearch_web/controllers/users/users_table.controller.dart';
 
 import 'package:spresearch_web/services/inactivity.service.dart';
 
@@ -53,15 +56,19 @@ class InitialBinding extends Bindings {
     Get.put(AcquisitionService(), permanent: true);
     Get.put(SettingsService(), permanent: true);
     Get.put(LeadService(), permanent: true);
+    Get.put(TelephonyService(), permanent: true);
     Get.put(PermissionService(), permanent: true);
 
-    // Controllers (Essential root singletons)
+    // Controllers (Essential root singletons - permanently active to prevent disposed controller crashes)
     Get.put(AuthController(), permanent: true);
     Get.put(MainDashboardController(), permanent: true);
+    Get.put(UserManagementController(), permanent: true);
+    Get.put(UsersNavigationController(), permanent: true);
+    Get.put(UserController(), permanent: true);
+    Get.put(UsersTableController(), permanent: true);
 
     // Domain Controllers (Lazy loaded on-demand per route to prevent startup bottleneck)
     Get.lazyPut(() => DashboardManagementController(), fenix: true);
-    Get.lazyPut(() => UserManagementController(), fenix: true);
     Get.lazyPut(() => StaffManagementController(), fenix: true);
     Get.lazyPut(() => SubscriptionManagementController(), fenix: true);
     Get.lazyPut(() => ReportManagementController(), fenix: true);
@@ -69,7 +76,6 @@ class InitialBinding extends Bindings {
     Get.lazyPut(() => ResearchNotificationController(), fenix: true);
 
     // Navigation Controllers (Lazy loaded on-demand)
-    Get.lazyPut(() => UsersNavigationController(), fenix: true);
     Get.lazyPut(() => ReportsNavigationController(), fenix: true);
     Get.lazyPut(() => SubscriptionNavigationController(), fenix: true);
   }

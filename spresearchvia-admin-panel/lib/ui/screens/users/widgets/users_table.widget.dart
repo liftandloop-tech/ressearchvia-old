@@ -17,9 +17,15 @@ class UsersTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<UserController>();
-    final userManagementController = Get.find<UserManagementController>();
-    final tableController = Get.put(UsersTableController());
+    final controller = Get.isRegistered<UserController>()
+        ? Get.find<UserController>()
+        : Get.put(UserController(), permanent: true);
+    final userManagementController = Get.isRegistered<UserManagementController>()
+        ? Get.find<UserManagementController>()
+        : Get.put(UserManagementController(), permanent: true);
+    final tableController = Get.isRegistered<UsersTableController>()
+        ? Get.find<UsersTableController>()
+        : Get.put(UsersTableController(), permanent: true);
 
     return Obx(() {
       final authController = Get.find<AuthController>();

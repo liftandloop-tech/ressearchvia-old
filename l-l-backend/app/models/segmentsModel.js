@@ -3,11 +3,11 @@ import mongoose from "mongoose";
 const segmentsSchema = new mongoose.Schema({
     segmentName: {
         type: String,
-        require: true
+        required: true
     },
     segmentDiscription: {
         type: String,
-        require: true
+        required: true
     },
     segmentStatus: {
         type: String,

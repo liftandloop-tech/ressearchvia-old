@@ -23,18 +23,28 @@ const ensureDefaultFreshPool = async (companyId) => {
         if (!pool.creatorRole) pool.creatorRole = "Admin";
         await pool.save();
     }
-    // Auto-migrate any unassigned or null-pool leads to this default pool
-    await leadModel.updateMany(
-        {
-            $or: [
-                { companyId: companyId, leadPoolId: null },
-                { companyId: companyId, leadPoolId: { $exists: false } },
-                { leadPoolId: null },
-                { leadPoolId: { $exists: false } }
-            ]
-        },
-        { $set: { leadPoolId: pool._id, companyId: companyId } }
-    );
+    // Auto-migrate any unassigned or null-pool leads to this default pool only if needed
+    const hasUnassignedLeads = await leadModel.exists({
+        $or: [
+            { companyId: companyId, leadPoolId: null },
+            { companyId: companyId, leadPoolId: { $exists: false } },
+            { leadPoolId: null },
+            { leadPoolId: { $exists: false } }
+        ]
+    });
+    if (hasUnassignedLeads) {
+        await leadModel.updateMany(
+            {
+                $or: [
+                    { companyId: companyId, leadPoolId: null },
+                    { companyId: companyId, leadPoolId: { $exists: false } },
+                    { leadPoolId: null },
+                    { leadPoolId: { $exists: false } }
+                ]
+            },
+            { $set: { leadPoolId: pool._id, companyId: companyId } }
+        );
+    }
     return pool;
 };
 

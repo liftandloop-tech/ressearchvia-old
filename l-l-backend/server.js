@@ -65,8 +65,17 @@ partialCronJob()
 initScheduler();
 let server = http.createServer(app)
 
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[FATAL PROCESS GUARD] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err, origin) => {
+    console.error(`[FATAL PROCESS GUARD] Uncaught Exception (${origin}):`, err);
+});
+
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at:`)
     console.log(`- Local:   http://localhost:${PORT}`)
     console.log(`- Network: http://192.168.29.90:${PORT}`)
 })
+

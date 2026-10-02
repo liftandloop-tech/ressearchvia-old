@@ -560,31 +560,6 @@ class AddStaffScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Obx(
-                    () => InkWell(
-                      onTap: () => controller.isViewOnly.value = !controller.isViewOnly.value,
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: Checkbox(
-                                value: controller.isViewOnly.value,
-                                onChanged: (v) => controller.isViewOnly.value = v ?? false,
-                                activeColor: AppTheme.primaryBlue,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('View-Only Mode', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF1E293B))),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ],

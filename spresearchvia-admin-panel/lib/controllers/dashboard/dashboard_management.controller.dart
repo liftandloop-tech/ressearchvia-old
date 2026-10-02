@@ -100,7 +100,7 @@ class DashboardManagementController extends GetxController {
         }
 
         try {
-          final staff = await _staffService.getStaffList();
+          final staff = await _staffService.getStaffList(scoped: true);
           if (Get.isRegistered<AuthController>()) {
             final auth = Get.find<AuthController>();
             final user = auth.user.value;

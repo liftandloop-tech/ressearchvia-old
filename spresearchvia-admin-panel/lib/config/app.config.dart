@@ -39,6 +39,11 @@ class AppConfig {
         : 'http://localhost:8080/api';
   }
 
+  static String buildApiUrl(String path) {
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$apiBaseUrl$cleanPath';
+  }
+
   static String get automatedApiBaseUrl {
     const fromEnv = String.fromEnvironment('AUTOMATED_API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;

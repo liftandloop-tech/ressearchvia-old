@@ -71,9 +71,10 @@ class _MetricDataPopupState extends State<MetricDataPopup> {
       backgroundColor: Colors.white,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       elevation: 16,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: SizedBox(
+      child: SelectionArea(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
           width: dialogWidth,
           height: dialogHeight,
           child: Column(
@@ -122,6 +123,7 @@ class _MetricDataPopupState extends State<MetricDataPopup> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

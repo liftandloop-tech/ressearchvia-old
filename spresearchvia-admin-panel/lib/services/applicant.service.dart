@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'api.service.dart';
 import '../models/staff.model.dart';
+import '../models/applicant.model.dart';
 
 class ApplicantService extends ApiService {
   Future<({bool success, String? applicantId, String? message})> registerApplicant(Map<String, dynamic> data) async {
@@ -84,9 +85,15 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<({List<StaffModel> applicants, String? error})> getApplicantsList() async {
+  Future<({List<StaffModel> applicants, String? error})> getApplicantsList({String stage = 'ALL', String? search}) async {
     try {
-      final response = await get('/staff/applicants', forceRefresh: true);
+      final queryParams = <String, String>{};
+      if (stage.isNotEmpty) queryParams['stage'] = stage;
+      if (search != null && search.trim().isNotEmpty) queryParams['search'] = search.trim();
+      final queryString = queryParams.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+      final url = '/staff/applicants${queryString.isNotEmpty ? '?$queryString' : ''}';
+
+      final response = await get(url, forceRefresh: true);
       if (response.statusCode == 200 && response.body != null) {
         final list = response.body['data']['applicants'] as List<dynamic>? ?? [];
         final applicants = list.map((x) => StaffModel.fromJson(x as Map<String, dynamic>)).toList();
@@ -96,6 +103,27 @@ class ApplicantService extends ApiService {
     } catch (e) {
       debugPrint('Error getting applicants list: $e');
       return (applicants: <StaffModel>[], error: e.toString());
+    }
+  }
+
+  Future<({List<ApplicantModel> applicants, String? error})> getApplicantsModelList({String stage = 'ALL', String? search}) async {
+    try {
+      final queryParams = <String, String>{};
+      if (stage.isNotEmpty) queryParams['stage'] = stage;
+      if (search != null && search.trim().isNotEmpty) queryParams['search'] = search.trim();
+      final queryString = queryParams.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+      final url = '/staff/applicants${queryString.isNotEmpty ? '?$queryString' : ''}';
+
+      final response = await get(url, forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final list = response.body['data']['applicants'] as List<dynamic>? ?? [];
+        final applicants = list.map((x) => ApplicantModel.fromJson(x as Map<String, dynamic>)).toList();
+        return (applicants: applicants, error: null);
+      }
+      return (applicants: <ApplicantModel>[], error: (response.body?['message'] ?? 'Failed to load applicants').toString());
+    } catch (e) {
+      debugPrint('Error getting applicants model list: $e');
+      return (applicants: <ApplicantModel>[], error: e.toString());
     }
   }
 

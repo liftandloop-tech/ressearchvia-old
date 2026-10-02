@@ -4,7 +4,10 @@ import 'package:spresearch_web/models/user.model.dart';
 import 'user_management.controller.dart';
 
 class UserController extends GetxController {
-  late final UserManagementController _userManagementController;
+  UserManagementController get _userManagementController =>
+      Get.isRegistered<UserManagementController>()
+          ? Get.find<UserManagementController>()
+          : Get.put(UserManagementController(), permanent: true);
 
   var filteredUsers = <UserModel>[].obs;
   var selectedUsers = <String>[].obs;
@@ -21,14 +24,24 @@ class UserController extends GetxController {
   var sortColumn = RxnString();
   var sortAscending = true.obs;
 
-  final TextEditingController searchController = TextEditingController();
+  TextEditingController? _searchController;
+  TextEditingController get searchController {
+    if (_searchController == null) {
+      _searchController = TextEditingController(text: searchQuery.value);
+      _searchController!.addListener(() {
+        if (searchQuery.value != _searchController!.text) {
+          searchQuery.value = _searchController!.text;
+        }
+      });
+    }
+    return _searchController!;
+  }
 
   // Expose isLoading from service controller
   bool get isLoading => _userManagementController.isLoading.value;
 
   @override
   void onInit() {
-    _userManagementController = Get.find<UserManagementController>();
     super.onInit();
 
     // 1. Read URL Parameters
@@ -153,7 +166,8 @@ class UserController extends GetxController {
 
   @override
   void onClose() {
-    searchController.dispose();
+    _searchController?.dispose();
+    _searchController = null;
     super.onClose();
   }
 

@@ -389,6 +389,8 @@ class AuthController extends GetxController {
     _navigateToInitialRoute(updatedUser);
   }
 
+  void navigateToInitialRoute(UserModel user) => _navigateToInitialRoute(user);
+
   void _navigateToInitialRoute(UserModel user) {
     if (user.needsJobAgreement) {
       Get.offAllNamed(AppRoutes.jobTermsAgreement);
@@ -396,6 +398,10 @@ class AuthController extends GetxController {
     }
     if (user.isAdmin || user.canAccessDepartmentPage('Dashboard')) {
       Get.offAllNamed(AppRoutes.dashboard);
+      return;
+    }
+    if (user.canAccessDepartmentPage('Leads')) {
+      Get.offAllNamed(AppRoutes.leads);
       return;
     }
     if (user.canAccessDepartmentPage('Reports')) {
@@ -412,10 +418,6 @@ class AuthController extends GetxController {
     }
     if (user.canAccessDepartmentPage('Payments')) {
       Get.offAllNamed(AppRoutes.pendingPayments);
-      return;
-    }
-    if (user.canAccessDepartmentPage('Leads')) {
-      Get.offAllNamed(AppRoutes.leads);
       return;
     }
     if (user.canAccessDepartmentPage('Staff')) {

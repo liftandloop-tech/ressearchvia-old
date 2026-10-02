@@ -47,9 +47,15 @@ export const salesRevenueService = {
     });
 
     // 2. Fetch User-to-Staff Assignments
+    const targetObjIds = targetStaffIds
+      .filter(id => id && mongoose.isValidObjectId(id))
+      .map(id => new mongoose.Types.ObjectId(id.toString()));
+    const targetStrIds = targetStaffIds.filter(Boolean).map(id => id.toString());
+    const allTargetStaffIds = [...new Set([...targetObjIds, ...targetStrIds])];
+
     const assignmentQuery = isSystemAdmin
       ? {}
-      : { staffId: { $in: targetStaffIds } };
+      : { staffId: { $in: allTargetStaffIds } };
     const allAssignments = await staffAssignmentModel.find(assignmentQuery);
 
     const userToStaffMap = {};
@@ -95,7 +101,11 @@ export const salesRevenueService = {
     // RBAC: Non-admin can only see payments for assigned users
     if (!isSystemAdmin) {
       const assignedUserIds = allAssignments.map(a => a.userId).filter(Boolean);
-      queryArgs.userId = { $in: assignedUserIds };
+      const assignedUserObjIds = assignedUserIds
+        .filter(id => id && mongoose.isValidObjectId(id))
+        .map(id => new mongoose.Types.ObjectId(id.toString()));
+      const assignedUserStrIds = assignedUserIds.map(id => id.toString());
+      queryArgs.userId = { $in: [...new Set([...assignedUserObjIds, ...assignedUserStrIds])] };
     }
 
     // Date filtering bounds
@@ -143,11 +153,17 @@ export const salesRevenueService = {
       const staffDept = staffInfo?.department || (sId && staffDeptMap[sId] ? staffDeptMap[sId] : 'Sales');
 
       // Staff filter check
-      if ((department && department !== 'All Departments' && department !== 'All') ||
-          (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') ||
-          staffId) {
+      if (!isSystemAdmin) {
         if (!sId || !allowedStaffIdSet.has(sId)) {
           continue;
+        }
+      } else {
+        if ((department && department !== 'All Departments' && department !== 'All') ||
+            (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') ||
+            staffId) {
+          if (!sId || !allowedStaffIdSet.has(sId)) {
+            continue;
+          }
         }
       }
 
@@ -346,7 +362,10 @@ export const salesRevenueService = {
 
     staffPerformanceList.sort((a, b) => b.totalSalesAmount - a.totalSalesAmount);
 
-    const activeStaffCount = staffPerformanceList.filter(s => s.totalSalesAmount > 0 || s.assignedClients > 0).length;
+    const activeStaffCount = isSystemAdmin
+      ? (await staffModel.countDocuments({ status: { $regex: /^active$/i } }))
+      : filteredStaffList.filter(s => !s.status || s.status.toLowerCase() === 'active').length;
+    const salesProducingStaffCount = staffPerformanceList.filter(s => s.totalSalesAmount > 0 || s.assignedClients > 0).length;
     const avgOrderValue = totalOrders > 0 ? Math.round(roundedGross / totalOrders) : 0;
 
     // Department Sales Breakdown

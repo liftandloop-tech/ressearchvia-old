@@ -69,9 +69,11 @@ const webhookController = {
                         staff.agreementSignedAt = new Date();
                         staff.agreementSignature = "Digio Aadhaar E-Sign";
                         staff.digioStatus = "verified";
-                        console.log(`[Digio Webhook] Staff agreement signed successfully for: ${staff.fullName}`);
+                        staff.agreementStatus = "PENDING_ADMIN_VERIFICATION";
+                        console.log(`[Digio Webhook] Staff agreement signed successfully for: ${staff.fullName} -> PENDING_ADMIN_VERIFICATION`);
                     } else if (status.includes("rejected")) {
                         staff.digioStatus = "rejected";
+                        staff.agreementStatus = "REJECTED";
                     } else if (status.includes("failed")) {
                         staff.digioStatus = "failed";
                     }

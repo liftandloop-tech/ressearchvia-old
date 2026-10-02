@@ -1,12 +1,16 @@
 import cron from 'node-cron';
-import segmentsController from '../controller/segmentsController.js';
+import segmentsService from '../services/segmentsServices.js';
 
 const segmentCronJob = async () => {
-    let job = null;
-    let cronInterval = `0 */12 * * *`;
-    if (job) {
-        job.stop(); 0
-    }
-    job = cron.schedule(cronInterval, segmentsController.expireSegments);
+    const cronInterval = `0 */12 * * *`;
+    cron.schedule(cronInterval, async () => {
+        try {
+            console.log('[CRON] Running expireSegments...');
+            await segmentsService.expireSegments();
+            console.log('[CRON] expireSegments completed successfully.');
+        } catch (error) {
+            console.error('[CRON] Error expiring segments:', error.message);
+        }
+    });
 };
 export default segmentCronJob;

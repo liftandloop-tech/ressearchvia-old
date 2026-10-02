@@ -1281,25 +1281,45 @@ const userService = {
     try {
       let { otp, phone } = body;
 
-      // Try finding by OTP first (Legacy)
-      let user = await userModel.findOne({ otp: otp });
+      if (!otp) {
+        return { status: 400, message: "OTP is required", data: {} };
+      }
 
-      // If not found by OTP, fallback to phone lookup (More Robust)
-      if (!user && phone) {
-        user = await findUserByPhone(phone);
+      let user = null;
+      // 1. Phone-scoped lookup is the primary, secure method
+      if (phone) {
+        const cleanPhone = phone.toString().replace(/\D/g, "").slice(-10);
+        user = await userModel.findOne({
+          $or: [
+            { phone: cleanPhone },
+            { phone: "91" + cleanPhone },
+            { phone: "+91" + cleanPhone },
+          ],
+        }).select('+otp +otpExpires');
+      }
+      // 2. Fallback only if phone was omitted
+      if (!user) {
+        user = await userModel.findOne({ otp: Number(otp) }).select('+otp +otpExpires');
       }
 
       if (!user) {
-        return { status: 200, message: "User not exist", data: {} };
+        return { status: 404, message: "User not found", data: {} };
       }
 
-      if (user.otp !== otp || user.otpExpires < Date.now()) {
-        return { status: 200, message: "OTP Invalid", data: {} };
+      const isOtpValid = (user.otp !== null && user.otp !== undefined) &&
+        (user.otp.toString() === otp.toString().trim()) &&
+        (!user.otpExpires || user.otpExpires >= Date.now());
+
+      if (!isOtpValid) {
+        return { status: 400, message: "OTP Invalid or expired", data: {} };
       }
+
       user.otp = null;
       user.otpExpires = null;
       if (!user.userObject) user.userObject = {}; // Ensure userObject exists
       user.markModified('userObject');
+      await user.save();
+
       return {
         status: 200,
         message: "OTP verify successfully",
@@ -2595,8 +2615,10 @@ const userService = {
         message: "counts",
         data: {
           userCount,
-          activeSubcription,
-          pandingKyc,
+          pendingKyc: pandingKyc,
+          pandingKyc, // legacy backward-compatible alias
+          activeSubscriptions: activeSubcription,
+          activeSubcription, // legacy backward-compatible alias
           totalSalesAmount: realizedMetrics.totalSalesAmount,
           totalOrders: realizedMetrics.totalOrders,
           activeStaffCount: realizedMetrics.activeStaffCount,

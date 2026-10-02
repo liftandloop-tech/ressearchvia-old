@@ -21,6 +21,8 @@ class ApiService extends GetConnect {
     }
   }
 
+  static final Map<String, _CacheEntry> _cache = {};
+
   @override
   Future<Response<T>> get<T>(
     String url, {
@@ -30,18 +32,51 @@ class ApiService extends GetConnect {
     Decoder<T>? decoder,
     bool forceRefresh = false,
     int cacheTtlSeconds = 0,
-  }) {
-    return super.get<T>(
+  }) async {
+    final queryString = query != null && query.isNotEmpty
+        ? '?${query.entries.map((e) => '${e.key}=${e.value}').join('&')}'
+        : '';
+    final cacheKey = '$url$queryString';
+
+    // Auto-cache static configuration endpoints like roles and departments (60s TTL)
+    final isStaticConfig = url.contains('/role/list') ||
+        url.contains('/role/all') ||
+        url.contains('/department/list') ||
+        url.contains('/applicant/roles');
+
+    final effectiveTtl = cacheTtlSeconds > 0
+        ? cacheTtlSeconds
+        : (isStaticConfig ? 60 : 0);
+
+    if (!forceRefresh && effectiveTtl > 0 && _cache.containsKey(cacheKey)) {
+      final entry = _cache[cacheKey]!;
+      if (DateTime.now().isBefore(entry.expiresAt)) {
+        return entry.response as Response<T>;
+      } else {
+        _cache.remove(cacheKey);
+      }
+    }
+
+    final res = await super.get<T>(
       url,
       headers: headers,
       contentType: contentType,
       query: query,
       decoder: decoder,
     );
+
+    if (effectiveTtl > 0 && res.isOk && res.body != null) {
+      _cache[cacheKey] = _CacheEntry(
+        response: res,
+        expiresAt: DateTime.now().add(Duration(seconds: effectiveTtl)),
+      );
+    }
+
+    return res;
   }
 
   static void clearAllCache() {
-    // Safe no-op kept for backwards compatibility with existing callers
+    _cache.clear();
   }
 
   void clearCache() => clearAllCache();
@@ -130,4 +165,11 @@ class ApiService extends GetConnect {
       return response;
     });
   }
+}
+
+class _CacheEntry {
+  final dynamic response;
+  final DateTime expiresAt;
+
+  _CacheEntry({required this.response, required this.expiresAt});
 }

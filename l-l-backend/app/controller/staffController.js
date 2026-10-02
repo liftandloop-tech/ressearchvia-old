@@ -1,4 +1,5 @@
 import staffService from "../services/staffService.js";
+import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 
 const staffController = {
     staffCreate: async (req, res) => {
@@ -43,7 +44,7 @@ const staffController = {
     },
     staffList: async (req, res) => {
         try {
-            const response = await staffService.staffList({ user: req.user });
+            const response = await staffService.staffList({ user: req.user, query: req.query });
             res.status(response.status).send(response);
         } catch (error) {
             res.status(400).send({ status: 400, message: error.message, data: {} });
@@ -171,7 +172,21 @@ const staffController = {
     initiateDigioAgreement: async (req, res) => {
         try {
             const staffId = req.user?._id || req.user?.userId || req.body?.staffId;
-            const response = await staffService.initiateStaffDigioAgreement(staffId);
+            const origin = req.body?.redirectUrl || req.headers.origin || req.headers.referer;
+            let customRedirectUrl = null;
+            if (origin) {
+              try {
+                if (typeof origin === 'string' && origin.startsWith('http')) {
+                  const parsed = new URL(origin);
+                  customRedirectUrl = `${parsed.origin}/job-terms-agreement?signed=true`;
+                }
+              } catch (_) {
+                if (typeof origin === 'string' && origin.startsWith('http')) {
+                  customRedirectUrl = origin.includes('/job-terms-agreement') ? origin : `${origin.replace(/\/+$/, '')}/job-terms-agreement?signed=true`;
+                }
+              }
+            }
+            const response = await staffService.initiateStaffDigioAgreement(staffId, customRedirectUrl);
             res.status(response.status).send(response);
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: null });
@@ -180,13 +195,73 @@ const staffController = {
 
     getAgreementStatus: async (req, res) => {
         try {
-            const staffId = req.user?._id || req.user?.userId || req.query?.staffId;
-            const response = await staffService.getStaffAgreementStatus(staffId);
+            const staffId = req.query?.staffId || req.user?._id || req.user?.userId;
+            const origin = req.headers.origin || req.headers.referer;
+            let customRedirectUrl = null;
+            if (origin && typeof origin === 'string' && origin.startsWith('http')) {
+              try {
+                const parsed = new URL(origin);
+                customRedirectUrl = `${parsed.origin}/job-terms-agreement?signed=true`;
+              } catch (_) {}
+            }
+            const response = await staffService.getStaffAgreementStatus(staffId, customRedirectUrl);
             res.status(response.status).send(response);
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message, data: null });
         }
     },
 
-}
+    verifyStaffAgreement: async (req, res) => {
+        try {
+            const { staffId } = req.params;
+            const response = await staffService.verifyStaffAgreement(staffId, req.user);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
+    rejectStaffAgreement: async (req, res) => {
+        try {
+            const { staffId } = req.params;
+            const { reason } = req.body;
+            const response = await staffService.rejectStaffAgreement(staffId, req.user, reason);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
+    downloadStaffAgreementDocument: async (req, res) => {
+        try {
+            const targetStaffId = (req.params.staffId || req.query.staffId || req.user?._id || '').toString();
+            const callerId = (req.user?._id || req.user?.id || '').toString();
+            const callerRole = (req.user?.role || '').toLowerCase();
+            const callerDept = (req.user?.deparment || req.user?.department || '').toLowerCase();
+            const isSystemAdmin = callerRole === 'admin' || callerDept === 'admin';
+            const isSelf = callerId && (callerId === targetStaffId);
+
+            if (!isSystemAdmin && !isSelf) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                const isSupervisor = hierarchy.isSystemAdmin || (hierarchy.supervisedStaffIds || []).some(id => id.toString() === targetStaffId);
+                if (!isSupervisor) {
+                    return res.status(403).send({ status: 403, message: "Forbidden: You are not authorized to view this agreement." });
+                }
+            }
+
+            const response = await staffService.downloadStaffAgreementDocument(targetStaffId);
+            if (response.status === 200) {
+                const buffer = Buffer.from(response.data);
+                res.setHeader('Content-Type', response.contentType || 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename=${response.filename || 'agreement.pdf'}`);
+                res.setHeader('Content-Length', buffer.length);
+                return res.end(buffer);
+            } else {
+                return res.status(response.status).send({ status: response.status, message: response.message });
+            }
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message });
+        }
+    }
+};
 export default staffController;

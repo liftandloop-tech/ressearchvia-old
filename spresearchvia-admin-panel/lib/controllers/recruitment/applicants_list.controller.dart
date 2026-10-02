@@ -15,6 +15,8 @@ class ApplicantsListController extends GetxController {
 
   var isLoading = false.obs;
   var applicants = <StaffModel>[].obs;
+  var selectedStage = 'ALL'.obs;
+  var searchQuery = ''.obs;
 
   var rolesList = <RoleModel>[].obs;
   var supervisorsList = <StaffModel>[].obs;
@@ -28,6 +30,16 @@ class ApplicantsListController extends GetxController {
   var selectedSupervisorId = RxnString();
   var selectedSupervisorName = RxnString();
   var isViewOnly = false.obs;
+
+  final stageFilters = const [
+    {'key': 'ALL', 'label': 'All Applicants'},
+    {'key': 'APPLIED', 'label': 'Applied'},
+    {'key': 'SCREENING', 'label': 'Screening'},
+    {'key': 'INTERVIEW', 'label': 'Interview'},
+    {'key': 'SELECTED', 'label': 'Selected'},
+    {'key': 'OFFER_ACCEPTED', 'label': 'Hired'},
+    {'key': 'REJECTED', 'label': 'Rejected'},
+  ];
 
   List<RoleModel> get availableRoles {
     final rawList = rolesList.isNotEmpty
@@ -83,6 +95,12 @@ class ApplicantsListController extends GetxController {
     super.onInit();
     fetchApplicants();
     fetchRolesAndSupervisors();
+
+    debounce(
+      searchQuery,
+      (_) => fetchApplicants(),
+      time: const Duration(milliseconds: 350),
+    );
   }
 
   Future<void> fetchRolesAndSupervisors() async {
@@ -107,10 +125,19 @@ class ApplicantsListController extends GetxController {
     }
   }
 
+  void setStageFilter(String stage) {
+    if (selectedStage.value == stage) return;
+    selectedStage.value = stage;
+    fetchApplicants();
+  }
+
   Future<void> fetchApplicants() async {
     isLoading.value = true;
     try {
-      final res = await _applicantService.getApplicantsList();
+      final res = await _applicantService.getApplicantsList(
+        stage: selectedStage.value,
+        search: searchQuery.value,
+      );
       if (res.error == null) {
         applicants.assignAll(res.applicants);
       } else {

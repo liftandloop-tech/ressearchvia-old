@@ -28,6 +28,9 @@ const staffRoutes = () => {
     Router.post("/sign-agreement", auth.tokenVerified, staffController.signAgreement)
     Router.post("/agreement/initiate-esign", auth.tokenVerified, staffController.initiateDigioAgreement)
     Router.get("/agreement/status", auth.tokenVerified, staffController.getAgreementStatus)
+    Router.post("/agreement/verify/:staffId", auth.tokenVerified, adminOnly, staffController.verifyStaffAgreement)
+    Router.post("/agreement/reject/:staffId", auth.tokenVerified, adminOnly, staffController.rejectStaffAgreement)
+    Router.get("/agreement/document/:staffId", auth.tokenVerified, staffController.downloadStaffAgreementDocument)
     Router.post("/logout", auth.tokenVerified, staffController.logoutStaff)
     Router.post("/impersonate", auth.tokenVerified, adminOnly, checkPermission('Staff', 'login'), staffController.staffImpersonate)
 
@@ -42,9 +45,9 @@ const staffRoutes = () => {
     Router.post("/applicant/continue-verify", applicantController.verifyContinueApplication)
 
     // Admin applicant review & approval
-    Router.get("/applicants", auth.tokenVerified, adminOnly, checkPermission('staff.view_applicants'), applicantController.listApplicants)
-    Router.post("/applicant/approve/:id", auth.tokenVerified, adminOnly, checkPermission('staff.approve_applicant'), applicantController.approveApplicant)
-    Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, checkPermission('staff.approve_applicant'), applicantController.saveEvaluationRemarks)
+    Router.get("/applicants", auth.tokenVerified, adminOnly, applicantController.listApplicants)
+    Router.post("/applicant/approve/:id", auth.tokenVerified, adminOnly, applicantController.approveApplicant)
+    Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, applicantController.saveEvaluationRemarks)
 
     // Document uploads for staff onboarding
     Router.post("/upload-doc/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), staffDocController.uploadDocument)

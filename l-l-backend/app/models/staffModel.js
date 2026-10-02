@@ -3,23 +3,32 @@ import mongoose from "mongoose";
 const staffSchema = new mongoose.Schema({
     staffId: {
         type: String,
-        require: true
+        required: true
     },
     fullName: {
         type: String,
-        require: true
+        required: true
     },
     mobileNumber: {
         type: Number,
-        require: true
+        required: true
     },
     emailAddress: {
         type: String,
-        require: true
+        required: true
     },
     deparment: {
         type: String,
         default: null
+    },
+    telephonyExtension: {
+        type: String,
+        default: null
+    },
+    telephonyType: {
+        type: String,
+        enum: ['extension', 'device'],
+        default: 'extension'
     },
 
     joiningDate: {
@@ -37,19 +46,23 @@ const staffSchema = new mongoose.Schema({
     },
     emailOtp: {
         type: mongoose.Schema.Types.Mixed,
-        default: null
+        default: null,
+        select: false
     },
     emailOtpExpires: {
         type: mongoose.Schema.Types.Mixed,
-        default: null
+        default: null,
+        select: false
     },
     mobileOtp: {
         type: mongoose.Schema.Types.Mixed,
-        default: null
+        default: null,
+        select: false
     },
     mobileOtpExpires: {
         type: mongoose.Schema.Types.Mixed,
-        default: null
+        default: null,
+        select: false
     },
     isEmailVerified: {
         type: Boolean,
@@ -131,14 +144,17 @@ const staffSchema = new mongoose.Schema({
     },
     otp: {
         type: Number,
+        select: false
     },
     otpExpires: {
-        type: Number
+        type: Number,
+        select: false
     },
 
     mpin: {
         type: String,
-        default: null
+        default: null,
+        select: false
     },
     assignedDirector: {
         type: mongoose.Schema.Types.ObjectId,
@@ -167,9 +183,21 @@ const staffSchema = new mongoose.Schema({
         ref: 'Department',
         default: null
     },
+    applicantId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'applicant',
+        default: null,
+        index: true
+    },
     walkInForm: {
         type: mongoose.Schema.Types.Mixed,
         default: {}
+    },
+    agreementStatus: {
+        type: String,
+        enum: ['NOT_INITIATED', 'PENDING_SIGNATURE', 'PENDING_ADMIN_VERIFICATION', 'VERIFIED', 'REJECTED'],
+        default: 'NOT_INITIATED',
+        index: true
     },
     hasSignedAgreement: {
         type: Boolean,
@@ -208,6 +236,35 @@ const staffSchema = new mongoose.Schema({
         enum: ['pending', 'verified', 'rejected', 'failed', null],
         default: null
     },
+    agreementVerifiedAt: {
+        type: Date,
+        default: null
+    },
+    agreementVerifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'staff',
+        default: null
+    },
+    agreementRejectionReason: {
+        type: String,
+        default: null
+    },
+    agreementRejectedAt: {
+        type: Date,
+        default: null
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false
+    },
 }, { timestamps: true, versionKey: false });
+
+staffSchema.index({ status: 1 });
+staffSchema.index({ mobileNumber: 1 });
+staffSchema.index({ emailAddress: 1 });
+staffSchema.index({ role: 1 });
+staffSchema.index({ departmentId: 1 });
+staffSchema.index({ isDeleted: 1 });
+
 const staffModel = mongoose.model("staff", staffSchema);
 export default staffModel;

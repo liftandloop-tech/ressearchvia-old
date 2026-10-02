@@ -12,13 +12,11 @@ class DashboardController extends GetxController {
   UserModel? get currentUser => _authController?.user.value;
   bool get isAdmin => currentUser?.isAdmin ?? false;
 
-  /// True if user manages a team (Admin, role level <= 2, staff management permissions, or user with subordinates)
+  /// True if user manages a team (Admin or user with subordinates in their scoped hierarchy)
   bool get hasTeamMembers {
     if (isAdmin) return true;
     final staffList = _dashboardManagementController.staffList;
     if (staffList.length > 1) return true;
-    if (currentUser?.roleLevel != null && currentUser!.roleLevel! <= 2) return true;
-    if (currentUser?.has('staff.assign') == true || currentUser?.has('staff.manage') == true) return true;
     return false;
   }
 
@@ -27,7 +25,7 @@ class DashboardController extends GetxController {
   bool get isRegularStaff => isSingleStaff; // backwards-compatible alias
 
   var selectedRenewalStatus = 'All'.obs; // Order Status filter
-  var selectedDateFilter = 'All Time'.obs;
+  var selectedDateFilter = 'This Month'.obs;
   var selectedCustomDate = Rxn<DateTime>();
   var startDate = Rxn<DateTime>();
   var endDate = Rxn<DateTime>();
@@ -40,6 +38,9 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    final now = DateTime.now();
+    startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
+    endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
     _syncFilterDefaults();
 
     if (_authController != null) {
@@ -73,6 +74,28 @@ class DashboardController extends GetxController {
     });
     ever(selectedRenewalStatus, (_) {
       if (!_isFilterSyncing) fetchFilteredData();
+    });
+    ever(selectedDateFilter, (val) {
+      if (!_isFilterSyncing) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        if (val == 'Today') {
+          startDate.value = DateTime(today.year, today.month, today.day, 0, 0, 0);
+          endDate.value = DateTime(today.year, today.month, today.day, 23, 59, 59, 999);
+        } else if (val == 'This Week') {
+          final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+          startDate.value = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day, 0, 0, 0);
+          final endOfWeek = startOfWeek.add(const Duration(days: 6));
+          endDate.value = DateTime(endOfWeek.year, endOfWeek.month, endOfWeek.day, 23, 59, 59, 999);
+        } else if (val == 'This Month') {
+          startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
+          endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+        } else if (val == 'All Time') {
+          startDate.value = null;
+          endDate.value = null;
+        }
+        fetchFilteredData();
+      }
     });
   }
 
@@ -150,8 +173,53 @@ class DashboardController extends GetxController {
   List<Map<String, dynamic>> get renewalsList =>
       _dashboardManagementController.renewalsList;
 
-  List<Map<String, dynamic>> get filteredRenewalsList =>
-      renewalsList;
+  List<Map<String, dynamic>> get filteredRenewalsList {
+    var list = List<Map<String, dynamic>>.from(renewalsList);
+
+    if (isSingleStaff) {
+      final myId = (currentUser?.id ?? '').toLowerCase();
+      final myName = (currentUser?.fullName ?? '').trim().toLowerCase();
+
+      list = list.where((item) {
+        final mId = (item['managerId'] ?? item['staffId'] ?? '').toString().toLowerCase();
+        final managerName = (item['manager'] ?? item['staffName'] ?? '').toString().trim().toLowerCase();
+        return (myId.isNotEmpty && mId == myId) ||
+            (myName.isNotEmpty && managerName == myName);
+      }).toList();
+    }
+
+    if (searchQuery.value.trim().isNotEmpty) {
+      final q = searchQuery.value.trim().toLowerCase();
+      list = list.where((item) {
+        final clientName = (item['name'] ?? item['clientName'] ?? '').toString().toLowerCase();
+        final email = (item['email'] ?? '').toString().toLowerCase();
+        final phone = (item['phone'] ?? item['mobile'] ?? '').toString().toLowerCase();
+        final manager = (item['manager'] ?? item['staffName'] ?? '').toString().toLowerCase();
+        return clientName.contains(q) || email.contains(q) || phone.contains(q) || manager.contains(q);
+      }).toList();
+    }
+
+    if (!isSingleStaff) {
+      if (selectedManagerFilter.value != 'All Staff' &&
+          selectedManagerFilter.value != 'All Managers') {
+        final targetManager = selectedManagerFilter.value.trim().toLowerCase();
+        list = list.where((item) {
+          final manager = (item['manager'] ?? item['staffName'] ?? '').toString().trim().toLowerCase();
+          return manager == targetManager;
+        }).toList();
+      }
+    }
+
+    if (selectedRenewalStatus.value != 'All') {
+      final filterStatus = selectedRenewalStatus.value.trim().toLowerCase();
+      list = list.where((item) {
+        final status = (item['kycStatus'] ?? item['status'] ?? '').toString().trim().toLowerCase();
+        return status == filterStatus;
+      }).toList();
+    }
+
+    return list;
+  }
 
   List<String> get managerFilterItems {
     if (isSingleStaff) {
@@ -430,10 +498,11 @@ class DashboardController extends GetxController {
     _isFilterSyncing = true;
     try {
       selectedRenewalStatus.value = 'All';
-      selectedDateFilter.value = 'All Time';
+      selectedDateFilter.value = 'This Month';
       selectedCustomDate.value = null;
-      startDate.value = null;
-      endDate.value = null;
+      final now = DateTime.now();
+      startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
+      endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
       searchQuery.value = '';
       activeTab.value = 0;
       if (isSingleStaff) {

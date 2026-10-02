@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const reportsSchema = new mongoose.Schema({
     title: {
         type: String,
-        require: true
+        required: true
     },
     reportId: {
         type: String,
@@ -12,12 +12,12 @@ const reportsSchema = new mongoose.Schema({
     },
     segment: [{
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "segments"
     }],
     segmentName: [{
         type: String,
-        require: true
+        required: true
     }],
     // Chunk 9: Publishing Metadata
     published_by: {
@@ -38,11 +38,11 @@ const reportsSchema = new mongoose.Schema({
     ],
     reportType: {
         type: String,
-        require: true
+        required: true
     },
     description: {
         type: String,
-        require: true
+        required: true
     },
     updates: [{
         text: String,
@@ -58,15 +58,15 @@ const reportsSchema = new mongoose.Schema({
     reportPath: {
 
         type: String,
-        require: true
+        required: true
     },
     reportOriginalName: {
         type: String,
-        require: true
+        required: true
     },
     reportName: {
         type: String,
-        require: true
+        required: true
     },
     publishedStatus: {
         type: String,

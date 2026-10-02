@@ -17,34 +17,39 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
   final AuthService _authService = Get.find<AuthService>();
   final AuthController _authController = Get.find<AuthController>();
 
-  final TextEditingController _signatureController = TextEditingController();
   bool _agreedToTerms = false;
-  bool _isSubmitting = false;
   bool _isDigioLoading = false;
   bool _isCheckingStatus = false;
   String? _digioSigningUrl;
   bool _digioInitiated = false;
   String _errorMessage = '';
+  String? _rejectionReason;
+  String? _agreementStatus;
 
   @override
   void initState() {
     super.initState();
-    final user = _authController.user.value;
-    if (user != null && user.fullName.isNotEmpty) {
-      _signatureController.text = user.fullName;
-    }
     _checkInitialStatus();
   }
 
   Future<void> _checkInitialStatus() async {
     try {
       final status = await _authService.checkStaffAgreementStatus();
-      if (status.success && status.hasSignedAgreement && status.user != null) {
-        _authController.onAgreementSigned(status.user!);
-      } else if (status.signingUrl != null) {
+      if (status.success) {
+        if ((status.agreementStatus == 'VERIFIED' ||
+                status.agreementStatus == 'PENDING_ADMIN_VERIFICATION' ||
+                status.agreementStatus == 'PENDING_REVIEW') &&
+            status.user != null) {
+          _authController.onAgreementSigned(status.user!);
+          return;
+        }
         setState(() {
-          _digioSigningUrl = status.signingUrl;
-          _digioInitiated = true;
+          _agreementStatus = status.agreementStatus;
+          _rejectionReason = status.agreementRejectionReason;
+          if (status.signingUrl != null) {
+            _digioSigningUrl = status.signingUrl;
+            _digioInitiated = true;
+          }
         });
       }
     } catch (_) {}
@@ -129,52 +134,7 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _signatureController.dispose();
-    super.dispose();
-  }
 
-  Future<void> _submitAgreement() async {
-    setState(() => _errorMessage = '');
-
-    if (!_agreedToTerms) {
-      setState(() => _errorMessage = 'Please check the box to confirm that you have read and accepted the agreement terms.');
-      return;
-    }
-
-    final signature = _signatureController.text.trim();
-    if (signature.isEmpty || signature.length < 3) {
-      setState(() => _errorMessage = 'Please enter your full legal name as your digital signature.');
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-
-    try {
-      final result = await _authService.signJobAgreement(signature: signature, version: '1.0');
-      if (result.success && result.user != null) {
-        Get.snackbar(
-          'Agreement Signed',
-          'Welcome to the ResearchVia team! Your workspace is now activated.',
-          backgroundColor: AppTheme.successGreen.withValues(alpha: 0.15),
-          colorText: AppTheme.successGreen,
-          duration: const Duration(seconds: 3),
-        );
-        _authController.onAgreementSigned(result.user!);
-      } else {
-        setState(() {
-          _isSubmitting = false;
-          _errorMessage = result.error ?? 'Failed to submit agreement. Please try again.';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isSubmitting = false;
-        _errorMessage = 'An unexpected error occurred: $e';
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -185,8 +145,9 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
     final supervisor = user?.rawJson?['assignedDirectorName'] ?? 'Admin Authority';
     final todayStr = DateFormat('MMMM dd, yyyy').format(DateTime.now());
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+    return SelectionArea(
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
@@ -236,6 +197,10 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_agreementStatus == 'REJECTED')
+                  _buildRejectionBanner(),
+                if (_agreementStatus == 'PENDING_ADMIN_VERIFICATION')
+                  _buildPendingVerificationBanner(),
                 // Top Banner
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -444,7 +409,7 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Digital Signature & Confirmation',
+                        'Aadhaar E-Sign & Confirmation',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -483,50 +448,10 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 20),
 
-                      // Digital signature text input
-                      const Text(
-                        'Digital Signature (Type your Full Legal Name)',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _signatureController,
-                        style: const TextStyle(
-                          fontFamily: 'Courier',
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'e.g. ${user?.fullName ?? "Your Full Name"}',
-                          prefixIcon: const Icon(Icons.draw_outlined, color: AppTheme.primaryBlue),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: AppTheme.primaryBlue, width: 2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'By typing your legal name and clicking "Sign & Accept Agreement", you execute a legally binding electronic agreement under the Information Technology Act, 2000. Your IP address, device details, and timestamp will be permanently logged.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4),
-                      ),
-
                       if (_errorMessage.isNotEmpty) ...[
-                        const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -547,9 +472,8 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 20),
                       ],
-
-                      const SizedBox(height: 24),
 
                       // Primary Action: Aadhaar E-Sign via Digio
                       Container(
@@ -645,57 +569,7 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'OR SIGN DIGITALLY BELOW',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade500,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton(
-                          onPressed: _isSubmitting ? null : _submitAgreement,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.primaryBlue,
-                            side: const BorderSide(color: AppTheme.primaryBlue),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppTheme.primaryBlue,
-                                  ),
-                                )
-                              : const Text(
-                                  'Quick Digital Sign & Accept',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -704,6 +578,7 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -783,6 +658,117 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
                     height: 1.55,
                     color: Color(0xFF475569),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRejectionBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 24),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Agreement Rejected by Administrator',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF991B1B)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _rejectionReason != null && _rejectionReason!.isNotEmpty
+                      ? 'Reason: $_rejectionReason'
+                      : 'Please verify your details and submit your agreement again.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFB91C1C)),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Review the terms below, ensure your name and details are correct, and sign again.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingVerificationBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF5FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE9D5FF)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.hourglass_top_outlined, color: Color(0xFF7C3AED), size: 24),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Agreement E-Signed — Pending Admin Review',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF6B21A8)),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Your electronic signature has been recorded successfully. While your agreement undergoes final administrative verification, you have full access to your assigned role dashboard and features.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF7E22CE)),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        final user = _authController.user.value;
+                        if (user != null) {
+                          _authController.navigateToInitialRoute(user);
+                        }
+                      },
+                      icon: const Icon(Icons.dashboard_outlined, size: 16),
+                      label: const Text('Proceed to Staff Dashboard', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C3AED),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _checkInitialStatus(),
+                      icon: const Icon(Icons.refresh, size: 14),
+                      label: const Text('Check Review Status', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF6B21A8),
+                        side: const BorderSide(color: Color(0xFFD8B4FE)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

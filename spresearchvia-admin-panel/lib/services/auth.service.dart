@@ -390,7 +390,11 @@ class AuthService extends ApiService {
   /// Initiates Aadhaar E-Sign via Digio for the staff joining agreement
   Future<({bool success, String? signingUrl, String? docId, String? error})> initiateStaffDigioAgreement() async {
     try {
-      final response = await post('/staff/agreement/initiate-esign', {});
+      final origin = Uri.base.origin;
+      final redirectUrl = '$origin/job-terms-agreement?signed=true';
+      final response = await post('/staff/agreement/initiate-esign', {
+        'redirectUrl': redirectUrl,
+      });
       if (response.statusCode == 200 && response.body != null) {
         final data = response.body;
         if (data['status'] == 200) {
@@ -409,28 +413,62 @@ class AuthService extends ApiService {
   }
 
   /// Checks whether the staff member has completed their Digio Aadhaar E-Sign
-  Future<({bool success, bool hasSignedAgreement, UserModel? user, String? signingUrl, String? error})> checkStaffAgreementStatus() async {
+  Future<({bool success, bool hasSignedAgreement, String? agreementStatus, String? agreementRejectionReason, UserModel? user, String? signingUrl, String? error})> checkStaffAgreementStatus() async {
     try {
-      final response = await get('/staff/agreement/status');
+      final response = await get('/staff/agreement/status', forceRefresh: true);
       if (response.statusCode == 200 && response.body != null) {
         final data = response.body;
         if (data['status'] == 200) {
           final resData = data['data'] ?? {};
           final hasSigned = resData['hasSignedAgreement'] == true;
+          final agreementStatus = resData['agreementStatus']?.toString();
+          final agreementRejectionReason = resData['agreementRejectionReason']?.toString();
           final signingUrl = resData['signingUrl']?.toString();
           UserModel? user;
           if (resData['staff'] != null) {
             await _saveUserData(resData['staff']);
             user = UserModel.fromJson(resData['staff']);
           }
-          return (success: true, hasSignedAgreement: hasSigned, user: user, signingUrl: signingUrl, error: null);
+          return (
+            success: true,
+            hasSignedAgreement: hasSigned,
+            agreementStatus: agreementStatus,
+            agreementRejectionReason: agreementRejectionReason,
+            user: user,
+            signingUrl: signingUrl,
+            error: null,
+          );
         }
-        return (success: false, hasSignedAgreement: false, user: null, signingUrl: null, error: (data['message'] ?? 'Failed to get status') as String);
+        return (
+          success: false,
+          hasSignedAgreement: false,
+          agreementStatus: null,
+          agreementRejectionReason: null,
+          user: null,
+          signingUrl: null,
+          error: (data['message'] ?? 'Failed to get status') as String,
+        );
       }
-      return (success: false, hasSignedAgreement: false, user: null, signingUrl: null, error: response.body?['message']?.toString() ?? 'Failed to get status');
+      return (
+        success: false,
+        hasSignedAgreement: false,
+        agreementStatus: null,
+        agreementRejectionReason: null,
+        user: null,
+        signingUrl: null,
+        error: response.body?['message']?.toString() ?? 'Failed to get status',
+      );
     } catch (e) {
       debugPrint('Error checking agreement status: $e');
-      return (success: false, hasSignedAgreement: false, user: null, signingUrl: null, error: 'Network error: $e');
+      return (
+        success: false,
+        hasSignedAgreement: false,
+        agreementStatus: null,
+        agreementRejectionReason: null,
+        user: null,
+        signingUrl: null,
+        error: 'Network error: $e',
+      );
     }
   }
 }

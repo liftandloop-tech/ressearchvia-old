@@ -182,7 +182,18 @@ class StaffController extends GetxController {
   var researchersPage = 1.obs;
   var directorsPage = 1.obs;
   var managersPage = 1.obs;
-  final itemsPerPage = 10;
+  var rowsPerPage = 10.obs;
+  int get itemsPerPage => rowsPerPage.value;
+
+  void setItemsPerPage(int count) {
+    rowsPerPage.value = count;
+    currentPage.value = 1;
+    directorsPage.value = 1;
+    researchersPage.value = 1;
+    managersPage.value = 1;
+    otherStaffPage.value = 1;
+    update();
+  }
 
   var selectedDepartment = ''.obs;
 

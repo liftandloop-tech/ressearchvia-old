@@ -26,9 +26,10 @@ class UserDetailsScreen extends StatelessWidget {
       });
     }
 
-    return Scaffold(
-      backgroundColor: AppTheme.gray50,
-      body: SingleChildScrollView(
+    return SelectionArea(
+      child: Scaffold(
+        backgroundColor: AppTheme.gray50,
+        body: SingleChildScrollView(
         padding: EdgeInsets.all(AppTheme.spacing32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,6 +110,7 @@ class UserDetailsScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

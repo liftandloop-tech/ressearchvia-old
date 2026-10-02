@@ -3,18 +3,18 @@ import mongoose from "mongoose";
 const staffAssignmentSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "users"
 
     },
     staffId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref:"staffs"
     },
     staffName:{
         type:String,
-        require:true
+        required: true
     }
 }, { timestamps: true, versionKey: false });
 const staffAssigmentModel = mongoose.model("staffAssigment", staffAssignmentSchema);

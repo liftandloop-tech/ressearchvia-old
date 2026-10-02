@@ -3,16 +3,16 @@ import mongoose from "mongoose";
 const segmentsPaymentSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true
+        required: true
     },
     segmentId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "segments"
     },
     segmentPlanId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "segmentsPlan"
     },
     razorpayOrderId: {

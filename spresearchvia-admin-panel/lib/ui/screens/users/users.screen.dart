@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import 'package:spresearch_web/controllers/users/user.controller.dart';
 import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
@@ -13,28 +14,35 @@ class UsersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!Get.isRegistered<UserManagementController>()) {
+      Get.put(UserManagementController(), permanent: true);
+    }
     final controller = Get.isRegistered<UserController>()
         ? Get.find<UserController>()
         : Get.put(UserController(), permanent: true);
-    final navController = Get.find<UsersNavigationController>();
+    final navController = Get.isRegistered<UsersNavigationController>()
+        ? Get.find<UsersNavigationController>()
+        : Get.put(UsersNavigationController(), permanent: true);
 
     final isRegistered = isRegisteredClients ||
         Get.currentRoute.startsWith('/registered-clients') ||
         Get.currentRoute.startsWith('/approvals/kyc');
 
-    // Synchronize filter state for Registered Clients vs All Users
-    if (isRegistered) {
-      if (controller.kycStatusFilter.value != 'VERIFIED') {
-        controller.kycStatusFilter.value = 'VERIFIED';
-        controller.fetchFilteredUsers(page: 1);
+    // Synchronize filter state for Registered Clients vs All Users safely after build frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isRegistered) {
+        if (controller.kycStatusFilter.value != 'VERIFIED') {
+          controller.kycStatusFilter.value = 'VERIFIED';
+          controller.fetchFilteredUsers(page: 1);
+        }
+      } else {
+        if (controller.kycStatusFilter.value == 'VERIFIED' &&
+            !Get.parameters.containsKey('kyc_status')) {
+          controller.kycStatusFilter.value = 'All';
+          controller.fetchFilteredUsers(page: 1);
+        }
       }
-    } else {
-      if (controller.kycStatusFilter.value == 'VERIFIED' &&
-          !Get.parameters.containsKey('kyc_status')) {
-        controller.kycStatusFilter.value = 'All';
-        controller.fetchFilteredUsers(page: 1);
-      }
-    }
+    });
 
     return Obx(() {
       return DashboardLayout(

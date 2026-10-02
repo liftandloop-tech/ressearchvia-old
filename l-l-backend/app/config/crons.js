@@ -1,15 +1,19 @@
 import cron from 'node-cron';
-import usersController from '../controller/userController.js';
+import TokenBlacklist from '../models/tokenBlacklistModel.js';
 
 const logoutCronJob = async () => {
-    let job = null;
-    let croneDay = 3;
-    let cronInterval = `0 0 */${croneDay} * *`;
-    if (job) {
-        job.stop();0
-    }
-    if (croneDay > 0)
-        job = cron.schedule(cronInterval, usersController.logOutUser);
+    const cronInterval = `0 0 */3 * *`;
+    cron.schedule(cronInterval, async () => {
+        try {
+            console.log('[CRON] Running TokenBlacklist cleanup...');
+            const result = await TokenBlacklist.deleteMany({
+                expiresAt: { $lte: new Date() }
+            });
+            console.log(`[CRON] Cleaned up ${result.deletedCount || 0} expired blacklisted tokens.`);
+        } catch (error) {
+            console.error('[CRON] Error during TokenBlacklist cleanup:', error.message);
+        }
+    });
 };
 export default logoutCronJob;
 

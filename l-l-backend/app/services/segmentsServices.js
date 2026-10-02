@@ -2046,7 +2046,7 @@ const segmentsService = {
       return { status: 400, message: error.message, data: {} };
     }
   },
-  expireSegments: async ({ }) => {
+  expireSegments: async () => {
     try {
       const result = await userActiveSegmentModel.updateMany(
         {
@@ -2548,6 +2548,7 @@ const segmentsService = {
         },
         {
           $project: {
+            createdAt: 1,
             fullName: "$userData.fullName",
             phone: "$userData.phone",
             email: "$userData.email",
@@ -2565,18 +2566,19 @@ const segmentsService = {
         { $sort: { createdAt: -1 } }
       ];
       if (search) {
-        queryArgs = {
-          "$or": [
-            { fullName: { $regex: search, $options: 'i' } },
-            { phone: { $regex: search, $options: 'i' } },
-            { manager: { $regex: search, $options: 'i' } },
-          ]
-        };
+        queryArgs["$or"] = [
+          { fullName: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search, $options: 'i' } },
+          { manager: { $regex: search, $options: 'i' } },
+        ];
       }
       if (newStartDate) {
-        queryArgs.createdAt = { $gte: newStartDate.toISOString() };
+        newStartDate.setHours(0, 0, 0, 0);
+        queryArgs.createdAt = { $gte: newStartDate };
       }
-      aggregationPipeline.push({ $match: queryArgs })
+      if (Object.keys(queryArgs).length > 0) {
+        aggregationPipeline.push({ $match: queryArgs });
+      }
       let countPipeLine = [...aggregationPipeline, { $group: { _id: null, count: { $sum: 1 } } }];
       const countResult = await segmentsPaymentModel.aggregate(countPipeLine);
       let totalCount = countResult.length > 0 ? countResult[0].count : 0;

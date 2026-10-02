@@ -10,7 +10,7 @@ const userKycSchema = new mongoose.Schema(
         },
         digioObject: {
             type: Object,
-            require: true
+            required: true
         },
         kycStatus: {
             type: String,

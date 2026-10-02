@@ -231,6 +231,8 @@ class StaffScreen extends StatelessWidget {
                                       currentItemsCount: paginatedList.length,
                                       onPageChange: (page) =>
                                           controller.currentPage.value = page,
+                                      onItemsPerPageChange: (count) =>
+                                          controller.setItemsPerPage(count),
                                     ),
                                   ],
                                 ),

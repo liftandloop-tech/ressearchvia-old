@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import staffModel from "../models/staffModel.js";
 import userModel from "../models/userModel.js";
 import roleModel from "../models/roleModel.js";
+import departmentModel from "../models/departmentModel.js";
+import permissionGroupModel from "../models/permissionGroupModel.js";
 
 /**
  * Resolves the list of staff ObjectIds supervised directly or indirectly by callerId.

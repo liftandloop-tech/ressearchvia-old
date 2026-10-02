@@ -3,42 +3,42 @@ import mongoose from "mongoose";
 const invoiceSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "users"
     },
     segmentId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "segments"
     },
     userActiveSegmentsId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true,
+        required: true,
         ref: "userActiveSegment"
     },
     invoiceNumber: {
         type: String,
-        require: true
+        required: true
     },
     paymentMode: {
         type: String,
-        require: true
+        required: true
     },
     amount: {
         type: Number,
-        require: true
+        required: true
     },
     gstAmount: {
         type: Number,
-        require: true
+        required: true
     },
     paymentRefId: {
         type: String,
-        require: true
+        required: true
     },
     generatedBy: {
         type: String,
-        require: true
+        required: true
     },
     status: {
         type: String,

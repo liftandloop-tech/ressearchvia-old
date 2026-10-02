@@ -74,7 +74,13 @@ export const PERMISSION_REGISTRY = {
     'settings.view': { feature: 'Settings', action: 'view', label: 'View System Settings', description: 'View company settings and policies' },
     'settings.update': { feature: 'Settings', action: 'update', label: 'Update System Settings', description: 'Modify and save system configurations' },
     'settings.upload_payment_qr': { feature: 'Settings', action: 'upload_payment_qr', label: 'Upload Payment QR Code', description: 'Update official payment QR code image' },
-    'settings.manage_roles': { feature: 'Settings', action: 'manage_roles', label: 'Manage Roles & Permissions', description: 'Create, update, and delete staff roles and permission groups' }
+    'settings.manage_roles': { feature: 'Settings', action: 'manage_roles', label: 'Manage Roles & Permissions', description: 'Create, update, and delete staff roles and permission groups' },
+
+    // Module 10: Automated Trading & Algo Gateways
+    'automated_trading.view': { feature: 'AutomatedTrading', action: 'view', label: 'View Automated Trading', description: 'View automated trading terminals, live signals, and broker status' },
+    'automated_trading.execute': { feature: 'AutomatedTrading', action: 'execute', label: 'Execute Trading Signals', description: 'Trigger and dispatch manual trading signals' },
+    'automated_trading.manage_strategy': { feature: 'AutomatedTrading', action: 'manage_strategy', label: 'Manage Strategies & Risk', description: 'Configure strategies, risk controls, and subscriber settings' },
+    'automated_trading.kill_switch': { feature: 'AutomatedTrading', action: 'kill_switch', label: 'Emergency Kill Switch', description: 'Pause/resume algo trading or trigger emergency shutdown' }
 };
 
 export const isValidPermissionKey = (key) => Object.prototype.hasOwnProperty.call(PERMISSION_REGISTRY, key);

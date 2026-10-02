@@ -17,6 +17,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import FormData from "form-data";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import emailService from "./emailService.js";
+import userKycService from "./userKycService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -93,6 +95,15 @@ export async function populateStaffHierarchy(staffDoc) {
   // Fallback departmentId from roleId if staff.departmentId is null
   if (!staffObj.departmentId && staffObj.roleId && staffObj.roleId.departmentId) {
     staffObj.departmentId = staffObj.roleId.departmentId;
+  }
+  if (!staffObj.departmentId && (staffObj.deparment || staffObj.department)) {
+    const deptName = (staffObj.deparment || staffObj.department).trim();
+    const deptDoc = await departmentModel.findOne({
+      name: { $regex: new RegExp(`^${deptName}$`, 'i') }
+    }).lean();
+    if (deptDoc) {
+      staffObj.departmentId = deptDoc;
+    }
   }
 
   // Hierarchy Inheritance:
@@ -242,17 +253,41 @@ const staffService = {
   },
   staffOtpVerify: async ({ body }) => {
     try {
-      let { otp } = body
-      let staff = await staffModel.findOne({ otp: otp })
-      if (!staff) {
-        return { status: 200, message: "staff not exist", data: {} }
+      let { otp, phone, email, staffId } = body;
+      if (!otp) {
+        return { status: 400, message: "OTP is required", data: {} };
       }
-      if (staff.otp !== otp || staff.otpExpires < Date.now()) {
-        return { status: 200, message: "OTP Invalid", data: {} }
+
+      let staff = null;
+      if (phone || email || staffId) {
+        const queryOr = [];
+        if (phone) {
+          const raw = phone.toString().replace(/\D/g, '').slice(-10);
+          queryOr.push({ mobileNumber: raw });
+          queryOr.push({ mobileNumber: Number(raw) });
+        }
+        if (email) queryOr.push({ emailAddress: email.trim().toLowerCase() });
+        if (staffId) queryOr.push({ staffId: staffId.trim() });
+        staff = await staffModel.findOne({ $or: queryOr }).select('+otp +otpExpires');
+      }
+      if (!staff) {
+        staff = await staffModel.findOne({ otp: Number(otp) }).select('+otp +otpExpires');
+      }
+
+      if (!staff) {
+        return { status: 404, message: "Staff not found", data: {} };
+      }
+
+      const isOtpValid = (staff.otp !== null && staff.otp !== undefined) &&
+        (staff.otp.toString() === otp.toString().trim()) &&
+        (!staff.otpExpires || staff.otpExpires >= Date.now());
+
+      if (!isOtpValid) {
+        return { status: 400, message: "OTP Invalid or expired", data: {} };
       }
 
       if (staff.status && staff.status.toLowerCase() === 'inactive') {
-        return { status: 200, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
+        return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
       staff.otp = null;
       staff.otpExpires = null;
@@ -312,7 +347,7 @@ const staffService = {
           { mobileNumber: `91${last10}` },
           { mobileNumber: `+91${last10}` }
         ]
-      });
+      }).select('+mpin');
 
       if (!staff) {
         return { status: 200, message: "Staff not found", data: {} }
@@ -568,9 +603,9 @@ const staffService = {
       return { status: 400, message: error.message, data: {} }
     }
   },
-  staffList: async ({ user }) => {
+  staffList: async ({ query = {}, user }) => {
     try {
-      let query = {
+      let mongoQuery = {
         stage: { $ne: 'Applicant' }
       };
 
@@ -579,30 +614,31 @@ const staffService = {
 
       const callerId = user?._id || user?.userId;
       let isSystemAdmin = false;
-      let hasStaffViewAll = false;
+      let hasGlobalStaffAccess = false;
 
       if (callerId) {
         const hierarchy = await getSupervisedStaffIds(callerId);
         isSystemAdmin = hierarchy.isSystemAdmin;
 
-        if (hierarchy.staffMember?.roleId?.permissionGroups) {
-          hasStaffViewAll = hierarchy.staffMember.roleId.permissionGroups.some(g =>
+        const deptName = (hierarchy.staffMember?.deparment || hierarchy.staffMember?.departmentId?.name || "").toLowerCase().trim();
+        const isHRorAdminDept = deptName === 'admin' || deptName === 'administration & management' || deptName === 'hr';
+
+        if (isHRorAdminDept && hierarchy.staffMember?.roleId?.permissionGroups) {
+          hasGlobalStaffAccess = hierarchy.staffMember.roleId.permissionGroups.some(g =>
             g.permissions?.some(p => p.actions?.includes('staff.view'))
           );
         }
 
-        if (!isSystemAdmin && !hasStaffViewAll) {
-          query = {
-            stage: { $ne: 'Applicant' },
-            _id: { $in: hierarchy.staffIds }
-          };
-          console.log(`Staff list scoped for ${hierarchy.staffMember?.fullName} (${hierarchy.staffIds.length} staff):`, JSON.stringify(query));
+        const forceScoped = query?.scoped === 'true' || query?.scoped === true;
+        if (!isSystemAdmin && (!hasGlobalStaffAccess || forceScoped)) {
+          mongoQuery._id = { $in: hierarchy.staffIds };
+          console.log(`Staff list scoped for ${hierarchy.staffMember?.fullName} (${hierarchy.staffIds?.length || 0} staff):`, JSON.stringify(mongoQuery));
         } else {
-          console.log('Admin / staff.view query (all staff):', JSON.stringify(query));
+          console.log('Admin / global staff access query (all staff):', JSON.stringify(mongoQuery));
         }
       }
 
-      const staffList = await staffModel.find(query)
+      const staffList = await staffModel.find(mongoQuery)
         .populate({
           path: 'roleId',
           populate: [
@@ -1066,10 +1102,12 @@ const staffService = {
         return { status: 404, message: "Profile not found", data: null };
       }
 
+      const staffObj = staff.toObject ? staff.toObject() : staff;
+      staffObj.serviceAgreementDocUrl = staffObj.agreementPdfUrl || `/api/staff/agreement/document/${staffObj._id}`;
       return {
         status: 200,
         message: "Staff profile retrieved successfully",
-        data: staff
+        data: staffObj
       };
     } catch (error) {
       return { status: 500, message: error.message, data: null };
@@ -1156,7 +1194,7 @@ const staffService = {
         return { status: 400, message: "New MPIN must be between 4 and 6 digits", data: null };
       }
 
-      const staff = await staffModel.findById(userId);
+      const staff = await staffModel.findById(userId).select('+mpin');
       if (!staff) {
         return { status: 404, message: "Staff member not found", data: null };
       }
@@ -1321,7 +1359,7 @@ const staffService = {
    * Initiates Aadhaar E-Sign on Digio for the staff joining agreement.
    * Signature is placed on ALL pages at the default position.
    */
-  initiateStaffDigioAgreement: async (staffIdOrUser) => {
+  initiateStaffDigioAgreement: async (staffIdOrUser, customRedirectUrl) => {
     try {
       const id = staffIdOrUser?._id || staffIdOrUser;
       const staff = await staffModel.findById(id);
@@ -1329,12 +1367,19 @@ const staffService = {
         return { status: 404, message: "Staff member not found", data: {} };
       }
 
-      if (staff.hasSignedAgreement) {
+      if (staff.hasSignedAgreement && staff.agreementStatus === 'VERIFIED') {
         return {
           status: 200,
-          message: "Agreement already signed",
+          message: "Agreement already verified",
           data: { staff, isSigned: true, hasSignedAgreement: true }
         };
+      }
+
+      // Determine return redirect URL to bring staff back to webapp after signing
+      let redirectUrl = customRedirectUrl;
+      if (!redirectUrl) {
+        const frontendBase = (process.env.FRONTEND_URL || "https://spadmin.researchvia.in").replace(/\/+$/, "");
+        redirectUrl = `${frontendBase}/job-terms-agreement?signed=true`;
       }
 
       // Generate customized PDF with employee name on pages 1 & 11
@@ -1344,9 +1389,28 @@ const staffService = {
       const CLIENT_ID = process.env.DIGIO_CLIENT_ID;
       const CLIENT_SECRET = process.env.DIGIO_CLIENT_SECRET_ID;
 
-      const signerIdentifier = staff.emailAddress || (staff.mobileNumber ? staff.mobileNumber.toString() : null);
+      // Check if email has a valid deliverable / public domain (not a fake or test domain)
+      const isPublicEmail = (email) => {
+        if (!email || typeof email !== 'string') return false;
+        const trimmed = email.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return false;
+        const domain = trimmed.split('@')[1];
+        const blockedDomains = ['test.com', 'example.com', 'sample.com', 'fake.com', 'dummy.com', 'invalid.com', 'test.in', 'localhost'];
+        return !blockedDomains.includes(domain);
+      };
+
+      const cleanMobile = staff.mobileNumber ? String(staff.mobileNumber).replace(/\D/g, '').slice(-10) : null;
+      let signerIdentifier = null;
+
+      // Keep EMAIL PRIMARY, then MOBILE NUMBER SECONDARY
+      if (staff.emailAddress && staff.emailAddress.trim().length > 0) {
+        signerIdentifier = staff.emailAddress.trim();
+      } else if (cleanMobile && cleanMobile.length === 10) {
+        signerIdentifier = cleanMobile;
+      }
+
       if (!signerIdentifier) {
-        return { status: 400, message: "Email or phone number is required for Digio signing request", data: {} };
+        return { status: 400, message: "A valid 10-digit mobile number or email is required for Digio Aadhaar signing", data: {} };
       }
 
       const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
@@ -1365,14 +1429,15 @@ const staffService = {
         send_sign_link: true,
         file_name: fileName,
         will_self_sign: false,
-        generate_access_token: true
+        generate_access_token: true,
+        redirect_url: redirectUrl
       };
 
       const formData = new FormData();
       formData.append("file", fs.createReadStream(outputFilePath), { filename: fileName });
       formData.append("request", JSON.stringify(requestData));
 
-      console.log(`[Staff Digio] Uploading agreement to Digio for ${staff.fullName} (${signerIdentifier})...`);
+      console.log(`[Staff Digio] Uploading agreement to Digio for ${staff.fullName} (${signerIdentifier}), redirect_url: ${redirectUrl}...`);
 
       const response = await axios.post(apiBaseUrl, formData, {
         headers: {
@@ -1393,16 +1458,46 @@ const staffService = {
         staff.digioDocId = docId;
         staff.digioObject = response.data;
         staff.digioStatus = 'pending';
+        staff.agreementStatus = 'PENDING_SIGNATURE';
         staff.agreementPdfUrl = outputFilePath;
         await staff.save();
 
+        const gatewayBase = apiBaseUrl.includes("ext.digio.in") ? "https://ext.digio.in" : "https://app.digio.in";
         const signingUrl = accessToken
-          ? `https://app.digio.in/#/gateway/login/${docId}/${accessToken}/${encodeURIComponent(signerIdentifier)}`
-          : `https://app.digio.in/#/gateway/login/${docId}/null/${encodeURIComponent(signerIdentifier)}`;
+          ? `${gatewayBase}/#/gateway/login/${docId}/${accessToken}/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`
+          : `${gatewayBase}/#/gateway/login/${docId}/null/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`;
+
+        // Send branded ResearchVia email with signing link and PDF attachment
+        if (staff.emailAddress && isPublicEmail(staff.emailAddress)) {
+          try {
+            await emailService.sendEmail({
+              to: staff.emailAddress,
+              subject: "Action Required: Sign Your ResearchVia Employment Agreement",
+              htmlContent: `
+                <h2>Welcome to the Team, ${staff.fullName}!</h2>
+                <p>Your employment joining agreement is prepared and ready for Aadhaar E-Sign.</p>
+                <p>Please review and sign your agreement by clicking the button below:</p>
+                <p><a href="${signingUrl}" class="button" style="display:inline-block;padding:12px 24px;background-color:#163174;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">Sign Employment Agreement</a></p>
+                <p>Or open this link directly in your browser: <br/><a href="${signingUrl}">${signingUrl}</a></p>
+                <p><strong>Important Note:</strong> You will need your Aadhaar-linked mobile number to complete OTP verification on Digio.</p>
+                <p>After you complete e-signing, the HR and Compliance team will verify your agreement to fully activate your workspace.</p>
+                <br/>
+                <p>Best regards,<br/>HR & Compliance Team<br/>ResearchVia</p>
+              `,
+              attachments: fs.existsSync(outputFilePath) ? [{
+                filename: fileName,
+                path: outputFilePath
+              }] : []
+            });
+            console.log(`[Staff Digio Email] Branded agreement email sent to ${staff.emailAddress}`);
+          } catch (mailErr) {
+            console.warn("[Staff Digio Email Error]:", mailErr.message);
+          }
+        }
 
         return {
           status: 200,
-          message: "Staff agreement initialized on Digio successfully",
+          message: "Staff agreement initialized on Digio successfully and email dispatched",
           data: {
             docId,
             tokenId: accessToken,
@@ -1431,7 +1526,7 @@ const staffService = {
   /**
    * Checks current agreement status for a staff member and syncs with Digio if pending.
    */
-  getStaffAgreementStatus: async (staffIdOrUser) => {
+  getStaffAgreementStatus: async (staffIdOrUser, customRedirectUrl) => {
     try {
       const id = staffIdOrUser?._id || staffIdOrUser;
       const staff = await staffModel.findById(id);
@@ -1456,6 +1551,9 @@ const staffService = {
               staff.agreementSignedAt = new Date();
               staff.agreementSignature = 'Digio Aadhaar E-Sign';
               staff.digioStatus = 'verified';
+              if (!staff.agreementStatus || staff.agreementStatus === 'PENDING_SIGNATURE') {
+                staff.agreementStatus = 'PENDING_ADMIN_VERIFICATION';
+              }
               staff.digioObject = res.data;
               await staff.save();
             }
@@ -1465,10 +1563,19 @@ const staffService = {
         }
       }
 
-      const signerIdentifier = staff.emailAddress || (staff.mobileNumber ? staff.mobileNumber.toString() : '');
+      let redirectUrl = customRedirectUrl;
+      if (!redirectUrl) {
+        const frontendBase = (process.env.FRONTEND_URL || "https://spadmin.researchvia.in").replace(/\/+$/, "");
+        redirectUrl = `${frontendBase}/job-terms-agreement?signed=true`;
+      }
+
+      const cleanMobile = staff.mobileNumber ? String(staff.mobileNumber).replace(/\D/g, '').slice(-10) : '';
+      const signerIdentifier = (staff.emailAddress && staff.emailAddress.trim().length > 0)
+        ? staff.emailAddress.trim()
+        : cleanMobile;
       const accessToken = staff.digioObject?.access_token?.id || null;
       const signingUrl = staff.digioDocId
-        ? `https://app.digio.in/#/gateway/login/${staff.digioDocId}/${accessToken}/${encodeURIComponent(signerIdentifier)}`
+        ? `https://app.digio.in/#/gateway/login/${staff.digioDocId}/${accessToken}/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`
         : null;
 
       return {
@@ -1476,7 +1583,9 @@ const staffService = {
         message: "Staff agreement status fetched successfully",
         data: {
           hasSignedAgreement: staff.hasSignedAgreement,
+          agreementStatus: staff.agreementStatus || (staff.hasSignedAgreement ? 'VERIFIED' : 'PENDING_SIGNATURE'),
           agreementSignedAt: staff.agreementSignedAt,
+          agreementRejectionReason: staff.agreementRejectionReason,
           digioStatus: staff.digioStatus,
           digioDocId: staff.digioDocId,
           signingUrl,
@@ -1485,6 +1594,151 @@ const staffService = {
       };
     } catch (error) {
       return { status: 500, message: error.message, data: {} };
+    }
+  },
+
+  /**
+   * Admin verifies the signed employment agreement
+   */
+  verifyStaffAgreement: async (staffId, adminUser) => {
+    try {
+      const staff = await staffModel.findById(staffId);
+      if (!staff) {
+        return { status: 404, message: "Staff member not found", data: {} };
+      }
+
+      const updatedStaff = await staffModel.findByIdAndUpdate(
+        staffId,
+        {
+          $set: {
+            agreementStatus: 'VERIFIED',
+            hasSignedAgreement: true,
+            agreementVerifiedAt: new Date(),
+            agreementVerifiedBy: adminUser?._id || null,
+            agreementRejectionReason: null
+          }
+        },
+        { new: true }
+      );
+
+      // Send email notification to employee confirming verification
+      if (staff.emailAddress) {
+        try {
+          await emailService.sendEmail({
+            to: staff.emailAddress,
+            subject: "ResearchVia: Employment Agreement Verified & Approved",
+            htmlContent: `
+              <h2>Congratulations, ${staff.fullName}!</h2>
+              <p>Your employment agreement has been reviewed, verified, and approved by the Administration.</p>
+              <p>Your employee workspace and dashboard access are now fully activated.</p>
+              <br/>
+              <p>Welcome aboard!<br/>ResearchVia Team</p>
+            `
+          });
+        } catch (mailErr) {
+          console.warn("[Agreement Verify Email Error]:", mailErr.message);
+        }
+      }
+
+      return {
+        status: 200,
+        message: "Employment agreement verified successfully",
+        data: { staff: updatedStaff }
+      };
+    } catch (error) {
+      return { status: 500, message: error.message, data: {} };
+    }
+  },
+
+  /**
+   * Admin rejects the signed employment agreement with mandatory reason
+   */
+  rejectStaffAgreement: async (staffId, adminUser, reason) => {
+    try {
+      if (!reason || reason.trim().length < 3) {
+        return { status: 400, message: "A valid rejection reason is required", data: {} };
+      }
+
+      const staff = await staffModel.findById(staffId);
+      if (!staff) {
+        return { status: 404, message: "Staff member not found", data: {} };
+      }
+
+      const updatedStaff = await staffModel.findByIdAndUpdate(
+        staffId,
+        {
+          $set: {
+            agreementStatus: 'REJECTED',
+            hasSignedAgreement: false,
+            agreementRejectionReason: reason.trim(),
+            agreementRejectedAt: new Date()
+          }
+        },
+        { new: true }
+      );
+
+      // Send rejection notification email to employee
+      if (staff.emailAddress) {
+        try {
+          await emailService.sendEmail({
+            to: staff.emailAddress,
+            subject: "Action Required: Employment Agreement Needs Revision",
+            htmlContent: `
+              <h2>Notice Regarding Your Employment Agreement</h2>
+              <p>Hello ${staff.fullName},</p>
+              <p>Your submitted employment agreement was reviewed by the Administration and could not be verified.</p>
+              <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px; margin: 16px 0;">
+                <p style="margin: 0; color: #991b1b; font-weight: bold;">Reason for Rejection:</p>
+                <p style="margin: 4px 0 0 0; color: #7f1d1d;">${reason.trim()}</p>
+              </div>
+              <p>Please log in to your employee portal, review and correct the required details, and e-sign the updated agreement.</p>
+              <br/>
+              <p>Regards,<br/>HR & Compliance Team<br/>ResearchVia</p>
+            `
+          });
+        } catch (mailErr) {
+          console.warn("[Agreement Reject Email Error]:", mailErr.message);
+        }
+      }
+
+      return {
+        status: 200,
+        message: "Employment agreement rejected. Employee notified to update and re-sign.",
+        data: { staff: updatedStaff }
+      };
+    } catch (error) {
+      return { status: 500, message: error.message, data: {} };
+    }
+  },
+
+  /**
+   * Streams or downloads the agreement PDF for preview
+   */
+  downloadStaffAgreementDocument: async (staffId) => {
+    try {
+      const staff = await staffModel.findById(staffId);
+      if (!staff) {
+        return { status: 404, message: "Staff member not found" };
+      }
+
+      if (staff.digioDocId) {
+        const digioDoc = await userKycService.downloadDigioDocument(staff.digioDocId);
+        if (digioDoc.status === 200 && digioDoc.data) {
+          return { status: 200, data: digioDoc.data, contentType: 'application/pdf', filename: `Agreement_${staff.staffId || staffId}.pdf` };
+        }
+      }
+
+      if (staff.agreementPdfUrl && fs.existsSync(staff.agreementPdfUrl)) {
+        const fileBytes = fs.readFileSync(staff.agreementPdfUrl);
+        return { status: 200, data: fileBytes, contentType: 'application/pdf', filename: `Agreement_${staff.staffId || staffId}.pdf` };
+      }
+
+      // Generate on the fly if not exists
+      const { outputFilePath, fileName } = await staffService.generateStaffAgreementPdf(staff);
+      const fileBytes = fs.readFileSync(outputFilePath);
+      return { status: 200, data: fileBytes, contentType: 'application/pdf', filename: fileName };
+    } catch (error) {
+      return { status: 500, message: error.message };
     }
   }
 

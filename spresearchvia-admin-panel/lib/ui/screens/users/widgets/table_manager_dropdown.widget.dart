@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/ui/widgets/searchable_manager_dialog.widget.dart';
 import '../../../../models/user.model.dart';
 
 class TableManagerDropdown extends StatelessWidget {
@@ -26,133 +27,67 @@ class TableManagerDropdown extends StatelessWidget {
       final seenIds = <String>{};
       final managers = rawManagers.where((m) => m.id.isNotEmpty && seenIds.add(m.id)).toList();
       final currentManagerId = user.managerId;
+      final matchedManager = managers.firstWhereOrNull((m) => m.id == currentManagerId);
+      final managerName = matchedManager?.name ?? user.manager ?? 'Unassigned';
+      final isAssigned = matchedManager != null || (user.manager != null && user.manager!.isNotEmpty);
 
-      // Ensure we have a valid selection
-      // If user has a managerId that exists in managers list, use it.
-      // Else use 'unassigned'.
-      String? selectedValue;
-      if (currentManagerId != null &&
-          managers.any((m) => m.id == currentManagerId)) {
-        selectedValue = currentManagerId;
-      } else {
-        selectedValue = 'unassigned';
-      }
-
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: AppTheme.white,
-          border: Border.all(color: AppTheme.gray300),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: selectedValue,
-            isExpanded: true,
-            isDense: false,
-            itemHeight: 48.0,
-            icon: const Icon(
-              Icons.keyboard_arrow_down,
-              size: 18,
-              color: AppTheme.gray600,
-            ),
-            selectedItemBuilder: (context) {
-              return [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Unassigned',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
-                      fontStyle: FontStyle.italic,
-                    ),
+      return InkWell(
+        onTap: canAssign
+            ? () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => SearchableManagerDialog(
+                    clientName: user.fullName,
+                    currentManagerId: currentManagerId,
+                    staffList: managers,
+                    onSelected: (staffId, staffName) {
+                      userManagementController.assignManager(user.id, staffId);
+                    },
+                    onUnassign: () {
+                      userManagementController.assignManager(user.id, 'unassigned');
+                    },
                   ),
-                ),
-                ...managers.map((m) {
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          m.name,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          m.department.isNotEmpty ? m.department : 'Unassigned',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.gray500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                );
+              }
+            : null,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: isAssigned ? const Color(0xFFF8FAFC) : Colors.white,
+            border: Border.all(color: isAssigned ? const Color(0xFFCBD5E1) : AppTheme.gray300),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      managerName,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: isAssigned ? const Color(0xFF0F172A) : AppTheme.gray500,
+                        fontWeight: isAssigned ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  );
-                }),
-              ];
-            },
-            items: [
-              const DropdownMenuItem<String>(
-                value: 'unassigned',
-                child: Text(
-                  'Unassigned',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
+                    if (matchedManager != null && matchedManager.department.isNotEmpty)
+                      Text(
+                        matchedManager.department,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
-              ...managers.map(
-                (m) => DropdownMenuItem<String>(
-                  value: m.id,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          m.name,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          m.department.isNotEmpty ? m.department : 'Unassigned',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.gray500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              if (canAssign) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.search, size: 14, color: AppTheme.gray500),
+              ],
             ],
-            onChanged: canAssign
-                ? (value) {
-                    if (value != null && value != 'unassigned') {
-                      userManagementController.assignManager(user.id, value);
-                    }
-                  }
-                : null,
           ),
         ),
       );

@@ -25,6 +25,7 @@ class RolePermissionController extends GetxController {
     'Staff',
     'Notifications',
     'Settings',
+    'AutomatedTrading',
   ];
 
   final List<String> availableActions = [];
@@ -117,6 +118,13 @@ class RolePermissionController extends GetxController {
           'settings.upload_payment_qr',
           'settings.manage_roles',
         ];
+      case 'AutomatedTrading':
+        return [
+          'automated_trading.view',
+          'automated_trading.execute',
+          'automated_trading.manage_strategy',
+          'automated_trading.kill_switch',
+        ];
       default:
         return [];
     }
@@ -200,6 +208,12 @@ class RolePermissionController extends GetxController {
       'settings.update': 'Update Settings',
       'settings.upload_payment_qr': 'Upload Payment QR',
       'settings.manage_roles': 'Manage Roles & Permissions',
+
+      // Automated Trading
+      'automated_trading.view': 'View Automated Trading',
+      'automated_trading.execute': 'Execute Trading Signals',
+      'automated_trading.manage_strategy': 'Manage Strategies & Risk',
+      'automated_trading.kill_switch': 'Emergency Kill Switch',
     };
 
     if (labels.containsKey(action)) return labels[action]!;
@@ -287,6 +301,12 @@ class RolePermissionController extends GetxController {
       'settings.update': 'Allows staff to modify and save system configurations.',
       'settings.upload_payment_qr': 'Allows staff to upload and crop official company payment QR codes.',
       'settings.manage_roles': 'Allows staff to create, update, and delete staff roles and permission groups.',
+
+      // Automated Trading
+      'automated_trading.view': 'Allows staff to view automated trading terminals, live signals, and broker status.',
+      'automated_trading.execute': 'Allows staff to manually trigger and dispatch trading signals.',
+      'automated_trading.manage_strategy': 'Allows staff to configure algo strategies, subscriber allocations, and multiplier settings.',
+      'automated_trading.kill_switch': 'Allows staff to pause/resume global algo trading or trigger emergency shutdown.',
     };
 
     if (descriptions.containsKey(action)) return descriptions[action]!;

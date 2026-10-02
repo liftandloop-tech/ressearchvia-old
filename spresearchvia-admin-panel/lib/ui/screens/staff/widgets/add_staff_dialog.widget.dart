@@ -16,7 +16,8 @@ class AddStaffDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ClipRRect(
+      child: SelectionArea(
+        child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -234,45 +235,6 @@ class AddStaffDialog extends StatelessWidget {
                     );
                   }),
                   const SizedBox(height: 14),
-                  // View Only Toggle (Only for Researcher)
-                  Obx(() {
-                    final isResearcher = controller.selectedRole.value.toLowerCase().contains('research') ||
-                        controller.selectedDepartment.value.toLowerCase().contains('research');
-                    if (!isResearcher) {
-                      return const SizedBox.shrink();
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'View Only Mode',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF212529),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Switch(
-                              value: controller.isViewOnly.value,
-                              onChanged: (v) => controller.isViewOnly.value = v,
-                              activeColor: const Color(0xFF0D6EFD),
-                            ),
-                          ],
-                        ),
-                        const Text(
-                          'Restricts researcher to view-only access (no editing/publishing).',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF6C757D),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-                    );
-                  }),
                   // Assigned Director / Supervisor (For all staff roles)
                   Obx(() {
                     final role = controller.selectedRole.value.toLowerCase().trim().isNotEmpty
@@ -706,6 +668,7 @@ class AddStaffDialog extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -11,6 +11,7 @@ class StaffPagination extends StatelessWidget {
   final int itemsPerPage;
   final int currentItemsCount;
   final Function(int) onPageChange;
+  final Function(int)? onItemsPerPageChange;
 
   const StaffPagination({
     super.key,
@@ -21,18 +22,57 @@ class StaffPagination extends StatelessWidget {
     required this.itemsPerPage,
     required this.currentItemsCount,
     required this.onPageChange,
+    this.onItemsPerPageChange,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            '${AppStrings.showing} ${(currentPage - 1) * itemsPerPage + 1}-${((currentPage - 1) * itemsPerPage + currentItemsCount)} ${AppStrings.of} $totalItems ${title.toLowerCase()}',
-            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          Row(
+            children: [
+              Text(
+                '${AppStrings.showing} ${(currentPage - 1) * itemsPerPage + 1}-${((currentPage - 1) * itemsPerPage + currentItemsCount)} ${AppStrings.of} $totalItems ${title.toLowerCase()}',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              if (onItemsPerPageChange != null) ...[
+                const SizedBox(width: 20),
+                Text(
+                  'Rows per page:',
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppTheme.gray300),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: itemsPerPage,
+                      isDense: true,
+                      style: TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
+                      items: const [10, 25, 50, 100].map((int val) {
+                        return DropdownMenuItem<int>(
+                          value: val,
+                          child: Text('$val'),
+                        );
+                      }).toList(),
+                      onChanged: (int? newVal) {
+                        if (newVal != null && newVal != itemsPerPage) {
+                          onItemsPerPageChange!(newVal);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           Row(
             children: [

@@ -87,7 +87,7 @@ class StaffDetailsScreen extends StatelessWidget {
                         case 2:
                           return _buildCareerTab(staff);
                         case 3:
-                          return _buildDocumentsTab(context, staff);
+                          return _buildDocumentsTab(context, staff, controller);
                         default:
                           return _buildOverviewTab(staff);
                       }
@@ -283,6 +283,8 @@ class StaffDetailsScreen extends StatelessWidget {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        _buildAgreementPill(staff.agreementStatus),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -690,23 +692,521 @@ class StaffDetailsScreen extends StatelessWidget {
   // ---------------------------------------------------------------------------
   // Tab 4: KYC & Documents
   // ---------------------------------------------------------------------------
-  Widget _buildDocumentsTab(BuildContext context, StaffModel staff) {
-    return _buildSectionCard(
-      title: 'Uploaded Compliance & Verification Media',
-      subtitle: 'Mandatory KYC documentation, identity proofs, and education verification files.',
+  Widget _buildDocumentsTab(BuildContext context, StaffModel staff, StaffDetailsController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildAgreementSection(context, staff, controller),
+        const SizedBox(height: 16),
+        _buildSectionCard(
+          title: 'Uploaded Compliance & Verification Media',
+          subtitle: 'Mandatory KYC documentation, identity proofs, and education verification files.',
+          child: Column(
+            children: [
+              _buildCompactDocTile(context, 'Resume / CV', staff.resumeUrl, Icons.description_outlined),
+              const SizedBox(height: 8),
+              _buildCompactDocTile(context, 'PAN Card', staff.panUrl, Icons.credit_card_outlined),
+              const SizedBox(height: 8),
+              _buildCompactDocTile(context, 'Aadhaar Card', staff.aadhaarUrl, Icons.badge_outlined),
+              const SizedBox(height: 8),
+              _buildCompactDocTile(context, 'NISM Certification', staff.nismUrl, Icons.verified_user_outlined),
+              const SizedBox(height: 8),
+              _buildCompactDocTile(context, 'Highest Education Degree', staff.highestEducationUrl, Icons.school_outlined),
+              const SizedBox(height: 8),
+              _buildCompactDocTile(context, 'KYC Verification Video', staff.kycVideoUrl, Icons.videocam_outlined, isVideo: true),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAgreementSection(BuildContext context, StaffModel staff, StaffDetailsController controller) {
+    final status = staff.agreementStatus;
+    final isVerified = status == 'VERIFIED';
+    final isPendingVerification = status == 'PENDING_ADMIN_VERIFICATION';
+    final isRejected = status == 'REJECTED';
+    final isPendingSignature = status == 'PENDING_SIGNATURE';
+
+    final agreementUrl = staff.serviceAgreementDocUrl?.isNotEmpty == true
+        ? staff.serviceAgreementDocUrl!
+        : AppConfig.buildApiUrl('/staff/agreement/document/${staff.id}');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isPendingVerification
+              ? const Color(0xFFC084FC)
+              : (isVerified ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
+          width: isPendingVerification ? 1.5 : 1,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x04000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildCompactDocTile(context, 'Resume / CV', staff.resumeUrl, Icons.description_outlined),
-          const SizedBox(height: 8),
-          _buildCompactDocTile(context, 'PAN Card', staff.panUrl, Icons.credit_card_outlined),
-          const SizedBox(height: 8),
-          _buildCompactDocTile(context, 'Aadhaar Card', staff.aadhaarUrl, Icons.badge_outlined),
-          const SizedBox(height: 8),
-          _buildCompactDocTile(context, 'NISM Certification', staff.nismUrl, Icons.verified_user_outlined),
-          const SizedBox(height: 8),
-          _buildCompactDocTile(context, 'Highest Education Degree', staff.highestEducationUrl, Icons.school_outlined),
-          const SizedBox(height: 8),
-          _buildCompactDocTile(context, 'KYC Verification Video', staff.kycVideoUrl, Icons.videocam_outlined, isVideo: true),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isPendingVerification
+                      ? const Color(0xFFFAF5FF)
+                      : (isVerified ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isPendingVerification
+                        ? const Color(0xFFE9D5FF)
+                        : (isVerified ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0)),
+                  ),
+                ),
+                child: Icon(
+                  isPendingVerification
+                      ? Icons.assignment_late_outlined
+                      : (isVerified ? Icons.verified_user_outlined : Icons.description_outlined),
+                  size: 20,
+                  color: isPendingVerification
+                      ? const Color(0xFF9333EA)
+                      : (isVerified ? const Color(0xFF16A34A) : const Color(0xFF475569)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Employment Service Agreement',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _buildAgreementPill(status),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Official legally-binding Digio e-sign workflow and administrative compliance verification.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 14),
+
+          // Context Alert Banner based on status
+          if (isPendingVerification) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAF5FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE9D5FF)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFF9333EA), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Staff Has Completed Digio E-Signature',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF581C87),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'The employee has signed their employment agreement. Please preview the signed document below and either verify it to grant full dashboard access or reject it with feedback.',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF7E22CE), height: 1.35),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else if (isVerified) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Agreement verified and active. The legally binding digital contract is on file.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF15803D)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else if (isRejected) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Agreement Rejected by Administrator',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF991B1B)),
+                      ),
+                    ],
+                  ),
+                  if (staff.agreementRejectionReason?.isNotEmpty == true) ...[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 26),
+                      child: Text(
+                        'Reason: "${staff.agreementRejectionReason}"',
+                        style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFFB91C1C)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else if (isPendingSignature) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.hourglass_top, color: Color(0xFFD97706), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Agreement dispatched via Digio. Awaiting candidate / employee electronic signature.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Action Toolbar
+          Obx(() {
+            final isVerifying = controller.isVerifying.value;
+            final isRejecting = controller.isRejecting.value;
+            final isInitiating = controller.isInitiatingAgreement.value;
+
+            return Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                // Preview Button (always accessible if doc exists or signed)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => FilePreviewDialog(
+                        fileName: '${staff.name}_Employment_Agreement.pdf',
+                        fileUrl: agreementUrl,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.remove_red_eye_outlined, size: 15),
+                  label: const Text('Preview Agreement PDF', style: TextStyle(fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1E293B),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+
+                // If Pending Admin Verification -> Show Verify and Reject buttons
+                if (isPendingVerification) ...[
+                  ElevatedButton.icon(
+                    onPressed: (isVerifying || isRejecting)
+                        ? null
+                        : () => controller.verifyAgreement(),
+                    icon: isVerifying
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.check_circle_rounded, size: 16),
+                    label: Text(
+                      isVerifying ? 'Verifying...' : 'Verify & Approve Agreement',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: (isVerifying || isRejecting)
+                        ? null
+                        : () => _showRejectModal(context, controller),
+                    icon: isRejecting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+                          )
+                        : const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
+                    label: const Text(
+                      'Reject Agreement',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFDC2626)),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      backgroundColor: const Color(0xFFFEF2F2),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ],
+
+                // If Verified -> Admin can also Reject / Revoke agreement
+                if (isVerified) ...[
+                  OutlinedButton.icon(
+                    onPressed: (isVerifying || isRejecting)
+                        ? null
+                        : () => _showRejectModal(context, controller),
+                    icon: isRejecting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)),
+                          )
+                        : const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFDC2626)),
+                    label: const Text(
+                      'Reject / Revoke Agreement',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFDC2626)),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      backgroundColor: const Color(0xFFFEF2F2),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ],
+
+                // If Not Initiated or Rejected or Pending Signature -> Allow Re-dispatching
+                if (!isVerified && !isPendingVerification) ...[
+                  ElevatedButton.icon(
+                    onPressed: isInitiating ? null : () => controller.initiateAgreement(),
+                    icon: isInitiating
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.send_rounded, size: 15),
+                    label: Text(
+                      isInitiating
+                          ? 'Dispatching...'
+                          : (isPendingSignature ? 'Resend Digio Signing Link' : 'Dispatch Digio Agreement'),
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryBlue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _showRejectModal(BuildContext context, StaffDetailsController controller) {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Reject Employment Agreement',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please provide a clear reason for rejecting the agreement. The employee will receive this feedback and will be instructed to revise and re-sign.',
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: textController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'e.g., Aadhaar mismatch, salary terms need revision, signature illegible...',
+                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFEF4444)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = textController.text.trim();
+              if (reason.isEmpty) {
+                Get.snackbar('Reason Required', 'Please enter a rejection reason.',
+                    backgroundColor: Colors.orange.withValues(alpha: 0.1));
+                return;
+              }
+              Navigator.of(ctx).pop();
+              await controller.rejectAgreement(reason);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('Confirm Rejection'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgreementPill(String? status) {
+    Color bg;
+    Color border;
+    Color text;
+    IconData icon;
+    String label;
+
+    switch (status) {
+      case 'VERIFIED':
+        bg = const Color(0xFFF0FDF4);
+        border = const Color(0xFFBBF7D0);
+        text = const Color(0xFF16A34A);
+        icon = Icons.verified_user_rounded;
+        label = 'Agreement Verified';
+        break;
+      case 'PENDING_ADMIN_VERIFICATION':
+        bg = const Color(0xFFFAF5FF);
+        border = const Color(0xFFE9D5FF);
+        text = const Color(0xFF9333EA);
+        icon = Icons.pending_actions_rounded;
+        label = 'Agreement Needs Verification';
+        break;
+      case 'PENDING_SIGNATURE':
+        bg = const Color(0xFFFFFBEB);
+        border = const Color(0xFFFDE68A);
+        text = const Color(0xFFD97706);
+        icon = Icons.draw_rounded;
+        label = 'Awaiting Staff Signature';
+        break;
+      case 'REJECTED':
+        bg = const Color(0xFFFEF2F2);
+        border = const Color(0xFFFECACA);
+        text = const Color(0xFFDC2626);
+        icon = Icons.cancel_outlined;
+        label = 'Agreement Rejected';
+        break;
+      default:
+        bg = const Color(0xFFF8FAFC);
+        border = const Color(0xFFE2E8F0);
+        text = const Color(0xFF64748B);
+        icon = Icons.article_outlined;
+        label = 'Agreement Not Initiated';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: text),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: text,
+            ),
+          ),
         ],
       ),
     );

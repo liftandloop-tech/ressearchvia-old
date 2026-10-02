@@ -1032,8 +1032,9 @@ class PendingBankTransfersScreen extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: Colors.white,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Container(
-          width: 1150,
+        child: SelectionArea(
+          child: Container(
+            width: 1150,
           constraints: BoxConstraints(maxHeight: Get.height * 0.9),
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -1372,6 +1373,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
               ],
             );
           }),
+        ),
         ),
       ),
     );
@@ -2869,8 +2871,9 @@ class PendingBankTransfersScreen extends StatelessWidget {
     Get.dialog(
       Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          width: 800,
+        child: SelectionArea(
+          child: Container(
+            width: 800,
           constraints: BoxConstraints(maxHeight: Get.height * 0.9),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -3594,6 +3597,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

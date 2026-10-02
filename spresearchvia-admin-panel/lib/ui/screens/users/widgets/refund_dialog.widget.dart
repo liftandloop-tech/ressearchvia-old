@@ -250,7 +250,8 @@ class _RefundDialogState extends State<RefundDialog> {
     // Double confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => SelectionArea(
+        child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
@@ -327,7 +328,8 @@ class _RefundDialogState extends State<RefundDialog> {
           ),
         ],
       ),
-    );
+    ),
+  );
 
     if (confirmed != true) return;
 
@@ -398,8 +400,9 @@ class _RefundDialogState extends State<RefundDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 16,
       backgroundColor: Colors.transparent,
-      child: Container(
-        width: 820,
+      child: SelectionArea(
+        child: Container(
+          width: 820,
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.92,
         ),
@@ -519,6 +522,7 @@ class _RefundDialogState extends State<RefundDialog> {
             _buildFooter(),
           ],
         ),
+      ),
       ),
     );
   }

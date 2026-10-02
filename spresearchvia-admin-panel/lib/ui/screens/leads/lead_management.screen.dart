@@ -11,6 +11,7 @@ import 'package:spresearch_web/models/lead_pool.model.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
+import 'widgets/click_to_call_dialog.widget.dart';
 
 class LeadManagementScreen extends StatelessWidget {
   const LeadManagementScreen({super.key});
@@ -429,7 +430,22 @@ class LeadManagementScreen extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  DataCell(Text(lead.mobileNumber)),
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(lead.mobileNumber),
+                                        const SizedBox(width: 6),
+                                        IconButton(
+                                          icon: const Icon(Icons.phone_in_talk, color: Colors.green, size: 17),
+                                          tooltip: 'Call Lead (Airtel Virtual SIM)',
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () => _showClickToCallDialog(context, lead, controller),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                   DataCell(
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1052,9 +1068,28 @@ class LeadManagementScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              Text(
-                'Add Follow-up for ${lead.fullName}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Add Follow-up for ${lead.fullName}',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Get.back();
+                      _showClickToCallDialog(context, lead, controller);
+                    },
+                    icon: const Icon(Icons.phone_in_talk, size: 16, color: Colors.green),
+                    label: const Text('Call Lead', style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.green),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               if (lead.followUps.isNotEmpty) ...[
@@ -2017,5 +2052,16 @@ class LeadManagementScreen extends StatelessWidget {
       ),
     ),
   );
+  }
+
+  void _showClickToCallDialog(BuildContext context, LeadModel lead, LeadsController controller) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => ClickToCallDialog(
+        lead: lead,
+        onFollowUpSaved: () => controller.fetchLeads(),
+      ),
+    );
   }
 }

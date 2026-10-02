@@ -8,7 +8,7 @@ const auth = {
         try {
             const authHeader = req.headers['authorization'];
             if (!authHeader) {
-                return res.status(401).json('Unauthorize user');
+                return res.status(401).json({ status: 401, error: "UNAUTHORIZED", message: "Unauthorized user" });
             }
 
             // Extract token from "Bearer <token>" format

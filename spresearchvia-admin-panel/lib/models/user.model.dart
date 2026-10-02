@@ -1,3 +1,6 @@
+import 'package:get/get.dart';
+import 'package:spresearch_web/controllers/settings/role_permission.controller.dart';
+
 class UserModel {
   final String id;
   final String firstName;
@@ -24,6 +27,8 @@ class UserModel {
   final String userStatus; // ACTIVE or SUSPENDED
   final bool isViewOnly;
   final bool hasSignedAgreement;
+  final String agreementStatus;
+  final String? agreementRejectionReason;
   final Map<String, dynamic>? rawJson;
 
   UserModel({
@@ -52,6 +57,8 @@ class UserModel {
     this.userStatus = 'ACTIVE',
     this.isViewOnly = false,
     this.hasSignedAgreement = false,
+    this.agreementStatus = 'PENDING_SIGNATURE',
+    this.agreementRejectionReason,
     this.rawJson,
   });
 
@@ -65,6 +72,24 @@ class UserModel {
     if (rawJson?['roleId'] is Map && rawJson!['roleId']['departmentId'] is Map) {
       return rawJson!['roleId']['departmentId'] as Map;
     }
+    try {
+      if (Get.isRegistered<RolePermissionController>()) {
+        final rpc = Get.find<RolePermissionController>();
+        final name = departmentName.toLowerCase().trim();
+        final rawDeptId = rawJson?['departmentId']?.toString();
+        final match = rpc.departments.firstWhereOrNull(
+          (d) => (name.isNotEmpty && d.name.toLowerCase().trim() == name) || (rawDeptId != null && d.id == rawDeptId)
+        );
+        if (match != null) {
+          return {
+            '_id': match.id,
+            'name': match.name,
+            'isGlobal': match.isGlobal,
+            'assignedPages': match.assignedPages,
+          };
+        }
+      }
+    } catch (_) {}
     return null;
   }
 
@@ -119,12 +144,16 @@ class UserModel {
   bool get isDirector {
     final r = roleName.toLowerCase();
     final d = departmentName.toLowerCase();
-    return r == 'director' || d == 'management' || roleLevel == 1;
+    final isExecutiveTitle = RegExp(r'executive|analyst|bde|intern|trainee|junior|back office|associate', caseSensitive: false).hasMatch(r);
+    if (isExecutiveTitle) return false;
+    return r.contains('director') || d == 'management';
   }
 
   bool get isManager {
     final r = roleName.toLowerCase();
-    return r.contains('manager') || r.contains('head') || roleLevel == 2;
+    final isExecutiveTitle = RegExp(r'executive|analyst|bde|intern|trainee|junior|back office|associate', caseSensitive: false).hasMatch(r);
+    if (isExecutiveTitle) return false;
+    return r.contains('manager') || r.contains('team leader') || r.contains('lead') || r.contains('supervisor') || r.contains('head');
   }
 
   bool get isSupervisor => isDirector || isManager;
@@ -209,19 +238,53 @@ class UserModel {
       userStatus: json['userStatus'] ?? 'ACTIVE',
       isViewOnly: json['isViewOnly'] ?? false,
       hasSignedAgreement: json['hasSignedAgreement'] == true || json['hasSignedAgreement'] == 'true',
+      agreementStatus: (json['agreementStatus']?.toString() ??
+              (json['hasSignedAgreement'] == true
+                  ? 'PENDING_ADMIN_VERIFICATION'
+                  : 'PENDING_SIGNATURE'))
+          .toUpperCase(),
+      agreementRejectionReason: json['agreementRejectionReason']?.toString(),
       rawJson: json,
     );
   }
 
   /// Whether this user is an active employee who must sign the job terms agreement
   /// before accessing internal features.
+  /// When agreement is pending review / verification, staff CAN surf their assigned panel.
+  /// When agreement is REJECTED, staff is locked and redirected to eSign until approved.
   bool get needsJobAgreement {
     if (isAdmin) return false;
     final isStaff = rawJson?['staffId'] != null ||
         rawJson?['stage'] == 'Employee' ||
         roleData != null ||
         departmentData != null;
-    return isStaff && !hasSignedAgreement;
+    if (!isStaff) return false;
+
+    final status = (agreementStatus.isNotEmpty
+            ? agreementStatus
+            : (rawJson?['agreementStatus']?.toString() ?? ''))
+        .toUpperCase();
+
+    // 1. If agreement was rejected by admin, staff MUST re-sign -> redirect to eSign
+    if (status == 'REJECTED') {
+      return true;
+    }
+
+    // 2. If agreement is verified, full access granted
+    if (status == 'VERIFIED') {
+      return false;
+    }
+
+    // 3. If agreement is pending review / verification, allow staff to surf their assigned panel
+    if (status == 'PENDING_ADMIN_VERIFICATION' ||
+        status == 'PENDING_REVIEW' ||
+        status == 'PENDING_FOR_REVIEW' ||
+        hasSignedAgreement) {
+      return false;
+    }
+
+    // 4. Otherwise (PENDING_SIGNATURE, NOT_INITIATED, etc.), staff must sign
+    return true;
   }
 
   /// Checks whether the user's assigned department has access to the specified page.
@@ -273,6 +336,10 @@ class UserModel {
         if ((key == 'settings') && assigned.contains('settings')) {
           return true;
         }
+        if ((key == 'automatedtrading' || key == 'automated_trading' || key == 'automated trading') &&
+            (assigned.contains('automatedtrading') || assigned.contains('automated_trading'))) {
+          return true;
+        }
         if ((key == 'attendance') && (assigned.contains('attendance') || assigned.contains('staff'))) {
           return true;
         }
@@ -282,7 +349,14 @@ class UserModel {
       }
     }
 
-    // If department has not explicitly restricted pages via assignedPages, allow access subject to role permissions
+    // Default policy: SENSITIVE pages (Dashboard, Settings, AutomatedTrading) are STRICTLY RESTRICTED.
+    // Non-admin users cannot access Dashboard or Settings unless explicitly assigned in their department!
+    final key = pageKey.toLowerCase().trim();
+    if (key == 'dashboard' || key == 'settings' || key == 'automatedtrading' || key == 'automated_trading') {
+      return false;
+    }
+
+    // If department has not explicitly restricted other pages via assignedPages, allow access subject to role permissions
     return true;
   }
 
@@ -295,6 +369,7 @@ class UserModel {
     if (f == 'payments' || f == 'payment') return 'Payments';
     if (f == 'subscriptions' || f == 'subscription' || f == 'plans' || f == 'segments') return 'Subscriptions';
     if (f == 'reports' || f == 'report') return 'Reports';
+    if (f == 'automatedtrading' || f == 'automated_trading' || f == 'automated trading') return 'AutomatedTrading';
     if (f == 'notifications' || f == 'notification') return 'Notifications';
     if (f == 'staff' || f == 'applicant' || f == 'applicants') return 'Staff';
     if (f == 'settings' || f == 'roles' || f == 'permissiongroups') return 'Settings';

@@ -36,6 +36,12 @@ export const AVAILABLE_DEPARTMENT_PAGES = [
         features: ['Reports']
     },
     {
+        key: 'AutomatedTrading',
+        label: 'Automated Trading & Algo Gateways',
+        description: 'Multi-tenant automated order distribution, strategy execution, risk controls, and broker gateways',
+        features: ['AutomatedTrading']
+    },
+    {
         key: 'Payments',
         label: 'Payments & Approvals',
         description: 'Review bank transfers and verify payment operations',

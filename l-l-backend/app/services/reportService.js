@@ -330,6 +330,8 @@ const reportService = {
             // Enhanced Date Range Support
             let newStartDate = startDate ? new Date(startDate) : null;
             let newEndDate = endDate ? new Date(endDate) : null;
+            if (newStartDate) newStartDate.setHours(0, 0, 0, 0);
+            if (newEndDate) newEndDate.setHours(23, 59, 59, 999);
 
             if (newStartDate && newEndDate == null) {
                 queryArg.published_at = { $gte: newStartDate };
@@ -694,15 +696,17 @@ const reportService = {
 
             let newStartDate = startDate ? new Date(startDate) : null;
             let newEndDate = endDate ? new Date(endDate) : null;
+            if (newStartDate) newStartDate.setHours(0, 0, 0, 0);
+            if (newEndDate) newEndDate.setHours(23, 59, 59, 999);
 
             if (newStartDate && newEndDate == null) {
-                queryArgs.createdAt = { $gte: newStartDate.toISOString() };
+                queryArgs.createdAt = { $gte: newStartDate };
             }
             if (newEndDate && newStartDate == null) {
-                queryArgs.createdAt = { $lte: newEndDate.toISOString() };
+                queryArgs.createdAt = { $lte: newEndDate };
             }
             if (newStartDate && newEndDate) {
-                queryArgs.createdAt = { $gte: newStartDate.toISOString(), $lte: newEndDate.toISOString() }
+                queryArgs.createdAt = { $gte: newStartDate, $lte: newEndDate };
             }
 
             if (segmentId) {

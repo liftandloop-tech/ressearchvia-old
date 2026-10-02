@@ -4,7 +4,7 @@ import { type } from "os";
 const userSchema = new mongoose.Schema({
     fullName: {
         type: String,
-        require: true
+        required: true
     },
     userId: {
         type: String,
@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
     },
     userObject: {
         type: Object,
-        require: true
+        required: true
     },
     panNumber: {
         type: String,
@@ -37,15 +37,17 @@ const userSchema = new mongoose.Schema({
     },
     phone: {
         type: String,
-        require: true,
+        required: true,
         unique: true,
         index: true
     },
     otp: {
         type: Number,
+        select: false,
     },
     otpExpires: {
-        type: Number
+        type: Number,
+        select: false,
     },
     // mPin is replaced by mpinHash
     // status is replaced by userStatus
@@ -114,7 +116,8 @@ const userSchema = new mongoose.Schema({
     },
     refreshTokenHash: {
         type: String,
-        default: null
+        default: null,
+        select: false,
     },
     refreshTokenExpiresAt: {
         type: Date,

@@ -411,6 +411,10 @@ class UserDetailsController extends GetxController {
       }
       return '${AppConfig.apiBaseUrl}/user/kyc/image/$manual';
     }
+    final digioId = userDetails.value?.digioDocumentId;
+    if (digioId != null && digioId.isNotEmpty) {
+      return '${AppConfig.apiBaseUrl}/user/kyc/digio-document/$digioId';
+    }
     return null;
   }
 
@@ -435,8 +439,14 @@ class UserDetailsController extends GetxController {
 
   Future<void> previewSignedDocument() async {
     final manual = userDetails.value?.manualServiceAgreement;
+    final digioId = userDetails.value?.digioDocumentId;
+
     if (manual != null && manual.isNotEmpty) {
-      final url = signedDocumentUrl!;
+      final url = signedDocumentUrl;
+      if (url == null) {
+        Get.snackbar('Notice', 'No signed document URL available for preview');
+        return;
+      }
       final isPdf = manual.toLowerCase().endsWith('.pdf');
 
       if (isPdf) {
@@ -510,7 +520,7 @@ class UserDetailsController extends GetxController {
           ),
         );
       }
-    } else if (userDetails.value?.digioDocumentId != null) {
+    } else if (digioId != null && digioId.isNotEmpty) {
       await viewServiceAgreement();
     } else {
       Get.snackbar('Notice', 'No signed document uploaded yet');

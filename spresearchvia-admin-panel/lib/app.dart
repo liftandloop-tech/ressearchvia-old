@@ -28,9 +28,7 @@ class App extends StatelessWidget {
           onPointerUp: (_) => InactivityService.recordIfRegistered(),
           onPointerSignal: (_) => InactivityService.recordIfRegistered(),
           onPointerHover: (_) => InactivityService.recordIfRegistered(),
-          child: SelectionArea(
-            child: child ?? const SizedBox.shrink(),
-          ),
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );

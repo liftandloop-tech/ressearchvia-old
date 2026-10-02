@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../../config/app.config.dart';
+import '../../../config/navigation.config.dart';
 import '../../../config/theme.config.dart';
 import '../../../controllers/staff/staff_profile.controller.dart';
 import '../../../models/staff.model.dart';
 import '../../layouts/dashboard_layout.widget.dart';
+import '../../widgets/file_preview_dialog.widget.dart';
 import 'widgets/staff_digital_id_dialog.widget.dart';
 
 class StaffProfileScreen extends StatelessWidget {
@@ -130,6 +133,8 @@ class StaffProfileScreen extends StatelessWidget {
                             flex: 2,
                             child: Column(
                               children: [
+                                _buildEmploymentAgreementCard(context, staff),
+                                const SizedBox(height: 24),
                                 _buildMpinSecurityCard(context, controller),
                                 const SizedBox(height: 24),
                                 _buildOrganizationInfoCard(context, staff),
@@ -142,6 +147,8 @@ class StaffProfileScreen extends StatelessWidget {
                       return Column(
                         children: [
                           _buildPersonalInfoCard(context, controller),
+                          const SizedBox(height: 24),
+                          _buildEmploymentAgreementCard(context, staff),
                           const SizedBox(height: 24),
                           _buildWalkInFormCard(context, staff),
                           const SizedBox(height: 24),
@@ -869,6 +876,221 @@ class StaffProfileScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEmploymentAgreementCard(BuildContext context, StaffModel staff) {
+    final status = staff.agreementStatus.toUpperCase();
+    final isVerified = status == 'VERIFIED';
+    final isPendingVerification = status == 'PENDING_ADMIN_VERIFICATION' || status == 'PENDING_REVIEW' || status == 'PENDING_FOR_REVIEW';
+    final isRejected = status == 'REJECTED';
+    final isPendingSignature = status == 'PENDING_SIGNATURE' || status == 'NOT_INITIATED';
+
+    final agreementUrl = staff.serviceAgreementDocUrl?.isNotEmpty == true
+        ? staff.serviceAgreementDocUrl!
+        : AppConfig.buildApiUrl('/staff/agreement/document/${staff.id}');
+
+    Color statusBg;
+    Color statusBorder;
+    Color statusColor;
+    IconData statusIcon;
+    String statusTitle;
+    String statusDesc;
+
+    if (isVerified) {
+      statusBg = const Color(0xFFF0FDF4);
+      statusBorder = const Color(0xFFBBF7D0);
+      statusColor = const Color(0xFF16A34A);
+      statusIcon = Icons.verified_user_rounded;
+      statusTitle = 'Agreement Verified & Active';
+      statusDesc = 'Your signed employment agreement has been reviewed and verified by HR Compliance.';
+    } else if (isPendingVerification) {
+      statusBg = const Color(0xFFFAF5FF);
+      statusBorder = const Color(0xFFE9D5FF);
+      statusColor = const Color(0xFF9333EA);
+      statusIcon = Icons.hourglass_top_rounded;
+      statusTitle = 'Awaiting Administrator Review';
+      statusDesc = 'Your Digio e-signature is recorded! Your agreement is pending final review by Administration.';
+    } else if (isRejected) {
+      statusBg = const Color(0xFFFEF2F2);
+      statusBorder = const Color(0xFFFECACA);
+      statusColor = const Color(0xFFDC2626);
+      statusIcon = Icons.cancel_rounded;
+      statusTitle = 'Agreement Requires Revision';
+      statusDesc = staff.agreementRejectionReason?.isNotEmpty == true
+          ? 'Rejection reason: "${staff.agreementRejectionReason}"'
+          : 'Your submitted agreement was not approved by administration. Please re-sign with updated details.';
+    } else {
+      statusBg = const Color(0xFFFFFBEB);
+      statusBorder = const Color(0xFFFDE68A);
+      statusColor = const Color(0xFFD97706);
+      statusIcon = Icons.draw_rounded;
+      statusTitle = 'Signature Required';
+      statusDesc = 'Please complete your Aadhaar electronic signature on Digio to finalize onboarding.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.assignment_outlined, color: AppTheme.primaryBlue, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Employment Agreement',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Official legally-binding digital contract and compliance record',
+                      style: TextStyle(fontSize: 12, color: AppTheme.gray500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: AppTheme.gray100),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: statusBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: statusBorder),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(statusIcon, color: statusColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        statusTitle,
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: statusColor),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        statusDesc,
+                        style: TextStyle(fontSize: 12, color: statusColor.withOpacity(0.9), height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (staff.agreementSignedAt != null && staff.agreementSignedAt!.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Signed On:', style: TextStyle(fontSize: 12.5, color: AppTheme.gray600)),
+                Text(
+                  staff.agreementSignedAt!,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Signing Method:', style: TextStyle(fontSize: 12.5, color: AppTheme.gray600)),
+              Text(
+                staff.agreementSignature ?? 'Digio Aadhaar E-Sign',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              if (isVerified || isPendingVerification || staff.serviceAgreementDocUrl != null)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => FilePreviewDialog(
+                        fileName: '${staff.name}_Employment_Agreement.pdf',
+                        fileUrl: agreementUrl,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                  label: const Text('Preview Signed Agreement', style: TextStyle(fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryBlue,
+                    side: BorderSide(color: AppTheme.primaryBlue.withOpacity(0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              if (isRejected)
+                ElevatedButton.icon(
+                  onPressed: () => Get.toNamed(AppRoutes.jobTermsAgreement),
+                  icon: const Icon(Icons.edit_document, size: 16),
+                  label: const Text('Re-Sign Agreement via Digio', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              if (isPendingSignature)
+                ElevatedButton.icon(
+                  onPressed: () => Get.toNamed(AppRoutes.jobTermsAgreement),
+                  icon: const Icon(Icons.draw, size: 16),
+                  label: const Text('Complete Aadhaar E-Sign', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

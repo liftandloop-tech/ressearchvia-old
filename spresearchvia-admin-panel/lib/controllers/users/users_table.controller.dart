@@ -2,8 +2,10 @@ import 'package:get/get.dart';
 import 'package:spresearch_web/controllers/users/user_management.controller.dart';
 
 class UsersTableController extends GetxController {
-  final UserManagementController _userManagementController =
-      Get.find<UserManagementController>();
+  UserManagementController get _userManagementController =>
+      Get.isRegistered<UserManagementController>()
+          ? Get.find<UserManagementController>()
+          : Get.put(UserManagementController(), permanent: true);
 
   RxInt get currentPage => _userManagementController.currentPage;
   RxInt get itemsPerPage => _userManagementController.pageSize;

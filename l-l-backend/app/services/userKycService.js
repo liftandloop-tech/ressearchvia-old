@@ -698,9 +698,9 @@ const userkycService = {
                     data: { aadhaarFrontFile: null, aadhaarBackFile: null, panCardFile: null }
                 };
             }
-            let aadhaarFront = userDoc.aadhaar.front.filePath
-            let aadhaarBack = userDoc.aadhaar.back.filePath
-            let pancard = userDoc.pancard.filePath
+            let aadhaarFront = userDoc?.aadhaar?.front?.filePath || null;
+            let aadhaarBack = userDoc?.aadhaar?.back?.filePath || null;
+            let pancard = userDoc?.pancard?.filePath || null;
             return { status: 200, message: "uploaded Document", data: { aadhaarFrontFile: aadhaarFront, aadhaarBackFile: aadhaarBack, panCardFile: pancard } };
         } catch (error) {
             return { status: 400, message: error.message, data: {} }

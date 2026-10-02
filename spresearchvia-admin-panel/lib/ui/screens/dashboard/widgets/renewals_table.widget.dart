@@ -5,6 +5,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard_management.controller.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/ui/widgets/searchable_manager_dialog.widget.dart';
 
 class RenewalsTable extends StatelessWidget {
   const RenewalsTable({super.key});
@@ -375,135 +376,61 @@ class ClientListTile extends StatelessWidget {
             flex: 18, // Assign Manager
             child: Padding(
               padding: const EdgeInsets.only(right: 8.0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.white,
-                  border: Border.all(color: AppTheme.gray300),
+              child: Obx(() {
+                final dmController = Get.find<DashboardManagementController>();
+                final rawStaffList = dmController.staffList;
+                final seenStaffIds = <String>{};
+                final staffList = rawStaffList.where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id)).toList();
+                final currentManagerName = item['manager'] ?? 'Assign Manager';
+                final isAssigned = item['managerId'] != null || (item['manager'] != null && item['manager'] != 'Select');
+
+                return InkWell(
+                  onTap: canAssign
+                      ? () {
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => SearchableManagerDialog(
+                              clientName: item['name'] ?? 'Client',
+                              currentManagerId: item['managerId'],
+                              staffList: staffList,
+                              onSelected: (staffId, staffName) {
+                                dmController.assignManager(item['id'], staffId);
+                              },
+                            ),
+                          );
+                        }
+                      : null,
                   borderRadius: BorderRadius.circular(6),
-                ),
-                child: Obx(() {
-                  final dmController =
-                      Get.find<DashboardManagementController>();
-                  final rawStaffList = dmController.staffList;
-                  final seenStaffIds = <String>{};
-                  final staffList = rawStaffList.where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id)).toList();
-
-                  // Ensure the current value exists in the list of items
-                  String? currentValue = item['managerId'];
-                  if (currentValue != null &&
-                      !staffList.any(
-                        (staff) => staff.id == currentValue,
-                      )) {
-                    currentValue = null;
-                  }
-
-                  return DropdownButton<String>(
-                    value: currentValue,
-                    hint: Text(
-                      item['manager'] ?? 'Select',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textPrimary,
-                        fontFamily: 'Poppins',
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isAssigned ? const Color(0xFFF8FAFC) : Colors.white,
+                      border: Border.all(color: isAssigned ? const Color(0xFFCBD5E1) : AppTheme.gray300),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    isExpanded: true,
-                    itemHeight: null,
-                    underline: const SizedBox(),
-                    icon: Icon(
-                      Icons.keyboard_arrow_down,
-                      size: 18,
-                      color: AppTheme.gray600,
-                    ),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textPrimary,
-                      fontFamily: 'Poppins',
-                    ),
-                    selectedItemBuilder: (BuildContext context) {
-                      return staffList.map<Widget>((staff) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                staff.name,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
-                                  fontFamily: 'Poppins',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                staff.department.isNotEmpty
-                                    ? staff.department
-                                    : 'Unassigned',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: AppTheme.gray500,
-                                  fontFamily: 'Poppins',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList();
-                    },
-                    items: staffList.map((staff) {
-                      return DropdownMenuItem<String>(
-                        value: staff.id,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                staff.name,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textPrimary,
-                                  fontFamily: 'Poppins',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                staff.department.isNotEmpty
-                                    ? staff.department
-                                    : 'Unassigned',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: AppTheme.gray500,
-                                  fontFamily: 'Poppins',
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            currentManagerName,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: isAssigned ? const Color(0xFF0F172A) : AppTheme.gray500,
+                              fontWeight: isAssigned ? FontWeight.w600 : FontWeight.w400,
+                              fontFamily: 'Poppins',
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      );
-                    }).toList(),
-                    onChanged: canAssign
-                        ? (v) {
-                            if (v != null) {
-                              dmController.assignManager(item['id'], v);
-                            }
-                          }
-                        : null,
-                  );
-                }),
-              ),
+                        if (canAssign) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.search, size: 14, color: AppTheme.gray500),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }),
             ),
           ),
         ],

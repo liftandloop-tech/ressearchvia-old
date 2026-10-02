@@ -20,6 +20,8 @@ class ApplicantProfileController extends GetxController {
   var uploadingDocType = ''.obs;
   var applicantId = ''.obs;
   var applicant = Rxn<StaffModel>();
+  final selectedTabIndex = 0.obs;
+  void setTab(int index) => selectedTabIndex.value = index;
 
   // Approval validation errors & state
   final roleError = ''.obs;

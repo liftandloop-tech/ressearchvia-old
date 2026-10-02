@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/config/routes.config.dart';
+import 'package:spresearch_web/controllers/users/users_navigation.controller.dart';
 
 class MainDashboardController extends GetxController {
   var selectedTab = 0.obs;
@@ -109,9 +110,8 @@ class MainDashboardController extends GetxController {
       isAllowed = user.canAccessDepartmentPage('Leads') && user.hasPermission('Leads', 'read');
     } else if (currentRoute.startsWith('/automated-trading')) {
       isAllowed = user.isAdmin ||
-          user.canAccessDepartmentPage('Research') ||
-          user.canAccessDepartmentPage('Trading') ||
-          user.hasPermission('AutomatedTrading', 'read');
+          (user.canAccessDepartmentPage('AutomatedTrading') &&
+              (user.has('automated_trading.view') || user.hasPermission('AutomatedTrading', 'read')));
     } else if (currentRoute.startsWith('/subscriptions')) {
       if (currentRoute.startsWith('/subscriptions/plans/create')) {
         isAllowed = user.isAdmin ||
@@ -123,8 +123,8 @@ class MainDashboardController extends GetxController {
     }
 
     if (!isAllowed) {
-      print('Access restricted for $currentRoute. Redirecting to dashboard...');
-      Future.microtask(() => Get.offNamed(AppRoutes.dashboard));
+      print('Access restricted for $currentRoute. Redirecting to authorized route...');
+      Future.microtask(() => authController.navigateToAuthorizedRoute());
     }
   }
 
@@ -172,6 +172,9 @@ class MainDashboardController extends GetxController {
         Get.offNamed('/dashboard');
         break;
       case 1:
+        if (Get.isRegistered<UsersNavigationController>()) {
+          Get.find<UsersNavigationController>().navigationStack.clear();
+        }
         Get.offNamed('/users');
         break;
       case 2:
@@ -194,6 +197,9 @@ class MainDashboardController extends GetxController {
         }
         break;
       case 7:
+        if (Get.isRegistered<UsersNavigationController>()) {
+          Get.find<UsersNavigationController>().navigationStack.clear();
+        }
         Get.offNamed(AppRoutes.registeredClients);
         break;
       case 8:

@@ -83,9 +83,12 @@ class StaffService extends ApiService {
     }
   }
 
-  Future<List<StaffModel>> getStaffList() async {
+  Future<List<StaffModel>> getStaffList({bool scoped = false}) async {
     try {
-      final response = await get('/staff/list');
+      final response = await get(
+        '/staff/list',
+        query: scoped ? {'scoped': 'true'} : null,
+      );
 
       if (response.status.hasError) {
         String errorMsg = 'Unknown error';
@@ -337,6 +340,36 @@ class StaffService extends ApiService {
     } catch (e) {
       debugPrint('Error getting public verification: $e');
       return null;
+    }
+  }
+
+  Future<bool> verifyStaffAgreement(String staffId) async {
+    try {
+      final response = await post('/staff/agreement/verify/$staffId', {});
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error verifying staff agreement: $e');
+      return false;
+    }
+  }
+
+  Future<bool> rejectStaffAgreement(String staffId, String reason) async {
+    try {
+      final response = await post('/staff/agreement/reject/$staffId', {'reason': reason});
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error rejecting staff agreement: $e');
+      return false;
+    }
+  }
+
+  Future<bool> initiateStaffAgreement(String staffId) async {
+    try {
+      final response = await post('/staff/agreement/initiate/$staffId', {});
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error initiating staff agreement: $e');
+      return false;
     }
   }
 }

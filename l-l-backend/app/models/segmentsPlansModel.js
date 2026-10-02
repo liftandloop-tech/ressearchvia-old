@@ -3,23 +3,23 @@ import mongoose from "mongoose";
 const segmentsPlansSchema = new mongoose.Schema({
     planName: {
         type: String,
-        require: true
+        required: true
     },
     duration: {
         type: String,
-        require: true
+        required: true
     },
     day: {
         type: String,
-        require: true
+        required: true
     },
     price: {
         type: Number,
-        require: true
+        required: true
     },
     perDayCharge: {
         type: Number,
-        require: true
+        required: true
     },
     planStatus: {
         type: String,
@@ -28,11 +28,11 @@ const segmentsPlansSchema = new mongoose.Schema({
     },
     discription: {
         type: String,
-        require: true
+        required: true
     },
     planFeatures: {
         type: String,
-        require: true
+        required: true
     },
     isHni: {
         type: Boolean,

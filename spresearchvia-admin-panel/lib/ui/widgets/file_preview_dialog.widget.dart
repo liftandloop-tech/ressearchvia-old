@@ -51,45 +51,47 @@ class FilePreviewDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Preview: $fileName',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryBlue,
+      child: SelectionArea(
+        child: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Preview: $fileName',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryBlue,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Get.back(),
-                    color: AppTheme.textSecondary,
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Get.back(),
+                      color: AppTheme.textSecondary,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            // Content
-            Expanded(
-              child: Container(
-                color: AppTheme.gray50,
-                child: Center(child: _buildPreviewContent(isPdf, isImage, isVideo)),
+              const Divider(height: 1),
+              // Content
+              Expanded(
+                child: Container(
+                  color: AppTheme.gray50,
+                  child: Center(child: _buildPreviewContent(isPdf, isImage, isVideo)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
