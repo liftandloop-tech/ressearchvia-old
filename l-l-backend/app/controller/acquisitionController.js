@@ -49,9 +49,10 @@ export const uploadProof = async (req, res) => {
     try {
         const { paymentIntentId, transactionDate, amountPaid, utrNumber } = req.body;
         const files = req.files;
+        const userId = req.user?._id || req.user?.userId;
         if (!paymentIntentId || !files || files.length === 0) throw new Error("Missing Payment ID or File");
 
-        const result = await acquisitionService.uploadProof(paymentIntentId, files, { transactionDate, amountPaid, utrNumber });
+        const result = await acquisitionService.uploadProof(paymentIntentId, files, { transactionDate, amountPaid, utrNumber }, userId);
         res.status(200).json({ status: 200, message: "Proof uploaded", data: result });
     } catch (error) {
         res.status(400).json({ status: 400, message: error.message });

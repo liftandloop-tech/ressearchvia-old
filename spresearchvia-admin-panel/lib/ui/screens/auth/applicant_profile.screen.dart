@@ -400,7 +400,7 @@ class ApplicantProfileScreen extends StatelessWidget {
               const SizedBox(width: 6),
             ],
             ElevatedButton.icon(
-              onPressed: isUploading ? null : () => controller.promptUploadChoice(context, type),
+              onPressed: isUploading ? null : () => controller.uploadDoc(type),
               icon: isUploading
                   ? const SizedBox(
                       width: 12,

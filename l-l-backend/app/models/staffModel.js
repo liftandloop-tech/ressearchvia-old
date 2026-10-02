@@ -191,6 +191,23 @@ const staffSchema = new mongoose.Schema({
         type: String,
         default: '1.0'
     },
+    agreementPdfUrl: {
+        type: String,
+        default: null
+    },
+    digioDocId: {
+        type: String,
+        default: null
+    },
+    digioObject: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
+    },
+    digioStatus: {
+        type: String,
+        enum: ['pending', 'verified', 'rejected', 'failed', null],
+        default: null
+    },
 }, { timestamps: true, versionKey: false });
 const staffModel = mongoose.model("staff", staffSchema);
 export default staffModel;

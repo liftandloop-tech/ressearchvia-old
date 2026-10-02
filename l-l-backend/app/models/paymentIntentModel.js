@@ -45,7 +45,7 @@ const paymentIntentSchema = new mongoose.Schema({
     }],
     status: {
         type: String,
-        enum: ["CREATED", "PAID", "FAILED", "PENDING_BANK_TRANSFER", "VERIFICATION_PENDING", "PENDING_ADMIN_APPROVAL", "REJECTED"],
+        enum: ["CREATED", "PROCESSING", "PAID", "FAILED", "PENDING_BANK_TRANSFER", "VERIFICATION_PENDING", "PENDING_ADMIN_APPROVAL", "REJECTED"],
         default: "CREATED"
     },
     paymentMethod: {

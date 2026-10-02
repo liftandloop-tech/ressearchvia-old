@@ -66,9 +66,13 @@ async function testFullE2EFlow() {
             });
         }
         console.log(`   ✓ Test User ready: ${user.firstName} ${user.lastName} (ID: ${user.id})`);
-        console.log('   🔐 Authenticating user session with Zebu Broker API...');
-        const sessionRes = await zebuService.generateSession(ZEBU_CREDENTIALS);
-        console.log(`   ✓ Zebu Session Token generated! (Token snippet: ${sessionRes.accessToken.substring(0, 15)}...)`);
+        console.log('   🔐 Configuring user session with Zebu OAuth...');
+        const sessionRes = {
+            accessToken: `test_zebu_oauth_token_${Date.now()}`,
+            refreshToken: `test_zebu_oauth_refresh_${Date.now()}`,
+            tokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        };
+        console.log(`   ✓ Zebu Session Token configured! (Token snippet: ${sessionRes.accessToken.substring(0, 15)}...)`);
         let userBroker = await prisma.userBroker.findUnique({
             where: { userId_brokerId: { userId: user.id, brokerId: zebuBroker.id } },
         });

@@ -168,5 +168,25 @@ const staffController = {
         }
     },
 
+    initiateDigioAgreement: async (req, res) => {
+        try {
+            const staffId = req.user?._id || req.user?.userId || req.body?.staffId;
+            const response = await staffService.initiateStaffDigioAgreement(staffId);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
+    getAgreementStatus: async (req, res) => {
+        try {
+            const staffId = req.user?._id || req.user?.userId || req.query?.staffId;
+            const response = await staffService.getStaffAgreementStatus(staffId);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: null });
+        }
+    },
+
 }
 export default staffController;

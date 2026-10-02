@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ZebuEndpoints = void 0;
 exports.ZebuEndpoints = {
-    QUICK_AUTH: '/QuickAuth',
     CLIENT_DETAILS: '/ClientDetails',
     LIMITS: '/Limits',
     POSITION_BOOK: '/PositionBook',

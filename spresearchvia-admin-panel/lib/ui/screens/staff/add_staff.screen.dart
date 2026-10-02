@@ -1587,7 +1587,7 @@ class AddStaffScreen extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           ElevatedButton.icon(
-            onPressed: isUploading ? null : () => controller.promptUploadChoice(context, staff.id, type),
+            onPressed: isUploading ? null : () => controller.pickAndUploadDoc(staff.id, type),
             icon: isUploading
                 ? const SizedBox(
                     width: 14,

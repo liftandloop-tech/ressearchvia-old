@@ -8,6 +8,7 @@ import '../services/api_client.service.dart';
 import '../services/api_exception.service.dart';
 import '../services/secure_storage.service.dart';
 import '../services/snackbar.service.dart';
+import '../core/models/user.dart';
 import 'user.controller.dart';
 import 'segment_plan.controller.dart';
 
@@ -37,6 +38,16 @@ class PlanPurchaseController extends GetxController {
     String paymentMode = 'ONLINE', // 'ONLINE' or 'BANK_TRANSFER'
   }) async {
     try {
+      if (Get.isRegistered<UserController>()) {
+        final current = Get.find<UserController>().currentUser.value;
+        if (current != null && current.kycStatus != KycStatus.verified) {
+          SnackbarService.showError(
+            'KYC Verification Required. Please complete KYC verification before purchasing a plan.',
+          );
+          return null;
+        }
+      }
+
       isLoading.value = true;
       final uid = await userId;
       if (uid == null) throw Exception('User not logged in');

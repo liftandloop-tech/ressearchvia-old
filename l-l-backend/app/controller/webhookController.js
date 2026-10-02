@@ -1,5 +1,6 @@
 import userKycModel from "../models/userKycModel.js";
 import userModel from "../models/userModel.js";
+import staffModel from "../models/staffModel.js";
 import crypto from "crypto";
 import KycService from "../services/kycService.js";
 
@@ -52,7 +53,36 @@ const webhookController = {
             }
 
             if (!userKyc) {
-                console.log(`User KYC record not found for Document ID: ${documentId}`);
+                // Check if this Document ID belongs to a Staff Joining Agreement
+                const staff = await staffModel.findOne({
+                    $or: [
+                        { "digioObject.id": documentId },
+                        { "digioObject.document_id": documentId },
+                        { digioDocId: documentId }
+                    ]
+                });
+
+                if (staff) {
+                    console.log(`[Digio Webhook] Processing staff agreement for: ${staff.fullName} (Doc ID: ${documentId})`);
+                    if (status.includes("signed")) {
+                        staff.hasSignedAgreement = true;
+                        staff.agreementSignedAt = new Date();
+                        staff.agreementSignature = "Digio Aadhaar E-Sign";
+                        staff.digioStatus = "verified";
+                        console.log(`[Digio Webhook] Staff agreement signed successfully for: ${staff.fullName}`);
+                    } else if (status.includes("rejected")) {
+                        staff.digioStatus = "rejected";
+                    } else if (status.includes("failed")) {
+                        staff.digioStatus = "failed";
+                    }
+                    if (staff.digioObject) {
+                        staff.digioObject.lastWebhook = { event, payload, receivedAt: new Date() };
+                    }
+                    await staff.save();
+                    return res.status(200).send("Staff agreement webhook processed");
+                }
+
+                console.log(`Neither User KYC nor Staff record found for Document ID: ${documentId}`);
                 // Return 200 to Digio so they don't retry endlessly for a missing local record
                 return res.status(200).send("Record not found locally");
             }

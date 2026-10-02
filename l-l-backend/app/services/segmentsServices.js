@@ -1506,21 +1506,43 @@ const segmentsService = {
         razorpay_signature,
       } = body;
 
-      const segmentsPayment = await segmentsPaymentModel.findOne({
-        razorpayOrderId: razorpay_order_id,
-      });
+      // Atomic concurrency lock against race conditions
+      const segmentsPayment = await segmentsPaymentModel.findOneAndUpdate(
+        { razorpayOrderId: razorpay_order_id, paymentStatus: { $ne: 'paid' } },
+        { $set: { paymentStatus: 'processing' } },
+        { new: true }
+      );
 
-      if (segmentsPayment.paymentStatus === 'paid') {
+      if (!segmentsPayment) {
+        const existing = await segmentsPaymentModel.findOne({ razorpayOrderId: razorpay_order_id });
+        if (existing && (existing.paymentStatus === 'paid' || existing.paymentStatus === 'processing')) {
+          return {
+            status: 200,
+            success: true,
+            message: "Payment already processed",
+            data: { segmentsPayment: existing },
+          };
+        }
         return {
-          status: 200,
-          success: true,
-          message: "Payment already processed",
-          data: { segmentsPayment },
+          status: 404,
+          success: false,
+          message: "Payment record not found",
+          data: {},
         };
       }
 
-      if (segmentsPayment) {
-        // Idempotency check handled above
+      // KYC Gate: Re-verify KYC before activating plan entitlement
+      const user = await userModel.findById(segmentsPayment.userId);
+      const validKycStatus = ['VERIFIED', 'APPROVED'];
+      if (!user || !validKycStatus.includes(user.kycStatus)) {
+        segmentsPayment.paymentStatus = 'pending';
+        await segmentsPayment.save();
+        return {
+          status: 403,
+          success: false,
+          message: `KYC Verification Required. Payment received but plan entitlement withheld pending KYC verification (Current KYC: "${user?.kycStatus || 'NOT_STARTED'}").`,
+          data: {}
+        };
       }
 
       const segmentPlan = await segmentsPlanModel.findById(segmentsPayment.segmentPlanId);

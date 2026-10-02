@@ -109,21 +109,24 @@ export const registrationAccess = async (req, res, next) => {
         );
 
         if (!hasEntitlement && !hasLegacyAccess && !isRegistrationActive && !isBrowsingRoute) {
-            const pendingReg = await paymentIntentModel.findOne({
-                userId: userId,
-                purchaseType: "REGISTRATION",
-                status: { $in: ["VERIFICATION_PENDING", "PENDING_ADMIN_APPROVAL", "PENDING_BANK_TRANSFER"] }
-            });
-
-            if (pendingReg) {
-                return next();
-            } else {
-                return res.status(403).json({
-                    message: "Registration required to access this resource.",
-                    errorCode: "REGISTRATION_REQUIRED",
-                    action: "REDIRECT_TO_REGISTRATION"
+            // Only allow browsing for users with a pending registration payment, never order creation
+            if (req.method === 'GET') {
+                const pendingReg = await paymentIntentModel.findOne({
+                    userId: userId,
+                    purchaseType: "REGISTRATION",
+                    status: { $in: ["VERIFICATION_PENDING", "PENDING_ADMIN_APPROVAL", "PENDING_BANK_TRANSFER"] }
                 });
+
+                if (pendingReg) {
+                    return next();
+                }
             }
+
+            return res.status(403).json({
+                message: "Registration required to access this resource.",
+                errorCode: "REGISTRATION_REQUIRED",
+                action: "REDIRECT_TO_REGISTRATION"
+            });
         }
 
         next();
@@ -155,10 +158,11 @@ export const contentAccess = async (req, res, next) => {
             return res.status(401).json({ message: "User context not found." });
         }
 
-        if (user.kycStatus === 'REJECTED') {
+        const validKycStatus = ['VERIFIED', 'APPROVED'];
+        if (!validKycStatus.includes(user.kycStatus)) {
             return res.status(403).json({
-                message: "Access Restricted. Your KYC has been rejected. Please complete KYC verification.",
-                errorCode: "KYC_REJECTED",
+                message: "KYC Verification Required. Please complete KYC verification before accessing research reports.",
+                errorCode: "KYC_REQUIRED",
                 action: "REDIRECT_TO_KYC"
             });
         }

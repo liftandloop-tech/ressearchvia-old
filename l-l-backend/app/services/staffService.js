@@ -12,6 +12,14 @@ import departmentModel from "../models/departmentModel.js";
 import generalSettingsModel from "../models/generalSettingsModel.js";
 import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 import TokenBlacklist from "../models/tokenBlacklistModel.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import FormData from "form-data";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 
@@ -1245,6 +1253,235 @@ const staffService = {
         status: 200,
         message: "Job terms agreement signed successfully.",
         data: { staff: updatedStaff }
+      };
+    } catch (error) {
+      return { status: 500, message: error.message, data: {} };
+    }
+  },
+
+  /**
+   * Generates a personalized Staff Joining Agreement PDF using the official
+   * template and embedding the employee's name at verified coordinates.
+   */
+  generateStaffAgreementPdf: async (staff) => {
+    const templatePath = path.join(__dirname, '../serviceAgreement/staff_disclaimer_terms_agreement.pdf');
+    if (!fs.existsSync(templatePath)) {
+      throw new Error(`Staff agreement template not found at: ${templatePath}`);
+    }
+    const templateBytes = fs.readFileSync(templatePath);
+    const pdfDoc = await PDFDocument.load(templateBytes);
+
+    const page1 = pdfDoc.getPage(0);
+    const page11 = pdfDoc.getPage(10);
+
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const black = rgb(0, 0, 0);
+    const employeeName = (staff.fullName || 'EMPLOYEE').toUpperCase().trim();
+
+    // Page 1, Line 1: 'I, ______' blank line (verified alignment)
+    page1.drawText(employeeName, {
+      x: 86,
+      y: 678,
+      size: 11,
+      font,
+      color: black
+    });
+
+    // Page 1, Last line: 'Employee\'s Name & Signature ______.' (verified alignment)
+    page1.drawText(employeeName, {
+      x: 218,
+      y: 245,
+      size: 11,
+      font,
+      color: black
+    });
+
+    // Page 11: To the right of 'NAME' label (verified alignment)
+    page11.drawText(employeeName, {
+      x: 120,
+      y: 221.9,
+      size: 11,
+      font,
+      color: black
+    });
+
+    const safeName = employeeName.replace(/[^a-zA-Z0-9]/g, '_');
+    const outputFilePath = path.join(__dirname, `../serviceAgreement/staff_agreement_${staff._id || safeName}.pdf`);
+    const pdfBytes = await pdfDoc.save();
+    fs.writeFileSync(outputFilePath, pdfBytes);
+
+    return {
+      outputFilePath,
+      fileName: `SP_Staff_Agreement_${safeName}.pdf`,
+      employeeName
+    };
+  },
+
+  /**
+   * Initiates Aadhaar E-Sign on Digio for the staff joining agreement.
+   * Signature is placed on ALL pages at the default position.
+   */
+  initiateStaffDigioAgreement: async (staffIdOrUser) => {
+    try {
+      const id = staffIdOrUser?._id || staffIdOrUser;
+      const staff = await staffModel.findById(id);
+      if (!staff) {
+        return { status: 404, message: "Staff member not found", data: {} };
+      }
+
+      if (staff.hasSignedAgreement) {
+        return {
+          status: 200,
+          message: "Agreement already signed",
+          data: { staff, isSigned: true, hasSignedAgreement: true }
+        };
+      }
+
+      // Generate customized PDF with employee name on pages 1 & 11
+      const { outputFilePath, fileName } = await staffService.generateStaffAgreementPdf(staff);
+
+      const apiBaseUrl = process.env.DIGIO_API_BASE_URL || "https://api.digio.in/v2/client/document/upload";
+      const CLIENT_ID = process.env.DIGIO_CLIENT_ID;
+      const CLIENT_SECRET = process.env.DIGIO_CLIENT_SECRET_ID;
+
+      const signerIdentifier = staff.emailAddress || (staff.mobileNumber ? staff.mobileNumber.toString() : null);
+      if (!signerIdentifier) {
+        return { status: 400, message: "Email or phone number is required for Digio signing request", data: {} };
+      }
+
+      const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+      const requestData = {
+        signers: [
+          {
+            identifier: signerIdentifier,
+            name: staff.fullName,
+            sign_type: "Aadhaar",
+            reason: "Staff Joining Agreement"
+          }
+        ],
+        expire_in_days: 15,
+        display_on_page: "ALL", // Aadhaar e-sign stamp on all pages at default position
+        notify_signers: true,
+        send_sign_link: true,
+        file_name: fileName,
+        will_self_sign: false,
+        generate_access_token: true
+      };
+
+      const formData = new FormData();
+      formData.append("file", fs.createReadStream(outputFilePath), { filename: fileName });
+      formData.append("request", JSON.stringify(requestData));
+
+      console.log(`[Staff Digio] Uploading agreement to Digio for ${staff.fullName} (${signerIdentifier})...`);
+
+      const response = await axios.post(apiBaseUrl, formData, {
+        headers: {
+          Authorization: `Basic ${authHeader}`,
+          Accept: "application/json",
+          ...formData.getHeaders(),
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
+
+      console.log("[Staff Digio] Upload successful, status:", response.status, "Doc ID:", response.data?.id);
+
+      if (response.status >= 200 && response.status < 300) {
+        const docId = response.data.id || response.data.document_id;
+        const accessToken = response.data.access_token?.id || null;
+
+        staff.digioDocId = docId;
+        staff.digioObject = response.data;
+        staff.digioStatus = 'pending';
+        staff.agreementPdfUrl = outputFilePath;
+        await staff.save();
+
+        const signingUrl = accessToken
+          ? `https://app.digio.in/#/gateway/login/${docId}/${accessToken}/${encodeURIComponent(signerIdentifier)}`
+          : `https://app.digio.in/#/gateway/login/${docId}/null/${encodeURIComponent(signerIdentifier)}`;
+
+        return {
+          status: 200,
+          message: "Staff agreement initialized on Digio successfully",
+          data: {
+            docId,
+            tokenId: accessToken,
+            signingUrl,
+            digio: response.data,
+            staff
+          }
+        };
+      } else {
+        return {
+          status: 400,
+          message: "Digio document initialization failed",
+          data: { digio: response.data }
+        };
+      }
+    } catch (error) {
+      console.error("[Staff Digio Error]:", error.response?.data || error.message);
+      return {
+        status: 500,
+        message: error.response?.data?.message || error.message,
+        data: { error: error.response?.data || error.message }
+      };
+    }
+  },
+
+  /**
+   * Checks current agreement status for a staff member and syncs with Digio if pending.
+   */
+  getStaffAgreementStatus: async (staffIdOrUser) => {
+    try {
+      const id = staffIdOrUser?._id || staffIdOrUser;
+      const staff = await staffModel.findById(id);
+      if (!staff) {
+        return { status: 404, message: "Staff member not found", data: {} };
+      }
+
+      // If document is pending on Digio, query Digio directly to sync
+      if (staff.digioDocId && !staff.hasSignedAgreement) {
+        try {
+          const CLIENT_ID = process.env.DIGIO_CLIENT_ID;
+          const CLIENT_SECRET = process.env.DIGIO_CLIENT_SECRET_ID;
+          const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
+          const checkUrl = `https://api.digio.in/v2/client/document/${staff.digioDocId}`;
+          const res = await axios.get(checkUrl, {
+            headers: { Authorization: `Basic ${authHeader}` }
+          });
+          if (res.data) {
+            const agreementStatus = (res.data.agreement_status || res.data.status || '').toLowerCase();
+            if (agreementStatus.includes('signed') || agreementStatus === 'completed') {
+              staff.hasSignedAgreement = true;
+              staff.agreementSignedAt = new Date();
+              staff.agreementSignature = 'Digio Aadhaar E-Sign';
+              staff.digioStatus = 'verified';
+              staff.digioObject = res.data;
+              await staff.save();
+            }
+          }
+        } catch (syncErr) {
+          console.warn("[Staff Digio Status Sync] Warning:", syncErr.message);
+        }
+      }
+
+      const signerIdentifier = staff.emailAddress || (staff.mobileNumber ? staff.mobileNumber.toString() : '');
+      const accessToken = staff.digioObject?.access_token?.id || null;
+      const signingUrl = staff.digioDocId
+        ? `https://app.digio.in/#/gateway/login/${staff.digioDocId}/${accessToken}/${encodeURIComponent(signerIdentifier)}`
+        : null;
+
+      return {
+        status: 200,
+        message: "Staff agreement status fetched successfully",
+        data: {
+          hasSignedAgreement: staff.hasSignedAgreement,
+          agreementSignedAt: staff.agreementSignedAt,
+          digioStatus: staff.digioStatus,
+          digioDocId: staff.digioDocId,
+          signingUrl,
+          staff
+        }
       };
     } catch (error) {
       return { status: 500, message: error.message, data: {} };

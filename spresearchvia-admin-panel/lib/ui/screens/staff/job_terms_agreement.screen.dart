@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/services/auth.service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class JobTermsAgreementScreen extends StatefulWidget {
   const JobTermsAgreementScreen({super.key});
@@ -19,6 +20,10 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
   final TextEditingController _signatureController = TextEditingController();
   bool _agreedToTerms = false;
   bool _isSubmitting = false;
+  bool _isDigioLoading = false;
+  bool _isCheckingStatus = false;
+  String? _digioSigningUrl;
+  bool _digioInitiated = false;
   String _errorMessage = '';
 
   @override
@@ -27,6 +32,100 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
     final user = _authController.user.value;
     if (user != null && user.fullName.isNotEmpty) {
       _signatureController.text = user.fullName;
+    }
+    _checkInitialStatus();
+  }
+
+  Future<void> _checkInitialStatus() async {
+    try {
+      final status = await _authService.checkStaffAgreementStatus();
+      if (status.success && status.hasSignedAgreement && status.user != null) {
+        _authController.onAgreementSigned(status.user!);
+      } else if (status.signingUrl != null) {
+        setState(() {
+          _digioSigningUrl = status.signingUrl;
+          _digioInitiated = true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _startDigioEsign() async {
+    setState(() => _errorMessage = '');
+
+    if (!_agreedToTerms) {
+      setState(() => _errorMessage = 'Please check the box above to confirm that you have read and accepted the agreement terms.');
+      return;
+    }
+
+    setState(() => _isDigioLoading = true);
+
+    try {
+      final result = await _authService.initiateStaffDigioAgreement();
+      setState(() => _isDigioLoading = false);
+
+      if (result.success && result.signingUrl != null) {
+        setState(() {
+          _digioSigningUrl = result.signingUrl;
+          _digioInitiated = true;
+        });
+
+        final uri = Uri.parse(result.signingUrl!);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          Get.snackbar(
+            'Aadhaar E-Sign Initiated',
+            'Your signing link is generated. Check your registered email/phone or open the link below.',
+            duration: const Duration(seconds: 5),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = result.error ?? 'Failed to initialize Digio Aadhaar e-sign. Please try again.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isDigioLoading = false;
+        _errorMessage = 'Error initiating Digio e-sign: $e';
+      });
+    }
+  }
+
+  Future<void> _checkDigioStatus() async {
+    setState(() {
+      _errorMessage = '';
+      _isCheckingStatus = true;
+    });
+
+    try {
+      final status = await _authService.checkStaffAgreementStatus();
+      setState(() => _isCheckingStatus = false);
+
+      if (status.success && status.hasSignedAgreement && status.user != null) {
+        Get.snackbar(
+          'Agreement Verified',
+          'Aadhaar E-Sign completed! Workspace unlocked.',
+          backgroundColor: AppTheme.successGreen.withValues(alpha: 0.15),
+          colorText: AppTheme.successGreen,
+          duration: const Duration(seconds: 3),
+        );
+        _authController.onAgreementSigned(status.user!);
+      } else {
+        Get.snackbar(
+          'Pending Signature',
+          'Document has not been signed yet on Digio. Please complete Aadhaar OTP signing on Digio and click refresh.',
+          backgroundColor: Colors.amber.withValues(alpha: 0.15),
+          colorText: Colors.amber.shade900,
+          duration: const Duration(seconds: 4),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isCheckingStatus = false;
+        _errorMessage = 'Error checking agreement status: $e';
+      });
     }
   }
 
@@ -451,42 +550,149 @@ class _JobTermsAgreementScreenState extends State<JobTermsAgreementScreen> {
                       ],
 
                       const SizedBox(height: 24),
+
+                      // Primary Action: Aadhaar E-Sign via Digio
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.verified, color: Color(0xFF16A34A), size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Aadhaar E-Sign via Digio (Recommended)',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Digitally sign all 11 pages of your customized appointment agreement using Aadhaar OTP verification via Digio.',
+                              style: TextStyle(fontSize: 13, color: Color(0xFF15803D)),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: (_isDigioLoading || _isCheckingStatus)
+                                        ? null
+                                        : (_digioInitiated && _digioSigningUrl != null
+                                            ? () async {
+                                                final uri = Uri.parse(_digioSigningUrl!);
+                                                if (await canLaunchUrl(uri)) {
+                                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                                }
+                                              }
+                                            : _startDigioEsign),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF16A34A),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    icon: _isDigioLoading
+                                        ? const SizedBox(
+                                            height: 18,
+                                            width: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                          )
+                                        : const Icon(Icons.open_in_new, size: 18),
+                                    label: Text(
+                                      _digioInitiated ? 'Re-open Digio Signing Page' : 'Proceed to Aadhaar E-Sign',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                                if (_digioInitiated) ...[
+                                  const SizedBox(width: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: _isCheckingStatus ? null : _checkDigioStatus,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF166534),
+                                      side: const BorderSide(color: Color(0xFF16A34A)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    icon: _isCheckingStatus
+                                        ? const SizedBox(
+                                            height: 16,
+                                            width: 16,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF166534)),
+                                          )
+                                        : const Icon(Icons.refresh, size: 18),
+                                    label: const Text('Check Status'),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'OR SIGN DIGITALLY BELOW',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade500,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
                       SizedBox(
                         width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
+                        height: 48,
+                        child: OutlinedButton(
                           onPressed: _isSubmitting ? null : _submitAgreement,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryBlue,
-                            foregroundColor: Colors.white,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryBlue,
+                            side: const BorderSide(color: AppTheme.primaryBlue),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            elevation: 2,
                           ),
                           child: _isSubmitting
                               ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
+                                  height: 20,
+                                  width: 20,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                    color: AppTheme.primaryBlue,
                                   ),
                                 )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.verified_outlined, size: 20),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Sign & Accept Agreement',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
+                              : const Text(
+                                  'Quick Digital Sign & Accept',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                         ),
                       ),

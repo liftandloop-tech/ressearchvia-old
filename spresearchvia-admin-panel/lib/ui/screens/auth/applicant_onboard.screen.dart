@@ -402,7 +402,7 @@ class ApplicantOnboardScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     ElevatedButton.icon(
-                      onPressed: (verified && !isUploading) ? () => controller.promptUploadChoice(context, type) : null,
+                      onPressed: (verified && !isUploading) ? () => controller.uploadDoc(type) : null,
                       icon: isUploading
                           ? const SizedBox(
                               width: 14,
@@ -512,7 +512,7 @@ class ApplicantOnboardScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 ElevatedButton.icon(
-                  onPressed: (verified && !isUploading) ? () => controller.promptUploadChoice(context, type) : null,
+                  onPressed: (verified && !isUploading) ? () => controller.uploadDoc(type) : null,
                   icon: isUploading
                       ? const SizedBox(
                           width: 14,

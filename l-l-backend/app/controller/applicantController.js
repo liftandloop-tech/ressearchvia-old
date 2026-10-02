@@ -1,7 +1,7 @@
 import staffModel from "../models/staffModel.js";
 import emailService from "../services/emailService.js";
 import axios from "axios";
-import { resolveRoleAndDepartment } from "../services/staffService.js";
+import staffService, { resolveRoleAndDepartment } from "../services/staffService.js";
 import roleModel from "../models/roleModel.js";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
@@ -429,6 +429,13 @@ const applicantController = {
             }
 
             await applicant.save();
+
+            // Automatically initialize personalized Digio Aadhaar agreement on promotion
+            try {
+                await staffService.initiateStaffDigioAgreement(applicant._id);
+            } catch (digioErr) {
+                console.warn("[Applicant Approval] Auto Digio agreement error:", digioErr.message);
+            }
 
             const updatedStaff = await staffModel.findById(applicant._id)
                 .populate('departmentId')

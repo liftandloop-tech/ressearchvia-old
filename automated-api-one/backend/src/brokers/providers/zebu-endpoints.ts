@@ -1,16 +1,16 @@
 /**
- * Zebu Base API endpoint paths.
- * Base URL: https://api.zebuetrade.com/NorenWClientTP
+ * Zebu API endpoint paths.
+ * Base URL: https://go.mynt.in/NorenWClientAPI
  *
  * All requests are POST with form-encoded body:
  *   jData=<JSON-string>&jKey=<susertoken>
  *
- * Authentication: susertoken is returned from QuickAuth and
+ * Authentication: Uses OAuth 2.0 flow via /OAuthlogin/authorize/oauth,
+ * GenAcsTok (/GenAcsTok), and RefreshToken (/RefreshToken).
+ * susertoken is returned from GenAcsTok and
  * must be included as `jKey` in every subsequent request body.
  */
 export const ZebuEndpoints = {
-  /** User login (QuickAuth – no OAuth redirect) */
-  QUICK_AUTH: '/QuickAuth',
 
   /** Fetch client profile details */
   CLIENT_DETAILS: '/ClientDetails',

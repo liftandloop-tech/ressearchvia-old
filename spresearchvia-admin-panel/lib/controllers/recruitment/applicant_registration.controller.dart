@@ -430,7 +430,7 @@ class ApplicantRegistrationController extends GetxController {
     }
   }
 
-  Future<void> uploadDoc(String type, {bool fromCamera = false}) async {
+  Future<void> uploadDoc(String type) async {
     try {
       FilePickerResult? result;
       if (type == 'video') {
@@ -438,15 +438,21 @@ class ApplicantRegistrationController extends GetxController {
           type: FileType.video,
           withData: true,
         );
-      } else if (fromCamera || type == 'photo') {
+      } else if (type == 'photo') {
         result = await FilePicker.platform.pickFiles(
           type: FileType.image,
+          withData: true,
+        );
+      } else if (type == 'resume') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
           withData: true,
         );
       } else {
         result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
-          allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'webp'],
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
           withData: true,
         );
       }
@@ -497,163 +503,63 @@ class ApplicantRegistrationController extends GetxController {
   }
 
   void promptUploadChoice(BuildContext context, String type) {
-    final title = switch (type) {
-      'photo' => 'Profile Photo',
-      'video' => 'KYC Video Verification',
-      'pan' => 'PAN Card',
-      'aadhaar' => 'Aadhaar Card',
-      'nism' => 'NISM Certificate',
-      'education' => 'Highest Education Certificate',
-      'resume' => 'Resume / CV',
-      _ => type.toUpperCase(),
-    };
+    uploadDoc(type);
+  }
 
-    if (type == 'video') {
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (ctx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
-                const SizedBox(height: 6),
-                const Text('Choose how you would like to submit your verification video:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.videocam_rounded, color: Color(0xFF2563EB)),
-                  ),
-                  title: const Text('Record Video with Camera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Use direct camera to record video', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    uploadDoc(type, fromCamera: true);
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.file_upload_outlined, color: Color(0xFF475569)),
-                  ),
-                  title: const Text('Choose Video File from Device', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Upload MP4, MOV, or AVI video', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    uploadDoc(type, fromCamera: false);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      return;
-    }
+  @override
+  void onClose() {
+    currentStreetController.removeListener(syncPermanentAddress);
+    currentCityController.removeListener(syncPermanentAddress);
+    currentStateController.removeListener(syncPermanentAddress);
+    currentZipController.removeListener(syncPermanentAddress);
 
-    if (type == 'photo') {
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.white,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (ctx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
-                const SizedBox(height: 6),
-                const Text('Take a live selfie or upload an existing photo:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF2563EB)),
-                  ),
-                  title: const Text('Take Photo with Camera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Capture direct photo with camera', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    uploadDoc(type, fromCamera: true);
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.photo_library_outlined, color: Color(0xFF475569)),
-                  ),
-                  title: const Text('Select from Gallery / Files', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Upload JPG or PNG image', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    uploadDoc(type, fromCamera: false);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-      return;
-    }
+    appliedPositionController.dispose();
+    nameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    dobController.dispose();
+    nativePlaceController.dispose();
+    currentLocationController.dispose();
+    skypeAddressController.dispose();
 
-    // Documents (PAN, Aadhaar, NISM, Education, Resume)
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Upload $title', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
-              const SizedBox(height: 6),
-              const Text('Take a photo of the document or select a file:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF2563EB)),
-                ),
-                title: const Text('Take Photo with Camera', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Direct camera capture of document', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  uploadDoc(type, fromCamera: true);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.file_present_outlined, color: Color(0xFF475569)),
-                ),
-                title: const Text('Choose PDF or Image File', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Browse device for PDF, JPG, or PNG', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  uploadDoc(type, fromCamera: false);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    currentStreetController.dispose();
+    currentCityController.dispose();
+    currentStateController.dispose();
+    currentZipController.dispose();
+
+    permanentStreetController.dispose();
+    permanentCityController.dispose();
+    permanentStateController.dispose();
+    permanentZipController.dispose();
+
+    emergencyNameController.dispose();
+    emergencyRelationController.dispose();
+    emergencyPhoneController.dispose();
+
+    interviewedBeforeDetailsController.dispose();
+    differentlyAbledDetailsController.dispose();
+    policeRecordDetailsController.dispose();
+    majorIllnessDetailsController.dispose();
+    sourceDetailsController.dispose();
+    academicGapDetailsController.dispose();
+    backlogsCountController.dispose();
+
+    experienceYearsController.dispose();
+    previousCompanyController.dispose();
+    currentDesignationController.dispose();
+    reportingManagerDesignationController.dispose();
+    reportingManagerNameController.dispose();
+    reporteesCountController.dispose();
+    fixedSalaryController.dispose();
+    bonusIncentiveController.dispose();
+    lastCtcController.dispose();
+    expectedSalaryController.dispose();
+    noticePeriodController.dispose();
+    careerGapController.dispose();
+
+    mobileOtpController.dispose();
+    emailOtpController.dispose();
+
+    super.onClose();
   }
 }

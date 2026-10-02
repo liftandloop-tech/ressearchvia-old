@@ -1,5 +1,4 @@
 export declare const ZebuEndpoints: {
-    readonly QUICK_AUTH: "/QuickAuth";
     readonly CLIENT_DETAILS: "/ClientDetails";
     readonly LIMITS: "/Limits";
     readonly POSITION_BOOK: "/PositionBook";

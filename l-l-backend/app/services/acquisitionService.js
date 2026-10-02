@@ -44,31 +44,9 @@ export const initiateRegistrationPurchase = async (userId, type, paymentMode, se
         console.log(`DEBUG: initiateRegistrationPurchase - Type: ${type}, Total: ${totalAmount}, Paise: ${amountPaise}, Partial: ${isPartial}`);
         console.log(`DEBUG: Trial Bundling - Segment: ${segmentId}, Plan: ${planId}`);
 
-        // Handle ADMIN ENTITLEMENT
+        // Handle ADMIN ENTITLEMENT (Admin only - client cannot self-assign)
         if (paymentMode === 'ADMIN_ENTITLEMENT') {
-            const shortUserId = userId.toString().slice(-8);
-            const receipt = `admin_${shortUserId}_${Date.now()}`;
-
-            const paymentIntent = new PaymentIntent({
-                userId,
-                purchaseType: 'REGISTRATION',
-                baseAmount,
-                gstAmount,
-                totalAmount,
-                razorpayOrderId: `ADMIN_${receipt}`,
-                status: 'PENDING_ADMIN_APPROVAL',
-                paymentMethod: 'ADMIN_ENTITLEMENT',
-                preferredSegmentId: segmentId,
-                preferredPlanId: planId
-            });
-            await paymentIntent.save();
-
-            return {
-                amount: totalAmount,
-                currency: "INR",
-                paymentIntentId: paymentIntent._id,
-                message: "Admin Request Submitted"
-            };
+            throw new Error("Invalid payment mode: ADMIN_ENTITLEMENT cannot be initiated directly by client.");
         }
 
         // ── DUPLICATE REGISTRATION GUARD ─────────────────────────────────────────
@@ -240,9 +218,15 @@ export const initiateRegistrationPurchase = async (userId, type, paymentMode, se
 };
 
 export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartial = false, segmentId = null, calledBySystem = false, gstin = null) => {
-    // 1. Verify User Registration Status
+    // 1. Verify User Registration Status & KYC Status
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
+
+    // Strictly enforce KYC verification for Plan Purchases
+    const validKycStatus = ['VERIFIED', 'APPROVED'];
+    if (!validKycStatus.includes(user.kycStatus)) {
+        throw new Error(`KYC Verification Required. Your KYC status is currently "${user.kycStatus || 'NOT_STARTED'}". Please complete KYC verification before purchasing a plan.`);
+    }
 
     if (user.account_type === 'SELF_REGISTERED' && (user.registrationStatus !== 'ACTIVE' || !user.registrationFeePaid)) {
         throw new Error("Registration approval required. You cannot purchase plans until your registration is approved by the admin.");
@@ -251,6 +235,10 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
     // 2. Fetch Plan
     const plan = await SegmentsPlan.findById(planId);
     if (!plan) throw new Error("Plan not found");
+
+    if (plan.planStatus === 'inactive') {
+        throw new Error("This plan is currently inactive and cannot be purchased.");
+    }
 
 
     // Strictly enforce exactly 1 segment selected at plan purchase
@@ -550,12 +538,19 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
         console.log(`[VerifyPayment] Server-Side Verification Passed.`);
     }
 
-    // 4. Find Intent & Standard Checks
-    const paymentIntent = await PaymentIntent.findOne({ razorpayOrderId });
-    if (!paymentIntent) throw new Error("Payment Intent not found");
+    // 4. Find Intent & Standard Checks (Atomic lock to prevent double-processing race conditions)
+    let paymentIntent = await PaymentIntent.findOneAndUpdate(
+        { razorpayOrderId, status: { $nin: ['PAID', 'PROCESSING'] } },
+        { $set: { status: 'PROCESSING' } },
+        { new: true }
+    );
 
-    if (paymentIntent.status === 'PAID') {
-        return { success: true, message: "Already Processed" }; // Idempotency
+    if (!paymentIntent) {
+        const existingIntent = await PaymentIntent.findOne({ razorpayOrderId });
+        if (existingIntent && (existingIntent.status === 'PAID' || existingIntent.status === 'PROCESSING')) {
+            return { success: true, message: "Already Processed" }; // Idempotency
+        }
+        throw new Error("Payment Intent not found");
     }
 
     // 5. Amount Verification
@@ -629,6 +624,15 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
             registrationExpiry: isLifetime ? new Date(Date.now() + 10 * 365.25 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
         });
     } else if (paymentIntent.purchaseType === 'PLAN') {
+        // KYC Gate: Re-verify KYC before activating plan entitlement
+        const user = await User.findById(paymentIntent.userId);
+        const validKycStatus = ['VERIFIED', 'APPROVED'];
+        if (!user || !validKycStatus.includes(user.kycStatus)) {
+            paymentIntent.status = 'VERIFICATION_PENDING';
+            await paymentIntent.save();
+            throw new Error(`KYC Verification Required. Payment received but plan entitlement withheld pending KYC verification (Current KYC: "${user?.kycStatus || 'NOT_STARTED'}").`);
+        }
+
         const plan = await SegmentsPlan.findById(paymentIntent.planId);
 
         let days = 30; // Default fallback
@@ -783,9 +787,22 @@ export const rejectPartialPayment = async (paymentIntentId, historyId) => {
     return { success: true };
 };
 
-export const uploadProof = async (paymentIntentId, files, extraData = {}) => {
+export const uploadProof = async (paymentIntentId, files, extraData = {}, userId = null) => {
     const paymentIntent = await PaymentIntent.findById(paymentIntentId);
     if (!paymentIntent) throw new Error("Payment Intent not found");
+
+    // IDOR Protection: Verify ownership if userId is provided
+    if (userId && paymentIntent.userId && paymentIntent.userId.toString() !== userId.toString()) {
+        throw new Error("Unauthorized: You can only upload payment proof for your own order.");
+    }
+
+    // Amount validation
+    if (extraData.amountPaid !== undefined && extraData.amountPaid !== null) {
+        const parsedAmount = Number(extraData.amountPaid);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            throw new Error("Payment amount must be greater than zero");
+        }
+    }
 
     // Allow re-upload
     const allowedStatuses = ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'CREATED', 'REJECTED'];

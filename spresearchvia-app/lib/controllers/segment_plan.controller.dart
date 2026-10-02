@@ -7,6 +7,8 @@ import '../services/api_client.service.dart';
 import '../services/api_exception.service.dart';
 import '../services/secure_storage.service.dart';
 import '../core/config/api.config.dart';
+import '../core/models/user.dart';
+import 'user.controller.dart';
 
 class SegmentPlan {
   final String id;
@@ -292,6 +294,16 @@ class SegmentPlanController extends GetxController {
     String? gstin,
   }) async {
     try {
+      if (Get.isRegistered<UserController>()) {
+        final current = Get.find<UserController>().currentUser.value;
+        if (current != null && current.kycStatus != KycStatus.verified) {
+          SnackbarService.showError(
+            'KYC Verification Required. Please complete KYC verification before purchasing a plan.',
+          );
+          return null;
+        }
+      }
+
       if (hasActiveSegment.value) {
         SnackbarService.showError(
           'You already have an active subscription. A single user can only have one plan at a time. Manage your segments in Settings.',

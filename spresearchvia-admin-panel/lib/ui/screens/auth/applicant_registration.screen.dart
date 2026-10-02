@@ -973,7 +973,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     ElevatedButton.icon(
-                      onPressed: isUploading ? null : () => controller.promptUploadChoice(context, type),
+                      onPressed: isUploading ? null : () => controller.uploadDoc(type),
                       icon: isUploading
                           ? const SizedBox(
                               width: 14,
@@ -1083,7 +1083,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 ElevatedButton.icon(
-                  onPressed: isUploading ? null : () => controller.promptUploadChoice(context, type),
+                  onPressed: isUploading ? null : () => controller.uploadDoc(type),
                   icon: isUploading
                       ? const SizedBox(
                           width: 14,

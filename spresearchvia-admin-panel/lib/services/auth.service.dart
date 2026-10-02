@@ -386,4 +386,52 @@ class AuthService extends ApiService {
       return (success: false, user: null, error: 'Network error: $e');
     }
   }
+
+  /// Initiates Aadhaar E-Sign via Digio for the staff joining agreement
+  Future<({bool success, String? signingUrl, String? docId, String? error})> initiateStaffDigioAgreement() async {
+    try {
+      final response = await post('/staff/agreement/initiate-esign', {});
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body;
+        if (data['status'] == 200) {
+          final resData = data['data'] ?? {};
+          final signingUrl = resData['signingUrl']?.toString();
+          final docId = resData['docId']?.toString();
+          return (success: true, signingUrl: signingUrl, docId: docId, error: null);
+        }
+        return (success: false, signingUrl: null, docId: null, error: (data['message'] ?? 'Failed to initiate Digio agreement') as String);
+      }
+      return (success: false, signingUrl: null, docId: null, error: response.body?['message']?.toString() ?? 'Failed to initiate Digio agreement');
+    } catch (e) {
+      debugPrint('Error initiating Digio agreement: $e');
+      return (success: false, signingUrl: null, docId: null, error: 'Network error: $e');
+    }
+  }
+
+  /// Checks whether the staff member has completed their Digio Aadhaar E-Sign
+  Future<({bool success, bool hasSignedAgreement, UserModel? user, String? signingUrl, String? error})> checkStaffAgreementStatus() async {
+    try {
+      final response = await get('/staff/agreement/status');
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body;
+        if (data['status'] == 200) {
+          final resData = data['data'] ?? {};
+          final hasSigned = resData['hasSignedAgreement'] == true;
+          final signingUrl = resData['signingUrl']?.toString();
+          UserModel? user;
+          if (resData['staff'] != null) {
+            await _saveUserData(resData['staff']);
+            user = UserModel.fromJson(resData['staff']);
+          }
+          return (success: true, hasSignedAgreement: hasSigned, user: user, signingUrl: signingUrl, error: null);
+        }
+        return (success: false, hasSignedAgreement: false, user: null, signingUrl: null, error: (data['message'] ?? 'Failed to get status') as String);
+      }
+      return (success: false, hasSignedAgreement: false, user: null, signingUrl: null, error: response.body?['message']?.toString() ?? 'Failed to get status');
+    } catch (e) {
+      debugPrint('Error checking agreement status: $e');
+      return (success: false, hasSignedAgreement: false, user: null, signingUrl: null, error: 'Network error: $e');
+    }
+  }
 }
+

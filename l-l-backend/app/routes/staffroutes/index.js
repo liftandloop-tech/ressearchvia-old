@@ -26,6 +26,8 @@ const staffRoutes = () => {
     Router.put("/me", auth.tokenVerified, staffController.updateStaffProfileMe)
     Router.post("/me/change-mpin", auth.tokenVerified, staffController.changeStaffMpinMe)
     Router.post("/sign-agreement", auth.tokenVerified, staffController.signAgreement)
+    Router.post("/agreement/initiate-esign", auth.tokenVerified, staffController.initiateDigioAgreement)
+    Router.get("/agreement/status", auth.tokenVerified, staffController.getAgreementStatus)
     Router.post("/logout", auth.tokenVerified, staffController.logoutStaff)
     Router.post("/impersonate", auth.tokenVerified, adminOnly, checkPermission('Staff', 'login'), staffController.staffImpersonate)
 

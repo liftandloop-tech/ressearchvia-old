@@ -1530,7 +1530,7 @@ class StaffController extends GetxController {
     }
   }
 
-  Future<void> pickAndUploadDoc(String id, String type, {bool fromCamera = false}) async {
+  Future<void> pickAndUploadDoc(String id, String type) async {
     try {
       FilePickerResult? result;
       if (type == 'video') {
@@ -1538,15 +1538,21 @@ class StaffController extends GetxController {
           type: FileType.video,
           withData: true,
         );
-      } else if (fromCamera || type == 'photo') {
+      } else if (type == 'photo') {
         result = await FilePicker.platform.pickFiles(
           type: FileType.image,
+          withData: true,
+        );
+      } else if (type == 'resume') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
           withData: true,
         );
       } else {
         result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
-          allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'webp'],
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
           withData: true,
         );
       }
@@ -1609,62 +1615,6 @@ class StaffController extends GetxController {
   }
 
   void promptUploadChoice(BuildContext context, String id, String type) {
-    final title = switch (type) {
-      'photo' => 'Profile Photo',
-      'video' => 'KYC Video Verification',
-      'pan' => 'PAN Card',
-      'aadhaar' => 'Aadhaar Card',
-      'nism' => 'NISM Certificate',
-      'education' => 'Highest Education Certificate',
-      'resume' => 'Resume / CV',
-      _ => type.toUpperCase(),
-    };
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Upload $title', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
-              const SizedBox(height: 6),
-              const Text('Take a photo/video directly or select a file from device:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                  child: Icon(type == 'video' ? Icons.videocam_rounded : Icons.camera_alt_outlined, color: const Color(0xFF2563EB)),
-                ),
-                title: Text(type == 'video' ? 'Record Video with Camera' : 'Take Photo with Camera', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Direct camera capture', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  pickAndUploadDoc(id, type, fromCamera: true);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                  child: Icon(type == 'video' ? Icons.file_upload_outlined : Icons.file_present_outlined, color: const Color(0xFF475569)),
-                ),
-                title: Text(type == 'video' ? 'Choose Video File' : 'Choose PDF or Image File', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: Text(type == 'video' ? 'Browse for MP4, MOV, AVI' : 'Browse for PDF, JPG, PNG', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  pickAndUploadDoc(id, type, fromCamera: false);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    pickAndUploadDoc(id, type);
   }
 }
