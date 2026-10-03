@@ -34,10 +34,7 @@ const initializeFirebase = () => {
       console.log("Firebase Admin initialized using JSON env.");
 
     } else {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("Firebase credentials not provided");
-      }
-      console.warn("⚠️ Firebase credentials not provided. Skipping Firebase Admin initialization in development mode.");
+      console.warn("⚠️ Firebase credentials not provided. Push notifications are disabled.");
       return null;
     }
 
@@ -46,11 +43,7 @@ const initializeFirebase = () => {
     });
 
   } catch (error) {
-    console.error("❌ Firebase Admin initialization failed:");
-    console.error(error.message);
-    if (process.env.NODE_ENV === "production") {
-      process.exit(1); // fail fast in prod
-    }
+    console.warn("⚠️ Firebase Admin initialization failed:", error.message);
     return null;
   }
 

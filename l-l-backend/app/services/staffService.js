@@ -1385,9 +1385,20 @@ const staffService = {
       // Generate customized PDF with employee name on pages 1 & 11
       const { outputFilePath, fileName } = await staffService.generateStaffAgreementPdf(staff);
 
-      const apiBaseUrl = process.env.DIGIO_API_BASE_URL || "https://api.digio.in/v2/client/document/upload";
-      const CLIENT_ID = process.env.DIGIO_CLIENT_ID;
-      const CLIENT_SECRET = process.env.DIGIO_CLIENT_SECRET_ID;
+      const rawDigioBase = (process.env.DIGIO_API_BASE_URL || "https://api.digio.in").trim().replace(/\/+$/, "");
+      const apiBaseUrl = rawDigioBase.includes("/v2/client/document/upload")
+        ? rawDigioBase
+        : `${rawDigioBase}/v2/client/document/upload`;
+      const CLIENT_ID = (process.env.DIGIO_CLIENT_ID || "").trim();
+      const CLIENT_SECRET = (process.env.DIGIO_CLIENT_SECRET_ID || "").trim();
+
+      if (!CLIENT_ID || !CLIENT_SECRET) {
+        return {
+          status: 400,
+          message: "Digio API credentials (DIGIO_CLIENT_ID / DIGIO_CLIENT_SECRET_ID) are missing or not configured on the server.",
+          data: {}
+        };
+      }
 
       // Check if email has a valid deliverable / public domain (not a fake or test domain)
       const isPublicEmail = (email) => {

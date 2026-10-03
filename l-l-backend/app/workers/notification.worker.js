@@ -11,6 +11,11 @@ MONGO_CLIENT();
 new Worker(
     "notifications",
     async job => {
+        if (!admin || !admin.messaging) {
+            console.warn("⚠️ Firebase Admin not initialized. Skipping notification job.");
+            return;
+        }
+
         const { userIds, title, body, imageUrl, data } = job.data;
 
         const tokens = await getUserTokens(userIds);

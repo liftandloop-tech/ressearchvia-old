@@ -532,12 +532,19 @@ const userkycService = {
             const outputFilePath = path.join(__dirname, `../serviceAgreement/service_agreement_final_${userName}.pdf`);
             fs.writeFileSync(outputFilePath, updatedPdf);
             
-            const apiBaseUrl = process.env.DIGIO_API_BASE_URL;
-            const CLIENT_ID = process.env.DIGIO_CLIENT_ID
-            const CLIENT_SECRET = process.env.DIGIO_CLIENT_SECRET_ID;
+            const rawDigioBase = (process.env.DIGIO_API_BASE_URL || "https://api.digio.in").trim().replace(/\/+$/, "");
+            const apiBaseUrl = rawDigioBase.includes("/v2/client/document/upload")
+                ? rawDigioBase
+                : `${rawDigioBase}/v2/client/document/upload`;
+            const CLIENT_ID = (process.env.DIGIO_CLIENT_ID || "").trim();
+            const CLIENT_SECRET = (process.env.DIGIO_CLIENT_SECRET_ID || "").trim();
             
             const signerEmail = email || userDetails.email || u.APP_EMAIL;
             const signerName = name || userDetails.fullName || u.APP_NAME;
+
+            if (!CLIENT_ID || !CLIENT_SECRET) {
+                return { status: 400, message: "Digio API credentials (DIGIO_CLIENT_ID / DIGIO_CLIENT_SECRET_ID) are missing or not configured on the server", data: {} };
+            }
 
             if (!signerEmail) {
                 return { status: 400, message: "Email identifier is required for Digio request", data: {} };
@@ -862,10 +869,12 @@ const userkycService = {
     // DIGIO Download Proxy
     downloadDigioDocument: async (documentId) => {
         try {
-            const url = `https://api.digio.in/v2/client/document/download?document_id=${documentId}`;
+            const rawDigioBase = (process.env.DIGIO_API_BASE_URL || "https://api.digio.in").trim().replace(/\/+$/, "");
+            const baseDomain = rawDigioBase.includes("ext.digio.in") ? "https://ext.digio.in" : "https://api.digio.in";
+            const url = `${baseDomain}/v2/client/document/download?document_id=${documentId}`;
 
-            const CLIENT_ID = process.env.DIGIO_CLIENT_ID;
-            const CLIENT_SECRET = process.env.DIGIO_CLIENT_SECRET_ID;
+            const CLIENT_ID = (process.env.DIGIO_CLIENT_ID || "").trim();
+            const CLIENT_SECRET = (process.env.DIGIO_CLIENT_SECRET_ID || "").trim();
             const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
 
             console.log(`[Proxy] Downloading Digio Document: ${documentId} using Basic Auth`);
