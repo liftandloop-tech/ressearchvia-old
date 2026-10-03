@@ -134,6 +134,16 @@ class UserModel {
     return false;
   }
 
+  String get status {
+    final s = rawJson?['status'] ?? rawJson?['userStatus'] ?? userStatus;
+    return (s ?? 'ACTIVE').toString();
+  }
+
+  bool get isInactive {
+    final s = status.toLowerCase().trim();
+    return s == 'inactive' || s == 'deactivated' || s == 'suspended';
+  }
+
   bool get isStaff {
     if (isAdmin) return false;
     return rawJson?['roleId'] != null ||

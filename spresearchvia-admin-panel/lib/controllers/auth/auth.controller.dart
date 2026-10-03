@@ -85,7 +85,7 @@ class AuthController extends GetxController {
           InactivityService.to.resetTimer();
         }
 
-        if (!storedUser.isAdmin && (storedUser.status.toLowerCase() == 'inactive' || storedUser.status.toLowerCase() == 'deactivated')) {
+        if (!storedUser.isAdmin && storedUser.isInactive) {
           debugPrint('[AuthController] Stored staff account is inactive. Clearing session.');
           await _authService.logout();
           user.value = null;

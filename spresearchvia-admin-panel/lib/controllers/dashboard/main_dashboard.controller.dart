@@ -49,7 +49,7 @@ class MainDashboardController extends GetxController {
       return;
     }
 
-    if (!user.isAdmin && (user.status.toLowerCase() == 'inactive' || user.status.toLowerCase() == 'deactivated')) {
+    if (!user.isAdmin && user.isInactive) {
       print('Inactive user detected on route check. Logging out cleanly.');
       authController.logout();
       return;
