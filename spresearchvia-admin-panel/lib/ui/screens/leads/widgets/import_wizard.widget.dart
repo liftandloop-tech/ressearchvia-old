@@ -736,7 +736,7 @@ class _ImportWizardState extends State<ImportWizard> {
                 builder: (context) {
                   final seenStaffIds = <String>{};
                   final validStaff = _leadsController.staffList
-                      .where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id))
+                      .where((s) => s.id.isNotEmpty && s.status.toLowerCase() == 'active' && seenStaffIds.add(s.id))
                       .toList();
                   final safeAssignedRM = (_assignedRM != null &&
                           validStaff.any((s) => s.id == _assignedRM))

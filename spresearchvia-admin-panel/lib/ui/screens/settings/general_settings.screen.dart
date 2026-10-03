@@ -438,7 +438,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                         value: null,
                         child: Text('Custom / Manual Entry', style: TextStyle(fontSize: 13)),
                       ),
-                      ...controller.staffList.map(
+                      ...controller.staffList.where((s) => s.status.toLowerCase() == 'active').map(
                         (staff) => DropdownMenuItem<StaffModel?>(
                           value: staff,
                           child: Text(

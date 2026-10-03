@@ -46,17 +46,54 @@ class StaffScreen extends StatelessWidget {
                             runSpacing: 8,
                             children: [
                               Obx(() {
+                                final selectedStatuses = controller.filterSelectedStatuses;
+                                final isActiveSelected = selectedStatuses.length == 1 && selectedStatuses.contains('Active');
+                                final isInactiveSelected = selectedStatuses.length == 1 && (selectedStatuses.contains('Inactive') || selectedStatuses.contains('Deactivated'));
+                                final isAllSelected = selectedStatuses.isEmpty || (selectedStatuses.contains('Active') && (selectedStatuses.contains('Inactive') || selectedStatuses.contains('Deactivated')));
+
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.gray100,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppTheme.gray200),
+                                  ),
+                                  padding: const EdgeInsets.all(3),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _buildStatusPill(
+                                        label: 'Active',
+                                        isSelected: isActiveSelected,
+                                        onTap: () => controller.setQuickStatusFilter('active'),
+                                      ),
+                                      _buildStatusPill(
+                                        label: 'Inactive',
+                                        isSelected: isInactiveSelected,
+                                        onTap: () => controller.setQuickStatusFilter('inactive'),
+                                      ),
+                                      _buildStatusPill(
+                                        label: 'All',
+                                        isSelected: isAllSelected,
+                                        onTap: () => controller.setQuickStatusFilter('all'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                              Obx(() {
+                                final selectedStatuses = controller.filterSelectedStatuses;
+                                final isDefaultActive = selectedStatuses.length == 1 && selectedStatuses.contains('Active');
                                 final hasActiveFilters = controller.filterName.value.isNotEmpty ||
                                     controller.filterMobile.value.isNotEmpty ||
                                     controller.filterEmail.value.isNotEmpty ||
                                     controller.filterSelectedRoles.isNotEmpty ||
-                                    controller.filterSelectedStatuses.isNotEmpty;
+                                    !isDefaultActive;
                                 if (!hasActiveFilters) return const SizedBox.shrink();
                                 return TextButton.icon(
                                   onPressed: () => controller.clearAllFilters(),
                                   icon: const Icon(Icons.clear_all, color: AppTheme.errorRed, size: 18),
                                   label: const Text(
-                                    'Clear Filters',
+                                    'Reset to Active',
                                     style: TextStyle(color: AppTheme.errorRed, fontSize: 13, fontWeight: FontWeight.w500),
                                   ),
                                 );
@@ -281,6 +318,41 @@ class StaffScreen extends StatelessWidget {
             style: TextStyle(fontSize: 14, color: AppTheme.textTertiary),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPill({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? AppTheme.primaryBlue : AppTheme.gray600,
+          ),
+        ),
       ),
     );
   }

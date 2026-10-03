@@ -83,11 +83,15 @@ class StaffService extends ApiService {
     }
   }
 
-  Future<List<StaffModel>> getStaffList({bool scoped = false}) async {
+  Future<List<StaffModel>> getStaffList({bool scoped = false, String? status}) async {
     try {
+      final queryParams = <String, String>{};
+      if (scoped) queryParams['scoped'] = 'true';
+      if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
       final response = await get(
         '/staff/list',
-        query: scoped ? {'scoped': 'true'} : null,
+        query: queryParams.isNotEmpty ? queryParams : null,
       );
 
       if (response.status.hasError) {

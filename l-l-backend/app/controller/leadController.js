@@ -82,6 +82,13 @@ const leadController = {
                 }
             }
 
+            if (updates.assignedRM) {
+                const targetStaff = await staffModel.findById(updates.assignedRM);
+                if (targetStaff && targetStaff.status && targetStaff.status.toLowerCase() !== 'active') {
+                    return res.status(400).send({ status: 400, message: "Cannot assign lead to an inactive staff member", data: {} });
+                }
+            }
+
             const lead = await leadModel.findOneAndUpdate(filter, updates, { new: true });
             if (!lead) {
                 return res.status(404).send({ status: 404, message: "Lead not found or access denied", data: {} });
@@ -251,6 +258,155 @@ const leadController = {
                 }
             });
         } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    bulkPaste: async (req, res) => {
+        try {
+            const {
+                rawText,
+                numbers: inputNumbers,
+                leadPoolId: inputPoolId,
+                assignedRM,
+                stage = 'New',
+                duplicateStrategy = 'skip',
+                defaultName = ''
+            } = req.body;
+
+            const companyId = req.user?.companyId || req.user?.company || "default_company";
+
+            // Extract items from rawText (splitting on line breaks, Enter key, commas, semicolons) or array
+            let rawItems = [];
+            if (Array.isArray(inputNumbers) && inputNumbers.length > 0) {
+                rawItems = inputNumbers;
+            } else if (typeof rawText === 'string' && rawText.trim().length > 0) {
+                rawItems = rawText.split(/[\r\n\u2028\u2029,;]+/);
+            }
+
+            if (rawItems.length === 0) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "No phone numbers provided. Paste numbers separated by new lines or commas.",
+                    data: {}
+                });
+            }
+
+            // Resolve target pool
+            let leadPoolId = inputPoolId;
+            if (!leadPoolId) {
+                const freshPool = await ensureDefaultFreshPool(companyId);
+                leadPoolId = freshPool._id;
+            }
+
+            // Validate assignedRM if provided (ensure active staff)
+            let validRM = null;
+            if (assignedRM) {
+                const staffDoc = await staffModel.findOne({
+                    _id: assignedRM,
+                    companyId: companyId,
+                    status: { $regex: /^active$/i }
+                });
+                if (staffDoc) {
+                    validRM = staffDoc._id;
+                }
+            }
+
+            const validLeads = [];
+            const seenInBatch = new Set();
+            let invalidCount = 0;
+            let batchDuplicateCount = 0;
+
+            for (const item of rawItems) {
+                const trimmed = String(item || '').trim();
+                if (!trimmed) continue;
+
+                const normalized10 = importService.normalizePhone(trimmed);
+                if (!normalized10 || normalized10.length !== 10 || !/^[6-9]\d{9}$/.test(normalized10)) {
+                    invalidCount++;
+                    continue;
+                }
+
+                if (seenInBatch.has(normalized10)) {
+                    batchDuplicateCount++;
+                    continue;
+                }
+                seenInBatch.add(normalized10);
+
+                validLeads.push({
+                    fullName: defaultName ? String(defaultName).trim() : '',
+                    mobileNumber: normalized10,
+                    emailAddress: null,
+                    stage: stage || 'New',
+                    assignedRM: validRM,
+                    leadPoolId: leadPoolId,
+                    companyId: companyId,
+                    isRead: false
+                });
+            }
+
+            if (validLeads.length === 0) {
+                return res.status(400).send({
+                    status: 400,
+                    message: `No valid 10-digit mobile numbers found (Processed ${rawItems.length} entries, ${invalidCount} invalid).`,
+                    data: { totalReceived: rawItems.length, invalidCount }
+                });
+            }
+
+            // Check duplicates against existing DB leads
+            const mobileNumbers = validLeads.map(l => l.mobileNumber);
+            const existingLeads = await leadModel.find({
+                companyId,
+                mobileNumber: { $in: mobileNumbers }
+            });
+
+            const existingMap = new Map();
+            for (const lead of existingLeads) {
+                existingMap.set(lead.mobileNumber, lead);
+            }
+
+            let insertedCount = 0;
+            let updatedCount = 0;
+            let dbDuplicateCount = 0;
+            const leadsToInsert = [];
+
+            for (const leadData of validLeads) {
+                const existing = existingMap.get(leadData.mobileNumber);
+                if (existing) {
+                    dbDuplicateCount++;
+                    if (duplicateStrategy === 'update') {
+                        if (validRM) existing.assignedRM = validRM;
+                        if (leadPoolId) existing.leadPoolId = leadPoolId;
+                        if (stage) existing.stage = stage;
+                        await existing.save();
+                        updatedCount++;
+                    }
+                } else {
+                    leadsToInsert.push(leadData);
+                }
+            }
+
+            if (leadsToInsert.length > 0) {
+                await leadModel.insertMany(leadsToInsert);
+                insertedCount = leadsToInsert.length;
+            }
+
+            return res.status(200).send({
+                status: 200,
+                message: `Successfully processed ${validLeads.length} unique numbers: ${insertedCount} inserted, ${dbDuplicateCount} existing duplicates (${duplicateStrategy === 'update' ? `${updatedCount} updated` : 'skipped'}), ${invalidCount} invalid.`,
+                data: {
+                    totalReceived: rawItems.length,
+                    validUnique: validLeads.length,
+                    insertedCount,
+                    updatedCount,
+                    duplicateCount: dbDuplicateCount + batchDuplicateCount,
+                    dbDuplicateCount,
+                    batchDuplicateCount,
+                    invalidCount
+                }
+            });
+        } catch (error) {
+            console.error("Error in bulkPaste leads:", error);
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
     },

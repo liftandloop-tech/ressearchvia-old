@@ -63,7 +63,7 @@ class AttendanceController extends GetxController {
   Future<void> loadStaff() async {
     try {
       final list = await _staffService.getStaffList();
-      staffList.assignAll(list);
+      staffList.assignAll(list.where((s) => s.status.toLowerCase() == 'active'));
     } catch (e) {
       debugPrint('Error loading staff list: $e');
     }

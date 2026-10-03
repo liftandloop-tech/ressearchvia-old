@@ -17,15 +17,17 @@ function getColumnLetter(colIndex) {
     return letter;
 }
 
-// Clean and normalize phone numbers (e.g. +91 98765 43210 -> 9876543210)
+// Clean and normalize phone numbers strictly to 10 digits (e.g. +91 98765 43210, 09876543210, 0919876543210 -> 9876543210)
 function normalizePhone(phone) {
     if (!phone) return "";
-    let clean = String(phone).replace(/[^0-9]/g, '');
+    let clean = String(phone).replace(/\D/g, '');
+    if (clean.length === 10) return clean;
+    if (clean.length === 11 && clean.startsWith('0')) return clean.slice(1);
+    if (clean.length === 12 && clean.startsWith('91')) return clean.slice(2);
+    if (clean.length === 13 && clean.startsWith('091')) return clean.slice(3);
     if (clean.length > 10) {
-        // Strip country code if present (like 91 at front)
-        if (clean.startsWith('91') && clean.length === 12) {
-            clean = clean.slice(2);
-        }
+        const last10 = clean.slice(-10);
+        if (/^[6-9]\d{9}$/.test(last10)) return last10;
     }
     return clean;
 }
@@ -87,6 +89,7 @@ function transformAndValidateRow(row, mapping, rowNum) {
 }
 
 const importService = {
+    normalizePhone,
     LEAD_IMPORT_FIELDS: [
         { key: "fullName", label: "Full Name", type: "text", required: false },
         { key: "mobileNumber", label: "Mobile Number", type: "phone", required: true },

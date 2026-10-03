@@ -435,7 +435,10 @@ const applicantController = {
                 if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
                     finalSupervisorName = effectiveSupervisorName.trim();
                 } else {
-                    const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName');
+                    const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName status');
+                    if (supervisor && supervisor.status && supervisor.status.toLowerCase() !== 'active') {
+                        return res.status(400).send({ status: 400, message: "Cannot assign an inactive supervisor to new staff", data: {} });
+                    }
                     finalSupervisorName = supervisor ? supervisor.fullName : null;
                 }
             }

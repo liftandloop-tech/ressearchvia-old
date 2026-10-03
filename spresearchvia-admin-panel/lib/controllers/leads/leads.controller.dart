@@ -124,12 +124,13 @@ class LeadsController extends GetxController {
   Future<void> fetchStaffDropdown() async {
     try {
       final list = await _staffService.getStaffList();
+      final activeList = list.where((s) => s.status.toLowerCase() == 'active').toList();
       if (Get.isRegistered<AuthController>()) {
         final auth = Get.find<AuthController>();
         final currentUser = auth.user.value;
         if (currentUser != null && !currentUser.isAdmin) {
-          if (list.isNotEmpty) {
-            staffList.assignAll(list);
+          if (activeList.isNotEmpty) {
+            staffList.assignAll(activeList);
             return;
           }
           staffList.assignAll([
@@ -147,7 +148,7 @@ class LeadsController extends GetxController {
           return;
         }
       }
-      staffList.assignAll(list);
+      staffList.assignAll(activeList);
     } catch (e) {
       debugPrint('Error loading staff dropdown: $e');
     }
@@ -304,6 +305,53 @@ class LeadsController extends GetxController {
     } catch (e) {
       isLoading.value = false;
       Get.snackbar('Error', 'Failed to read file: $e', backgroundColor: Colors.red.withOpacity(0.1));
+    }
+  }
+
+  Future<bool> bulkPasteLeads({
+    required String rawText,
+    String? leadPoolId,
+    String? assignedRM,
+    String stage = 'New',
+    String duplicateStrategy = 'skip',
+    String defaultName = '',
+  }) async {
+    try {
+      isLoading.value = true;
+      final res = await _leadService.bulkPasteLeads(
+        rawText: rawText,
+        leadPoolId: leadPoolId,
+        assignedRM: assignedRM,
+        stage: stage,
+        duplicateStrategy: duplicateStrategy,
+        defaultName: defaultName,
+      );
+      isLoading.value = false;
+
+      if (!res.status.hasError && res.body != null) {
+        final data = res.body['data'] as Map<String, dynamic>? ?? {};
+        final inserted = data['insertedCount'] ?? 0;
+        final dups = data['duplicateCount'] ?? 0;
+        final invalid = data['invalidCount'] ?? 0;
+
+        Get.snackbar(
+          'Bulk Paste Complete',
+          '$inserted leads created | $dups duplicates | $invalid invalid',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          duration: const Duration(seconds: 4),
+        );
+        fetchLeads();
+        fetchPullStats();
+        return true;
+      } else {
+        final msg = res.body?['message'] ?? 'Failed to import pasted leads';
+        Get.snackbar('Import Failed', msg, backgroundColor: Colors.red.withOpacity(0.1));
+        return false;
+      }
+    } catch (e) {
+      isLoading.value = false;
+      Get.snackbar('Error', 'Failed to paste leads: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      return false;
     }
   }
 

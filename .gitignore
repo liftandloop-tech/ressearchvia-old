@@ -50,3 +50,6 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local nested repositories
+futurepride-admin-backend/

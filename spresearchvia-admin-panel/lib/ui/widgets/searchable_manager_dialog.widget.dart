@@ -35,7 +35,8 @@ class _SearchableManagerDialogState extends State<SearchableManagerDialog> {
   @override
   Widget build(BuildContext context) {
     final query = _filter.trim().toLowerCase();
-    final filtered = widget.staffList.where((staff) {
+    final activeStaff = widget.staffList.where((s) => s.status.toLowerCase() == 'active').toList();
+    final filtered = activeStaff.where((staff) {
       if (query.isEmpty) return true;
       final name = staff.name.toLowerCase();
       final dept = staff.department.toLowerCase();

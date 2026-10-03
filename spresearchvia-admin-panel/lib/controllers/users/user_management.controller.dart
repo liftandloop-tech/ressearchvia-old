@@ -67,14 +67,15 @@ class UserManagementController extends GetxController {
   Future<void> fetchManagers() async {
     try {
       final list = await _staffService.getStaffList();
+      final activeList = list.where((s) => s.status.toLowerCase() == 'active').toList();
 
       // If non-admin is logged in:
       if (Get.isRegistered<AuthController>()) {
         final authController = Get.find<AuthController>();
         final currentUser = authController.user.value;
         if (currentUser != null && !currentUser.isAdmin) {
-          if (list.isNotEmpty) {
-            managers.value = list;
+          if (activeList.isNotEmpty) {
+            managers.value = activeList;
             return;
           } else {
             // Fallback: only themselves in the manager dropdown if list is empty
@@ -95,7 +96,7 @@ class UserManagementController extends GetxController {
         }
       }
 
-      managers.value = list;
+      managers.value = activeList;
     } catch (e) {
       debugPrint('Error fetching managers: $e');
     }

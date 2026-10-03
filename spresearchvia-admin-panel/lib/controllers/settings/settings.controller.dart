@@ -111,7 +111,7 @@ class SettingsController extends GetxController {
           ? Get.find<StaffService>()
           : Get.put(StaffService());
       final list = await staffService.getStaffList();
-      staffList.assignAll(list);
+      staffList.assignAll(list.where((s) => s.status.toLowerCase() == 'active'));
       _syncSelectedStaff();
     } catch (e) {
       debugPrint('Error loading staff list: $e');

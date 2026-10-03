@@ -380,7 +380,7 @@ class ClientListTile extends StatelessWidget {
                 final dmController = Get.find<DashboardManagementController>();
                 final rawStaffList = dmController.staffList;
                 final seenStaffIds = <String>{};
-                final staffList = rawStaffList.where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id)).toList();
+                final staffList = rawStaffList.where((s) => s.id.isNotEmpty && s.status.toLowerCase() == 'active' && seenStaffIds.add(s.id)).toList();
                 final currentManagerName = item['manager'] ?? 'Assign Manager';
                 final isAssigned = item['managerId'] != null || (item['manager'] != null && item['manager'] != 'Select');
 

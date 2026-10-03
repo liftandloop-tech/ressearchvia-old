@@ -12,6 +12,7 @@ import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import 'widgets/click_to_call_dialog.widget.dart';
+import 'widgets/bulk_upload_dialog.widget.dart';
 
 class LeadManagementScreen extends StatelessWidget {
   const LeadManagementScreen({super.key});
@@ -63,7 +64,7 @@ class LeadManagementScreen extends StatelessWidget {
                           title: 'Bulk Upload',
                           buttonType: ButtonType.blue,
                           icon: Icons.upload_file,
-                          onTap: () => controller.pickAndUploadBulkLeads(),
+                          onTap: () => _showBulkUploadDialog(context, controller),
                         ),
                         const SizedBox(width: 8),
                         Button(
@@ -1272,6 +1273,13 @@ class LeadManagementScreen extends StatelessWidget {
   );
   }
 
+  void _showBulkUploadDialog(BuildContext context, LeadsController controller) {
+    Get.dialog(
+      BulkUploadDialog(controller: controller),
+      barrierDismissible: true,
+    );
+  }
+
   void _showSearchableRMDialog(
     BuildContext context,
     LeadsController controller, {
@@ -1289,7 +1297,7 @@ class LeadManagementScreen extends StatelessWidget {
 
     void updateFilteredLists(String query) {
       final q = query.trim().toLowerCase();
-      final allStaff = controller.staffList;
+      final allStaff = controller.staffList.where((s) => s.status.toLowerCase() == 'active').toList();
 
       filteredDirectors.value = allStaff
           .where((s) => (s.role.toLowerCase().contains('director') || s.department.toLowerCase().contains('director')) && (q.isEmpty || s.name.toLowerCase().contains(q) || s.email.toLowerCase().contains(q)))

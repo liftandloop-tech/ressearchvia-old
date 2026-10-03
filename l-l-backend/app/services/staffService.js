@@ -609,6 +609,20 @@ const staffService = {
         stage: { $ne: 'Applicant' }
       };
 
+      // Status filtering: Default to Active only unless explicitly requested
+      const statusParam = (query?.status || '').toString().trim();
+      if (statusParam.toUpperCase() === 'ALL') {
+        // Return all staff members regardless of status
+      } else if (statusParam.toUpperCase() === 'INACTIVE') {
+        // Return inactive / deactivated staff
+        mongoQuery.status = { $in: ['Inactive', 'Deactivated', 'inactive', 'deactivated'] };
+      } else if (statusParam) {
+        mongoQuery.status = { $regex: new RegExp(`^${statusParam}$`, 'i') };
+      } else {
+        // DEFAULT: Show only active staff
+        mongoQuery.status = { $in: ['Active', 'active'] };
+      }
+
       console.log('=== staffList called ===');
       console.log('User:', user ? { userType: user.userType, deparment: user.deparment, _id: user._id } : 'No user');
 
@@ -648,8 +662,8 @@ const staffService = {
         })
         .populate('departmentId')
         .lean();
-      console.log(`Found ${staffList.length} staff members`);
-      console.log('Staff departments:', staffList.map(s => ({ name: s.fullName, dept: s.deparment })));
+      console.log(`Found ${staffList.length} staff members (statusFilter=${statusParam || 'Active(default)'})`);
+      console.log('Staff departments:', staffList.map(s => ({ name: s.fullName, dept: s.deparment, status: s.status })));
 
       return { status: 200, message: "staff list", data: { staffList } };
     } catch (error) {
@@ -665,6 +679,9 @@ const staffService = {
         let assignmentData = await staffModel.findOne({ _id: body.staffId })
         if (!assignmentData) {
           return { status: 200, message: "staff not exist", data: {} }
+        }
+        if (assignmentData.status && assignmentData.status.toLowerCase() !== 'active') {
+          return { status: 400, message: "Cannot assign an inactive staff member", data: {} };
         }
 
         // Hierarchy Check: Non-admins can only assign staff from their own team/hierarchy

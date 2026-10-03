@@ -21,10 +21,11 @@ class StaffManagementController extends GetxController {
     isLoading.value = true;
     try {
       final list = await _staffService.getStaffList();
-      managers.value = list
+      final activeList = list.where((s) => s.status.toLowerCase() == 'active').toList();
+      managers.value = activeList
           .where((s) => s.department.trim().toLowerCase().contains('manager'))
           .toList();
-      admins.value = list
+      admins.value = activeList
           .where((s) => s.department.trim().toLowerCase().contains('research') || s.department.trim().toLowerCase().contains('admin'))
           .toList();
     } catch (e) {

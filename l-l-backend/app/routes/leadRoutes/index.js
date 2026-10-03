@@ -46,6 +46,14 @@ const leadRoutes = () => {
         leadController.bulkUpload
     );
 
+    // Bulk Paste Ingestion Route (Line breaks / commas / semicolons separated numbers)
+    Router.post(
+        "/bulk-paste",
+        auth.tokenVerified,
+        checkPermission('leads.bulk_upload'),
+        leadController.bulkPaste
+    );
+
     return Router;
 };
 

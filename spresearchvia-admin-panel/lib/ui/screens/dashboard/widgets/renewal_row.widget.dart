@@ -111,7 +111,7 @@ class RenewalRow extends StatelessWidget {
                 final dmController = Get.find<DashboardManagementController>();
                 final rawStaffList = dmController.staffList;
                 final seenStaffIds = <String>{};
-                final staffList = rawStaffList.where((s) => s.id.isNotEmpty && seenStaffIds.add(s.id)).toList();
+                final staffList = rawStaffList.where((s) => s.id.isNotEmpty && s.status.toLowerCase() == 'active' && seenStaffIds.add(s.id)).toList();
                 final currentManagerName = renewal['manager'] ?? 'Assign Manager';
                 final isAssigned = renewal['managerId'] != null || (renewal['manager'] != null && renewal['manager'] != 'Select');
 

@@ -26,7 +26,7 @@ class StaffDetailsController extends GetxController {
   Future<void> fetchStaffDetails() async {
     isLoading.value = true;
     try {
-      final list = await _staffService.getStaffList();
+      final list = await _staffService.getStaffList(status: 'all');
       final found = list.firstWhereOrNull((s) => s.id == staffId.value || s.staffId == staffId.value);
       if (found != null) {
         staff.value = found;

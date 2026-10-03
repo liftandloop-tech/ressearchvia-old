@@ -16,9 +16,9 @@ class TableReportingToDropdown extends StatelessWidget {
     return Obx(() {
       final allStaff = controller.staffList;
       final seenIds = <String>{};
-      // Filter out self so staff member cannot report to themselves, and deduplicate by ID
+      // Filter out self, inactive staff, and deduplicate by ID
       final potentialSupervisors = allStaff
-          .where((s) => s.id.isNotEmpty && s.id != staff.id && seenIds.add(s.id))
+          .where((s) => s.id.isNotEmpty && s.id != staff.id && s.status.toLowerCase() == 'active' && seenIds.add(s.id))
           .toList();
 
       final currentSupervisorId = staff.assignedDirector;

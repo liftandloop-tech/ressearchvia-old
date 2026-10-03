@@ -88,6 +88,24 @@ class LeadService extends ApiService {
     return post('/leads/bulk-upload', formData);
   }
 
+  Future<Response> bulkPasteLeads({
+    required String rawText,
+    String? leadPoolId,
+    String? assignedRM,
+    String stage = 'New',
+    String duplicateStrategy = 'skip',
+    String defaultName = '',
+  }) async {
+    return post('/leads/bulk-paste', {
+      'rawText': rawText,
+      if (leadPoolId != null && leadPoolId.isNotEmpty) 'leadPoolId': leadPoolId,
+      if (assignedRM != null && assignedRM.isNotEmpty) 'assignedRM': assignedRM,
+      'stage': stage,
+      'duplicateStrategy': duplicateStrategy,
+      'defaultName': defaultName,
+    });
+  }
+
   Future<Response> startImport(String importId, Map<String, dynamic> data) =>
       post('/leads/import/$importId/start', data);
 

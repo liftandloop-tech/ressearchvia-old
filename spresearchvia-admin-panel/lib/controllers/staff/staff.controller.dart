@@ -173,7 +173,7 @@ class StaffController extends GetxController {
   var filterMobile = ''.obs;
   var filterEmail = ''.obs;
   var filterSelectedRoles = <String>[].obs;
-  var filterSelectedStatuses = <String>[].obs;
+  var filterSelectedStatuses = <String>['Active'].obs;
   var currentPage = 1.obs;
 
   var researchersExpanded = true.obs;
@@ -251,8 +251,16 @@ class StaffController extends GetxController {
       if (uri.queryParameters.containsKey('statuses')) {
         final statusesStr = uri.queryParameters['statuses'] ?? '';
         if (statusesStr.isNotEmpty) {
-          filterSelectedStatuses.assignAll(statusesStr.split(','));
+          if (statusesStr.toLowerCase() == 'all') {
+            filterSelectedStatuses.clear();
+          } else {
+            filterSelectedStatuses.assignAll(statusesStr.split(','));
+          }
+        } else {
+          filterSelectedStatuses.clear();
         }
+      } else {
+        filterSelectedStatuses.assignAll(['Active']);
       }
     } catch (e) {
       debugPrint('Error loading filters from URL: $e');
@@ -267,7 +275,11 @@ class StaffController extends GetxController {
       if (filterMobile.value.isNotEmpty) params['mobile'] = filterMobile.value;
       if (filterEmail.value.isNotEmpty) params['email'] = filterEmail.value;
       if (filterSelectedRoles.isNotEmpty) params['roles'] = filterSelectedRoles.join(',');
-      if (filterSelectedStatuses.isNotEmpty) params['statuses'] = filterSelectedStatuses.join(',');
+      if (filterSelectedStatuses.isNotEmpty) {
+        params['statuses'] = filterSelectedStatuses.join(',');
+      } else {
+        params['statuses'] = 'all';
+      }
 
       final uri = Uri.base;
       final newUri = uri.replace(queryParameters: params);
@@ -333,7 +345,7 @@ class StaffController extends GetxController {
   Future<void> fetchStaffList() async {
     isLoading.value = true;
     try {
-      final list = await _staffService.getStaffList();
+      final list = await _staffService.getStaffList(status: 'all');
 
       debugPrint('=== Received ${list.length} staff from backend ===');
       for (var s in list) {
@@ -988,7 +1000,13 @@ class StaffController extends GetxController {
       }
 
       if (filterSelectedStatuses.isNotEmpty) {
-        if (!filterSelectedStatuses.contains(s.status.trim())) {
+        final matches = filterSelectedStatuses.any((status) {
+          if (status.toLowerCase() == 'inactive') {
+            return s.status.toLowerCase() == 'inactive' || s.status.toLowerCase() == 'deactivated';
+          }
+          return s.status.toLowerCase() == status.toLowerCase();
+        });
+        if (!matches) {
           return false;
         }
       }
@@ -1002,7 +1020,18 @@ class StaffController extends GetxController {
     filterMobile.value = '';
     filterEmail.value = '';
     filterSelectedRoles.clear();
-    filterSelectedStatuses.clear();
+    filterSelectedStatuses.assignAll(['Active']);
+    currentPage.value = 1;
+  }
+
+  void setQuickStatusFilter(String status) {
+    if (status.toLowerCase() == 'all') {
+      filterSelectedStatuses.clear();
+    } else if (status.toLowerCase() == 'inactive') {
+      filterSelectedStatuses.assignAll(['Inactive']);
+    } else {
+      filterSelectedStatuses.assignAll(['Active']);
+    }
     currentPage.value = 1;
   }
 

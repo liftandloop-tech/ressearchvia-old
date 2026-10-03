@@ -101,12 +101,13 @@ class DashboardManagementController extends GetxController {
 
         try {
           final staff = await _staffService.getStaffList(scoped: true);
+          final activeStaff = staff.where((s) => s.status.toLowerCase() == 'active').toList();
           if (Get.isRegistered<AuthController>()) {
             final auth = Get.find<AuthController>();
             final user = auth.user.value;
             if (user != null && !user.isAdmin) {
-              if (staff.isNotEmpty) {
-                staffList.value = staff;
+              if (activeStaff.isNotEmpty) {
+                staffList.value = activeStaff;
               } else {
                 staffList.value = [
                   StaffModel(
@@ -124,10 +125,10 @@ class DashboardManagementController extends GetxController {
                 ];
               }
             } else {
-              staffList.value = staff;
+              staffList.value = activeStaff;
             }
           } else {
-            staffList.value = staff;
+            staffList.value = activeStaff;
           }
         } catch (e) {
           debugPrint('DashboardManagementController: Error fetching staff list: $e');

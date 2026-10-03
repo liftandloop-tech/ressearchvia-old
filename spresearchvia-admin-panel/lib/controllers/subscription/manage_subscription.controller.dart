@@ -108,7 +108,7 @@ class ManageSubscriptionController extends GetxController {
   Future<void> fetchStaffList() async {
     try {
       final list = await _staffService.getStaffList();
-      staffList.value = list;
+      staffList.value = list.where((s) => s.status.toLowerCase() == 'active').toList();
     } catch (e) {
       debugPrint('Error fetching staff for manage subscription: $e');
     }
