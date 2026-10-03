@@ -26,7 +26,8 @@ class DashboardLayout extends StatelessWidget {
                 child: Column(
                   children: [
                     Obx(() {
-                      if (!authController.isImpersonating.value) {
+                      final currentUser = authController.user.value;
+                      if (!authController.isImpersonating.value || currentUser == null || currentUser.isAdmin) {
                         return const SizedBox.shrink();
                       }
                       return Container(

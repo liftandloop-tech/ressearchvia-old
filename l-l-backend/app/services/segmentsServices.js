@@ -22,6 +22,8 @@ import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 import Refund from "../models/refundModel.js";
 import salesRevenueService from "./salesRevenueService.js";
 
+let lastLegacySyncTime = 0;
+
 const segmentsService = {
   createSegments: async ({ body }) => {
     try {
@@ -884,44 +886,47 @@ const segmentsService = {
     try {
       console.log('[getPendingBankTransfers] Called with query:', query);
 
-      // --- SYNC LEGACY PAYMENTS START ---
-      try {
-        const legacyPending = await segmentsPaymentModel.find({
-          paymentStatus: 'pending',
-          paymentMethod: 'BANK_TRANSFER'
-        });
+      // --- SYNC LEGACY PAYMENTS START (Throttled to run at most once per 15 mins) ---
+      if (Date.now() - lastLegacySyncTime > 15 * 60 * 1000) {
+        lastLegacySyncTime = Date.now();
+        try {
+          const legacyPending = await segmentsPaymentModel.find({
+            paymentStatus: 'pending',
+            paymentMethod: 'BANK_TRANSFER'
+          });
 
-        for (const lp of legacyPending) {
-          // Determine consistent unique ID
-          const uniqueId = (lp.razorpayOrderId && lp.razorpayOrderId.length > 5)
-            ? lp.razorpayOrderId
-            : `LEGACY_${lp._id}`;
+          for (const lp of legacyPending) {
+            // Determine consistent unique ID
+            const uniqueId = (lp.razorpayOrderId && lp.razorpayOrderId.length > 5)
+              ? lp.razorpayOrderId
+              : `LEGACY_${lp._id}`;
 
-          // Check if already synced to PaymentIntent
-          const exists = await PaymentIntent.findOne({ razorpayOrderId: uniqueId });
+            // Check if already synced to PaymentIntent
+            const exists = await PaymentIntent.findOne({ razorpayOrderId: uniqueId });
 
-          if (!exists) {
-            console.log(`[getPendingBankTransfers] Syncing legacy payment ${lp._id}`);
+            if (!exists) {
+              console.log(`[getPendingBankTransfers] Syncing legacy payment ${lp._id}`);
 
-            await PaymentIntent.create({
-              userId: lp.userId,
-              purchaseType: 'PLAN',
-              planId: lp.segmentPlanId,
-              baseAmount: (lp.amount && lp.gstAmount) ? (lp.amount - lp.gstAmount) : (lp.amount || 0),
-              gstAmount: lp.gstAmount || 0,
-              totalAmount: lp.amount || 0,
-              razorpayOrderId: uniqueId,
-              status: lp.paymentProof ? 'VERIFICATION_PENDING' : 'PENDING_BANK_TRANSFER',
-              paymentMethod: 'BANK_TRANSFER',
-              proofImage: lp.paymentProof,
-              preferredSegmentId: lp.segmentId,
-              preferredPlanId: lp.segmentPlanId,
-              createdAt: lp.createdAt
-            });
+              await PaymentIntent.create({
+                userId: lp.userId,
+                purchaseType: 'PLAN',
+                planId: lp.segmentPlanId,
+                baseAmount: (lp.amount && lp.gstAmount) ? (lp.amount - lp.gstAmount) : (lp.amount || 0),
+                gstAmount: lp.gstAmount || 0,
+                totalAmount: lp.amount || 0,
+                razorpayOrderId: uniqueId,
+                status: lp.paymentProof ? 'VERIFICATION_PENDING' : 'PENDING_BANK_TRANSFER',
+                paymentMethod: 'BANK_TRANSFER',
+                proofImage: lp.paymentProof,
+                preferredSegmentId: lp.segmentId,
+                preferredPlanId: lp.segmentPlanId,
+                createdAt: lp.createdAt
+              });
+            }
           }
+        } catch (syncErr) {
+          console.error('[getPendingBankTransfers] Legacy sync error:', syncErr);
         }
-      } catch (syncErr) {
-        console.error('[getPendingBankTransfers] Legacy sync error:', syncErr);
       }
       // --- SYNC LEGACY PAYMENTS END ---
 
@@ -1157,111 +1162,124 @@ const segmentsService = {
         pendingPaymentsCount: pendingIntentsCount
       };
 
-      // Reusable intent-to-frontend mapper
-      const mapIntentToPayment = async (intent) => {
-        let planObj = intent.planId;
-        let segmentName = 'N/A';
+      // Optimized batch intent-to-frontend mapper (eliminates N+1 queries)
+      const buildPaymentMapper = async (intentList) => {
+        if (!intentList || intentList.length === 0) return () => null;
 
-        if (intent.purchaseType === 'REGISTRATION' || intent.preferredSegmentId === 'REGISTRATION') {
-          const isLifetime = (intent.baseAmount === 10000 || intent.totalAmount === 10000);
-          planObj = {
-            _id: 'REGISTRATION',
-            planName: isLifetime ? 'Gold Registration' : 'Silver Registration',
-            price: intent.baseAmount || intent.totalAmount || 0,
-            duration: isLifetime ? '3652' : '365',
-            segmentsName: 'Platform'
-          };
-          segmentName = 'Platform';
-        } else {
-          // Fetch segment name if ID exists and is a valid ObjectId
-          if (intent.preferredSegmentId && mongoose.Types.ObjectId.isValid(intent.preferredSegmentId)) {
-            const seg = await segmentsModel.findById(intent.preferredSegmentId).lean();
-            if (seg) segmentName = seg.segmentName;
-          }
+        const intentIds = intentList.map(i => i._id.toString());
+        const segmentIds = [...new Set(intentList.map(i => i.preferredSegmentId).filter(id => id && mongoose.isValidObjectId(id)))];
+        const planIds = [...new Set(intentList.map(i => i.preferredPlanId).filter(id => id && mongoose.isValidObjectId(id)))];
 
-          if (!planObj && intent.preferredPlanId && mongoose.Types.ObjectId.isValid(intent.preferredPlanId)) {
-            const plan = await segmentsPlanModel.findById(intent.preferredPlanId).lean();
-            if (plan) {
+        const [invoices, segments, plans] = await Promise.all([
+          invoiceModel.find({ paymentRefId: { $in: intentIds } }).select('paymentRefId invoiceNumber').lean(),
+          segmentIds.length > 0 ? segmentsModel.find({ _id: { $in: segmentIds } }).select('segmentName').lean() : [],
+          planIds.length > 0 ? segmentsPlanModel.find({ _id: { $in: planIds } }).lean() : []
+        ]);
+
+        const invoiceMap = new Map(invoices.map(inv => [inv.paymentRefId, inv.invoiceNumber]));
+        const segmentMap = new Map(segments.map(s => [s._id.toString(), s.segmentName]));
+        const planMap = new Map(plans.map(p => [p._id.toString(), p]));
+
+        const baseUrl = process.env.BASE_URL || 'https://api.researchvia.in';
+
+        return (intent) => {
+          let planObj = intent.planId;
+          let segmentName = 'N/A';
+
+          if (intent.purchaseType === 'REGISTRATION' || intent.preferredSegmentId === 'REGISTRATION') {
+            const isLifetime = (intent.baseAmount === 10000 || intent.totalAmount === 10000);
+            planObj = {
+              _id: 'REGISTRATION',
+              planName: isLifetime ? 'Gold Registration' : 'Silver Registration',
+              price: intent.baseAmount || intent.totalAmount || 0,
+              duration: isLifetime ? '3652' : '365',
+              segmentsName: 'Platform'
+            };
+            segmentName = 'Platform';
+          } else {
+            if (intent.preferredSegmentId) {
+              const sName = segmentMap.get(intent.preferredSegmentId.toString());
+              if (sName) segmentName = sName;
+            }
+
+            if (!planObj && intent.preferredPlanId) {
+              const pObj = planMap.get(intent.preferredPlanId.toString());
+              if (pObj) {
+                planObj = {
+                  ...pObj,
+                  segmentsName: segmentName
+                };
+              } else {
+                planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
+              }
+            } else if (!planObj) {
+              planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
+            } else {
               planObj = {
-                ...plan,
+                ...(planObj.toObject ? planObj.toObject() : planObj),
                 segmentsName: segmentName
               };
-            } else {
-              planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
             }
-          } else if (!planObj) {
-            planObj = { planName: 'Unknown Plan', segmentsName: segmentName };
-          } else {
-            // Flatten segmentsName into planObj for easier frontend access if desired
-            planObj = {
-              ...planObj.toObject ? planObj.toObject() : planObj,
-              segmentsName: segmentName
-            };
           }
-        }
 
-        // Construct full URL for proof image
-        const baseUrl = process.env.BASE_URL || 'https://api.researchvia.in';
-        const paymentProof = intent.proofImage ? `${baseUrl}/${intent.proofImage}` : null;
-        const paymentProofs = (intent.proofImages && intent.proofImages.length > 0)
-          ? intent.proofImages.map(img => `${baseUrl}/${img}`)
-          : (paymentProof ? [paymentProof] : []);
+          const paymentProof = intent.proofImage ? `${baseUrl}/${intent.proofImage}` : null;
+          const paymentProofs = (intent.proofImages && intent.proofImages.length > 0)
+            ? intent.proofImages.map(img => `${baseUrl}/${img}`)
+            : (paymentProof ? [paymentProof] : []);
 
-        // Map history proof images with the same baseUrl
-        const historyMapped = (intent.partialPaymentsHistory || []).map(h => {
-          let hq = h.toObject ? h.toObject() : h;
-          hq.proofImage = hq.proofImage ? `${baseUrl}/${hq.proofImage}` : null;
-          hq.proofImages = (hq.proofImages && hq.proofImages.length > 0)
-            ? hq.proofImages.map(img => `${baseUrl}/${img}`)
-            : (hq.proofImage ? [hq.proofImage] : []);
-          return hq;
-        });
+          const historyMapped = (intent.partialPaymentsHistory || []).map(h => {
+            let hq = h.toObject ? h.toObject() : h;
+            hq.proofImage = hq.proofImage ? `${baseUrl}/${hq.proofImage}` : null;
+            hq.proofImages = (hq.proofImages && hq.proofImages.length > 0)
+              ? hq.proofImages.map(img => `${baseUrl}/${img}`)
+              : (hq.proofImage ? [hq.proofImage] : []);
+            return hq;
+          });
 
-        // Determine Frontend Status
-        let displayStatus = intent.status;
-        if (intent.isPartial && intent.status !== 'PAID') {
-          const hasApproved = (intent.partialPaymentsHistory || []).some(h => h.status === 'APPROVED');
-          if (hasApproved) {
-            displayStatus = 'PARTIAL-PAID';
+          let displayStatus = intent.status;
+          if (intent.isPartial && intent.status !== 'PAID') {
+            const hasApproved = (intent.partialPaymentsHistory || []).some(h => h.status === 'APPROVED');
+            if (hasApproved) {
+              displayStatus = 'PARTIAL-PAID';
+            }
           }
-        }
 
-        // Look up the linked invoice to get the official invoiceNumber (same as shown in mobile app)
-        const linkedInvoice = await invoiceModel.findOne({ paymentRefId: intent._id.toString() }).select('invoiceNumber').lean();
+          const invoiceNumber = invoiceMap.get(intent._id.toString()) || null;
 
-        return {
-          _id: intent._id,
-          userId: intent.userId,
-          segmentPlanId: planObj,
-          amount: intent.totalAmount,
-          amountPaid: intent.amountPaid,
-          paymentProof: paymentProof,
-          paymentProofs: paymentProofs,
-          razorpayOrderId: intent.razorpayOrderId,
-          createdAt: intent.createdAt,
-          isPartial: intent.isPartial,
-          partialTotalTarget: intent.partialTotalTarget,
-          perDayCharge: intent.perDayCharge,
-          maxAllowedDays: intent.maxAllowedDays,
-          partialPaymentsHistory: historyMapped,
-          walletBalance: intent.walletBalance,
-          utrNumber: intent.utrNumber,
-          transactionDate: intent.transactionDate,
-          purchaseType: intent.purchaseType,
-          correctionVersion: intent.correctionVersion || 0,
-          correctionHistory: intent.correctionHistory || [],
-          discount: intent.discount || 0,
-          status: displayStatus,
-          baseAmount: intent.baseAmount || 0,
-          gstAmount: intent.gstAmount || 0,
-          gstRateUsed: intent.gstRateUsed || 18,
-          invoiceNumber: linkedInvoice?.invoiceNumber || null,
-          paymentMethod: intent.paymentMethod || 'BANK_TRANSFER',
-          preferredSegmentId: intent.preferredSegmentId,
-          preferredPlanId: intent.preferredPlanId,
-          planId: intent.planId?._id || intent.planId,
-          serviceStartDate: intent.serviceStartDate,
-          currentExpiryDate: intent.currentExpiryDate,
+          return {
+            _id: intent._id,
+            userId: intent.userId,
+            segmentPlanId: planObj,
+            amount: intent.totalAmount,
+            amountPaid: intent.amountPaid,
+            paymentProof: paymentProof,
+            paymentProofs: paymentProofs,
+            razorpayOrderId: intent.razorpayOrderId,
+            createdAt: intent.createdAt,
+            isPartial: intent.isPartial,
+            partialTotalTarget: intent.partialTotalTarget,
+            perDayCharge: intent.perDayCharge,
+            maxAllowedDays: intent.maxAllowedDays,
+            partialPaymentsHistory: historyMapped,
+            walletBalance: intent.walletBalance,
+            utrNumber: intent.utrNumber,
+            transactionDate: intent.transactionDate,
+            purchaseType: intent.purchaseType,
+            correctionVersion: intent.correctionVersion || 0,
+            correctionHistory: intent.correctionHistory || [],
+            discount: intent.discount || 0,
+            status: displayStatus,
+            baseAmount: intent.baseAmount || 0,
+            gstAmount: intent.gstAmount || 0,
+            gstRateUsed: intent.gstRateUsed || 18,
+            invoiceNumber,
+            paymentMethod: intent.paymentMethod || 'BANK_TRANSFER',
+            preferredSegmentId: intent.preferredSegmentId,
+            preferredPlanId: intent.preferredPlanId,
+            planId: intent.planId?._id || intent.planId,
+            serviceStartDate: intent.serviceStartDate,
+            currentExpiryDate: intent.currentExpiryDate,
+          };
         };
       };
 
@@ -1356,7 +1374,8 @@ const segmentsService = {
           })
           .sort({ updatedAt: -1 });
 
-        const mappedPayments = await Promise.all(intents.map(mapIntentToPayment));
+        const mapper = await buildPaymentMapper(intents);
+        const mappedPayments = intents.map(mapper);
 
         // Group mapped payments by userId
         const userMap = new Map();
@@ -1481,7 +1500,8 @@ const segmentsService = {
       });
 
       // Map to frontend expected format
-      const pendingPayments = await Promise.all(intents.map(mapIntentToPayment));
+      const mapper = await buildPaymentMapper(intents);
+      const pendingPayments = intents.map(mapper);
 
       return {
         status: 200,

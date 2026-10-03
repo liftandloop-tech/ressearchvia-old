@@ -35,10 +35,11 @@ export const salesRevenueService = {
       targetStaffIds = [];
     }
 
-    // 1. Fetch Staff List & Department Hierarchy
-    const staffListQuery = isSystemAdmin
-      ? {}
-      : { _id: { $in: targetStaffIds } };
+    // 1. Fetch Staff List & Department Hierarchy (Active staff only)
+    const staffListQuery = {
+      ...(isSystemAdmin ? {} : { _id: { $in: targetStaffIds } }),
+      status: { $regex: /^active$/i }
+    };
     const staffList = await staffModel.find(staffListQuery).select('fullName staffId deparment emailAddress mobileNumber status');
 
     const staffDeptMap = {};
@@ -345,6 +346,7 @@ export const salesRevenueService = {
         assignedClients: staffClientCountMap[sId] || 0,
         ordersCount: salesData.paidOrdersCount || salesData.ordersCount,
         totalSalesAmount: Math.round(salesData.totalAmount),
+        status: s.status || 'Active',
       };
     });
 

@@ -232,8 +232,8 @@ const staffService = {
         return { status: 200, message: "staff not found", data: {} }
       }
 
-      if (staff.status && staff.status.toLowerCase() === 'inactive') {
-        return { status: 200, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
+      if (staff.status && (staff.status.toLowerCase() === 'inactive' || staff.status.toLowerCase() === 'deactivated')) {
+        return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
       const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
       const messageText = defaultTemplate.replaceAll('{OTP}', otp);
@@ -286,7 +286,7 @@ const staffService = {
         return { status: 400, message: "OTP Invalid or expired", data: {} };
       }
 
-      if (staff.status && staff.status.toLowerCase() === 'inactive') {
+      if (staff.status && (staff.status.toLowerCase() === 'inactive' || staff.status.toLowerCase() === 'deactivated')) {
         return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
       staff.otp = null;
@@ -353,8 +353,8 @@ const staffService = {
         return { status: 200, message: "Staff not found", data: {} }
       }
 
-      if (staff.status && staff.status.toLowerCase() === 'inactive') {
-        return { status: 200, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
+      if (staff.status && (staff.status.toLowerCase() === 'inactive' || staff.status.toLowerCase() === 'deactivated')) {
+        return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
 
       if (!staff.mpin) {
@@ -483,7 +483,8 @@ const staffService = {
 
       // Hierarchy Check: Non-admins can only manage staff from their own team/hierarchy
       const callerId = user?._id || user?.userId || user?.id;
-      if (callerId) {
+      const isSuper = user?.userType === 'admin' || user?.userType === 'super_admin' || user?.role === 'Admin' || user?.role === 'admin';
+      if (!isSuper && callerId) {
         const hierarchy = await getSupervisedStaffIds(callerId);
         if (!hierarchy.isSystemAdmin) {
           const isSupervised = hierarchy.staffIds?.some(id => id.toString() === staff._id.toString());
@@ -546,10 +547,17 @@ const staffService = {
       }
 
       if (body.assignedDirector !== undefined) {
-        staff.assignedDirector = (body.assignedDirector && body.assignedDirector !== 'unassigned' && body.assignedDirector !== 'admin') ? body.assignedDirector : null;
+        const rawDir = body.assignedDirector;
+        if (!rawDir || rawDir === 'unassigned' || rawDir === 'admin' || !mongoose.isValidObjectId(rawDir)) {
+          staff.assignedDirector = null;
+        } else {
+          staff.assignedDirector = new mongoose.Types.ObjectId(rawDir.toString());
+        }
       }
       if (body.assignedDirectorName !== undefined) {
-        staff.assignedDirectorName = (body.assignedDirector && body.assignedDirector !== 'unassigned' && body.assignedDirector !== 'admin') ? body.assignedDirectorName : (body.assignedDirector === 'admin' || body.assignedDirectorName === 'Admin' ? 'Admin' : null);
+        staff.assignedDirectorName = staff.assignedDirector 
+          ? (body.assignedDirectorName || null) 
+          : ((body.assignedDirector === 'admin' || body.assignedDirectorName === 'Admin') ? 'Admin' : null);
       }
 
       if (body.mpin) {
@@ -644,7 +652,8 @@ const staffService = {
         }
 
         const forceScoped = query?.scoped === 'true' || query?.scoped === true;
-        if (!isSystemAdmin && (!hasGlobalStaffAccess || forceScoped)) {
+        const isDirector = hierarchy.isDirector || /director/i.test(deptName) || /director/i.test(hierarchy.staffMember?.role || "");
+        if (!isSystemAdmin && (!hasGlobalStaffAccess || forceScoped || isDirector)) {
           mongoQuery._id = { $in: hierarchy.staffIds };
           console.log(`Staff list scoped for ${hierarchy.staffMember?.fullName} (${hierarchy.staffIds?.length || 0} staff):`, JSON.stringify(mongoQuery));
         } else {

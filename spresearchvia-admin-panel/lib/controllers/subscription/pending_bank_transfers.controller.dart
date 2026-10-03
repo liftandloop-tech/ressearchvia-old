@@ -2554,6 +2554,17 @@ class PendingBankTransfersController extends GetxController {
     }
 
     filteredConsolidatedUsers.assignAll(list);
+    _calculateGstMetrics();
+  }
+
+  bool get hasActiveClientFilters {
+    return customerFilter.value.trim().isNotEmpty ||
+        balanceStatusFilter.value != 'All' ||
+        amountRangeFilter.value != 'All' ||
+        stateTypeFilter.value != 'All' ||
+        stateNameFilter.value != 'All' ||
+        activityFilter.value != 'All' ||
+        activityDateFilter.value.trim().isNotEmpty;
   }
 
   void resetFilters() {
@@ -2964,8 +2975,8 @@ class PendingBankTransfersController extends GetxController {
   }
 
   void _calculateGstMetrics() {
-    // If backend provided authoritative unpaginated GST metrics, prioritize them
-    if (summaryStats.containsKey('grossTurnover') && summaryStats['grossTurnover'] != null) {
+    // If NO client filters are active, and backend provided authoritative unpaginated GST metrics, prioritize them
+    if (!hasActiveClientFilters && summaryStats.containsKey('grossTurnover') && summaryStats['grossTurnover'] != null) {
       gstGrossTurnover.value = (summaryStats['grossTurnover'] as num?)?.toDouble() ?? 0.0;
       gstTaxableTurnover.value = (summaryStats['taxableTurnover'] as num?)?.toDouble() ?? 0.0;
       gstTotalTax.value = (summaryStats['totalTax'] as num?)?.toDouble() ?? 0.0;
@@ -2990,8 +3001,12 @@ class PendingBankTransfersController extends GetxController {
     double b2bAmt = 0.0;
     double b2cAmt = 0.0;
 
+    final targetUsers = (hasActiveClientFilters || filteredConsolidatedUsers.isNotEmpty)
+        ? filteredConsolidatedUsers
+        : consolidatedUsers;
+
     final allRealizedPayments = <Map<String, dynamic>>[];
-    for (var uGroup in consolidatedUsers) {
+    for (var uGroup in targetUsers) {
       final payments = uGroup['payments'] as List? ?? [];
       final user = uGroup['user'] is Map ? uGroup['user'] as Map<String, dynamic> : <String, dynamic>{};
       for (var p in payments) {
@@ -3004,7 +3019,10 @@ class PendingBankTransfersController extends GetxController {
     }
 
     if (allRealizedPayments.isEmpty) {
-      for (var p in pendingPayments) {
+      final targetPayments = (hasActiveClientFilters || filteredPayments.isNotEmpty)
+          ? filteredPayments
+          : pendingPayments;
+      for (var p in targetPayments) {
         allRealizedPayments.add(p);
       }
     }
@@ -3234,9 +3252,19 @@ class PendingBankTransfersController extends GetxController {
         final user = p['userId'] is Map ? p['userId'] as Map : (p['user'] is Map ? p['user'] as Map : {});
         final String fullName = user['fullName']?.toString() ?? 'Customer';
         final String mobile = user['phone']?.toString() ?? '-';
-        final String gstin = (user['gstin'] ?? p['gstin'] ?? '').toString().trim().toUpperCase();
+        final rawGst = (user['gstin'] ??
+                        user['gstNumber'] ??
+                        user['gst'] ??
+                        user['userObject']?['gstin'] ??
+                        user['userObject']?['gstNumber'] ??
+                        user['userObject']?['gst'] ??
+                        p['gstin'] ??
+                        p['gstNumber'] ??
+                        '').toString().trim().toUpperCase();
+        final bool hasGst = rawGst.isNotEmpty && rawGst != 'NULL' && rawGst != 'UNDEFINED' && rawGst != '-';
+        final String displayGst = hasGst ? rawGst : 'URP';
         final String pan = (user['panNumber'] ?? '').toString().trim().toUpperCase();
-        final bool isB2b = gstin.length == 15;
+        final bool isB2b = hasGst;
 
         final stateInfo = resolveStateInfo(user, fallbackGstin: p['gstin']?.toString());
         final String pos = (stateInfo.code != '--')
@@ -3311,7 +3339,7 @@ class PendingBankTransfersController extends GetxController {
                 : '$basePlanName (Installment $instNumber)';
 
             csvBuffer.writeln(
-              '"$itemInvoiceNo","$formattedDate","${_cleanCsv(fullName)}","${_cleanCsv(mobile)}","${isB2b ? gstin : 'URP'}","${_cleanCsv(pan)}","${isB2b ? 'B2B Regular' : 'B2C Small'}","$pos","N","998371",${baseAmount.toStringAsFixed(2)},18%,${cgst.toStringAsFixed(2)},${sgst.toStringAsFixed(2)},${igst.toStringAsFixed(2)},${instAmount.toStringAsFixed(2)},"$paymentMode","${_cleanCsv(utr)}","${_cleanCsv(planLabel)}","APPROVED"',
+              '"$itemInvoiceNo","$formattedDate","${_cleanCsv(fullName)}",${_formatMobileForCsv(mobile)},"${_cleanCsv(displayGst)}","${_cleanCsv(pan)}","${isB2b ? 'B2B Regular' : 'B2C Small'}","$pos","N","998371",${baseAmount.toStringAsFixed(2)},18%,${cgst.toStringAsFixed(2)},${sgst.toStringAsFixed(2)},${igst.toStringAsFixed(2)},${instAmount.toStringAsFixed(2)},"$paymentMode","${_cleanCsv(utr)}","${_cleanCsv(planLabel)}","APPROVED"',
             );
             count++;
             hasExportedInstallment = true;
@@ -3359,7 +3387,7 @@ class PendingBankTransfersController extends GetxController {
               : basePlanName;
 
           csvBuffer.writeln(
-            '"$invoiceNo","$formattedDate","${_cleanCsv(fullName)}","${_cleanCsv(mobile)}","${isB2b ? gstin : 'URP'}","${_cleanCsv(pan)}","${isB2b ? 'B2B Regular' : 'B2C Small'}","$pos","N","998371",${baseAmount.toStringAsFixed(2)},18%,${cgst.toStringAsFixed(2)},${sgst.toStringAsFixed(2)},${igst.toStringAsFixed(2)},${totalPaid.toStringAsFixed(2)},"$paymentMode","${_cleanCsv(utr)}","${_cleanCsv(planLabel)}","$status"',
+            '"$invoiceNo","$formattedDate","${_cleanCsv(fullName)}",${_formatMobileForCsv(mobile)},"${_cleanCsv(displayGst)}","${_cleanCsv(pan)}","${isB2b ? 'B2B Regular' : 'B2C Small'}","$pos","N","998371",${baseAmount.toStringAsFixed(2)},18%,${cgst.toStringAsFixed(2)},${sgst.toStringAsFixed(2)},${igst.toStringAsFixed(2)},${totalPaid.toStringAsFixed(2)},"$paymentMode","${_cleanCsv(utr)}","${_cleanCsv(planLabel)}","$status"',
           );
           count++;
 
@@ -3515,4 +3543,18 @@ class PendingBankTransfersController extends GetxController {
   }
 
   String _cleanCsv(String val) => val.replaceAll('"', '""');
+
+  String _formatMobileForCsv(String? raw) {
+    if (raw == null || raw.trim().isEmpty || raw.trim() == '-') return '"-"';
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 12 && digits.startsWith('91')) {
+      digits = digits.substring(2);
+    } else if (digits.length == 13 && digits.startsWith('091')) {
+      digits = digits.substring(3);
+    } else if (digits.length == 11 && digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    if (digits.isEmpty) return '"-"';
+    return '"=""$digits"""';
+  }
 }

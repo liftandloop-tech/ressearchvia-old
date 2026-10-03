@@ -13,6 +13,7 @@ import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import 'widgets/click_to_call_dialog.widget.dart';
 import 'widgets/bulk_upload_dialog.widget.dart';
+import 'widgets/bulk_assign_by_numbers_dialog.widget.dart';
 
 class LeadManagementScreen extends StatelessWidget {
   const LeadManagementScreen({super.key});
@@ -74,7 +75,14 @@ class LeadManagementScreen extends StatelessWidget {
                           onTap: () => controller.downloadTemplate(),
                         ),
                       ],
-                      if (canBulkAssign)
+                      if (canBulkAssign) ...[
+                        const SizedBox(width: 8),
+                        Button(
+                          title: 'Paste Numbers to Assign',
+                          buttonType: ButtonType.blue,
+                          icon: Icons.paste_rounded,
+                          onTap: () => _showBulkAssignByNumbersDialog(context, controller),
+                        ),
                         Obx(() {
                           if (controller.selectedLeadIds.isEmpty) return const SizedBox.shrink();
                           return Padding(
@@ -91,6 +99,7 @@ class LeadManagementScreen extends StatelessWidget {
                             ),
                           );
                         }),
+                      ],
                       if (canCreateLead) ...[
                         const SizedBox(width: 8),
                         Button(
@@ -1276,6 +1285,13 @@ class LeadManagementScreen extends StatelessWidget {
   void _showBulkUploadDialog(BuildContext context, LeadsController controller) {
     Get.dialog(
       BulkUploadDialog(controller: controller),
+      barrierDismissible: true,
+    );
+  }
+
+  void _showBulkAssignByNumbersDialog(BuildContext context, LeadsController controller) {
+    Get.dialog(
+      BulkAssignByNumbersDialog(controller: controller),
       barrierDismissible: true,
     );
   }

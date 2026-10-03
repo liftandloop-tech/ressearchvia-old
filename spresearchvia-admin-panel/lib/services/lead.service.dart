@@ -106,6 +106,16 @@ class LeadService extends ApiService {
     });
   }
 
+  Future<Response> bulkAssignByNumbers({
+    required String rawNumbers,
+    required String assignedRM,
+  }) async {
+    return post('/leads/bulk-assign-by-numbers', {
+      'rawNumbers': rawNumbers,
+      'assignedRM': assignedRM,
+    });
+  }
+
   Future<Response> startImport(String importId, Map<String, dynamic> data) =>
       post('/leads/import/$importId/start', data);
 

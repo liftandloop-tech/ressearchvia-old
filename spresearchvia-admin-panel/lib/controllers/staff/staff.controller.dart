@@ -345,7 +345,13 @@ class StaffController extends GetxController {
   Future<void> fetchStaffList() async {
     isLoading.value = true;
     try {
-      final list = await _staffService.getStaffList(status: 'all');
+      final authController = Get.find<AuthController>();
+      final currentUser = authController.user.value;
+      final isDirector = currentUser != null &&
+          !currentUser.isAdmin &&
+          currentUser.isDirector;
+
+      final list = await _staffService.getStaffList(scoped: isDirector, status: 'all');
 
       debugPrint('=== Received ${list.length} staff from backend ===');
       for (var s in list) {
@@ -974,7 +980,19 @@ class StaffController extends GetxController {
   }
 
   List<StaffModel> get filteredStaffList {
+    final authUser = _authController.user.value;
+    final isDirector = authUser != null &&
+        !authUser.isAdmin &&
+        authUser.isDirector;
+
     return staffList.where((s) {
+      if (isDirector) {
+        final isSelf = s.id == authUser.id || (s.email.isNotEmpty && s.email.toLowerCase() == authUser.email.toLowerCase());
+        final isAssigned = s.assignedDirector != null && s.assignedDirector == authUser.id;
+        if (!isSelf && !isAssigned) {
+          return false;
+        }
+      }
       if (filterName.value.isNotEmpty) {
         if (!s.name.toLowerCase().contains(filterName.value.toLowerCase())) {
           return false;

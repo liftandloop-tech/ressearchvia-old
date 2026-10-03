@@ -49,6 +49,12 @@ class MainDashboardController extends GetxController {
       return;
     }
 
+    if (!user.isAdmin && (user.status.toLowerCase() == 'inactive' || user.status.toLowerCase() == 'deactivated')) {
+      print('Inactive user detected on route check. Logging out cleanly.');
+      authController.logout();
+      return;
+    }
+
     if (currentRoute == AppRoutes.login || currentRoute == '/') {
       print('Authenticated user detected on login route. Redirecting to authorized route.');
       Future.microtask(() => authController.navigateToAuthorizedRoute());

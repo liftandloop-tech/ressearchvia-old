@@ -25,7 +25,7 @@ class DashboardController extends GetxController {
   bool get isRegularStaff => isSingleStaff; // backwards-compatible alias
 
   var selectedRenewalStatus = 'All'.obs; // Order Status filter
-  var selectedDateFilter = 'This Month'.obs;
+  var selectedDateFilter = 'All Time'.obs;
   var selectedCustomDate = Rxn<DateTime>();
   var startDate = Rxn<DateTime>();
   var endDate = Rxn<DateTime>();
@@ -38,9 +38,8 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    final now = DateTime.now();
-    startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
-    endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+    startDate.value = null;
+    endDate.value = null;
     _syncFilterDefaults();
 
     if (_authController != null) {
@@ -233,12 +232,17 @@ class DashboardController extends GetxController {
     final myName = currentUser?.fullName.trim() ?? '';
     final staffNames = <String>{};
     for (final s in _dashboardManagementController.staffList) {
-      final n = s.name.trim();
-      if (n.isNotEmpty) staffNames.add(n);
+      if (s.status.toLowerCase() == 'active') {
+        final n = s.name.trim();
+        if (n.isNotEmpty) staffNames.add(n);
+      }
     }
     for (final p in _dashboardManagementController.staffPerformanceList) {
-      final n = (p['name'] ?? p['staffName'] ?? '').toString().trim();
-      if (n.isNotEmpty) staffNames.add(n);
+      final st = (p['status'] ?? 'active').toString().toLowerCase();
+      if (st == 'active') {
+        final n = (p['name'] ?? p['staffName'] ?? '').toString().trim();
+        if (n.isNotEmpty) staffNames.add(n);
+      }
     }
     final sortedStaff = staffNames.toList()..sort();
 
@@ -292,6 +296,12 @@ class DashboardController extends GetxController {
 
   List<Map<String, dynamic>> get filteredStaffPerformance {
     var list = List<Map<String, dynamic>>.from(staffPerformanceList);
+
+    // Only show active staff on dashboard
+    list = list.where((item) {
+      final st = (item['status'] ?? 'active').toString().toLowerCase();
+      return st == 'active';
+    }).toList();
 
     if (isSingleStaff) {
       final myId = (currentUser?.id ?? '').toLowerCase();
@@ -498,11 +508,10 @@ class DashboardController extends GetxController {
     _isFilterSyncing = true;
     try {
       selectedRenewalStatus.value = 'All';
-      selectedDateFilter.value = 'This Month';
+      selectedDateFilter.value = 'All Time';
       selectedCustomDate.value = null;
-      final now = DateTime.now();
-      startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
-      endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+      startDate.value = null;
+      endDate.value = null;
       searchQuery.value = '';
       activeTab.value = 0;
       if (isSingleStaff) {

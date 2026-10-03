@@ -617,4 +617,46 @@ class LeadsController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  Future<bool> bulkAssignByNumbers({
+    required String rawNumbers,
+    required String assignedRM,
+  }) async {
+    isLoading.value = true;
+    try {
+      final res = await _leadService.bulkAssignByNumbers(
+        rawNumbers: rawNumbers,
+        assignedRM: assignedRM,
+      );
+      if (!res.status.hasError && res.body != null) {
+        final msg = res.body['message'] ?? 'Leads assigned successfully';
+        Get.snackbar(
+          'Success',
+          msg.toString(),
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+          duration: const Duration(seconds: 4),
+        );
+        fetchLeads();
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message']?.toString() ?? 'Failed to assign leads',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to assign leads: $e',
+        backgroundColor: Colors.red.withOpacity(0.1),
+      );
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
 }

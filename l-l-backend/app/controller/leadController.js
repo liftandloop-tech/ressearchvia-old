@@ -486,6 +486,97 @@ const leadController = {
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message });
         }
+    },
+
+    bulkAssignByNumbers: async (req, res) => {
+        try {
+            const { rawNumbers, numbers, assignedRM } = req.body;
+            let numberList = [];
+
+            if (Array.isArray(numbers) && numbers.length > 0) {
+                numberList = numbers;
+            } else if (typeof rawNumbers === 'string' && rawNumbers.trim().length > 0) {
+                numberList = rawNumbers.split(/[\r\n,;\t]+/);
+            }
+
+            // Normalize each number to 10 digits
+            const normalizedMap = new Set();
+            for (const item of numberList) {
+                if (!item) continue;
+                const digits = item.toString().replace(/\D/g, '');
+                if (digits.length >= 10) {
+                    const tenDigit = digits.slice(-10);
+                    normalizedMap.add(tenDigit);
+                }
+            }
+
+            const uniqueNumbers = Array.from(normalizedMap);
+            if (uniqueNumbers.length === 0) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "No valid 10-digit mobile numbers found in input"
+                });
+            }
+
+            const staffId = assignedRM && assignedRM !== 'unassigned' ? assignedRM : null;
+
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+
+            let targetStaff = null;
+            if (staffId) {
+                targetStaff = await staffModel.findById(staffId).select('fullName staffId status');
+                if (!targetStaff) {
+                    return res.status(404).send({ status: 404, message: "Target staff member not found" });
+                }
+            }
+
+            // Build query numbers variations (+91, 91, 0, raw)
+            const queryVariations = [];
+            for (const n of uniqueNumbers) {
+                queryVariations.push(n);
+                queryVariations.push(`+91${n}`);
+                queryVariations.push(`91${n}`);
+                queryVariations.push(`0${n}`);
+            }
+
+            const leadFilter = {
+                $or: [
+                    { mobileNumber: { $in: queryVariations } },
+                    { mobileNumber: { $regex: new RegExp(`(${uniqueNumbers.join('|')})$`) } }
+                ]
+            };
+
+            if (!isSuper && callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                if (!hierarchy.isSystemAdmin) {
+                    if (!hierarchy.isSupervisor && (!hierarchy.staffIds || hierarchy.staffIds.length <= 1)) {
+                        return res.status(403).send({ status: 403, message: "Only team leaders and administrators can assign leads" });
+                    }
+                    if (staffId && !hierarchy.staffIds.some(sid => sid.toString() === staffId.toString())) {
+                        return res.status(403).send({ status: 403, message: "Cannot assign leads to staff outside your supervised team" });
+                    }
+                }
+            }
+
+            const updateResult = await leadModel.updateMany(
+                leadFilter,
+                { $set: { assignedRM: staffId } }
+            );
+
+            return res.status(200).send({
+                status: 200,
+                message: `Successfully assigned ${updateResult.modifiedCount} leads to ${targetStaff ? targetStaff.fullName : 'unassigned'}`,
+                data: {
+                    matchedCount: updateResult.matchedCount,
+                    modifiedCount: updateResult.modifiedCount,
+                    totalNumbersProvided: uniqueNumbers.length,
+                    staffName: targetStaff ? targetStaff.fullName : 'Unassigned'
+                }
+            });
+        } catch (error) {
+            return res.status(500).send({ status: 500, message: error.message });
+        }
     }
 };
 

@@ -185,7 +185,7 @@ final appPages = [
   ),
   GetPage(
     name: '/applicant/:id',
-    page: () => DashboardLayout(child: const ApplicantProfileScreen()),
+    page: () => const ApplicantProfileScreen(),
   ),
   GetPage(
     name: AppRoutes.profile,

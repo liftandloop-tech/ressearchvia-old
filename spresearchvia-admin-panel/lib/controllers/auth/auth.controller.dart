@@ -70,26 +70,64 @@ class AuthController extends GetxController {
         authToken.value = token;
         user.value = storedUser;
         isAuthenticated.value = true;
-        isImpersonating.value = hasBackup;
-        if (hasBackup) {
-          impersonatedStaffName.value = storedUser.fullName;
+        if (storedUser.isAdmin) {
+          isImpersonating.value = false;
+          impersonatedStaffName.value = '';
+          await _authService.clearAdminBackup();
+        } else {
+          isImpersonating.value = hasBackup;
+          if (hasBackup) {
+            impersonatedStaffName.value = storedUser.fullName;
+          }
         }
 
         if (Get.isRegistered<InactivityService>()) {
           InactivityService.to.resetTimer();
         }
 
+        if (!storedUser.isAdmin && (storedUser.status.toLowerCase() == 'inactive' || storedUser.status.toLowerCase() == 'deactivated')) {
+          debugPrint('[AuthController] Stored staff account is inactive. Clearing session.');
+          await _authService.logout();
+          user.value = null;
+          authToken.value = '';
+          isAuthenticated.value = false;
+          Get.snackbar(
+            'Account Inactive',
+            'Your account is deactivated. Please contact your administrator.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppTheme.errorRed,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 4),
+          );
+          return;
+        }
+
         // Fresh profile sync: If staff member's role or permissions were updated by admin,
         // sync the latest profile from backend so the updated permissions take effect immediately.
         if (!storedUser.isAdmin && !hasBackup) {
           _staffService.getStaffProfileMe().then((freshStaff) async {
-            if (freshStaff != null && freshStaff.rawJson != null) {
-              final freshUser = UserModel.fromJson(freshStaff.rawJson!);
-              user.value = freshUser;
-              await _authService.saveUserData(freshStaff.rawJson!);
-              debugPrint('Staff profile refreshed with role: ${freshUser.subscriptionPlan}');
-              if (freshUser.needsJobAgreement && Get.currentRoute != AppRoutes.jobTermsAgreement) {
-                Get.offAllNamed(AppRoutes.jobTermsAgreement);
+            if (freshStaff != null) {
+              if (freshStaff.status.toLowerCase() == 'inactive' || freshStaff.status.toLowerCase() == 'deactivated') {
+                debugPrint('[AuthController] Fresh staff check: Account is inactive. Logging out.');
+                await logout();
+                Get.snackbar(
+                  'Account Inactive',
+                  'Your account has been deactivated. Please contact your administrator.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: AppTheme.errorRed,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 4),
+                );
+                return;
+              }
+              if (freshStaff.rawJson != null) {
+                final freshUser = UserModel.fromJson(freshStaff.rawJson!);
+                user.value = freshUser;
+                await _authService.saveUserData(freshStaff.rawJson!);
+                debugPrint('Staff profile refreshed with role: ${freshUser.subscriptionPlan}');
+                if (freshUser.needsJobAgreement && Get.currentRoute != AppRoutes.jobTermsAgreement) {
+                  Get.offAllNamed(AppRoutes.jobTermsAgreement);
+                }
               }
             }
           }).catchError((e) {
@@ -141,6 +179,8 @@ class AuthController extends GetxController {
         authToken.value = result.token!;
         isAuthenticated.value = true;
         isImpersonating.value = false;
+        impersonatedStaffName.value = '';
+        await _authService.clearAdminBackup();
 
         _clearSessionStateAndCache();
         if (Get.isRegistered<InactivityService>()) {

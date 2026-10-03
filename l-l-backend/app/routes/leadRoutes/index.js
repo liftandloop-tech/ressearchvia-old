@@ -22,6 +22,7 @@ const leadRoutes = () => {
 
     Router.post("/create", auth.tokenVerified, checkPermission('leads.create'), leadController.createLead);
     Router.post("/bulk-assign", auth.tokenVerified, checkPermission('leads.bulk_assign'), leadController.bulkAssign);
+    Router.post("/bulk-assign-by-numbers", auth.tokenVerified, checkPermission('leads.bulk_assign'), leadController.bulkAssignByNumbers);
     Router.put("/update/:id", auth.tokenVerified, checkPermission('leads.update'), leadController.updateLead);
     Router.get("/", auth.tokenVerified, checkPermission('leads.view'), leadController.listLeads);
     Router.post("/follow-up/:id", auth.tokenVerified, checkPermission('leads.follow_up'), leadController.addFollowUp);
