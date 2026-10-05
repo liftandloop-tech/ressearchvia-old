@@ -51,7 +51,7 @@ const ALLOWED_EXTENSIONS_BY_TYPE = {
   'serviceAgreement': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'agreement': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'signedDocument': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
-  'report': ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'],
+  'report': ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'mov', 'mp4', 'avi', 'mkv', 'webm', '3gp'],
   'bulk-import': ['csv', 'xls', 'xlsx'],
   'kyc-video': ['mp4', 'mov', 'avi', 'mkv', '3gp', 'webm'],
   'staff-video': ['mp4', 'mov', 'avi', 'mkv', '3gp', 'webm'],

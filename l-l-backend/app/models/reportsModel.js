@@ -56,17 +56,28 @@ const reportsSchema = new mongoose.Schema({
         }
     }],
     reportPath: {
-
         type: String,
-        required: true
+        required: function () {
+            const type = (this.reportType || '').toLowerCase();
+            return !type.includes('trading');
+        },
+        default: ""
     },
     reportOriginalName: {
         type: String,
-        required: true
+        required: function () {
+            const type = (this.reportType || '').toLowerCase();
+            return !type.includes('trading');
+        },
+        default: ""
     },
     reportName: {
         type: String,
-        required: true
+        required: function () {
+            const type = (this.reportType || '').toLowerCase();
+            return !type.includes('trading');
+        },
+        default: ""
     },
     publishedStatus: {
         type: String,

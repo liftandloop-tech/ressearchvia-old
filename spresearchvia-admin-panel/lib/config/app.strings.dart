@@ -207,7 +207,7 @@ class AppStrings {
   static const String dragDropFile = 'Drag & drop file';
   static const String clickToChoose = 'or click to choose files';
   static const String supportedFormats =
-      'Supported formats: PDF, PNG, JPG, JPEG, GIF, WEBP (Max 50MB)';
+      'Supported formats: PDF, PNG, JPG, JPEG, GIF, WEBP, MOV, MP4 (Max 50MB)';
   static const String browseFiles = 'Browse Files';
   static const String reportDescription =
       'Provide a brief description of the report content and key insights.';

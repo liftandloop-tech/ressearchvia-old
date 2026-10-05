@@ -692,24 +692,30 @@ class UploadReportScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Obx(
-                          () => RichText(
-                            text: TextSpan(
-                              text: AppStrings.uploadFile,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textPrimary,
+                          () {
+                            final isTradingCall = controller.selectedReportType.value
+                                .toLowerCase()
+                                .contains('trading');
+                            return RichText(
+                              text: TextSpan(
+                                text: isTradingCall
+                                    ? '${AppStrings.uploadFile} (Optional)'
+                                    : AppStrings.uploadFile,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppTheme.textPrimary,
+                                ),
+                                children: [
+                                  if (!isTradingCall)
+                                    TextSpan(
+                                      text: ' *',
+                                      style: TextStyle(color: AppTheme.errorRed),
+                                    ),
+                                ],
                               ),
-                              children: [
-                                if (controller.selectedReportType.value ==
-                                    'Detailed Reports')
-                                  TextSpan(
-                                    text: '*',
-                                    style: TextStyle(color: AppTheme.errorRed),
-                                  ),
-                              ],
-                            ),
-                          ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 8),
                         Container(

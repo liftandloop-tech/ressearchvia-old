@@ -7,6 +7,8 @@ import 'package:spresearch_web/controllers/reports/report.controller.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/services/report.service.dart';
 import '../../../models/report.model.dart';
+import 'package:spresearch_web/config/app.config.dart';
+import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
@@ -227,82 +229,142 @@ class ReportDetailsScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.gray50,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFEBEE),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Icon(
-                                        Icons.picture_as_pdf,
-                                        color: Color(0xFFD32F2F),
-                                        size: 24,
-                                      ),
+                              Builder(
+                                builder: (context) {
+                                  final ext = (report.reportOriginalName ?? '').toLowerCase();
+                                  final isPdf = ext.endsWith('.pdf');
+                                  final isVid = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.3gp'].any((e) => ext.endsWith(e));
+                                  final isImg = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].any((e) => ext.endsWith(e));
+
+                                  final badgeBg = isPdf
+                                      ? const Color(0xFFFFEBEE)
+                                      : (isVid ? const Color(0xFFF3E8FF) : (isImg ? const Color(0xFFE3F2FD) : AppTheme.gray100));
+                                  final iconColor = isPdf
+                                      ? const Color(0xFFD32F2F)
+                                      : (isVid ? const Color(0xFF7C3AED) : (isImg ? AppTheme.primaryBlue : AppTheme.textSecondary));
+                                  final iconData = isPdf
+                                      ? Icons.picture_as_pdf
+                                      : (isVid ? Icons.video_file : (isImg ? Icons.image : Icons.insert_drive_file));
+                                  final fileCategory = isPdf
+                                      ? 'PDF Document'
+                                      : (isVid ? 'Video File' : (isImg ? 'Image File' : 'Document'));
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.gray50,
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            report.reportOriginalName!,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppTheme.textPrimary,
-                                            ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: badgeBg,
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
-                                          Text(
-                                            'Document',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: AppTheme.textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    ElevatedButton.icon(
-                                      onPressed: () {
-                                        final controller =
-                                            Get.find<ReportController>();
-                                        controller.downloadReport(report);
-                                      },
-                                      icon: const Icon(
-                                        Icons.download,
-                                        size: 16,
-                                      ),
-                                      label: Text(
-                                        AppStrings.download,
-                                        style: const TextStyle(fontSize: 14),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.primaryBlue,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 10,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
+                                          child: Icon(
+                                            iconData,
+                                            color: iconColor,
+                                            size: 24,
                                           ),
                                         ),
-                                        elevation: 0,
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                report.reportOriginalName!,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppTheme.textPrimary,
+                                                ),
+                                              ),
+                                              Text(
+                                                fileCategory,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: AppTheme.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        OutlinedButton.icon(
+                                          onPressed: () {
+                                            final url = AppConfig.buildImageUrl(
+                                                'reports/${report.reportName}');
+                                            Get.dialog(
+                                              FilePreviewDialog(
+                                                fileName:
+                                                    report.reportOriginalName!,
+                                                fileUrl: url,
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.visibility_outlined,
+                                            size: 16,
+                                          ),
+                                          label: const Text(
+                                            'Preview',
+                                            style: TextStyle(fontSize: 14),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor:
+                                                AppTheme.primaryBlue,
+                                            side: BorderSide(
+                                                color: AppTheme.primaryBlue),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 10,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton.icon(
+                                          onPressed: () {
+                                            final controller =
+                                                Get.find<ReportController>();
+                                            controller.downloadReport(report);
+                                          },
+                                          icon: const Icon(
+                                            Icons.download,
+                                            size: 16,
+                                          ),
+                                          label: Text(
+                                            AppStrings.download,
+                                            style: const TextStyle(fontSize: 14),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                AppTheme.primaryBlue,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 10,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                6,
+                                              ),
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
                             ],
                             if (report.youtubeUrl != null &&
@@ -951,7 +1013,7 @@ class ReportDetailsScreen extends StatelessWidget {
                 }
                 isSubmitting.value = true;
                 final reportService = Get.find<ReportService>();
-                final success = await reportService.updateReport(
+                final result = await reportService.updateReport(
                   id: report.id,
                   title: report.title,
                   categoryId: report.segmentId,
@@ -963,7 +1025,7 @@ class ReportDetailsScreen extends StatelessWidget {
                   youtubeUrl: report.youtubeUrl,
                 );
                 isSubmitting.value = false;
-                if (success) {
+                if (result.success) {
                   if (context.mounted) {
                     Navigator.pop(context);
                   }
@@ -973,7 +1035,7 @@ class ReportDetailsScreen extends StatelessWidget {
                   Get.snackbar('Success', 'Update added successfully');
                   Get.find<ReportsNavigationController>().goBack();
                 } else {
-                  Get.snackbar('Error', 'Failed to add update');
+                  Get.snackbar('Error', result.message ?? 'Failed to add update');
                 }
               },
               style: ElevatedButton.styleFrom(

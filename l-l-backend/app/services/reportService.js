@@ -169,6 +169,11 @@ const reportService = {
             let reportOriginalName = file ? file.originalname : ""
             let reportName = file ? file.filename : ""
 
+            const isTradingCall = (reportType || '').toLowerCase().includes('trading');
+            if (!isTradingCall && !file) {
+                return { status: 400, message: "A document file is required for research reports", data: {} };
+            }
+
             // Handle segment as array (stringified if form-data)
             let segmentIds = [];
             if (typeof segment === 'string') {
@@ -825,6 +830,11 @@ const reportService = {
                 report.reportOriginalName = file.originalname;
                 report.reportName = file.filename;
             } else if (body.removeFile === 'true') {
+                const currentReportType = reportType || report.reportType || '';
+                const isTradingCall = currentReportType.toLowerCase().includes('trading');
+                if (!isTradingCall) {
+                    return { status: 400, message: "A document file is required for research reports", data: {} };
+                }
                 if (report.reportPath) {
                     const filePath = path.join(report.reportPath);
                     if (fs.existsSync(filePath)) {

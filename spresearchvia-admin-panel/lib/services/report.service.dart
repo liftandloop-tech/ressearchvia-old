@@ -72,7 +72,7 @@ class ReportService extends ApiService {
     }
   }
 
-  Future<bool> createReport({
+  Future<({bool success, String? message})> createReport({
     required String title,
     required String categoryId,
     required List<String> planIds,
@@ -101,7 +101,7 @@ class ReportService extends ApiService {
       debugPrint('=== CREATE REPORT SENDING ===');
       debugPrint('youtubeUrl field in FormData: ${youtubeUrl ?? ""}');
 
-      if (fileBytes != null && fileName != null) {
+      if (fileBytes != null && fileName != null && fileName.isNotEmpty) {
         formData.files.add(
           MapEntry('file', MultipartFile(fileBytes, filename: fileName)),
         );
@@ -119,16 +119,22 @@ class ReportService extends ApiService {
       if (response.status.hasError) {
         debugPrint('Error creating report: ${response.statusText}');
         debugPrint('Response body: ${response.body}');
-        return false;
+        final msg = response.body is Map
+            ? (response.body['message'] ?? response.statusText)
+            : response.statusText;
+        return (
+          success: false,
+          message: msg?.toString() ?? 'Failed to create report',
+        );
       }
-      return true;
+      return (success: true, message: null);
     } catch (e) {
       debugPrint('Error creating report: $e');
-      return false;
+      return (success: false, message: e.toString());
     }
   }
 
-  Future<bool> updateReport({
+  Future<({bool success, String? message})> updateReport({
     required String id,
     required String title,
     required String categoryId,
@@ -161,7 +167,7 @@ class ReportService extends ApiService {
       debugPrint('newUpdate field in FormData: ${newUpdate ?? ""}');
       debugPrint('youtubeUrl field in FormData: ${youtubeUrl ?? ""}');
 
-      if (fileBytes != null && fileName != null) {
+      if (fileBytes != null && fileName != null && fileName.isNotEmpty) {
         formData.files.add(
           MapEntry('file', MultipartFile(fileBytes, filename: fileName)),
         );
@@ -179,12 +185,18 @@ class ReportService extends ApiService {
       if (response.status.hasError) {
         debugPrint('Error updating report: ${response.statusText}');
         debugPrint('Response body: ${response.body}');
-        return false;
+        final msg = response.body is Map
+            ? (response.body['message'] ?? response.statusText)
+            : response.statusText;
+        return (
+          success: false,
+          message: msg?.toString() ?? 'Failed to update report',
+        );
       }
-      return true;
+      return (success: true, message: null);
     } catch (e) {
       debugPrint('Error updating report: $e');
-      return false;
+      return (success: false, message: e.toString());
     }
   }
 

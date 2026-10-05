@@ -382,7 +382,20 @@ class UploadReportController extends GetxController {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'],
+        allowedExtensions: [
+          'pdf',
+          'png',
+          'jpg',
+          'jpeg',
+          'gif',
+          'webp',
+          'mov',
+          'mp4',
+          'avi',
+          'mkv',
+          'webm',
+          '3gp',
+        ],
         withData: true, // Important for web
       );
 
@@ -420,13 +433,17 @@ class UploadReportController extends GetxController {
       return;
     }
 
-    bool isDetailedReport = selectedReportType.value == 'Detailed Reports';
-    if (isDetailedReport &&
-        uploadedFileBytes.value == null &&
-        !isEditMode.value) {
+    final isTradingCall =
+        selectedReportType.value.toLowerCase().contains('trading');
+    final hasFile = uploadedFileBytes.value != null ||
+        (isEditMode.value &&
+            uploadedFileName.value.isNotEmpty &&
+            !isFileRemoved.value);
+
+    if (!isTradingCall && !hasFile) {
       Get.snackbar(
         'Validation Error',
-        'Please upload a file for Detailed Reports',
+        'Please upload a document for Detailed Reports',
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
       );
@@ -452,9 +469,9 @@ class UploadReportController extends GetxController {
     // JSON Encode the list of segment IDs
     final segmentPayload = jsonEncode(selectedSegmentIds);
 
-    bool success;
+    final ({bool success, String? message}) result;
     if (isEditMode.value) {
-      success = await _reportService.updateReport(
+      result = await _reportService.updateReport(
         id: reportId!,
         title: titleController.text,
         categoryId: segmentPayload,
@@ -474,7 +491,7 @@ class UploadReportController extends GetxController {
         removeFile: isFileRemoved.value,
       );
     } else {
-      success = await _reportService.createReport(
+      result = await _reportService.createReport(
         title: titleController.text,
         categoryId: segmentPayload, // Sending JSON string
         planIds: planArray,
@@ -484,13 +501,17 @@ class UploadReportController extends GetxController {
         newUpdateStatus: selectedUpdateStatus.value,
         youtubeUrl: youtubeUrlController.text.trim(),
         fileBytes: uploadedFileBytes.value,
-        fileName: uploadedFileName.value,
+        fileName:
+            uploadedFileBytes.value != null &&
+                uploadedFileName.value.isNotEmpty
+            ? uploadedFileName.value
+            : null,
       );
     }
 
     isLoading.value = false;
 
-    if (success) {
+    if (result.success) {
       if (Get.isRegistered<ReportController>()) {
         Get.find<ReportController>().fetchReports();
       }
@@ -508,14 +529,19 @@ class UploadReportController extends GetxController {
         'Success',
         isEditMode.value
             ? 'Report updated successfully'
-            : 'Report uploaded successfully',
+            : (isTradingCall
+                ? 'Trading call created successfully'
+                : 'Report uploaded successfully'),
       );
     } else {
       Get.snackbar(
         'Error',
-        isEditMode.value
-            ? 'Failed to update report'
-            : 'Failed to upload report',
+        result.message ??
+            (isEditMode.value
+                ? 'Failed to update report'
+                : (isTradingCall
+                    ? 'Failed to create trading call'
+                    : 'Failed to upload report')),
       );
     }
   }
