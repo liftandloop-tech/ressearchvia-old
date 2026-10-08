@@ -11,6 +11,7 @@ class LoginPasswordField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
   final FocusNode? focusNode;
+  final Iterable<String>? autofillHints;
 
   const LoginPasswordField({
     super.key,
@@ -21,6 +22,7 @@ class LoginPasswordField extends StatelessWidget {
     this.textInputAction,
     this.onFieldSubmitted,
     this.focusNode,
+    this.autofillHints = const [AutofillHints.password],
   });
 
   @override
@@ -46,6 +48,7 @@ class LoginPasswordField extends StatelessWidget {
             validator: validator,
             textInputAction: textInputAction,
             onFieldSubmitted: onFieldSubmitted,
+            autofillHints: autofillHints,
             decoration: InputDecoration(
               hintText: AppStrings.enterPassword,
               hintStyle: TextStyle(

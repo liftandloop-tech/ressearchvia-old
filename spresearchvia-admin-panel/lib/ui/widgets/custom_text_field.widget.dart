@@ -11,6 +11,7 @@ class CustomTextField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
   final FocusNode? focusNode;
+  final Iterable<String>? autofillHints;
 
   const CustomTextField({
     super.key,
@@ -23,6 +24,7 @@ class CustomTextField extends StatelessWidget {
     this.textInputAction,
     this.onFieldSubmitted,
     this.focusNode,
+    this.autofillHints,
   });
 
   @override
@@ -48,6 +50,7 @@ class CustomTextField extends StatelessWidget {
           obscureText: obscureText,
           textInputAction: textInputAction,
           onFieldSubmitted: onFieldSubmitted,
+          autofillHints: autofillHints,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(

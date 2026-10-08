@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/services/auth.service.dart';
 import 'auth.controller.dart';
@@ -79,6 +80,8 @@ class LoginController extends GetxController {
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
       );
+    } else {
+      TextInput.finishAutofillContext(shouldSave: true);
     }
     // Success case is handled by AuthController (navigates to dashboard)
   }
@@ -101,6 +104,7 @@ class LoginController extends GetxController {
     isLoading.value = false;
 
     if (result.user != null && result.token != null) {
+      TextInput.finishAutofillContext(shouldSave: true);
       // Save to AuthController and navigate
       await _authController.staffLoginSuccess(result.user!, result.token!);
 

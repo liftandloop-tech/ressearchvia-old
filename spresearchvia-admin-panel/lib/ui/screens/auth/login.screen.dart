@@ -232,59 +232,63 @@ class Login extends StatelessWidget {
 }
 
   Widget _buildAdminLogin(BuildContext context, LoginController controller) {
-    return Column(
-      children: [
-        Form(
-          key: controller.adminFormKey,
-          child: Column(
-            children: [
-              CustomTextField(
-                label: AppStrings.emailAddress,
-                hint: AppStrings.enterEmail,
-                controller: controller.emailController,
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) {
-                  if (controller.passwordController.text.trim().isEmpty) {
-                    FocusScope.of(context).nextFocus();
-                  } else if (!controller.isLoading.value) {
-                    controller.adminLogin();
-                  }
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  if (!GetUtils.isEmail(value)) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              LoginPasswordField(
-                controller: controller.passwordController,
-                obscurePassword: controller.obscurePassword,
-                onToggleVisibility: controller.togglePasswordVisibility,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) {
-                  if (!controller.isLoading.value) {
-                    controller.adminLogin();
-                  }
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
-                  }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
-                  }
-                  return null;
-                },
-              ),
-            ],
+    return AutofillGroup(
+      child: Column(
+        children: [
+          Form(
+            key: controller.adminFormKey,
+            child: Column(
+              children: [
+                CustomTextField(
+                  label: AppStrings.emailAddress,
+                  hint: AppStrings.enterEmail,
+                  controller: controller.emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email, AutofillHints.username],
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) {
+                    if (controller.passwordController.text.trim().isEmpty) {
+                      FocusScope.of(context).nextFocus();
+                    } else if (!controller.isLoading.value) {
+                      controller.adminLogin();
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!GetUtils.isEmail(value)) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                LoginPasswordField(
+                  controller: controller.passwordController,
+                  obscurePassword: controller.obscurePassword,
+                  onToggleVisibility: controller.togglePasswordVisibility,
+                  autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    if (!controller.isLoading.value) {
+                      controller.adminLogin();
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -375,65 +379,69 @@ class Login extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ),
+  );
   }
 
   Widget _buildStaffLogin(BuildContext context, LoginController controller) {
-    return Column(
-      children: [
-        Form(
-          key: controller.staffFormKey,
-          child: Column(
-            children: [
-              CustomTextField(
-                label: 'Mobile No',
-                hint: 'Enter your mobile',
-                controller: controller.mobileController,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) {
-                  if (controller.mpinController.text.trim().isEmpty) {
-                    FocusScope.of(context).nextFocus();
-                  } else if (!controller.isLoading.value) {
-                    controller.staffLogin();
-                  }
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your mobile number';
-                  }
-                  if (value.length != 10) {
-                    return 'Please enter a valid 10-digit mobile number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              CustomTextField(
-                label: 'MPIN',
-                hint: 'Enter MPIN',
-                controller: controller.mpinController,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) {
-                  if (!controller.isLoading.value) {
-                    controller.staffLogin();
-                  }
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter MPIN';
-                  }
-                  if (value.length < 4) {
-                    return 'MPIN must be at least 4 digits';
-                  }
-                  return null;
-                },
-              ),
-            ],
+    return AutofillGroup(
+      child: Column(
+        children: [
+          Form(
+            key: controller.staffFormKey,
+            child: Column(
+              children: [
+                CustomTextField(
+                  label: 'Mobile No',
+                  hint: 'Enter your mobile',
+                  controller: controller.mobileController,
+                  keyboardType: TextInputType.phone,
+                  autofillHints: const [AutofillHints.telephoneNumber, AutofillHints.username],
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) {
+                    if (controller.mpinController.text.trim().isEmpty) {
+                      FocusScope.of(context).nextFocus();
+                    } else if (!controller.isLoading.value) {
+                      controller.staffLogin();
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your mobile number';
+                    }
+                    if (value.length != 10) {
+                      return 'Please enter a valid 10-digit mobile number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  label: 'MPIN',
+                  hint: 'Enter MPIN',
+                  controller: controller.mpinController,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    if (!controller.isLoading.value) {
+                      controller.staffLogin();
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter MPIN';
+                    }
+                    if (value.length < 4) {
+                      return 'MPIN must be at least 4 digits';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -513,6 +521,7 @@ class Login extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ),
+  );
   }
 }
