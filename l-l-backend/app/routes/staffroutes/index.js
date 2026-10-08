@@ -38,6 +38,7 @@ const staffRoutes = () => {
     // Public applicant routes
     Router.get("/applicant/roles", roleController.getPublicRoles)
     Router.post("/applicant/register", applicantController.registerApplicant)
+    Router.post("/applicant/update-contact", applicantController.updateContactAndResendOtp)
     Router.post("/applicant/verify", applicantController.verifyOtp)
     Router.post("/applicant/upload-doc/:id", (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), applicantController.uploadApplicantDoc)
     Router.post("/applicant/upload-video/:id", (req, res, next) => { req.uploadType = 'staff-video'; next(); }, upload.single("file"), applicantController.uploadApplicantVideo)

@@ -269,6 +269,84 @@ const applicantController = {
         }
     },
 
+    updateContactAndResendOtp: async (req, res) => {
+        try {
+            const { applicantId, mobileNumber, emailAddress } = req.body;
+            if (!applicantId) {
+                return res.status(400).send({ status: 400, message: "Applicant ID is required", data: {} });
+            }
+            if (!mobileNumber || !emailAddress) {
+                return res.status(400).send({ status: 400, message: "Mobile number and email address are required", data: {} });
+            }
+
+            const phoneInfo = normalizeIndianMobile(mobileNumber);
+            if (!phoneInfo.valid) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "Please enter a valid 10-digit mobile number or 12-digit number with 91 prefix",
+                    data: {}
+                });
+            }
+
+            const applicant = await applicantModel.findById(applicantId);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            const cleanEmail = emailAddress.trim().toLowerCase();
+            const normalizedPhone = phoneInfo.numeric12;
+
+            // Check if phone/email belongs to another existing staff
+            const existingStaff = await staffModel.findOne({
+                _id: { $ne: applicant.convertedStaffId },
+                $or: [
+                    { mobileNumber: normalizedPhone },
+                    { emailAddress: cleanEmail }
+                ]
+            });
+            if (existingStaff) {
+                return res.status(400).send({ status: 400, message: "A staff member is already registered with these details", data: {} });
+            }
+
+            const mobileOtp = generateOtp();
+            const emailOtp = generateOtp();
+            const expiry = new Date(Date.now() + 10 * 60000);
+
+            applicant.mobileNumber = normalizedPhone;
+            applicant.emailAddress = cleanEmail;
+            if (applicant.walkInForm) {
+                applicant.walkInForm.mobileNumber = phoneInfo.normalized12;
+                applicant.walkInForm.emailAddress = cleanEmail;
+                applicant.markModified('walkInForm');
+            }
+            applicant.mobileOtp = mobileOtp;
+            applicant.mobileOtpExpires = expiry;
+            applicant.emailOtp = emailOtp;
+            applicant.emailOtpExpires = expiry;
+            applicant.isMobileVerified = false;
+            applicant.isEmailVerified = false;
+            applicant.isVerified = false;
+            await applicant.save();
+
+            // Dispatch verification OTPs
+            await sendMobileOtp(phoneInfo.normalized12, mobileOtp);
+            await sendEmailOtp(cleanEmail, emailOtp);
+
+            return res.status(200).send({
+                status: 200,
+                message: "New verification codes sent to your updated mobile and email",
+                data: {
+                    applicantId: applicant._id,
+                    mobileNumber: applicant.mobileNumber,
+                    emailAddress: applicant.emailAddress
+                }
+            });
+        } catch (error) {
+            console.error("[updateContactAndResendOtp Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
     uploadApplicantDoc: async (req, res) => {
         try {
             const { id } = req.params;

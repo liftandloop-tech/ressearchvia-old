@@ -757,19 +757,121 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Enter the verification codes sent to your phone and email to proceed.',
+          'Verification codes have been sent to your phone and email. You can edit your contact details below if needed.',
           style: TextStyle(color: AppTheme.textSecondary, fontSize: isMobile ? 12 : 13),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 28),
-        TextField(
-          controller: controller.mobileOtpController,
-          decoration: const InputDecoration(labelText: 'Mobile OTP *', border: OutlineInputBorder(), hintText: 'Enter 4-digit code'),
+        const SizedBox(height: 24),
+
+        // Editable Phone & Email Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Verify & Edit Contact Details',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildResponsiveRow(
+                isMobile,
+                [
+                  TextField(
+                    controller: controller.phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Mobile Number *',
+                      prefixIcon: Icon(Icons.phone_outlined, size: 18),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                  TextField(
+                    controller: controller.emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email Address *',
+                      prefixIcon: Icon(Icons.email_outlined, size: 18),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Obx(
+                  () => OutlinedButton.icon(
+                    onPressed: controller.isResendingOtp.value ? null : () => controller.updateContactAndResendOtp(),
+                    icon: controller.isResendingOtp.value
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+                          )
+                        : const Icon(Icons.refresh, size: 16),
+                    label: Text(
+                      controller.isResendingOtp.value ? 'Sending New Codes...' : 'Update & Resend OTPs',
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2563EB),
+                      side: const BorderSide(color: Color(0xFF93C5FD)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: controller.emailOtpController,
-          decoration: const InputDecoration(labelText: 'Email OTP *', border: OutlineInputBorder(), hintText: 'Enter 4-digit code'),
+
+        const SizedBox(height: 24),
+        const Text(
+          'Enter Verification Codes',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF334155),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildResponsiveRow(
+          isMobile,
+          [
+            TextField(
+              controller: controller.mobileOtpController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Mobile OTP *',
+                prefixIcon: Icon(Icons.sms_outlined, size: 18),
+                border: OutlineInputBorder(),
+                hintText: 'Enter 4-digit code',
+              ),
+            ),
+            TextField(
+              controller: controller.emailOtpController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Email OTP *',
+                prefixIcon: Icon(Icons.mark_email_read_outlined, size: 18),
+                border: OutlineInputBorder(),
+                hintText: 'Enter 4-digit code',
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 28),
         isMobile

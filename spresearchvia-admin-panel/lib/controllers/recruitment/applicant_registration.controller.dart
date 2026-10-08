@@ -370,6 +370,35 @@ class ApplicantRegistrationController extends GetxController {
     }
   }
 
+  var isResendingOtp = false.obs;
+
+  Future<void> updateContactAndResendOtp() async {
+    final phone = phoneController.text.trim();
+    final email = emailController.text.trim();
+
+    if (phone.isEmpty || email.isEmpty) {
+      Get.snackbar('Required Fields', 'Please enter both Mobile Number and Email Address',
+          backgroundColor: Colors.orange.withValues(alpha: 0.1));
+      return;
+    }
+
+    isResendingOtp.value = true;
+    try {
+      final res = await _applicantService.updateContactAndResendOtp(applicantId.value, phone, email);
+      if (res.success) {
+        mobileOtpController.clear();
+        emailOtpController.clear();
+        Get.snackbar('Codes Sent', res.message ?? 'New verification codes sent to your phone and email',
+            backgroundColor: Colors.green.withValues(alpha: 0.1));
+      } else {
+        Get.snackbar('Error', res.message ?? 'Failed to update contact info',
+            backgroundColor: Colors.red.withValues(alpha: 0.1));
+      }
+    } finally {
+      isResendingOtp.value = false;
+    }
+  }
+
   Future<void> verifyOtps() async {
     if (mobileOtpController.text.trim().isEmpty || emailOtpController.text.trim().isEmpty) {
       Get.snackbar('Alert', 'Please enter both OTPs', backgroundColor: Colors.orange.withOpacity(0.1));

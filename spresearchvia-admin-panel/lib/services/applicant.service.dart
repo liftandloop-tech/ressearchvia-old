@@ -19,6 +19,23 @@ class ApplicantService extends ApiService {
     }
   }
 
+  Future<({bool success, String? message})> updateContactAndResendOtp(String applicantId, String mobileNumber, String emailAddress) async {
+    try {
+      final response = await post('/staff/applicant/update-contact', {
+        'applicantId': applicantId,
+        'mobileNumber': mobileNumber,
+        'emailAddress': emailAddress,
+      });
+      if (response.statusCode == 200 && response.body != null) {
+        return (success: true, message: response.body['message']?.toString() ?? 'Verification codes sent');
+      }
+      return (success: false, message: response.body?['message']?.toString() ?? 'Failed to update contact info');
+    } catch (e) {
+      debugPrint('Error updating contact and resending OTP: $e');
+      return (success: false, message: e.toString());
+    }
+  }
+
   Future<({bool success, StaffModel? applicant, String? message})> verifyOtp(String applicantId, String mobileOtp, String emailOtp) async {
     try {
       final response = await post('/staff/applicant/verify', {
