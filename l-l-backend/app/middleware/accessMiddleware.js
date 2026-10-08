@@ -196,13 +196,20 @@ export const contentAccess = async (req, res, next) => {
 export const adminOnly = async (req, res, next) => {
     try {
         const userType = (req.user?.userType || "").toLowerCase();
-        if (userType === 'admin' || userType === 'super_admin') {
+        const role = (req.user?.role || req.user?.userObject?.role || "").toLowerCase();
+        if (userType === 'admin' || userType === 'super_admin' || role === 'admin' || role === 'super_admin') {
             return next();
         }
 
-        // Allow any registered staff member to pass outer admin checks
         const userId = req.user?._id || req.user?.userId;
         if (userId) {
+            // Live check if primary user is admin or has adminAccessGranted
+            const user = await users.findById(userId).select('userType role adminAccessGranted');
+            if (user && (user.userType === 'admin' || user.userType === 'super_admin' || user.role === 'admin' || user.role === 'super_admin' || user.adminAccessGranted === true)) {
+                return next();
+            }
+
+            // Allow any registered staff member to pass outer admin checks
             const staffMember = await staff.findById(userId);
             if (staffMember) {
                 return next();
@@ -226,8 +233,8 @@ export const adminStrictOnly = async (req, res, next) => {
         if (!userId) return res.status(401).json({ message: "Identity not found in token." });
 
         // Check if it's a primary admin (userModel)
-        const user = await users.findById(userId).select('userType');
-        if (user && (user.userType === 'admin' || user.userType === 'super_admin')) {
+        const user = await users.findById(userId).select('userType role adminAccessGranted');
+        if (user && (user.userType === 'admin' || user.userType === 'super_admin' || user.role === 'admin' || user.role === 'super_admin' || user.adminAccessGranted === true)) {
             return next();
         }
 
@@ -254,8 +261,8 @@ export const adminStrictOnlyNoStaff = async (req, res, next) => {
         if (!userId) return res.status(401).json({ message: "Identity not found in token." });
 
         // 1. Check primary users collection
-        const user = await users.findById(userId).select('userType role');
-        if (user && (user.userType === 'admin' || user.userType === 'super_admin' || user.role === 'admin' || user.role === 'super_admin')) {
+        const user = await users.findById(userId).select('userType role adminAccessGranted');
+        if (user && (user.userType === 'admin' || user.userType === 'super_admin' || user.role === 'admin' || user.role === 'super_admin' || user.adminAccessGranted === true)) {
             req.adminUser = user;
             return next();
         }
@@ -381,14 +388,20 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                 return res.status(401).json({ message: "User ID not found in token." });
             }
 
-            // 1. Check token userType or primary users collection for Admin / Super Admin
+            // 1. Check token userType, role, or primary users collection for Admin / Super Admin
             const tokenUserType = (req.user?.userType || "").toLowerCase();
-            if (tokenUserType === 'admin' || tokenUserType === 'super_admin' || tokenUserType === 'super admin') {
+            const tokenRole = (req.user?.role || req.user?.userObject?.role || "").toLowerCase();
+            if (tokenUserType === 'admin' || tokenUserType === 'super_admin' || tokenUserType === 'super admin' ||
+                tokenRole === 'admin' || tokenRole === 'super_admin') {
                 return next();
             }
 
-            const primaryUser = await users.findById(userId).select('userType');
-            if (primaryUser && (primaryUser.userType === 'admin' || primaryUser.userType === 'super_admin')) {
+            const primaryUser = await users.findById(userId).select('userType role adminAccessGranted');
+            if (primaryUser && (
+                primaryUser.userType === 'admin' || primaryUser.userType === 'super_admin' ||
+                primaryUser.role === 'admin' || primaryUser.role === 'super_admin' ||
+                primaryUser.adminAccessGranted === true
+            )) {
                 return next();
             }
 
@@ -494,8 +507,8 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     if (perm.actions.includes(requiredKey)) return true;
 
                     // Alias resolution for legacy route keys and new button-level permission keys
-                    if ((requiredKey === 'users.read' || requiredKey === 'users:read' || requiredKey === 'users.view_assigned' || requiredKey === 'users.view_all') &&
-                        (perm.actions.includes('users.view') || perm.actions.includes('users.view_all') || perm.actions.includes('users.view_assigned') || perm.actions.includes('read'))) return true;
+                    if ((requiredKey === 'users.read' || requiredKey === 'users:read' || requiredKey === 'users.view' || requiredKey === 'users.view_assigned' || requiredKey === 'users.view_branch' || requiredKey === 'users.view_all') &&
+                        (perm.actions.includes('users.view') || perm.actions.includes('users.view_all') || perm.actions.includes('users.view_branch') || perm.actions.includes('users.view_assigned') || perm.actions.includes('read') || perm.actions.includes('view'))) return true;
 
                     if ((requiredKey === 'kyc.read' || requiredKey === 'kyc:read') &&
                         (perm.actions.includes('kyc.view') || perm.actions.includes('read'))) return true;
@@ -508,6 +521,11 @@ export const checkPermission = (targetPermission, actionParam = null) => {
 
                     if ((requiredKey === 'subscriptions.read' || requiredKey === 'subscriptions:read') &&
                         (perm.actions.includes('subscriptions.view') || perm.actions.includes('read'))) return true;
+
+                    if ((requiredKey === 'subscriptions.create' || requiredKey === 'subscriptions:create' ||
+                         requiredKey === 'subscriptions.update' || requiredKey === 'subscriptions:update' ||
+                         requiredKey === 'subscriptions.delete' || requiredKey === 'subscriptions:delete') &&
+                        (perm.actions.includes('subscriptions.manage_plans') || perm.actions.includes('subscriptions.edit_correction') || perm.actions.includes('subscriptions.create') || perm.actions.includes('create') || perm.actions.includes('update') || perm.actions.includes('delete'))) return true;
 
                     if ((requiredKey === 'reports.trading_call_popup') &&
                         (perm.actions.includes('reports.trading_call_popup') || perm.actions.includes('trading_call_popup'))) return true;

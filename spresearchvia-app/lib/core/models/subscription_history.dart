@@ -24,6 +24,8 @@ class SubscriptionHistory {
   final double? gstAmount;
   final double? baseRemaining;
   final double? gstRemaining;
+  final String? paymentMethod;
+  final String? utrNumber;
 
   String get remainingAmount {
     // Use the backend-computed value first
@@ -77,6 +79,8 @@ class SubscriptionHistory {
     this.gstAmount,
     this.baseRemaining,
     this.gstRemaining,
+    this.paymentMethod,
+    this.utrNumber,
   });
 
   factory SubscriptionHistory.fromJson(Map<String, dynamic> json) {
@@ -208,6 +212,8 @@ class SubscriptionHistory {
       gstAmount: json['gstAmount'] != null ? double.tryParse(json['gstAmount'].toString()) : null,
       baseRemaining: json['baseRemaining'] != null ? double.tryParse(json['baseRemaining'].toString()) : null,
       gstRemaining: json['gstRemaining'] != null ? double.tryParse(json['gstRemaining'].toString()) : null,
+      paymentMethod: json['paymentMethod']?.toString(),
+      utrNumber: json['utrNumber']?.toString() ?? json['paymentRefId']?.toString(),
     );
   }
 

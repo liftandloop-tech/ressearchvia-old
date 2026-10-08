@@ -7,11 +7,11 @@ const segmentsPlansSchema = new mongoose.Schema({
     },
     duration: {
         type: String,
-        required: true
+        default: "30"
     },
     day: {
         type: String,
-        required: true
+        default: "days"
     },
     price: {
         type: Number,
@@ -19,7 +19,7 @@ const segmentsPlansSchema = new mongoose.Schema({
     },
     perDayCharge: {
         type: Number,
-        required: true
+        default: 0
     },
     planStatus: {
         type: String,
@@ -28,11 +28,11 @@ const segmentsPlansSchema = new mongoose.Schema({
     },
     discription: {
         type: String,
-        required: true
+        default: ""
     },
     planFeatures: {
         type: String,
-        required: true
+        default: ""
     },
     isHni: {
         type: Boolean,

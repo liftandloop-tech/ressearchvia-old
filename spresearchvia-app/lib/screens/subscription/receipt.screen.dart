@@ -62,11 +62,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         String pMode = purchase['paymentMode'] ?? purchase['paymentMethod'] ?? '';
         if (pMode.isEmpty) {
           if (purchase['razorpayPaymentId'] != null) {
-            pMode = 'Online';
+            pMode = 'Razorpay';
           } else if (purchase['paymentProof'] != null) {
              pMode = 'Bank Transfer';
           } else {
-             pMode = 'Online'; // Default for registration
+             pMode = 'Razorpay'; // Default for registration
           }
         } else {
           pMode = _formatPaymentMode(pMode);
@@ -86,7 +86,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           },
           'amountPaid': (basic + gst),
           'paymentRefId':
-              purchase['paymentRefId'] ?? purchase['paymentId'] ?? '',
+              purchase['utrNumber'] ?? purchase['paymentRefId'] ?? purchase['paymentId'] ?? '',
         };
         invoiceLoaded = true;
       }
@@ -202,9 +202,16 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         || m == 'BANK' || m.contains('TRANSFER')) {
       return 'Bank Transfer';
     }
+    if (m == 'RAZORPAY') {
+      return 'Razorpay';
+    }
+    if (m.startsWith('RAZORPAY_')) {
+      final sub = m.replaceFirst('RAZORPAY_', '');
+      return 'Razorpay ($sub)';
+    }
     if (m == 'UPI' || m == 'NETBANKING' || m == 'CARD' || m == 'EMI'
-        || m == 'ONLINE' || m == 'RAZORPAY') {
-      return 'Online';
+        || m == 'ONLINE') {
+      return m == 'ONLINE' ? 'Razorpay' : 'Razorpay ($m)';
     }
     // Title-case fallback
     return rawMode
@@ -283,8 +290,12 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     final double originalTotal = _toDouble(intentData['totalAmount'] ?? (amount + gstAmount));
     final double discountAmount = _toDouble(intentData['discount']);
     final double totalPayable = originalTotal - discountAmount;
+    double resolvedPaid = _toDouble(intentData['amountPaid'] ?? _invoice['amountPaid']);
+    if (resolvedPaid == 0 && (_invoice['status']?.toString().toLowerCase() == 'paid' || intentData['status'] == 'PAID')) {
+      resolvedPaid = totalPayable > 0 ? totalPayable : originalTotal;
+    }
     final double amountPaid = installments.isEmpty
-        ? (_invoice['status'] == 'REJECTED' ? 0.0 : _toDouble(intentData['amountPaid'] ?? _invoice['amountPaid']))
+        ? (_invoice['status'] == 'REJECTED' ? 0.0 : resolvedPaid)
         : installments.fold(0.0, (sum, item) => sum + _toDouble(item['amountPaid'] ?? item['amount']));
     final double remaining = totalPayable - amountPaid;
 
@@ -382,7 +393,12 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     debugPrint('Final validity: $validity');
     debugPrint('=== END VALIDITY DEBUG ===');
     
-    final String paymentRefId = _invoice['paymentRefId']?.toString() ?? '';
+    final String paymentRefId = _invoice['utrNumber']?.toString() ??
+        intentData['utrNumber']?.toString() ??
+        _invoice['paymentRefId']?.toString() ??
+        _invoice['paymentId']?.toString() ??
+        intentData['paymentId']?.toString() ??
+        '';
 
     return Scaffold(
       backgroundColor: const Color(0xffF9FAFB),
@@ -1026,8 +1042,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           ),
                           const SizedBox(height: 12),
                           ReceiptInfoRow(
-                            label: 'Payment Ref ID:',
-                            value: paymentRefId,
+                            label: 'Payment Ref / UTR:',
+                            value: paymentRefId.isNotEmpty ? paymentRefId : 'N/A',
                           ),
                           const SizedBox(height: 8),
                           ReceiptInfoRow(
@@ -1152,6 +1168,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       gstin = user['gstin']?.toString() ?? '';
       firmName = user['firmName']?.toString() ?? '';
     }
+
+    final String partialPaymentMode = _formatPaymentMode(args['paymentMethod']?.toString() ?? '');
+    final String partialUtr = (args['utrNumber'] ?? args['paymentRefId'] ?? '').toString();
 
     Color statusColor = const Color(0xffF59E0B);
     String statusText = 'PARTIALLY PAID';
@@ -1651,6 +1670,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           fontWeight: FontWeight.w700,
                           color: Color(0xff163174))),
                   const SizedBox(height: 12),
+                  ReceiptInfoRow(label: 'Payment Ref / UTR:', value: partialUtr.isNotEmpty ? partialUtr : 'N/A'),
+                  const SizedBox(height: 8),
+                  ReceiptInfoRow(label: 'Payment Mode:', value: partialPaymentMode.isNotEmpty ? partialPaymentMode : 'N/A'),
+                  const SizedBox(height: 8),
                   ReceiptInfoRow(label: 'Expiry Date:', value: expiryDate),
                   const SizedBox(height: 8),
                   ReceiptInfoRow(label: 'Generated By:', value: 'ResearchVia Admin'),

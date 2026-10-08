@@ -13,6 +13,14 @@ class LeadModel {
   final List<FollowUpModel> followUps;
   final String? leadPoolId;
   final String? leadPoolName;
+  final String leadSource;
+  final bool isAppUser;
+  final String? appUserId;
+  final DateTime? appOnboardedAt;
+  final String? previousRMStaffId;
+  final String? previousRMStaffName;
+  final DateTime? previousRMTransferredAt;
+  final String? previousRMTransferReason;
   final DateTime createdAt;
 
   LeadModel({
@@ -30,6 +38,14 @@ class LeadModel {
     required this.followUps,
     this.leadPoolId,
     this.leadPoolName,
+    this.leadSource = 'IMPORTED_POOL',
+    this.isAppUser = false,
+    this.appUserId,
+    this.appOnboardedAt,
+    this.previousRMStaffId,
+    this.previousRMStaffName,
+    this.previousRMTransferredAt,
+    this.previousRMTransferReason,
     required this.createdAt,
   });
 
@@ -56,6 +72,19 @@ class LeadModel {
       }
     }
 
+    final prevRM = json['previousRM'] as Map<String, dynamic>?;
+    String? prevStaffId;
+    String? prevStaffName;
+    if (prevRM != null) {
+      if (prevRM['staffId'] is Map) {
+        prevStaffId = prevRM['staffId']['_id']?.toString();
+        prevStaffName = prevRM['staffId']['fullName']?.toString() ?? prevRM['staffName']?.toString();
+      } else {
+        prevStaffId = prevRM['staffId']?.toString();
+        prevStaffName = prevRM['staffName']?.toString();
+      }
+    }
+
     final personal = json['personalDetails'] as Map<String, dynamic>?;
     final fList = json['followUps'] as List<dynamic>? ?? [];
 
@@ -74,6 +103,18 @@ class LeadModel {
       followUps: fList.map((x) => FollowUpModel.fromJson(x as Map<String, dynamic>)).toList(),
       leadPoolId: poolId,
       leadPoolName: poolName,
+      leadSource: json['leadSource']?.toString() ?? 'IMPORTED_POOL',
+      isAppUser: json['isAppUser'] == true,
+      appUserId: json['appUserId']?.toString(),
+      appOnboardedAt: json['appOnboardedAt'] != null
+          ? DateTime.tryParse(json['appOnboardedAt'].toString())
+          : null,
+      previousRMStaffId: prevStaffId,
+      previousRMStaffName: prevStaffName,
+      previousRMTransferredAt: prevRM?['transferredAt'] != null
+          ? DateTime.tryParse(prevRM!['transferredAt'].toString())
+          : null,
+      previousRMTransferReason: prevRM?['transferReason']?.toString(),
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),

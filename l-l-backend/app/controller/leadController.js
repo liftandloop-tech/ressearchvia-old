@@ -9,6 +9,7 @@ import importService from "../services/importService.js";
 import importJobModel from "../models/importJobModel.js";
 import { ensureDefaultFreshPool } from "./leadPoolController.js";
 import { getSupervisedStaffIds, getAccessibleLeadPoolFilter } from "../utils/staffHierarchy.js";
+import { resolveAdminStaff } from "../services/staffService.js";
 
 const leadController = {
     createLead: async (req, res) => {
@@ -101,7 +102,7 @@ const leadController = {
 
     listLeads: async (req, res) => {
         try {
-            const { page = 1, limit = 10, search = "", stage = "", assignedRM = "", leadPoolId = "" } = req.query;
+            const { page = 1, limit = 10, search = "", stage = "", assignedRM = "", leadPoolId = "", name = "", mobile = "", location = "", sortBy = "", sortOrder = "" } = req.query;
             const query = {};
 
             // Data-Scope Enforcement: Non-admins without leads.view_all are restricted to their team or themselves
@@ -136,9 +137,26 @@ const leadController = {
                     { emailAddress: { $regex: search, $options: "i" } }
                 ];
             }
+            if (name && name.trim() !== '') {
+                query.fullName = { $regex: name.trim(), $options: "i" };
+            }
+            if (mobile && mobile.trim() !== '') {
+                query.mobileNumber = { $regex: mobile.trim(), $options: "i" };
+            }
+            if (location && location.trim() !== '') {
+                query.$or = [
+                    { city: { $regex: location.trim(), $options: "i" } },
+                    { state: { $regex: location.trim(), $options: "i" } }
+                ];
+            }
             if (stage) query.stage = stage;
             if (assignedRM) {
-                if (query.assignedRM && query.assignedRM.$in) {
+                if (assignedRM === 'unassigned' || assignedRM === 'null') {
+                    query.assignedRM = null;
+                } else if (assignedRM === 'admin') {
+                    const adminStaff = await resolveAdminStaff();
+                    query.assignedRM = adminStaff ? adminStaff._id : null;
+                } else if (query.assignedRM && query.assignedRM.$in) {
                     const allowed = query.assignedRM.$in.map(id => id.toString());
                     if (allowed.includes(assignedRM.toString())) {
                         query.assignedRM = assignedRM;
@@ -147,15 +165,28 @@ const leadController = {
                     query.assignedRM = assignedRM;
                 }
             }
+            if (req.query.leadSource && req.query.leadSource.trim() !== '') {
+                query.leadSource = req.query.leadSource.trim();
+            }
+            if (req.query.isAppUser !== undefined && req.query.isAppUser !== '') {
+                query.isAppUser = req.query.isAppUser === 'true' || req.query.isAppUser === true;
+            }
             if (leadPoolId) query.leadPoolId = leadPoolId;
+
+            let sortOptions = { createdAt: -1 };
+            if (sortBy && sortBy.trim() !== '') {
+                const direction = (sortOrder === 'asc' || sortOrder === '1') ? 1 : -1;
+                sortOptions = { [sortBy.trim()]: direction };
+            }
 
             const total = await leadModel.countDocuments(query);
             const leads = await leadModel.find(query)
                 .populate('assignedRM', 'fullName emailAddress mobileNumber')
                 .populate('leadPoolId', 'name description pullSize maxPerStaff isActive')
+                .populate('previousRM.staffId', 'fullName emailAddress mobileNumber')
                 .skip((page - 1) * limit)
                 .limit(parseInt(limit))
-                .sort({ createdAt: -1 });
+                .sort(sortOptions);
 
             res.status(200).send({ status: 200, message: "Leads fetched successfully", data: { total, leads, page, limit } });
         } catch (error) {
@@ -477,9 +508,25 @@ const leadController = {
                 }
             }
 
+            const targetStaff = staffId ? await staffModel.findById(staffId).select('fullName') : null;
+            const reassignmentNote = targetStaff
+                ? `🔄 Reassigned to RM: ${targetStaff.fullName}`
+                : '🔄 Lead set to unassigned';
+
             await leadModel.updateMany(
                 leadFilter,
-                { $set: { assignedRM: staffId } }
+                {
+                    $set: { assignedRM: staffId, isRead: false },
+                    $push: {
+                        followUps: {
+                            notes: reassignmentNote,
+                            followUpDate: new Date(),
+                            followUpType: 'Manager Follow-up',
+                            status: 'Completed',
+                            createdAt: new Date()
+                        }
+                    }
+                }
             );
 
             res.status(200).send({ status: 200, message: "Leads assigned successfully" });

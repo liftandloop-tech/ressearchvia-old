@@ -562,9 +562,22 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
         throw new Error(`Amount mismatch fraud check: Expected ${expectedAmountPaise}, Got ${razorpayPayment.amount}`);
     }
 
-    // 6. Mark Paid
+    // 6. Mark Paid & Record Payment Details
+    const actualAmountPaid = (razorpayPayment.amount / 100) || paymentIntent.totalAmount;
+    const utr = razorpayPayment.acquirer_data?.rrn 
+             || razorpayPayment.acquirer_data?.upi_transaction_id 
+             || razorpayPayment.acquirer_data?.bank_transaction_id 
+             || validPaymentId;
+
     paymentIntent.status = 'PAID';
     paymentIntent.paymentId = validPaymentId;
+    paymentIntent.amountPaid = actualAmountPaid;
+    paymentIntent.paymentMethod = 'RAZORPAY';
+    paymentIntent.utrNumber = utr;
+    paymentIntent.transactionDate = new Date();
+    if (!paymentIntent.serviceStartDate) {
+        paymentIntent.serviceStartDate = new Date();
+    }
     await paymentIntent.save();
 
     // 5. Grant Entitlement
@@ -573,6 +586,10 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
         if (paymentIntent.baseAmount === 10000) {
             isLifetime = true;
         }
+
+        const regExpiry = isLifetime ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+        paymentIntent.currentExpiryDate = regExpiry;
+        await paymentIntent.save();
 
         // --- FETCH TRIAL SETTINGS ---
         let yearlyTrial = 5;
@@ -650,6 +667,11 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
             }
         }
 
+        const calculatedEndDate = new Date();
+        calculatedEndDate.setDate(calculatedEndDate.getDate() + days);
+        paymentIntent.currentExpiryDate = isLifetime ? null : calculatedEndDate;
+        await paymentIntent.save();
+
         await grantEntitlement({
             userId: paymentIntent.userId,
             type: 'PLAN',
@@ -663,8 +685,6 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
         });
 
         if (paymentIntent.preferredSegmentId) {
-            const calculatedEndDate = new Date();
-            calculatedEndDate.setDate(calculatedEndDate.getDate() + days);
             await userActiveSegmentModel.findOneAndUpdate(
                 { userId: paymentIntent.userId, segmentId: paymentIntent.preferredSegmentId },
                 {
@@ -1185,8 +1205,8 @@ export const approvePartialPayment = async (paymentIntentId, historyId, adminId,
             });
         }
 
-        // Cleanup: If a full plan is granted, revoke any active REGISTRATION_TRIAL for this user
-        if (paymentIntent.purchaseType === 'PLAN' && totalPaid >= currentTarget) {
+        // Cleanup: If a plan (partial or full) is approved, revoke any active REGISTRATION_TRIAL for this user
+        if (paymentIntent.purchaseType === 'PLAN') {
             await Entitlement.updateMany(
                 {
                     userId: paymentIntent.userId,
@@ -1195,7 +1215,7 @@ export const approvePartialPayment = async (paymentIntentId, historyId, adminId,
                     status: 'ACTIVE'
                 },
                 {
-                    $set: { status: 'REVOKED', remarks: 'Revoked due to full plan purchase' }
+                    $set: { status: 'REVOKED', remarks: 'Revoked due to plan purchase/approval' }
                 }
             );
         }

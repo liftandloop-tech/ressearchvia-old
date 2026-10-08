@@ -16,7 +16,8 @@ const leadSchema = new mongoose.Schema({
     assignedRM: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'staff',
-        default: null
+        default: null,
+        index: true
     },
     leadPoolId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -34,8 +35,47 @@ const leadSchema = new mongoose.Schema({
     },
     stage: {
         type: String,
-        enum: ['New', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'],
+        enum: ['New', 'App Onboarded', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'],
         default: 'New'
+    },
+    leadSource: {
+        type: String,
+        enum: ['ORGANIC_APP', 'ORGANIC_WEB', 'ORPHANED_STAFF', 'IMPORTED_POOL', 'MANUAL_ENTRY'],
+        default: 'IMPORTED_POOL',
+        index: true
+    },
+    isAppUser: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    appUserId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'user',
+        default: null
+    },
+    appOnboardedAt: {
+        type: Date,
+        default: null
+    },
+    previousRM: {
+        staffId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'staff',
+            default: null
+        },
+        staffName: {
+            type: String,
+            default: null
+        },
+        transferredAt: {
+            type: Date,
+            default: null
+        },
+        transferReason: {
+            type: String,
+            default: null
+        }
     },
     personalDetails: {
         city: { type: String, default: null },

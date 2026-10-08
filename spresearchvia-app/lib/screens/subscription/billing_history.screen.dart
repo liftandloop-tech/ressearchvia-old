@@ -63,6 +63,14 @@ class _BillingCard extends StatelessWidget {
 
   const _BillingCard({required this.item});
 
+  String _formatPaymentMethod(dynamic method) {
+    if (method == null) return 'Razorpay';
+    final m = method.toString().trim().toUpperCase();
+    if (m == 'RAZORPAY' || m == 'ONLINE') return 'Razorpay';
+    if (m == 'BANK_TRANSFER' || m == 'OFFLINE') return 'Bank Transfer';
+    return m;
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = item['status'] ?? 'CREATED';
@@ -119,6 +127,13 @@ class _BillingCard extends StatelessWidget {
             icon: Icons.currency_rupee_outlined,
             text: 'Paid: ₹${basePaid.toStringAsFixed(2)} + ₹${gstPaid.toStringAsFixed(2)} / Total: ₹${baseTotal.toStringAsFixed(2)} + ₹${gstTotal.toStringAsFixed(2)}',
           ),
+          if (item['paymentMethod'] != null || item['utrNumber'] != null) ...[
+            const SizedBox(height: 8),
+            _IconText(
+              icon: Icons.payment_outlined,
+              text: 'Method: ${_formatPaymentMethod(item['paymentMethod'])} | UTR: ${item['utrNumber'] ?? item['paymentRefId'] ?? 'N/A'}',
+            ),
+          ],
           if (isInvoiceAvailable && invoiceId != null) ...[
             const Divider(height: 24),
             SizedBox(

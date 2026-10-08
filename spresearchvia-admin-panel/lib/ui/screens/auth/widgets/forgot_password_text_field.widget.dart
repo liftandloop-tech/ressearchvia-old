@@ -5,11 +5,17 @@ import 'package:spresearch_web/config/app.strings.dart';
 class ForgotPasswordTextField extends StatelessWidget {
   final TextEditingController controller;
   final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+  final FocusNode? focusNode;
 
   const ForgotPasswordTextField({
     super.key,
     required this.controller,
     this.validator,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.focusNode,
   });
 
   @override
@@ -29,7 +35,10 @@ class ForgotPasswordTextField extends StatelessWidget {
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
+          focusNode: focusNode,
           validator: validator,
+          textInputAction: textInputAction,
+          onFieldSubmitted: onFieldSubmitted,
           decoration: InputDecoration(
             hintText: AppStrings.enterEmail,
             hintStyle: TextStyle(

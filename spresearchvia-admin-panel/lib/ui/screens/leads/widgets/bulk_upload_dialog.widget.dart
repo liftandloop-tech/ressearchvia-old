@@ -5,17 +5,22 @@ import '../../../../controllers/leads/leads.controller.dart';
 
 class BulkUploadDialog extends StatefulWidget {
   final LeadsController controller;
+  final int initialTab;
 
-  const BulkUploadDialog({super.key, required this.controller});
+  const BulkUploadDialog({
+    super.key,
+    required this.controller,
+    this.initialTab = 0,
+  });
 
   @override
   State<BulkUploadDialog> createState() => _BulkUploadDialogState();
 }
 
 class _BulkUploadDialogState extends State<BulkUploadDialog> {
-  int _activeTab = 1; // Default to Quick Paste Numbers (or 0 for File Upload)
+  late int _activeTab;
 
-  // Quick Paste State
+  // Quick Paste State (Create Leads)
   final _pasteController = TextEditingController();
   final List<String> _validNumbers = [];
   final List<Map<String, String>> _previewItems = [];
@@ -23,7 +28,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
   int _invalidCount = 0;
   bool _isSubmitting = false;
 
-  // Options
+  // Options for Ingestion
   String _duplicateStrategy = 'skip';
   String? _assignedRM;
   String _leadStage = 'New';
@@ -31,15 +36,33 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
   List<dynamic> _leadPools = [];
   bool _isLoadingPools = true;
 
+  // Quick Paste State (Assign Leads to RM)
+  final _assignPasteController = TextEditingController();
+  final List<String> _assignUniqueNumbers = [];
+  int _assignDuplicateCount = 0;
+  int _assignInvalidCount = 0;
+  bool _isAssignSubmitting = false;
+  String? _targetAssignRMId;
+
   @override
   void initState() {
     super.initState();
+    _activeTab = widget.initialTab;
     _fetchLeadPools();
+
+    // Default to the first active staff member if available for assignment
+    final activeStaff = widget.controller.staffList
+        .where((s) => s.status.toLowerCase() == 'active')
+        .toList();
+    if (activeStaff.isNotEmpty) {
+      _targetAssignRMId = activeStaff.first.id;
+    }
   }
 
   @override
   void dispose() {
     _pasteController.dispose();
+    _assignPasteController.dispose();
     super.dispose();
   }
 
@@ -169,14 +192,80 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
     }
   }
 
+  void _onAssignTextChanged(String text) {
+    final seen = <String>{};
+    final valid = <String>[];
+    int dups = 0;
+    int invalids = 0;
+
+    final rawTokens = text.split(RegExp(r'[\r\n\u2028\u2029,;\t]+'));
+
+    for (final raw in rawTokens) {
+      final token = raw.trim();
+      if (token.isEmpty) continue;
+
+      final normalized10 = _normalizePhone(token);
+      if (normalized10.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(normalized10)) {
+        if (seen.contains(normalized10)) {
+          dups++;
+        } else {
+          seen.add(normalized10);
+          valid.add(normalized10);
+        }
+      } else {
+        invalids++;
+      }
+    }
+
+    setState(() {
+      _assignUniqueNumbers.clear();
+      _assignUniqueNumbers.addAll(valid);
+      _assignDuplicateCount = dups;
+      _assignInvalidCount = invalids;
+    });
+  }
+
+  Future<void> _handleAssignSubmit() async {
+    if (_assignUniqueNumbers.isEmpty) {
+      Get.snackbar(
+        'Validation Alert',
+        'Please paste at least one valid 10-digit mobile number.',
+        backgroundColor: Colors.amber.withOpacity(0.2),
+      );
+      return;
+    }
+    if (_targetAssignRMId == null || _targetAssignRMId!.isEmpty) {
+      Get.snackbar(
+        'Validation Alert',
+        'Please select a target Relationship Manager (RM).',
+        backgroundColor: Colors.amber.withOpacity(0.2),
+      );
+      return;
+    }
+
+    setState(() => _isAssignSubmitting = true);
+
+    final success = await widget.controller.bulkAssignByNumbers(
+      rawNumbers: _assignUniqueNumbers.join('\n'),
+      assignedRM: _targetAssignRMId!,
+    );
+
+    if (mounted) {
+      setState(() => _isAssignSubmitting = false);
+      if (success) {
+        Get.back();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 12,
       child: Container(
-        width: 680,
-        constraints: const BoxConstraints(maxHeight: 780),
+        width: 700,
+        constraints: const BoxConstraints(maxHeight: 800),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -199,17 +288,30 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
                       Text(
-                        'Bulk Lead Upload',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                        'Bulk Lead Operations',
+                        style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Upload Excel/CSV file or paste numbers directly',
-                        style: TextStyle(fontSize: 13, color: AppTheme.gray500),
+                        'Upload files, paste new leads, or bulk assign relationships',
+                        style: TextStyle(fontSize: 12.5, color: AppTheme.gray500),
                       ),
                     ],
                   ),
                 ),
+                // Quick Action: Download Template Button
+                OutlinedButton.icon(
+                  onPressed: () => widget.controller.downloadTemplate(),
+                  icon: const Icon(Icons.download, size: 15),
+                  label: const Text('Template', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryBlue,
+                    side: const BorderSide(color: AppTheme.primaryBlue),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.close, color: AppTheme.gray400),
                   splashRadius: 20,
@@ -217,7 +319,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
 
             // Tab Selector (Segmented buttons)
             Container(
@@ -230,7 +332,15 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
                 children: [
                   Expanded(
                     child: _buildTabButton(
-                      title: 'Paste Numbers',
+                      title: 'Upload File',
+                      icon: Icons.table_chart_outlined,
+                      isActive: _activeTab == 0,
+                      onTap: () => setState(() => _activeTab = 0),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildTabButton(
+                      title: 'Paste to Create',
                       icon: Icons.paste_rounded,
                       isActive: _activeTab == 1,
                       onTap: () => setState(() => _activeTab = 1),
@@ -238,21 +348,23 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
                   ),
                   Expanded(
                     child: _buildTabButton(
-                      title: 'Upload File (Excel / CSV)',
-                      icon: Icons.table_chart_outlined,
-                      isActive: _activeTab == 0,
-                      onTap: () => setState(() => _activeTab = 0),
+                      title: 'Paste to Assign',
+                      icon: Icons.assignment_ind_rounded,
+                      isActive: _activeTab == 2,
+                      onTap: () => setState(() => _activeTab = 2),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             // Tab Content
             Expanded(
               child: SingleChildScrollView(
-                child: _activeTab == 1 ? _buildPasteTab() : _buildFileTab(),
+                child: _activeTab == 0
+                    ? _buildFileTab()
+                    : (_activeTab == 1 ? _buildPasteTab() : _buildAssignTab()),
               ),
             ),
           ],
@@ -271,7 +383,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
           color: isActive ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -284,14 +396,14 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
           children: [
             Icon(
               icon,
-              size: 18,
+              size: 16,
               color: isActive ? AppTheme.primaryBlue : AppTheme.gray500,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               title,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                 color: isActive ? AppTheme.primaryBlue : AppTheme.gray600,
               ),
@@ -302,337 +414,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
     );
   }
 
-  // --- TAB 1: PASTE NUMBERS ---
-  Widget _buildPasteTab() {
-    // Active staff list for RM dropdown
-    final seenStaffIds = <String>{};
-    final activeStaff = widget.controller.staffList
-        .where((s) => s.id.isNotEmpty && s.status.toLowerCase() == 'active' && seenStaffIds.add(s.id))
-        .toList();
-    final safeAssignedRM = (_assignedRM != null && activeStaff.any((s) => s.id == _assignedRM)) ? _assignedRM : null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Helper notification banner
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.skyBlue.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.skyBlue.withOpacity(0.2)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Icon(Icons.auto_fix_high, size: 20, color: AppTheme.skyBlue),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Paste numbers one per line (Enter key) or separated by commas. Country codes (+91, 91, 091, 0) and formatting will automatically normalize to 10 digits.',
-                  style: TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, height: 1.4),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Text Area for pasting
-        TextField(
-          controller: _pasteController,
-          maxLines: 7,
-          onChanged: _onTextChanged,
-          style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-          decoration: InputDecoration(
-            hintText: "Enter or paste phone numbers here...\n\nExample:\n9876543210\n+91 98765 43211\n919876543212, 09876543213\n0919876543214",
-            hintStyle: TextStyle(fontSize: 12.5, color: AppTheme.gray400),
-            filled: true,
-            fillColor: AppTheme.gray50,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppTheme.gray300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppTheme.primaryBlue, width: 1.5),
-            ),
-            contentPadding: const EdgeInsets.all(14),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Real-time analysis stat chips
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: [
-            _buildStatBadge(
-              icon: Icons.check_circle_outline,
-              label: '${_validNumbers.length} Valid (10 Digits)',
-              bgColor: AppTheme.successGreen.withOpacity(0.1),
-              textColor: AppTheme.successGreen,
-            ),
-            if (_duplicateCount > 0)
-              _buildStatBadge(
-                icon: Icons.copy,
-                label: '$_duplicateCount Duplicate in Paste',
-                bgColor: AppTheme.warningOrange.withOpacity(0.1),
-                textColor: AppTheme.warningOrange,
-              ),
-            if (_invalidCount > 0)
-              _buildStatBadge(
-                icon: Icons.error_outline,
-                label: '$_invalidCount Invalid / Ignored',
-                bgColor: AppTheme.errorRed.withOpacity(0.1),
-                textColor: AppTheme.errorRed,
-              ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Options Row 1: Target Lead Pool & Default RM
-        Row(
-          children: [
-            // Lead Pool Dropdown
-            Expanded(
-              child: _isLoadingPools
-                  ? const Center(child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)))
-                  : DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        labelText: 'Target Lead Pool',
-                        isDense: true,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      value: _selectedLeadPoolId,
-                      items: _leadPools.map((p) {
-                        return DropdownMenuItem<String>(
-                          value: p['_id'].toString(),
-                          child: Text(
-                            p['name'].toString(),
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedLeadPoolId = val),
-                    ),
-            ),
-            const SizedBox(width: 14),
-
-            // Assigned RM Dropdown (Active Staff Only)
-            Expanded(
-              child: DropdownButtonFormField<String?>(
-                decoration: InputDecoration(
-                  labelText: 'Default Owner / RM',
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                value: safeAssignedRM,
-                hint: const Text('None (Unassigned)', style: TextStyle(fontSize: 13)),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('None (Leave Unassigned)', style: TextStyle(fontSize: 13)),
-                  ),
-                  ...activeStaff.map((s) {
-                    return DropdownMenuItem<String?>(
-                      value: s.id,
-                      child: Text(
-                        s.fullName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    );
-                  }),
-                ],
-                onChanged: (val) => setState(() => _assignedRM = val),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        // Options Row 2: Lead Stage & Duplicate Strategy
-        Row(
-          children: [
-            // Lead Stage
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'Lead Stage',
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                value: _leadStage,
-                items: const [
-                  DropdownMenuItem(value: 'New', child: Text('New', style: TextStyle(fontSize: 13))),
-                  DropdownMenuItem(value: 'Contacted', child: Text('Contacted', style: TextStyle(fontSize: 13))),
-                  DropdownMenuItem(value: 'Interested', child: Text('Interested', style: TextStyle(fontSize: 13))),
-                  DropdownMenuItem(value: 'Qualified', child: Text('Qualified', style: TextStyle(fontSize: 13))),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _leadStage = val);
-                },
-              ),
-            ),
-            const SizedBox(width: 14),
-
-            // Duplicate Handling Strategy
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'Duplicate Handling',
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                value: _duplicateStrategy,
-                items: const [
-                  DropdownMenuItem(value: 'skip', child: Text('Skip Existing in DB', style: TextStyle(fontSize: 13))),
-                  DropdownMenuItem(value: 'update', child: Text('Update Existing Lead', style: TextStyle(fontSize: 13))),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _duplicateStrategy = val);
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Live Preview of Normalized Numbers (if any detected)
-        if (_previewItems.isNotEmpty) ...[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Normalized 10-Digit Preview (${_previewItems.length}${_validNumbers.length > _previewItems.length ? ' of ${_validNumbers.length}' : ''})',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.gray600),
-              ),
-              const Text(
-                'Auto-Cleaned',
-                style: TextStyle(fontSize: 11, color: AppTheme.successGreen, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Container(
-            height: 90,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.gray200),
-            ),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              itemCount: _previewItems.length,
-              separatorBuilder: (_, _) => const Divider(height: 1, color: AppTheme.gray100),
-              itemBuilder: (context, idx) {
-                final item = _previewItems[idx];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Text(
-                        '#${idx + 1}',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.gray400, fontFamily: 'monospace'),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        item['normalized'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryBlue,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'from "${item['raw']}"',
-                          style: const TextStyle(fontSize: 11, color: AppTheme.gray400),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const Icon(Icons.check, size: 14, color: AppTheme.successGreen),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 18),
-        ],
-
-        // Submit Button
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            OutlinedButton(
-              onPressed: () => Get.back(),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Cancel'),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: (_validNumbers.isEmpty || _isSubmitting) ? null : _handlePasteSubmit,
-              icon: _isSubmitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.send_rounded, size: 18),
-              label: Text(_isSubmitting
-                  ? 'Importing...'
-                  : _validNumbers.isEmpty
-                      ? 'Import Leads'
-                      : 'Import ${_validNumbers.length} Leads'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryBlue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 1,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatBadge({
-    required IconData icon,
-    required String label,
-    required Color bgColor,
-    required Color textColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: textColor),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- TAB 2: UPLOAD FILE (EXCEL / CSV) ---
+  // --- TAB 0: UPLOAD FILE (EXCEL / CSV) ---
   Widget _buildFileTab() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -645,7 +427,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.all(36),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
               color: AppTheme.gray50,
               borderRadius: BorderRadius.circular(12),
@@ -715,7 +497,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('Need a sample spreadsheet?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text('Need a sample spreadsheet template?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     SizedBox(height: 2),
                     Text(
                       'Download our pre-formatted CSV template with standard columns (fullName, mobileNumber, email, city, state).',
@@ -728,7 +510,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
               OutlinedButton.icon(
                 onPressed: () => widget.controller.downloadTemplate(),
                 icon: const Icon(Icons.download, size: 16),
-                label: const Text('Template'),
+                label: const Text('Download Template'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.primaryBlue,
                   side: const BorderSide(color: AppTheme.primaryBlue),
@@ -739,6 +521,430 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
           ),
         ),
       ],
+    );
+  }
+
+  // --- TAB 1: PASTE NUMBERS (CREATE LEADS) ---
+  Widget _buildPasteTab() {
+    final seenStaffIds = <String>{};
+    final activeStaff = widget.controller.staffList
+        .where((s) => s.id.isNotEmpty && s.status.toLowerCase() == 'active' && seenStaffIds.add(s.id))
+        .toList();
+    final safeAssignedRM = (_assignedRM != null && activeStaff.any((s) => s.id == _assignedRM)) ? _assignedRM : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Helper notification banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.skyBlue.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.skyBlue.withOpacity(0.2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Icon(Icons.auto_fix_high, size: 20, color: AppTheme.skyBlue),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Paste numbers one per line (Enter key) or separated by commas. Country codes (+91, 91, 091, 0) and formatting will automatically normalize to 10 digits.',
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Text Area for pasting
+        TextField(
+          controller: _pasteController,
+          maxLines: 6,
+          onChanged: _onTextChanged,
+          style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+          decoration: InputDecoration(
+            hintText: "Enter or paste phone numbers here...\n\nExample:\n9876543210\n+91 98765 43211\n919876543212, 09876543213\n0919876543214",
+            hintStyle: TextStyle(fontSize: 12.5, color: AppTheme.gray400),
+            filled: true,
+            fillColor: AppTheme.gray50,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.gray300)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.gray300)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.primaryBlue, width: 1.5)),
+            contentPadding: const EdgeInsets.all(14),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Badges summary
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _buildStatBadge(
+              icon: Icons.check_circle_outline,
+              label: '${_validNumbers.length} Valid Numbers',
+              bgColor: AppTheme.successGreen.withOpacity(0.12),
+              textColor: const Color(0xFF15803D),
+            ),
+            if (_duplicateCount > 0)
+              _buildStatBadge(
+                icon: Icons.copy_outlined,
+                label: '$_duplicateCount Duplicates',
+                bgColor: Colors.amber.withOpacity(0.15),
+                textColor: Colors.amber.shade900,
+              ),
+            if (_invalidCount > 0)
+              _buildStatBadge(
+                icon: Icons.warning_amber_rounded,
+                label: '$_invalidCount Invalid',
+                bgColor: Colors.red.withOpacity(0.1),
+                textColor: Colors.red.shade700,
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Ingestion Configuration Grid
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.gray200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Ingestion Settings', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Target Lead Pool
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Target Lead Pool', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        _isLoadingPools
+                            ? const LinearProgressIndicator()
+                            : DropdownButtonFormField<String>(
+                                initialValue: _selectedLeadPoolId,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  isDense: true,
+                                ),
+                                items: _leadPools.map((p) {
+                                  return DropdownMenuItem<String>(
+                                    value: p['_id']?.toString(),
+                                    child: Text(p['name']?.toString() ?? 'Pool', overflow: TextOverflow.ellipsis),
+                                  );
+                                }).toList(),
+                                onChanged: (val) => setState(() => _selectedLeadPoolId = val),
+                              ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Duplicate Handling Strategy
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Duplicate Handling', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          initialValue: _duplicateStrategy,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'skip', child: Text('Skip Existing', overflow: TextOverflow.ellipsis)),
+                            DropdownMenuItem(value: 'update', child: Text('Update Existing', overflow: TextOverflow.ellipsis)),
+                          ],
+                          onChanged: (val) => setState(() => _duplicateStrategy = val ?? 'skip'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Stage Selection
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Initial Stage', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          initialValue: _leadStage,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'New', child: Text('New')),
+                            DropdownMenuItem(value: 'Contacted', child: Text('Contacted')),
+                            DropdownMenuItem(value: 'Interested', child: Text('Interested')),
+                            DropdownMenuItem(value: 'Qualified', child: Text('Qualified')),
+                          ],
+                          onChanged: (val) => setState(() => _leadStage = val ?? 'New'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Assigned RM (Optional)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Assign RM (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: safeAssignedRM,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            isDense: true,
+                          ),
+                          items: [
+                            const DropdownMenuItem<String>(value: null, child: Text('Unassigned (Pool)', overflow: TextOverflow.ellipsis)),
+                            ...activeStaff.map((staff) {
+                              return DropdownMenuItem<String>(
+                                value: staff.id,
+                                child: Text('${staff.name} (${staff.role.isNotEmpty ? staff.role : "Staff"})', overflow: TextOverflow.ellipsis),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) => setState(() => _assignedRM = val),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Action Buttons
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Cancel'),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _handlePasteSubmit,
+              icon: _isSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.cloud_upload, size: 18),
+              label: Text(_isSubmitting ? 'Uploading...' : 'Upload ${_validNumbers.length} Leads'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // --- TAB 2: PASTE NUMBERS TO ASSIGN (REASSIGN EXISTING LEADS) ---
+  Widget _buildAssignTab() {
+    final seenStaffIds = <String>{};
+    final activeStaff = widget.controller.staffList
+        .where((s) => s.id.isNotEmpty && s.status.toLowerCase() == 'active' && seenStaffIds.add(s.id))
+        .toList();
+    final safeAssignRM = (_targetAssignRMId != null && activeStaff.any((s) => s.id == _targetAssignRMId))
+        ? _targetAssignRMId
+        : (activeStaff.isNotEmpty ? activeStaff.first.id : null);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Helper notification banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFBFDBFE)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Icon(Icons.assignment_ind_rounded, size: 20, color: AppTheme.primaryBlue),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Paste mobile numbers of existing leads to assign them to a Relationship Manager. Country codes (+91, 91, 0) will automatically normalize.',
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.textPrimary, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Text Area for pasting numbers to assign
+        TextField(
+          controller: _assignPasteController,
+          maxLines: 6,
+          onChanged: _onAssignTextChanged,
+          style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+          decoration: InputDecoration(
+            hintText: "Enter or paste phone numbers to assign...\n\nExample:\n9876543210\n+91 98765 43211\n919876543212, 09876543213",
+            hintStyle: TextStyle(fontSize: 12.5, color: AppTheme.gray400),
+            filled: true,
+            fillColor: AppTheme.gray50,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.gray300)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppTheme.gray300)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.primaryBlue, width: 1.5)),
+            contentPadding: const EdgeInsets.all(14),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Badges summary
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _buildStatBadge(
+              icon: Icons.check_circle_outline,
+              label: '${_assignUniqueNumbers.length} Valid Numbers',
+              bgColor: AppTheme.successGreen.withOpacity(0.12),
+              textColor: const Color(0xFF15803D),
+            ),
+            if (_assignDuplicateCount > 0)
+              _buildStatBadge(
+                icon: Icons.copy_outlined,
+                label: '$_assignDuplicateCount Duplicates Skipped',
+                bgColor: Colors.amber.withOpacity(0.15),
+                textColor: Colors.amber.shade900,
+              ),
+            if (_assignInvalidCount > 0)
+              _buildStatBadge(
+                icon: Icons.warning_amber_rounded,
+                label: '$_assignInvalidCount Invalid',
+                bgColor: Colors.red.withOpacity(0.1),
+                textColor: Colors.red.shade700,
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Target RM Dropdown Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.gray200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Target Relationship Manager (RM)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: safeAssignRM,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  isDense: true,
+                ),
+                items: activeStaff.map((staff) {
+                  return DropdownMenuItem<String>(
+                    value: staff.id,
+                    child: Text('${staff.name} (${staff.role.isNotEmpty ? staff.role : "Staff"})', overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: (val) => setState(() => _targetAssignRMId = val),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Action Buttons
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Cancel'),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _isAssignSubmitting ? null : _handleAssignSubmit,
+              icon: _isAssignSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.assignment_ind_rounded, size: 18),
+              label: Text(_isAssignSubmitting ? 'Assigning...' : 'Assign ${_assignUniqueNumbers.length} Leads to RM'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatBadge({
+    required IconData icon,
+    required String label,
+    required Color bgColor,
+    required Color textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: textColor),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor),
+          ),
+        ],
+      ),
     );
   }
 }

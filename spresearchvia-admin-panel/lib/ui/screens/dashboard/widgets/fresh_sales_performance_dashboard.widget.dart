@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/dashboard/dashboard.controller.dart';
-import '../../../widgets/button.widget.dart';
+import 'package:spresearch_web/ui/widgets/compact_date_range_picker.widget.dart';
 import 'filter_dropdown_field.widget.dart';
 import 'sales_metrics_cards.widget.dart';
 import 'staff_orders_table.widget.dart';
@@ -184,27 +184,119 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    width: 135,
-                    child: _buildDateField(
-                      context: context,
-                      label: 'From Date',
-                      placeholder: 'Start Date',
-                      selectedDate: controller.startDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
+                    width: 155,
+                    child: Obx(
+                      () => FilterDropdownField(
+                        label: 'Date Range',
+                        value: controller.selectedDateFilter.value,
+                        items: const [
+                          'Today',
+                          'This Week',
+                          'This Month',
+                          'This Quarter',
+                          'Custom',
+                          'All Time',
+                        ],
+                        onChanged: (v) async {
+                          if (v == null) return;
+                          if (v == 'Custom') {
+                            controller.setDateFilter('Custom');
+                            final picked = await showCompactDateRangePicker(
+                              context: context,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                              initialDateRange: (controller.startDate.value != null &&
+                                      controller.endDate.value != null)
+                                  ? DateTimeRange(
+                                      start: controller.startDate.value!,
+                                      end: controller.endDate.value!,
+                                    )
+                                  : DateTimeRange(
+                                      start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+                                      end: DateTime.now(),
+                                    ),
+                            );
+                            if (picked != null) {
+                              controller.setCustomDateRange(picked.start, picked.end);
+                            }
+                          } else {
+                            controller.setDateFilter(v);
+                          }
+                        },
+                        height: 36,
+                        fontSize: 12,
+                        labelFontSize: 11.5,
+                      ),
                     ),
                   ),
-                  SizedBox(
-                    width: 135,
-                    child: _buildDateField(
-                      context: context,
-                      label: 'To Date',
-                      placeholder: 'End Date',
-                      selectedDate: controller.endDate,
-                      firstDate: controller.startDate.value ?? DateTime(2020),
-                      lastDate: DateTime(2035),
-                    ),
-                  ),
+                  Obx(() {
+                    if (controller.selectedDateFilter.value == 'Custom') {
+                      final start = controller.startDate.value;
+                      final end = controller.endDate.value;
+                      String customDateText = "Select Dates";
+                      if (start != null && end != null) {
+                        customDateText =
+                            "${DateFormat('dd MMM').format(start)} - ${DateFormat('dd MMM').format(end)}";
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Custom Dates',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            height: 36,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: AppTheme.primaryBlue,
+                                side: BorderSide(
+                                  color: AppTheme.primaryBlue.withValues(alpha: 0.5),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                backgroundColor: Colors.white,
+                              ),
+                              onPressed: () async {
+                                final picked = await showCompactDateRangePicker(
+                                  context: context,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                  initialDateRange: (start != null && end != null)
+                                      ? DateTimeRange(start: start, end: end)
+                                      : DateTimeRange(
+                                          start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+                                          end: DateTime.now(),
+                                        ),
+                                );
+                                if (picked != null) {
+                                  controller.setCustomDateRange(picked.start, picked.end);
+                                }
+                              },
+                              icon: const Icon(Icons.date_range_rounded, size: 14),
+                              label: Text(
+                                customDateText,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }),
                   SizedBox(
                     width: 130,
                     child: Obx(
@@ -263,115 +355,7 @@ class FreshSalesPerformanceDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildDateField({
-    required BuildContext context,
-    required String label,
-    required String placeholder,
-    required Rxn<DateTime> selectedDate,
-    DateTime? firstDate,
-    DateTime? lastDate,
-  }) {
-    return Obx(() {
-      final date = selectedDate.value;
-      final displayDate =
-          date != null ? DateFormat('dd MMM yyyy').format(date) : placeholder;
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            child: InkWell(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: date ?? DateTime.now(),
-                  firstDate: firstDate ?? DateTime(2020),
-                  lastDate: lastDate ?? DateTime(2035),
-                  builder: (context, child) {
-                    return Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.light(
-                          primary: AppTheme.primaryBlue,
-                          onPrimary: Colors.white,
-                          onSurface: AppTheme.gray900,
-                        ),
-                      ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (picked != null) {
-                  selectedDate.value = picked;
-                }
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: date != null
-                        ? AppTheme.primaryBlue.withOpacity(0.6)
-                        : AppTheme.gray300,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      displayDate,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            date != null ? FontWeight.w500 : FontWeight.w400,
-                        color: date != null
-                            ? AppTheme.textPrimary
-                            : AppTheme.gray400,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (date != null)
-                    GestureDetector(
-                      onTap: () => selectedDate.value = null,
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 4),
-                        child: Icon(
-                          Icons.cancel_rounded,
-                          size: 14,
-                          color: AppTheme.gray400,
-                        ),
-                      ),
-                    ),
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 14,
-                    color: date != null
-                        ? AppTheme.primaryBlue
-                        : AppTheme.gray500,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        ],
-      );
-    });
-  }
 
   Widget _buildDataTableSection(DashboardController controller) {
     return Container(

@@ -25,7 +25,7 @@ class DashboardController extends GetxController {
   bool get isRegularStaff => isSingleStaff; // backwards-compatible alias
 
   var selectedRenewalStatus = 'All'.obs; // Order Status filter
-  var selectedDateFilter = 'All Time'.obs;
+  var selectedDateFilter = 'This Month'.obs;
   var selectedCustomDate = Rxn<DateTime>();
   var startDate = Rxn<DateTime>();
   var endDate = Rxn<DateTime>();
@@ -38,8 +38,8 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    startDate.value = null;
-    endDate.value = null;
+    _applyDateFilterBounds('This Month');
+    selectedDateFilter.value = 'This Month';
     _syncFilterDefaults();
 
     if (_authController != null) {
@@ -75,27 +75,68 @@ class DashboardController extends GetxController {
       if (!_isFilterSyncing) fetchFilteredData();
     });
     ever(selectedDateFilter, (val) {
-      if (!_isFilterSyncing) {
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        if (val == 'Today') {
-          startDate.value = DateTime(today.year, today.month, today.day, 0, 0, 0);
-          endDate.value = DateTime(today.year, today.month, today.day, 23, 59, 59, 999);
-        } else if (val == 'This Week') {
-          final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
-          startDate.value = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day, 0, 0, 0);
-          final endOfWeek = startOfWeek.add(const Duration(days: 6));
-          endDate.value = DateTime(endOfWeek.year, endOfWeek.month, endOfWeek.day, 23, 59, 59, 999);
-        } else if (val == 'This Month') {
-          startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
-          endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
-        } else if (val == 'All Time') {
-          startDate.value = null;
-          endDate.value = null;
+      if (!_isFilterSyncing && val != 'Custom') {
+        _isFilterSyncing = true;
+        try {
+          _applyDateFilterBounds(val);
+        } finally {
+          _isFilterSyncing = false;
         }
         fetchFilteredData();
       }
     });
+
+    fetchFilteredData();
+  }
+
+  void _applyDateFilterBounds(String val) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (val == 'Today') {
+      startDate.value = DateTime(today.year, today.month, today.day, 0, 0, 0);
+      endDate.value = DateTime(today.year, today.month, today.day, 23, 59, 59, 999);
+    } else if (val == 'This Week') {
+      final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+      startDate.value = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day, 0, 0, 0);
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      endDate.value = DateTime(endOfWeek.year, endOfWeek.month, endOfWeek.day, 23, 59, 59, 999);
+    } else if (val == 'This Month') {
+      startDate.value = DateTime(now.year, now.month, 1, 0, 0, 0);
+      endDate.value = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+    } else if (val == 'This Quarter' || val == 'This Quarter (QRMP)') {
+      final startQuarterMonth = ((now.month - 1) ~/ 3) * 3 + 1;
+      startDate.value = DateTime(now.year, startQuarterMonth, 1, 0, 0, 0);
+      endDate.value = DateTime(now.year, startQuarterMonth + 3, 0, 23, 59, 59, 999);
+    } else if (val == 'All Time') {
+      startDate.value = null;
+      endDate.value = null;
+    }
+  }
+
+  void setDateFilter(String filter) {
+    if (selectedDateFilter.value == filter && filter != 'Custom') return;
+    selectedDateFilter.value = filter;
+    if (filter != 'Custom') {
+      _isFilterSyncing = true;
+      try {
+        _applyDateFilterBounds(filter);
+      } finally {
+        _isFilterSyncing = false;
+      }
+      fetchFilteredData();
+    }
+  }
+
+  void setCustomDateRange(DateTime start, DateTime end) {
+    selectedDateFilter.value = 'Custom';
+    _isFilterSyncing = true;
+    try {
+      startDate.value = DateTime(start.year, start.month, start.day, 0, 0, 0);
+      endDate.value = DateTime(end.year, end.month, end.day, 23, 59, 59, 999);
+    } finally {
+      _isFilterSyncing = false;
+    }
+    fetchFilteredData();
   }
 
   void _syncFilterDefaults() {
@@ -161,6 +202,9 @@ class DashboardController extends GetxController {
     }
     if (selectedRenewalStatus.value != 'All') {
       query['status'] = selectedRenewalStatus.value;
+    }
+    if (selectedDateFilter.value != 'Custom') {
+      query['period'] = selectedDateFilter.value;
     }
 
     _dashboardManagementController.fetchDashboardData(
@@ -486,6 +530,11 @@ class DashboardController extends GetxController {
           return !orderDay.isBefore(startOfWeek) && orderDay.isBefore(endOfWeek);
         } else if (selectedDateFilter.value == 'This Month') {
           return orderDay.year == today.year && orderDay.month == today.month;
+        } else if (selectedDateFilter.value == 'This Quarter' || selectedDateFilter.value == 'This Quarter (QRMP)') {
+          final startQuarterMonth = ((today.month - 1) ~/ 3) * 3 + 1;
+          final startQuarter = DateTime(today.year, startQuarterMonth, 1);
+          final endQuarter = DateTime(today.year, startQuarterMonth + 3, 0, 23, 59, 59, 999);
+          return !date.isBefore(startQuarter) && !date.isAfter(endQuarter);
         }
         return true;
       }).toList();
@@ -508,10 +557,9 @@ class DashboardController extends GetxController {
     _isFilterSyncing = true;
     try {
       selectedRenewalStatus.value = 'All';
-      selectedDateFilter.value = 'All Time';
+      selectedDateFilter.value = 'This Month';
       selectedCustomDate.value = null;
-      startDate.value = null;
-      endDate.value = null;
+      _applyDateFilterBounds('This Month');
       searchQuery.value = '';
       activeTab.value = 0;
       if (isSingleStaff) {
@@ -531,11 +579,11 @@ class DashboardController extends GetxController {
     } finally {
       _isFilterSyncing = false;
     }
-    // Force a fresh data fetch with no filters applied
+    // Force a fresh data fetch with default filters applied (This Month)
     fetchFilteredData(force: true);
   }
 
   void refreshData() {
-    _dashboardManagementController.fetchDashboardData(force: true);
+    fetchFilteredData(force: true);
   }
 }

@@ -9,6 +9,9 @@ class ResetPasswordField extends StatelessWidget {
   final RxBool obscurePassword;
   final VoidCallback onToggle;
   final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+  final FocusNode? focusNode;
 
   const ResetPasswordField({
     super.key,
@@ -18,6 +21,9 @@ class ResetPasswordField extends StatelessWidget {
     required this.obscurePassword,
     required this.onToggle,
     this.validator,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.focusNode,
   });
 
   @override
@@ -38,8 +44,11 @@ class ResetPasswordField extends StatelessWidget {
         Obx(
           () => TextFormField(
             controller: textController,
+            focusNode: focusNode,
             obscureText: obscurePassword.value,
             validator: validator,
+            textInputAction: textInputAction,
+            onFieldSubmitted: onFieldSubmitted,
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(

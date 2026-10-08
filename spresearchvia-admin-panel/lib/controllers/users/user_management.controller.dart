@@ -37,8 +37,24 @@ class UserManagementController extends GetxController {
     _staffService = Get.find<StaffService>();
     super.onInit();
     _loadPersistedPageSize();
-    fetchUsers();
-    fetchManagers();
+
+    if (Get.isRegistered<AuthController>()) {
+      final auth = Get.find<AuthController>();
+      if (auth.isAuthenticated.value) {
+        fetchUsers();
+        fetchManagers();
+      } else {
+        ever(auth.isAuthenticated, (bool isAuth) {
+          if (isAuth) {
+            fetchUsers();
+            fetchManagers();
+          }
+        });
+      }
+    } else {
+      fetchUsers();
+      fetchManagers();
+    }
   }
 
   void _loadPersistedPageSize() {

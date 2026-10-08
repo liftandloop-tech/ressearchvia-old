@@ -8,18 +8,32 @@ class LeadService extends ApiService {
     int page = 1,
     int limit = 10,
     String search = '',
+    String name = '',
+    String mobile = '',
+    String location = '',
     String stage = '',
     String assignedRM = '',
     String? leadPoolId,
+    String? leadSource,
+    bool? isAppUser,
+    String? sortBy,
+    String? sortOrder,
   }) async {
     try {
       final query = {
         'page': page.toString(),
         'limit': limit.toString(),
-        'search': search,
-        'stage': stage,
-        'assignedRM': assignedRM,
+        if (search.isNotEmpty) 'search': search,
+        if (name.isNotEmpty) 'name': name,
+        if (mobile.isNotEmpty) 'mobile': mobile,
+        if (location.isNotEmpty) 'location': location,
+        if (stage.isNotEmpty) 'stage': stage,
+        if (assignedRM.isNotEmpty) 'assignedRM': assignedRM,
         if (leadPoolId != null && leadPoolId.isNotEmpty) 'leadPoolId': leadPoolId,
+        if (leadSource != null && leadSource.isNotEmpty) 'leadSource': leadSource,
+        if (isAppUser != null) 'isAppUser': isAppUser.toString(),
+        if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
+        if (sortOrder != null && sortOrder.isNotEmpty) 'sortOrder': sortOrder,
       };
 
       final response = await get('/leads', query: query, forceRefresh: true);

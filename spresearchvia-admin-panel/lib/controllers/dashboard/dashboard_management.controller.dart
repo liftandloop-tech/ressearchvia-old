@@ -30,7 +30,16 @@ class DashboardManagementController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchDashboardData();
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, 1, 0, 0, 0);
+    final end = DateTime(now.year, now.month + 1, 0, 23, 59, 59, 999);
+    fetchDashboardData(
+      query: {
+        'period': 'This Month',
+        'startDate': start.toIso8601String(),
+        'endDate': end.toIso8601String(),
+      },
+    );
   }
 
   Future<void> fetchDashboardData({

@@ -8,6 +8,9 @@ class LoginPasswordField extends StatelessWidget {
   final RxBool obscurePassword;
   final VoidCallback onToggleVisibility;
   final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+  final FocusNode? focusNode;
 
   const LoginPasswordField({
     super.key,
@@ -15,6 +18,9 @@ class LoginPasswordField extends StatelessWidget {
     required this.obscurePassword,
     required this.onToggleVisibility,
     this.validator,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.focusNode,
   });
 
   @override
@@ -35,8 +41,11 @@ class LoginPasswordField extends StatelessWidget {
         Obx(
           () => TextFormField(
             controller: controller,
+            focusNode: focusNode,
             obscureText: obscurePassword.value,
             validator: validator,
+            textInputAction: textInputAction,
+            onFieldSubmitted: onFieldSubmitted,
             decoration: InputDecoration(
               hintText: AppStrings.enterPassword,
               hintStyle: TextStyle(

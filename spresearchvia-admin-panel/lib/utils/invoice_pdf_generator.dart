@@ -23,13 +23,17 @@ class InvoicePdfGenerator {
         m == 'BANK' ||
         m.contains('TRANSFER'))
       return 'Bank Transfer';
+    if (m == 'RAZORPAY') return 'Razorpay';
+    if (m.startsWith('RAZORPAY_')) {
+      final sub = m.replaceFirst('RAZORPAY_', '');
+      return 'Razorpay ($sub)';
+    }
     if (m == 'UPI' ||
         m == 'NETBANKING' ||
         m == 'CARD' ||
         m == 'EMI' ||
-        m == 'ONLINE' ||
-        m == 'RAZORPAY')
-      return 'Online';
+        m == 'ONLINE')
+      return m == 'ONLINE' ? 'Razorpay' : 'Razorpay ($m)';
     return rawMode
         .toLowerCase()
         .split('_')
@@ -66,7 +70,11 @@ class InvoicePdfGenerator {
     final double amountPaid = history.isEmpty
         ? (payment['status'] == 'REJECTED'
               ? 0.0
-              : _toDouble(payment['amountPaid']))
+              : (_toDouble(payment['amountPaid']) > 0
+                    ? _toDouble(payment['amountPaid'])
+                    : (['PAID', 'APPROVED'].contains((payment['status'] ?? '').toString().toUpperCase())
+                        ? _toDouble(payment['amount'] ?? payment['totalAmount'])
+                        : 0.0)))
         : history.fold(
             0.0,
             (sum, item) =>
@@ -105,8 +113,10 @@ class InvoicePdfGenerator {
           'BANK_TRANSFER',
     );
     final paymentRefId =
-        payment['paymentRefId']?.toString() ??
         payment['utrNumber']?.toString() ??
+        payment['paymentRefId']?.toString() ??
+        payment['razorpayPaymentId']?.toString() ??
+        payment['paymentId']?.toString() ??
         payment['razorpayOrderId']?.toString() ??
         'N/A';
 

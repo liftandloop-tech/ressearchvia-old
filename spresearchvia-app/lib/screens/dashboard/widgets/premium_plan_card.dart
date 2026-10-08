@@ -158,11 +158,14 @@ class PremiumPlanCard extends StatelessWidget {
 
   Widget _buildDetailedPlanCard(Map<String, dynamic> segment, SegmentPlanController controller) {
     final segmentData = segment['segmentId'] as Map<String, dynamic>?;
-    final segmentName = segmentData?['segmentName'] ?? 'Segment';
+    final segmentName = segment['segmentName'] ??
+        (segmentData?['segmentName']) ??
+        segment['planName'] ??
+        'Segment';
     final planName = segment['planName'] as String?; // Get plan name from response
-    final validity = segmentData?['validity']?.toString() ?? '';
-    final endDate = segment['expiryDate'] != null
-        ? DateTime.parse(segment['expiryDate'].toString())
+    final endDateRaw = segment['endDate'] ?? segment['expiryDate'];
+    final endDate = endDateRaw != null
+        ? DateTime.tryParse(endDateRaw.toString())
         : null;
 
     int daysRemaining = 0;

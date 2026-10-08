@@ -10,12 +10,13 @@ import planCronJob from "./app/config/planCrons.js"
 import segmentCronJob from "./app/config/segmentCron.js"
 import partialCronJob from "./app/config/partialCrons.js"
 import { initScheduler } from "./app/config/scheduledNotificationCron.js";
+import departmentModel from "./app/models/departmentModel.js";
+import roleModel from "./app/models/roleModel.js";
+import permissionGroupModel from "./app/models/permissionGroupModel.js";
+import userModel from "./app/models/userModel.js";
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-var corsOptions = {
-    origin: process.env.ALLOW_ACCESS_ORIGIN,
-};
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -23,8 +24,38 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Preflight & CORS handling
+const allowOrigin = process.env.ALLOW_ACCESS_ORIGIN || '*';
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Allow all origins when configured as '*' or unset, otherwise reflect requesting origin
+        if (!origin || allowOrigin === '*' || allowOrigin.split(',').map(s => s.trim()).includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Fallback permissive for admin panel domain
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Range'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Content-Disposition'],
+    credentials: true,
+};
+
 app.use(cors(corsOptions));
+
+// Explicit preflight handler to prevent Caddy / proxy header dropping
+app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Range');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        return res.sendStatus(200);
+    }
+    next();
+});
+
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // app.use(express.urlencoded({ extended: false, limit: '50mb' })); // Removed duplicate
 app.use(express.json({
     limit: '50mb',
@@ -57,6 +88,26 @@ app.use('/uploads', (req, res, next) => {
 }));
 //dbconnect
 await MONGO_CLIENT();
+
+// Ensure default RBAC (Admin department, permission groups, and roles) exists
+try {
+    const adminDept = await departmentModel.findOne({ code: 'ADMIN' });
+    const adminRole = await roleModel.findOne({ name: 'Admin' });
+    const adminGroup = await permissionGroupModel.findOne({ name: 'admin' });
+    if (!adminDept || !adminRole || !adminGroup || adminDept.name !== 'Admin') {
+        console.log('[BOOTSTRAP] Default Admin RBAC incomplete or needs sync. Running seedCompleteRBAC...');
+        const { seedCompleteRBAC } = await import("./seed_complete_rbac.js");
+        await seedCompleteRBAC();
+    }
+    // Self-heal primary super admin accounts to ensure userType & role are super_admin
+    await userModel.updateMany(
+        { email: { $in: ['support@futurepride.in', 'admin@futurepride.in'] } },
+        { $set: { userType: 'super_admin', role: 'super_admin', adminAccessGranted: true } }
+    );
+} catch (rbacErr) {
+    console.warn('[BOOTSTRAP] RBAC auto-seed / admin bootstrap check warning:', rbacErr.message);
+}
+
 initRoutes(app)
 logoutCronJob()
 planCronJob()

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app.config.dart';
 import '../config/routes.config.dart';
+import '../controllers/auth/auth.controller.dart';
 import 'inactivity.service.dart';
 
 class ApiService extends GetConnect {
@@ -142,7 +143,12 @@ class ApiService extends GetConnect {
           }
         }
 
-        if (isTokenError) {
+        final reqAuth = request.headers['Authorization'] ?? request.headers['authorization'];
+        final hadAuthToken = reqAuth != null && reqAuth.trim().isNotEmpty;
+
+        // Only clear storage and redirect if the request actually sent an auth token that was rejected.
+        // Unauthenticated initial requests before auth check finishes must not wipe stored tokens.
+        if (isTokenError && hadAuthToken) {
           debugPrint(
             'Auth Token Invalid or Expired (Status: ${response.statusCode}). Redirecting to login.',
           );
@@ -153,9 +159,17 @@ class ApiService extends GetConnect {
             await prefs.remove('user_data');
             clearCache();
 
-            // Redirect to login if not already there and not on a public page
-            if (Get.currentRoute != '/' && !AppRoutes.isPublicRoute(Get.currentRoute)) {
-              Get.offAllNamed('/');
+            if (Get.isRegistered<AuthController>()) {
+              final auth = Get.find<AuthController>();
+              auth.user.value = null;
+              auth.authToken.value = '';
+              auth.isAuthenticated.value = false;
+            }
+
+            if (Get.currentRoute != AppRoutes.login &&
+                Get.currentRoute != '/' &&
+                !AppRoutes.isPublicRoute(Get.currentRoute)) {
+              Get.offAllNamed(AppRoutes.login);
             }
           } catch (e) {
             debugPrint('Error handling auth clearing: $e');

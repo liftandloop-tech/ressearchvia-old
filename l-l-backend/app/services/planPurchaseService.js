@@ -1458,6 +1458,7 @@ const planPurchaseService = {
         userId: id,
         type: 'PLAN',
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
         $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
       });
       if (activeEntitlement) {
@@ -1637,26 +1638,44 @@ const planPurchaseService = {
 
         // UNIFIED ENGINE: Finalize PaymentIntent
         try {
-          const intent = await PaymentIntent.findOne({ razorpayOrderId: razorpay_order_id });
-          if (intent) {
-            intent.status = 'PAID';
-            intent.amountPaid = payment.amount;
-            intent.paymentMethod = razorpayPayment.method || 'ONLINE';
-            if (!intent.serviceStartDate) {
-              intent.serviceStartDate = new Date();
-            }
-            if (plan && plan.endDate) {
-              intent.currentExpiryDate = plan.endDate;
-            }
-            await intent.save();
+          let intent = await PaymentIntent.findOne({ razorpayOrderId: razorpay_order_id });
+          const utr = razorpayPayment.acquirer_data?.rrn 
+                   || razorpayPayment.acquirer_data?.upi_transaction_id 
+                   || razorpayPayment.acquirer_data?.bank_transaction_id 
+                   || razorpay_payment_id;
+          const actualAmountPaid = (razorpayPayment.amount / 100) || payment.amount;
+
+          if (!intent) {
+            intent = new PaymentIntent({
+              userId: payment.userId,
+              purchaseType: (plan && plan.packageName && plan.packageName.includes("Registration")) ? 'REGISTRATION' : 'PLAN',
+              baseAmount: plan?.basicAmount || payment.amount,
+              gstAmount: (plan?.cgstAmount || 0) + (plan?.sgstAmount || 0),
+              totalAmount: payment.amount,
+              razorpayOrderId: razorpay_order_id,
+              packageName: plan?.packageName,
+            });
           }
+          intent.status = 'PAID';
+          intent.paymentId = razorpay_payment_id;
+          intent.amountPaid = actualAmountPaid;
+          intent.paymentMethod = 'RAZORPAY';
+          intent.utrNumber = utr;
+          intent.transactionDate = new Date();
+          if (!intent.serviceStartDate) {
+            intent.serviceStartDate = new Date();
+          }
+          if (plan && plan.endDate) {
+            intent.currentExpiryDate = plan.endDate;
+          }
+          await intent.save();
         } catch (intentErr) {
           console.error("Error finalizing PaymentIntent in verification:", intentErr);
         }
 
         // Update User Registration Status if this was a Registration Purchase
         const user = await userModel.findById(payment.userId);
-        if (plan.packageName.includes("Registration") && user) {
+        if (plan && plan.packageName && plan.packageName.includes("Registration") && user) {
           user.registrationStatus = 'ACTIVE';
           if (plan.packageName.includes("Lifetime")) {
             user.registrationType = 'LIFETIME';
@@ -1687,6 +1706,17 @@ const planPurchaseService = {
             });
           }
           await user.save();
+        } else if (plan && user) {
+          // Grant PLAN Entitlement (superseding any registration trial)
+          await grantEntitlement({
+            userId: user._id,
+            type: 'PLAN',
+            resourceId: payment.packageId,
+            days: plan.validity || 30,
+            grantedBy: 'SYSTEM',
+            grantReason: 'ONLINE_PAYMENT',
+            sourceRefId: payment._id
+          });
         }
 
 
@@ -2018,10 +2048,33 @@ const planPurchaseService = {
 
               if (ent.sourceRefId) {
                 // Try to find if sourceRefId is a PaymentIntent
-                const possiblePI = await PaymentIntent.findById(ent.sourceRefId);
-                if (possiblePI) {
-                  paymentIntent = possiblePI;
+                paymentIntent = await PaymentIntent.findById(ent.sourceRefId);
+                if (!paymentIntent) {
+                  // Maybe sourceRefId is segmentsPayment or legacy payment
+                  const sp = await segmentsPaymentModel.findById(ent.sourceRefId);
+                  if (sp && sp.razorpayOrderId) {
+                    paymentIntent = await PaymentIntent.findOne({ razorpayOrderId: sp.razorpayOrderId });
+                  }
+                  if (!paymentIntent) {
+                    const pm = await paymentModel.findById(ent.sourceRefId);
+                    if (pm && pm.razorpayOrderId) {
+                      paymentIntent = await PaymentIntent.findOne({ razorpayOrderId: pm.razorpayOrderId });
+                    }
+                  }
                 }
+              }
+
+              if (!paymentIntent) {
+                // Fallback: Check if there's a matching PaymentIntent for this user and plan/segment
+                paymentIntent = await PaymentIntent.findOne({
+                  userId: id,
+                  status: 'PAID',
+                  $or: [
+                    { preferredPlanId: ent.resourceId?._id || ent.resourceId },
+                    { planId: ent.resourceId?._id || ent.resourceId },
+                    { preferredSegmentId: ent.segmentId?._id || ent.segmentId }
+                  ]
+                }).sort({ createdAt: -1 });
               }
 
               // 2. Logic to determine isPartial and Correct Amount
@@ -2138,7 +2191,12 @@ const planPurchaseService = {
           currentExpiryDate: piData?.currentExpiryDate,
           remarks: remarks || "",
           totalPlanAmount: piData?.totalAmount || null,
-          amountPaid: piData?.amountPaid != null ? piData.amountPaid : (amount || 0),
+          amountPaid: (piData?.status === 'PAID' && (!piData?.amountPaid || piData?.amountPaid === 0))
+            ? (piData.totalAmount || amount || 0)
+            : (piData?.amountPaid != null ? piData.amountPaid : (amount || 0)),
+          paymentMethod: (piData?.paymentMethod === 'RAZORPAY' || (piData?.razorpayOrderId && !piData.razorpayOrderId.startsWith('BANK_') && !piData.razorpayOrderId.startsWith('MANUAL_'))) ? 'RAZORPAY' : (piData?.paymentMethod || 'BANK_TRANSFER'),
+          utrNumber: piData?.utrNumber || piData?.paymentId || ((piData?.razorpayOrderId && !piData.razorpayOrderId.startsWith('BANK_') && !piData.razorpayOrderId.startsWith('MANUAL_')) ? piData.razorpayOrderId : null),
+          paymentRefId: piData?.utrNumber || piData?.paymentId || piData?.razorpayOrderId || null,
           totalAmount: (piData?.totalAmount != null && piData.totalAmount > 0) ? piData.totalAmount : (amount || 0),
           baseAmount: piData?.baseAmount || (amount > 0 ? Math.round(amount / (1 + (piData?.gstRateUsed || 18) / 100)) : 0),
           gstAmount: piData?.gstAmount || (amount > 0 ? (amount - Math.round(amount / (1 + (piData?.gstRateUsed || 18) / 100))) : 0),
@@ -2349,11 +2407,11 @@ const planPurchaseService = {
       const matchStage = {};
       const callerId = user?._id || user?.userId || user?.id;
       if (callerId) {
-        const { getSupervisedStaffIds } = await import("../utils/staffHierarchy.js");
+        const { resolveUserScope } = await import("../utils/staffHierarchy.js");
         const staffAssignmentModel = (await import("../models/staffAssignmentModel.js")).default;
-        const hierarchy = await getSupervisedStaffIds(callerId);
-        if (!hierarchy.isSystemAdmin) {
-          const rawStaffIds = hierarchy.staffIds || [callerId];
+        const scope = await resolveUserScope(callerId, 'users');
+        if (scope.type !== 'global') {
+          const rawStaffIds = scope.staffIds || [callerId];
           const staffObjIds = rawStaffIds
             .filter(sid => sid && mongoose.isValidObjectId(sid))
             .map(sid => new mongoose.Types.ObjectId(sid.toString()));
@@ -2466,33 +2524,74 @@ const planPurchaseService = {
 
         let invoiceId = null;
         if (isInvoiceAvailable) {
-          const inv = await invoiceModel.findOne({
+          const conditions = [
+            { paymentRefId: doc._id.toString() }
+          ];
+          if (doc.razorpayOrderId) conditions.push({ paymentRefId: doc.razorpayOrderId });
+          if (doc.paymentId) conditions.push({ paymentRefId: doc.paymentId });
+          if (doc.utrNumber) conditions.push({ paymentRefId: doc.utrNumber });
+
+          let inv = await invoiceModel.findOne({
             userId: id,
-            $or: [
-              { paymentRefId: doc._id.toString() },
-              { paymentRefId: doc.razorpayOrderId }
-            ]
+            $or: conditions
           }).select('_id');
+
+          if (!inv && effectiveStatus === 'PAID') {
+            try {
+              const year = new Date().getFullYear();
+              const count = await invoiceModel.countDocuments();
+              const seq = String(count + 1).padStart(3, "0");
+              const effectiveAmount = (effectiveStatus === 'PAID' && (!doc.amountPaid || doc.amountPaid === 0))
+                ? (doc.totalAmount || 0)
+                : (doc.amountPaid || 0);
+              const isRazorpay = doc.paymentMethod === 'RAZORPAY' ||
+                (doc.razorpayOrderId && !doc.razorpayOrderId.startsWith('BANK_') && !doc.razorpayOrderId.startsWith('MANUAL_'));
+
+              inv = await invoiceModel.create({
+                userId: id,
+                invoiceNumber: `RV/${year}/${seq}`,
+                paymentMode: isRazorpay ? 'RAZORPAY' : (doc.paymentMethod || 'BANK_TRANSFER'),
+                amount: effectiveAmount,
+                gstAmount: Math.round((effectiveAmount - (effectiveAmount / 1.18)) * 100) / 100,
+                paymentRefId: doc.utrNumber || doc.paymentId || doc._id.toString(),
+                generatedBy: 'SYSTEM',
+                status: 'paid',
+                segmentId: doc.preferredSegmentId || undefined
+              });
+            } catch (invErr) {
+              console.error("Auto-generate invoice error in billing history:", invErr);
+            }
+          }
+
           if (inv) invoiceId = inv._id;
         }
+
+        const isRazorpay = doc.paymentMethod === 'RAZORPAY' ||
+          (doc.razorpayOrderId && !doc.razorpayOrderId.startsWith('BANK_') && !doc.razorpayOrderId.startsWith('MANUAL_'));
+        const effectiveMethod = isRazorpay ? 'RAZORPAY' : (doc.paymentMethod || 'BANK_TRANSFER');
+        const effectiveAmount = (effectiveStatus === 'PAID' && (!doc.amountPaid || doc.amountPaid === 0))
+          ? (doc.totalAmount || 0)
+          : (doc.amountPaid || 0);
+        const effectiveUtr = doc.utrNumber || doc.paymentId || (isRazorpay ? doc.razorpayOrderId : null);
 
         return {
           id: doc._id,
           planName: planName,
           purchaseDate: doc.createdAt,
-          amountPaid: doc.amountPaid || 0,
-          baseAmountPaid: Math.round((doc.amountPaid || 0) / (1 + (doc.gstRateUsed || 18) / 100) * 100) / 100,
-          gstAmountPaid: Math.round(((doc.amountPaid || 0) - ((doc.amountPaid || 0) / (1 + (doc.gstRateUsed || 18) / 100))) * 100) / 100,
+          amountPaid: effectiveAmount,
+          baseAmountPaid: Math.round(effectiveAmount / (1 + (doc.gstRateUsed || 18) / 100) * 100) / 100,
+          gstAmountPaid: Math.round((effectiveAmount - (effectiveAmount / (1 + (doc.gstRateUsed || 18) / 100))) * 100) / 100,
           totalAmount: (doc.totalAmount != null && doc.totalAmount > 0) ? doc.totalAmount : (doc.partialTotalTarget || 0),
           baseTotalAmount: Math.round(((doc.totalAmount != null && doc.totalAmount > 0) ? doc.totalAmount : (doc.partialTotalTarget || 0)) / (1 + (doc.gstRateUsed || 18) / 100) * 100) / 100,
           gstTotalAmount: Math.round((((doc.totalAmount != null && doc.totalAmount > 0) ? doc.totalAmount : (doc.partialTotalTarget || 0)) - (((doc.totalAmount != null && doc.totalAmount > 0) ? doc.totalAmount : (doc.partialTotalTarget || 0)) / (1 + (doc.gstRateUsed || 18) / 100))) * 100) / 100,
           totalAgreedAmount: doc.isPartial ? (doc.partialTotalTarget || doc.totalAmount) : doc.totalAmount,
-          remainingAmount: (doc.totalAmount != null && doc.totalAmount > 0) ? Math.max(0, doc.totalAmount - (doc.amountPaid || 0)) : (doc.remainingAmount || 0),
+          remainingAmount: (doc.totalAmount != null && doc.totalAmount > 0) ? Math.max(0, doc.totalAmount - effectiveAmount) : (doc.remainingAmount || 0),
           status: effectiveStatus,
           isPartial: doc.isPartial,
           isInvoiceAvailable: isInvoiceAvailable && !!invoiceId,
           invoiceId: invoiceId,
-          paymentMethod: doc.paymentMethod,
+          paymentMethod: effectiveMethod,
+          utrNumber: effectiveUtr,
           razorpayOrderId: doc.razorpayOrderId
         };
       }));

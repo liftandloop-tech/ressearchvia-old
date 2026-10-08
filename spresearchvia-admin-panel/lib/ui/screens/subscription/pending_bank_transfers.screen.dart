@@ -2117,14 +2117,14 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          "UTR: ${payment['utrNumber'] ?? 'N/A'}",
+                                          "UTR: ${payment['utrNumber'] ?? payment['paymentId'] ?? 'N/A'}",
                                           style: const TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 13),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          "Method: ${payment['paymentMethod'] ?? 'BANK_TRANSFER'}",
+                                          "Method: ${_formatPaymentMode(payment['paymentMethod']?.toString() ?? 'BANK_TRANSFER')}",
                                           style: const TextStyle(
                                               fontSize: 11, color: Colors.grey),
                                         ),
@@ -2837,7 +2837,13 @@ class PendingBankTransfersScreen extends StatelessWidget {
         : [];
         
     final double amountPaid = history.isEmpty 
-        ? (payment['status'] == 'REJECTED' ? 0.0 : _toDouble(payment['amountPaid']))
+        ? (payment['status'] == 'REJECTED' 
+            ? 0.0 
+            : (_toDouble(payment['amountPaid']) > 0 
+                ? _toDouble(payment['amountPaid']) 
+                : (['PAID', 'APPROVED'].contains((payment['status'] ?? '').toString().toUpperCase()) 
+                    ? _toDouble(payment['amount'] ?? payment['totalAmount']) 
+                    : 0.0)))
         : history.fold(0.0, (sum, item) => sum + _toDouble(item['amountPaid'] ?? item['amount']));
 
     final double totalAmount = _toDouble(payment['amount']);
@@ -3652,13 +3658,15 @@ class PendingBankTransfersScreen extends StatelessWidget {
       return 'Bank Transfer';
     }
     // Razorpay / online methods
+    if (m == 'RAZORPAY') {
+      return 'Razorpay';
+    }
     if (m == 'UPI' ||
         m == 'NETBANKING' ||
         m == 'CARD' ||
         m == 'EMI' ||
-        m == 'ONLINE' ||
-        m == 'RAZORPAY') {
-      return 'Online';
+        m == 'ONLINE') {
+      return m == 'ONLINE' ? 'Razorpay' : 'Razorpay ($m)';
     }
     // Title-case fallback
     return rawMode

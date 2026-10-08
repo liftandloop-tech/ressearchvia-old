@@ -18,7 +18,7 @@ import { approvePartialPayment } from "./acquisitionService.js";
 import mongoose from "mongoose";
 import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
-import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
+import { getSupervisedStaffIds, resolveUserScope } from "../utils/staffHierarchy.js";
 import Refund from "../models/refundModel.js";
 import salesRevenueService from "./salesRevenueService.js";
 
@@ -28,6 +28,12 @@ const segmentsService = {
   createSegments: async ({ body }) => {
     try {
       const payload = { ...body };
+      if (!payload.segmentName || !payload.segmentName.trim()) {
+        return { status: 400, message: "Segment name is required.", data: {} };
+      }
+      payload.segmentName = payload.segmentName.trim();
+      payload.segmentDiscription = (payload.segmentDiscription || '').trim() || `${payload.segmentName} Segment`;
+      payload.segmentStatus = payload.segmentStatus || 'active';
       const segment = new segmentsModel(payload);
       await segment.save();
       return { status: 201, message: "segments created", data: { segment } };
@@ -190,6 +196,7 @@ const segmentsService = {
         type: 'PLAN',
         resourceId: segmentPlanId,
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
+        grantReason: { $ne: 'REGISTRATION_TRIAL' },
         $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
       });
       if (activeEntitlement) {
@@ -345,6 +352,26 @@ const segmentsService = {
         gstAmount: gstAmount,
       });
       await segmentsPayment.save();
+
+      // Create PaymentIntent for unified system tracking
+      try {
+        await PaymentIntent.create({
+          userId: userId,
+          purchaseType: 'PLAN',
+          planId: segmentPlanId,
+          baseAmount: basePrice,
+          gstAmount: gstAmount,
+          totalAmount: totalAmount,
+          razorpayOrderId: order.id,
+          status: 'CREATED',
+          paymentMethod: 'RAZORPAY',
+          preferredSegmentId: segmentId,
+          preferredPlanId: segmentPlanId,
+          originalPlanAmount: totalAmount,
+        });
+      } catch (piErr) {
+        console.error('[purchaseSegmentPlan] Failed to create PaymentIntent for Razorpay order:', piErr);
+      }
 
       return {
         status: 201,
@@ -975,12 +1002,12 @@ const segmentsService = {
         }
       }
 
-      // Restrict payments by staff/director/manager assignment hierarchy
+      // Restrict payments by permission-controlled data scope (global, branch, or assigned)
       const callerId = user?._id || user?.userId || user?.id;
       if (callerId) {
-        const hierarchy = await getSupervisedStaffIds(callerId);
-        if (!hierarchy.isSystemAdmin) {
-          const rawStaffIds = hierarchy.staffIds || [callerId];
+        const scope = await resolveUserScope(callerId, 'users');
+        if (scope.type !== 'global') {
+          const rawStaffIds = scope.staffIds || [callerId];
           const staffObjIds = rawStaffIds
             .filter(sid => sid && mongoose.isValidObjectId(sid))
             .map(sid => new mongoose.Types.ObjectId(sid.toString()));
@@ -1180,7 +1207,7 @@ const segmentsService = {
         const segmentMap = new Map(segments.map(s => [s._id.toString(), s.segmentName]));
         const planMap = new Map(plans.map(p => [p._id.toString(), p]));
 
-        const baseUrl = process.env.BASE_URL || 'https://api.researchvia.in';
+        const baseUrl = process.env.BASE_URL || 'https://api.futurepride.in';
 
         return (intent) => {
           let planObj = intent.planId;
@@ -1246,12 +1273,25 @@ const segmentsService = {
 
           const invoiceNumber = invoiceMap.get(intent._id.toString()) || null;
 
+          const isRazorpayOrder = intent.paymentMethod === 'RAZORPAY' ||
+            (intent.razorpayOrderId && !intent.razorpayOrderId.startsWith('BANK_') && !intent.razorpayOrderId.startsWith('MANUAL_'));
+
+          const effectiveAmountPaid = (intent.status === 'PAID' && (!intent.amountPaid || intent.amountPaid === 0))
+            ? intent.totalAmount
+            : (intent.amountPaid != null ? intent.amountPaid : 0);
+
+          const effectiveUtr = intent.utrNumber 
+            || intent.paymentId 
+            || (isRazorpayOrder ? intent.razorpayOrderId : null);
+
+          const effectivePaymentMethod = isRazorpayOrder ? 'RAZORPAY' : (intent.paymentMethod || 'BANK_TRANSFER');
+
           return {
             _id: intent._id,
             userId: intent.userId,
             segmentPlanId: planObj,
             amount: intent.totalAmount,
-            amountPaid: intent.amountPaid,
+            amountPaid: effectiveAmountPaid,
             paymentProof: paymentProof,
             paymentProofs: paymentProofs,
             razorpayOrderId: intent.razorpayOrderId,
@@ -1262,7 +1302,7 @@ const segmentsService = {
             maxAllowedDays: intent.maxAllowedDays,
             partialPaymentsHistory: historyMapped,
             walletBalance: intent.walletBalance,
-            utrNumber: intent.utrNumber,
+            utrNumber: effectiveUtr,
             transactionDate: intent.transactionDate,
             purchaseType: intent.purchaseType,
             correctionVersion: intent.correctionVersion || 0,
@@ -1273,7 +1313,7 @@ const segmentsService = {
             gstAmount: intent.gstAmount || 0,
             gstRateUsed: intent.gstRateUsed || 18,
             invoiceNumber,
-            paymentMethod: intent.paymentMethod || 'BANK_TRANSFER',
+            paymentMethod: effectivePaymentMethod,
             preferredSegmentId: intent.preferredSegmentId,
             preferredPlanId: intent.preferredPlanId,
             planId: intent.planId?._id || intent.planId,
@@ -1627,7 +1667,44 @@ const segmentsService = {
           expiryDate: expiryDate,
         });
 
-        // CHUNK 7: Grant Entitlement (Access-Based)
+        // Sync PaymentIntent first so it can be referenced
+        let verifiedIntent = null;
+        const utr = payment.acquirer_data?.rrn 
+                 || payment.acquirer_data?.upi_transaction_id 
+                 || payment.acquirer_data?.bank_transaction_id 
+                 || razorpay_payment_id;
+        const actualAmountPaid = (payment.amount / 100) || segmentsPayment.amount;
+
+        try {
+          verifiedIntent = await PaymentIntent.findOne({ razorpayOrderId: razorpay_order_id });
+
+          if (!verifiedIntent) {
+            verifiedIntent = new PaymentIntent({
+              userId: segmentsPayment.userId,
+              purchaseType: 'PLAN',
+              planId: segmentsPayment.segmentPlanId,
+              baseAmount: segmentsPayment.amount - (segmentsPayment.gstAmount || 0),
+              gstAmount: segmentsPayment.gstAmount || 0,
+              totalAmount: segmentsPayment.amount,
+              razorpayOrderId: razorpay_order_id,
+              preferredSegmentId: segmentsPayment.segmentId,
+              preferredPlanId: segmentsPayment.segmentPlanId,
+            });
+          }
+          verifiedIntent.status = 'PAID';
+          verifiedIntent.paymentId = razorpay_payment_id;
+          verifiedIntent.amountPaid = actualAmountPaid;
+          verifiedIntent.paymentMethod = 'RAZORPAY';
+          verifiedIntent.utrNumber = utr;
+          verifiedIntent.transactionDate = new Date();
+          verifiedIntent.serviceStartDate = purchaseDate;
+          verifiedIntent.currentExpiryDate = expiryDate;
+          await verifiedIntent.save();
+        } catch (piErr) {
+          console.error("Error updating PaymentIntent in segmentsPaymentVerify:", piErr);
+        }
+
+        // CHUNK 7: Grant Entitlement (Access-Based) - links to intent._id
         await grantEntitlement({
           userId: segmentsPayment.userId,
           type: 'PLAN',
@@ -1636,20 +1713,15 @@ const segmentsService = {
           days: duration > 0 ? duration : (parseInt(segmentPlan.day) || 30),
           grantedBy: 'SYSTEM',
           grantReason: 'ONLINE_PAYMENT',
-          sourceRefId: segmentsPayment._id
+          sourceRefId: verifiedIntent?._id || segmentsPayment._id
         });
 
-        // Also grant segment level? 
-        // accessMiddleware checks 'hasAnyActivePlan' or checks by planId. 
-        // We usually check by PlanId or SegmentId. 
-        // entitlementService.js checks type='PLAN', resourceId=planId.
-        // So granting PLAN is correct.
-
+        // Create invoice
         const year = new Date().getFullYear();
         const count = await invoiceModel.countDocuments();
         const seq = String(count + 1).padStart(3, "0");
         const invoiceNumber = `RV/${year}/${seq}`;
-        const paymentMode = payment.method || "UPI";
+        const paymentMode = payment.method ? `RAZORPAY_${payment.method.toUpperCase()}` : "RAZORPAY";
 
         const invoice = await invoiceModel.create({
           userId: segmentsPayment.userId,
@@ -1659,9 +1731,9 @@ const segmentsService = {
           status: "paid",
           amount: segmentsPayment.amount,
           gstAmount: segmentsPayment.gstAmount,
-          paymentRefId: razorpay_payment_id,
+          paymentRefId: utr || razorpay_payment_id,
           userActiveSegmentsId: userActiveSegment._id,
-          generatedBy: "ResearchVia Admin",
+          generatedBy: "Future Pride Admin",
         });
 
         return {
@@ -1697,10 +1769,17 @@ const segmentsService = {
         type: 'PLAN',
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
-        startDate: { $lte: now },
         $or: [
-          { endDate: null },
-          { endDate: { $gte: now } }
+          { startDate: null },
+          { startDate: { $lte: new Date(Date.now() + 60000) } }
+        ],
+        $and: [
+          {
+            $or: [
+              { endDate: null },
+              { endDate: { $gte: now } }
+            ]
+          }
         ]
       }).populate({
         path: 'resourceId',
@@ -1710,24 +1789,27 @@ const segmentsService = {
         model: 'segments'
       });
 
-      // Map to legacy format expected by UI
-      // Legacy Format: { _id, userId, segmentId, purchaseDate (startDate), expiryDate (endDate), isActive: true }
-      // We need to group by segment? UI probably expects list of segments.
-
+      // Map to format expected by UI
       const activeSegments = activeEntitlements.map(ent => {
         const plan = ent.resourceId;
+        const segObj = ent.segmentId;
+        const segName = segObj?.segmentName || segObj?.name || plan?.segmentsName || 'Segment';
+        const validityDays = plan?.day || (ent.endDate && ent.startDate ? Math.round((new Date(ent.endDate) - new Date(ent.startDate)) / (1000 * 60 * 60 * 24)) : null);
 
         return {
           _id: ent._id, // Use entitlement ID as unique ID
           userId: ent.userId,
           segmentId: ent.segmentId,
+          segmentName: segName,
           purchaseDate: ent.startDate,
           expiryDate: ent.endDate,
+          endDate: ent.endDate, // for UI compatibility
+          validity: validityDays,
+          days: plan?.day || validityDays,
           isActive: ent.status === 'ACTIVE',
           status: ent.status,
           // Extra metadata
           planName: plan?.planName,
-          days: plan?.day,
         };
       }).filter(item => item !== null);
 
@@ -1760,10 +1842,17 @@ const segmentsService = {
         type: 'PLAN',
         status: 'ACTIVE',
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
-        startDate: { $lte: now },
         $or: [
-          { endDate: null },
-          { endDate: { $gte: now } }
+          { startDate: null },
+          { startDate: { $lte: new Date(Date.now() + 60000) } }
+        ],
+        $and: [
+          {
+            $or: [
+              { endDate: null },
+              { endDate: { $gte: now } }
+            ]
+          }
         ]
       }).populate({
         path: 'resourceId',
@@ -2086,30 +2175,30 @@ const segmentsService = {
     try {
       let { segmentId, invoiceId } = query;
 
-      let queryObj = {};
+      let invoice = null;
       if (invoiceId) {
-        queryObj = { _id: invoiceId };
+        if (mongoose.Types.ObjectId.isValid(invoiceId)) {
+          invoice = await invoiceModel.findById(invoiceId)
+            .populate({ path: "userId", select: "fullName phone aadhaarNumber userObject gstin firmName" })
+            .populate({ path: "segmentId", select: "segmentName segmentCode segmentStatus" })
+            .populate({ path: "userActiveSegmentsId", select: "amount gstAmount purchaseDate expiryDate isActive" });
+        }
+        if (!invoice) {
+          invoice = await invoiceModel.findOne({ paymentRefId: invoiceId })
+            .sort({ createdAt: -1 })
+            .populate({ path: "userId", select: "fullName phone aadhaarNumber userObject gstin firmName" })
+            .populate({ path: "segmentId", select: "segmentName segmentCode segmentStatus" })
+            .populate({ path: "userActiveSegmentsId", select: "amount gstAmount purchaseDate expiryDate isActive" });
+        }
       } else if (segmentId) {
-        queryObj = { segmentId: segmentId };
+        invoice = await invoiceModel.findOne({ segmentId: segmentId })
+          .sort({ createdAt: -1 })
+          .populate({ path: "userId", select: "fullName phone aadhaarNumber userObject gstin firmName" })
+          .populate({ path: "segmentId", select: "segmentName segmentCode segmentStatus" })
+          .populate({ path: "userActiveSegmentsId", select: "amount gstAmount purchaseDate expiryDate isActive" });
       } else {
         return { status: 400, message: "Missing segmentId or invoiceId", data: {} };
       }
-
-      const invoice = await invoiceModel
-        .findOne(queryObj)
-        .sort({ createdAt: -1 })
-        .populate({
-          path: "userId",
-          select: "fullName phone aadhaarNumber userObject gstin firmName",
-        })
-        .populate({
-          path: "segmentId",
-          select: "segmentName segmentCode segmentStatus",
-        })
-        .populate({
-          path: "userActiveSegmentsId",
-          select: "amount gstAmount purchaseDate expiryDate isActive",
-        });
 
       if (!invoice) {
         return { status: 404, message: "Invoice not found", data: {} };
@@ -2119,16 +2208,34 @@ const segmentsService = {
       let planName = invoice.segmentId?.segmentName || "Subscription";
       let intentData = {};
 
-      if (invoice.paymentRefId) {
+      const searchRef = invoice.paymentRefId || (invoiceId && mongoose.Types.ObjectId.isValid(invoiceId) ? invoiceId : null);
+      if (searchRef) {
         // Try to find the PaymentIntent to get the exact plan and segment
-        const intent = await PaymentIntent.findById(invoice.paymentRefId).populate('planId');
+        let intent = null;
+        if (mongoose.Types.ObjectId.isValid(searchRef)) {
+          intent = await PaymentIntent.findById(searchRef).populate('planId');
+        }
+        if (!intent) {
+          intent = await PaymentIntent.findOne({
+            $or: [
+              { razorpayOrderId: searchRef },
+              { paymentId: searchRef },
+              { utrNumber: searchRef }
+            ]
+          }).populate('planId');
+        }
+
         if (intent) {
+          const effectivePaid = intent.amountPaid || (intent.status === 'PAID' ? intent.totalAmount : 0);
           intentData = {
             totalAmount: intent.totalAmount,
-            amountPaid: intent.amountPaid || 0,
+            amountPaid: effectivePaid,
             discount: intent.discount || 0,
             isPartial: intent.isPartial,
             purchaseType: intent.purchaseType,
+            status: intent.status,
+            paymentMethod: intent.paymentMethod || 'RAZORPAY',
+            utrNumber: intent.utrNumber || intent.paymentId,
             installments: (intent.partialPaymentsHistory || [])
               .filter(p => p.status === 'APPROVED')
               .map((p, index) => ({
@@ -2235,10 +2342,13 @@ const segmentsService = {
               planName,
               segmentName,
               amount: item.amountPaid,
+              amountPaid: item.amountPaid,
               date: item.transactionDate || intent.createdAt,
               status: item.status || 'PENDING',
               method: intent.paymentMethod || 'BANK_TRANSFER',
+              paymentMethod: intent.paymentMethod || 'BANK_TRANSFER',
               transactionId: item.utrNumber || intent.razorpayOrderId || 'N/A',
+              utrNumber: item.utrNumber || intent.utrNumber,
               source: 'intent_history',
               segmentId: intent.preferredSegmentId,
               planId: intent.planId?._id || intent.planId,
@@ -2248,17 +2358,21 @@ const segmentsService = {
           }
         } else {
           // Full payment or partial with no uploads yet
+          const effectivePaid = intent.amountPaid || (intent.status === 'PAID' ? intent.totalAmount : 0);
           allPayments.push({
             _id: intent._id,
             paymentIntentId: intent._id,
             type,
             planName,
             segmentName,
-            amount: intent.totalAmount,
+            amount: effectivePaid || intent.totalAmount,
+            amountPaid: effectivePaid,
             date: intent.createdAt,
             status: intent.status,
-            method: intent.paymentMethod || 'ONLINE',
-            transactionId: intent.razorpayOrderId || 'N/A',
+            method: intent.paymentMethod || (intent.razorpayOrderId ? 'RAZORPAY' : 'ONLINE'),
+            paymentMethod: intent.paymentMethod || (intent.razorpayOrderId ? 'RAZORPAY' : 'ONLINE'),
+            transactionId: intent.utrNumber || intent.paymentId || intent.razorpayOrderId || 'N/A',
+            utrNumber: intent.utrNumber || intent.paymentId,
             source: 'payment_intent',
             segmentId: intent.preferredSegmentId,
             planId: intent.planId?._id || intent.planId,
@@ -2292,10 +2406,13 @@ const segmentsService = {
           planName,
           segmentName,
           amount: payment.amount,
+          amountPaid: payment.amount,
           date: payment.createdAt,
           status: (payment.paymentStatus || 'paid').toUpperCase(),
-          method: payment.paymentMethod || 'N/A',
-          transactionId: payment.razorpayOrderId || 'N/A',
+          method: payment.paymentMethod || 'RAZORPAY',
+          paymentMethod: payment.paymentMethod || 'RAZORPAY',
+          transactionId: payment.razorpayPaymentId || payment.razorpayOrderId || 'N/A',
+          utrNumber: payment.razorpayPaymentId || payment.razorpayOrderId || 'N/A',
           source: 'segments_payment',
           segmentId: payment.segmentId?._id || payment.segmentId,
           planId: payment.segmentPlanId?._id || payment.segmentPlanId,
@@ -2359,18 +2476,22 @@ const segmentsService = {
         };
       }
 
-      let totalDays = parseInt(duration) || 0;
-      let perDayCharge = (totalDays > 0) ? Math.round(price / totalDays) : 0;
+      let totalDays = parseInt(duration) || 30;
+      let numPrice = Number(price);
+      if (isNaN(numPrice) || numPrice < 0) {
+        numPrice = 0;
+      }
+      let perDayCharge = (totalDays > 0) ? Math.round(numPrice / totalDays) : 0;
 
       const planData = {
         planName: cleanName,
-        duration: duration,
-        day: day,
-        price: price,
+        duration: duration !== undefined && duration !== null ? String(duration) : "30",
+        day: day || 'days',
+        price: numPrice,
         perDayCharge: perDayCharge,
-        discription: discription,
-        planFeatures: planFeatures,
-        planStatus: planStatus
+        discription: (discription || '').trim() || `${cleanName} Plan`,
+        planFeatures: (planFeatures || '').trim() || 'Standard Features',
+        planStatus: planStatus || 'active'
       };
 
       // Add isHni if provided
@@ -2378,7 +2499,7 @@ const segmentsService = {
         planData.isHni = body.isHni;
       }
 
-      let segmentPlan = await segmentsPlanModel.create(planData)
+      let segmentPlan = await segmentsPlanModel.create(planData);
       return {
         status: 201,
         message: "segment plan created",
@@ -2391,9 +2512,10 @@ const segmentsService = {
 
   segmentsPlanUpdate: async ({ query, body }) => {
     try {
-      let { id } = query
+      let { id } = query;
       let { planName, segmentsId, duration, day, price, discription, planFeatures, planStatus } = body;
 
+      const updateData = {};
       if (planName) {
         const cleanName = planName.trim().toUpperCase();
         if (!cleanName) {
@@ -2403,40 +2525,40 @@ const segmentsService = {
             data: {}
           };
         }
+        updateData.planName = cleanName;
       }
 
-      let totalDays = parseInt(duration) || 0;
-      let perDayCharge = (totalDays > 0) ? Math.round(price / totalDays) : 0;
-      const segmentPlan = await segmentsPlanModel.findOne({ _id: id })
-      if (!segmentPlan) {
+      if (duration !== undefined && duration !== null) {
+        updateData.duration = String(duration);
+      }
+      if (day) updateData.day = day;
+      if (price !== undefined && price !== null) {
+        const numPrice = Number(price);
+        updateData.price = isNaN(numPrice) ? 0 : numPrice;
+        const totalDays = parseInt(duration || 30) || 30;
+        updateData.perDayCharge = Math.round(updateData.price / totalDays);
+      }
+      if (discription !== undefined) {
+        updateData.discription = discription.trim() || `${updateData.planName || 'Updated'} Plan`;
+      }
+      if (planFeatures !== undefined) {
+        updateData.planFeatures = planFeatures.trim() || 'Standard Features';
+      }
+      if (planStatus) updateData.planStatus = planStatus;
+      if (body.isHni !== undefined) updateData.isHni = body.isHni;
+
+      const updatedPlan = await segmentsPlanModel.findByIdAndUpdate(id, updateData, { new: true });
+      if (!updatedPlan) {
         return {
-          status: 200,
+          status: 404,
           message: "segment plan not found",
           data: {},
         };
       }
-
-      if (planName) {
-        segmentPlan.planName = planName.trim().toUpperCase();
-      }
-      segmentPlan.duration = duration
-      segmentPlan.day = day
-      segmentPlan.discription = discription
-      segmentPlan.planFeatures = planFeatures
-      segmentPlan.perDayCharge = perDayCharge
-      segmentPlan.price = price
-      segmentPlan.planStatus = planStatus
-
-      // Handle isHni field if provided
-      if (body.isHni !== undefined) {
-        segmentPlan.isHni = body.isHni;
-      }
-
-      await segmentPlan.save()
       return {
-        status: 201,
+        status: 200,
         message: "segment plan updated",
-        data: { segmentPlan },
+        data: { segmentPlan: updatedPlan },
       };
     } catch (error) {
       return { status: 400, message: error.message, data: {} };

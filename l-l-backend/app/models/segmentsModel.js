@@ -7,7 +7,7 @@ const segmentsSchema = new mongoose.Schema({
     },
     segmentDiscription: {
         type: String,
-        required: true
+        default: ""
     },
     segmentStatus: {
         type: String,

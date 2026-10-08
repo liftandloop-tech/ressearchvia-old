@@ -19,9 +19,127 @@ import FormData from "form-data";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import emailService from "./emailService.js";
 import userKycService from "./userKycService.js";
+import leadModel from "../models/leadModel.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Resolves the active Admin custody staff document.
+ * Integrates directly with the existing roles -> departments -> staff architecture.
+ * Links to the Super Admin (research@researchvia.in) and Admin role.
+ */
+export async function resolveAdminStaff() {
+  const adminRole = await roleModel.findOne({ name: { $regex: /^admin$/i } });
+  const adminDept = await departmentModel.findOne({ name: { $regex: /^admin$/i } });
+
+  const queryOr = [
+    { emailAddress: 'research@researchvia.in' },
+    { role: { $regex: /^admin$/i } },
+    { roleName: { $regex: /^admin$/i } }
+  ];
+  if (adminRole) {
+    queryOr.push({ roleId: adminRole._id });
+  }
+
+  let adminStaff = await staffModel.findOne({
+    $or: queryOr,
+    status: { $regex: /^active$/i }
+  }).populate('roleId').populate('departmentId');
+
+  // If not yet in staffModel, resolve from the existing super_admin userModel
+  if (!adminStaff) {
+    const superAdminUser = await userModel.findOne({
+      $or: [
+        { email: 'research@researchvia.in' },
+        { userType: 'super_admin' }
+      ]
+    });
+
+    if (superAdminUser) {
+      adminStaff = await staffModel.findOneAndUpdate(
+        { emailAddress: superAdminUser.email || 'research@researchvia.in' },
+        {
+          $setOnInsert: {
+            staffId: 'ADMIN-001',
+            fullName: superAdminUser.fullName || 'Super Admin',
+            emailAddress: superAdminUser.email || 'research@researchvia.in',
+            mobileNumber: superAdminUser.phone ? (Number(superAdminUser.phone.replace(/\D/g, '')) || 0) : 0,
+            role: 'Admin',
+            roleId: adminRole?._id || null,
+            departmentId: adminDept?._id || null,
+            deparment: 'Admin',
+            status: 'Active',
+            stage: 'Employee'
+          }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      ).populate('roleId').populate('departmentId');
+    }
+  }
+
+  return adminStaff;
+}
+
+/**
+ * Atomically reassigns all leads belonging to a departing/deactivated staff member
+ * directly to the Admin custody account.
+ * Idempotent: Only leads currently assigned to `staffId` are transferred.
+ */
+export async function transferDepartingStaffLeads(staffId, staffName, reason = 'STAFF_DEACTIVATED') {
+  if (!staffId) return { transferredCount: 0 };
+
+  const staffObjectId = mongoose.isValidObjectId(staffId)
+    ? new mongoose.Types.ObjectId(staffId.toString())
+    : staffId;
+
+  const adminStaff = await resolveAdminStaff();
+  if (!adminStaff) {
+    console.error('[LEAD_TRANSFER] Error: Could not resolve Admin staff for lead transfer');
+    return { transferredCount: 0 };
+  }
+
+  // Guard: Admin staff itself cannot be transferred to itself
+  if (adminStaff._id.toString() === staffObjectId.toString()) {
+    return { transferredCount: 0 };
+  }
+
+  const actionText = reason === 'STAFF_CANCELLED' ? 'removed/cancelled' : 'deactivated';
+  const auditNote = `System Transfer: Staff ${staffName || 'Staff'} was ${actionText}. Lead transferred directly to Admin custody.`;
+
+  // Idempotent bulk transfer: only leads where assignedRM == staffObjectId
+  const updateResult = await leadModel.updateMany(
+    { assignedRM: staffObjectId },
+    {
+      $set: {
+        assignedRM: adminStaff._id,
+        leadSource: 'ORPHANED_STAFF',
+        'previousRM.staffId': staffObjectId,
+        'previousRM.staffName': staffName || 'Ex-Staff',
+        'previousRM.transferredAt': new Date(),
+        'previousRM.transferReason': reason
+      },
+      $push: {
+        followUps: {
+          notes: auditNote,
+          followUpDate: new Date(),
+          followUpType: 'Manager Follow-up',
+          status: 'Completed',
+          createdAt: new Date()
+        }
+      }
+    }
+  );
+
+  const transferredCount = updateResult.modifiedCount || 0;
+  console.log(`[LEAD_TRANSFER] Transferred ${transferredCount} leads from ${staffName} (${staffId}) to Admin (${adminStaff._id}) [Reason: ${reason}]`);
+
+  return {
+    adminId: adminStaff._id,
+    adminName: adminStaff.fullName,
+    transferredCount
+  };
+}
 
 
 
@@ -564,8 +682,22 @@ const staffService = {
         staff.mpin = body.mpin.toString();
       }
 
+      const previousStatus = (staff.status || '').toString().trim().toLowerCase();
+      let transferredCount = 0;
+
       if (body.status) {
+        const newStatus = body.status.toString().trim().toLowerCase();
         staff.status = body.status;
+
+        // If transitioning from Active to Inactive or Deactivated, atomically transfer leads to Admin
+        if (previousStatus === 'active' && (newStatus === 'inactive' || newStatus === 'deactivated')) {
+          const transferResult = await transferDepartingStaffLeads(
+            staff._id,
+            staff.fullName,
+            newStatus === 'deactivated' ? 'STAFF_DEACTIVATED' : 'STAFF_INACTIVE'
+          );
+          transferredCount = transferResult.transferredCount;
+        }
       }
 
       console.log('body.isViewOnly value:', body.isViewOnly, 'type:', typeof body.isViewOnly);
@@ -581,7 +713,14 @@ const staffService = {
       console.log('Final staff object before save (isViewOnly):', staff.isViewOnly);
       await staff.save()
       console.log('Staff saved successfully. DB state isViewOnly:', staff.isViewOnly);
-      return { status: 200, message: "staff", data: { staff } }
+      return {
+        status: 200,
+        message: "staff",
+        data: {
+          staff,
+          transferredLeadsCount: transferredCount
+        }
+      }
 
     } catch (error) {
       return { status: 400, message: error.message, data: {} }
@@ -605,8 +744,21 @@ const staffService = {
         }
       }
 
+      // Atomically transfer all leads assigned to this staff directly to Admin BEFORE deletion
+      const transferResult = await transferDepartingStaffLeads(
+        staff._id,
+        staff.fullName,
+        'STAFF_CANCELLED'
+      );
+
       await staffModel.findByIdAndDelete(id)
-      return { status: 200, message: "staff cancle", data: {} }
+      return {
+        status: 200,
+        message: "staff cancle",
+        data: {
+          transferredLeadsCount: transferResult.transferredCount
+        }
+      }
     } catch (error) {
       return { status: 400, message: error.message, data: {} }
     }

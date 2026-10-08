@@ -19,7 +19,8 @@ export const salesRevenueService = {
     staffMember,
     staffId,
     search,
-    status
+    status,
+    period,
   } = {}) => {
     let isSystemAdmin = false;
     let targetStaffIds = [];
@@ -110,8 +111,30 @@ export const salesRevenueService = {
     }
 
     // Date filtering bounds
-    let filterStart = startDate ? new Date(startDate) : null;
-    let filterEnd = endDate ? new Date(endDate) : null;
+    let filterStart = (startDate && !isNaN(new Date(startDate).getTime())) ? new Date(startDate) : null;
+    let filterEnd = (endDate && !isNaN(new Date(endDate).getTime())) ? new Date(endDate) : null;
+
+    if (!filterStart && !filterEnd && period) {
+      const p = period.trim().toLowerCase();
+      const now = new Date();
+      if (p === 'today') {
+        filterStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        filterEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      } else if (p === 'this week') {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        filterStart = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+        filterEnd = new Date(filterStart.getFullYear(), filterStart.getMonth(), filterStart.getDate() + 6, 23, 59, 59, 999);
+      } else if (p === 'this month') {
+        filterStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        filterEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      } else if (p === 'this quarter' || p === 'this quarter (qrmp)') {
+        const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+        filterStart = new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0, 0);
+        filterEnd = new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59, 999);
+      }
+    }
+
     if (filterStart) filterStart.setHours(0, 0, 0, 0);
     if (filterEnd) filterEnd.setHours(23, 59, 59, 999);
 

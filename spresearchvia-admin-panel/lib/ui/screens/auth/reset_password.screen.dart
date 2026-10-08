@@ -95,6 +95,14 @@ class ResetPassword extends StatelessWidget {
                       textController: controller.newPasswordController,
                       obscurePassword: controller.obscureNewPassword,
                       onToggle: controller.toggleNewPasswordVisibility,
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) {
+                        if (controller.confirmPasswordController.text.trim().isEmpty) {
+                          FocusScope.of(context).nextFocus();
+                        } else if (!controller.isLoading.value) {
+                          controller.resetPassword();
+                        }
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter new password';
@@ -112,6 +120,12 @@ class ResetPassword extends StatelessWidget {
                       textController: controller.confirmPasswordController,
                       obscurePassword: controller.obscureConfirmPassword,
                       onToggle: controller.toggleConfirmPasswordVisibility,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!controller.isLoading.value) {
+                          controller.resetPassword();
+                        }
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please confirm your password';

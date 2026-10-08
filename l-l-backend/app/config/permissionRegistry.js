@@ -12,6 +12,8 @@ export const PERMISSION_REGISTRY = {
 
     // Module 2: Users & Clients
     'users.view': { feature: 'Users', action: 'view', label: 'View Clients', description: 'View client list and client profiles' },
+    'users.view_branch': { feature: 'Users', action: 'view_branch', label: 'View Branch Clients', description: 'View all clients assigned to Branch Director and branch staff' },
+    'users.view_all': { feature: 'Users', action: 'view_all', label: 'View All Clients (Global)', description: 'View all company-wide clients across all branches' },
     'users.create': { feature: 'Users', action: 'create', label: 'Create Client', description: 'Provision new client account' },
     'users.update': { feature: 'Users', action: 'update', label: 'Edit Client Profile', description: 'Edit client personal and bank details' },
     'users.manage': { feature: 'Users', action: 'manage', label: 'Manage Client', description: 'Manage client subscriptions, plans, and entitlements' },

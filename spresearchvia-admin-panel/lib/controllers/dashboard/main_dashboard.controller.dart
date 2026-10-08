@@ -113,7 +113,14 @@ class MainDashboardController extends GetxController {
     } else if (currentRoute.startsWith('/settings')) {
       isAllowed = user.canAccessDepartmentPage('Settings') && user.hasPermission('Settings', 'read');
     } else if (currentRoute.startsWith('/leads')) {
-      isAllowed = user.canAccessDepartmentPage('Leads') && user.hasPermission('Leads', 'read');
+      isAllowed = user.isAdmin ||
+          (user.canAccessDepartmentPage('Leads') &&
+              (user.has('leads.view') ||
+                  user.has('leads.view_all') ||
+                  user.has('leads.view_assigned') ||
+                  user.has('leads.pull') ||
+                  user.hasPermission('Leads', 'read') ||
+                  user.hasPermission('Leads', 'view')));
     } else if (currentRoute.startsWith('/automated-trading')) {
       isAllowed = user.isAdmin ||
           (user.canAccessDepartmentPage('AutomatedTrading') &&

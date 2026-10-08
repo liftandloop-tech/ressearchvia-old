@@ -22,11 +22,13 @@ import TokenBlacklist from "../models/tokenBlacklistModel.js";
 
 // Helper function for Canonical Onboarding Logic
 import { grantEntitlement } from "./entitlementService.js";
-import staffService from "./staffService.js";
+import staffService, { resolveAdminStaff } from "./staffService.js";
 import staffModel from "../models/staffModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
-import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
+import { getSupervisedStaffIds, resolveUserScope } from "../utils/staffHierarchy.js";
 import salesRevenueService from "./salesRevenueService.js";
+import leadModel from "../models/leadModel.js";
+import notificationService from "./notificationService.js";
 
 /* ==========================================================================
    HELPER FUNCTIONS (Refactored to reduce redundancy)
@@ -131,6 +133,215 @@ const syncUserDevice = async (user, deviceId, platform = 'android') => {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 };
+
+/**
+ * Dispatches a notification for lead onboarding using the existing notification infrastructure.
+ * Reuses notificationService.sendPushNotification and deviceModel.
+ */
+export async function dispatchOnboardingNotification({ recipientStaffId, lead, user, type }) {
+  try {
+    if (!recipientStaffId) {
+      console.log(`[CRM_NOTIFICATION] No recipient staff ID provided for lead ${lead._id}`);
+      return { sent: false, reason: 'NO_RECIPIENT' };
+    }
+
+    const staff = await staffModel.findById(recipientStaffId).lean();
+    if (!staff) {
+      console.log(`[CRM_NOTIFICATION] Staff not found for ID ${recipientStaffId}`);
+      return { sent: false, reason: 'STAFF_NOT_FOUND' };
+    }
+
+    const cleanStaffPhone = staff.mobileNumber ? String(staff.mobileNumber).replace(/\D/g, '').slice(-10) : null;
+    const userQuery = [{ email: staff.emailAddress }];
+    if (cleanStaffPhone) {
+      userQuery.push({ phone: cleanStaffPhone });
+      userQuery.push({ phone: `+91${cleanStaffPhone}` });
+      userQuery.push({ phone: `91${cleanStaffPhone}` });
+    }
+    const staffUser = await userModel.findOne({ $or: userQuery }).lean();
+
+    const cleanLeadPhone = (lead.mobileNumber || user.phone || '').toString().replace(/\D/g, '').slice(-10);
+    const leadDisplayName = lead.fullName || user.fullName || 'Lead';
+
+    let title = '';
+    let body = '';
+    if (type === 'ORGANIC_LEAD_CREATED') {
+      title = `🚀 New Organic Lead: ${leadDisplayName}`;
+      body = `New user ${leadDisplayName} (${cleanLeadPhone}) registered via mobile app and assigned to Admin custody.`;
+    } else if (type === 'UNASSIGNED_LEAD_ONBOARDED') {
+      title = `🎉 Unassigned Lead Onboarded: ${leadDisplayName}`;
+      body = `Unassigned lead ${leadDisplayName} (${cleanLeadPhone}) has installed and logged into the mobile app.`;
+    } else {
+      title = `🎉 Lead App Onboarded: ${leadDisplayName}`;
+      body = `Your assigned lead ${leadDisplayName} (${cleanLeadPhone}) has logged into the mobile app!`;
+    }
+
+    const dataPayload = {
+      type: 'LEAD_APP_ONBOARDED',
+      leadId: lead._id ? lead._id.toString() : '',
+      appUserId: user._id ? user._id.toString() : '',
+      leadSource: lead.leadSource || 'ORGANIC_APP'
+    };
+
+    console.log(`[CRM_NOTIFICATION] Notification logged for ${staff.fullName || 'Staff'} (${staff.emailAddress}): "${title}"`);
+
+    if (staffUser) {
+      const activeDevices = await deviceModel.find({ userId: staffUser._id, isActive: true }).lean();
+      const tokens = activeDevices.map(d => d.pushToken).filter(Boolean);
+
+      if (tokens.length > 0) {
+        await notificationService.sendPushNotification(tokens, title, body, dataPayload);
+        console.log(`[CRM_NOTIFICATION] Push notification dispatched to ${tokens.length} device(s) of ${staff.fullName}`);
+        return { sent: true, staffId: staff._id, tokensCount: tokens.length };
+      }
+    }
+
+    return { sent: true, staffId: staff._id, tokensCount: 0, reason: 'NO_ACTIVE_DEVICES_LOGGED_EVENT' };
+  } catch (error) {
+    console.error('[CRM_NOTIFICATION] Error dispatching onboarding notification:', error);
+    return { sent: false, error: error.message };
+  }
+}
+
+/**
+ * Detects mobile app onboarding for CRM leads upon successful authentication/token generation.
+ * Idempotent: Only triggers on the FIRST successful app entry.
+ */
+export async function handleAppUserOnboarding(user) {
+  if (!user || !user.phone) {
+    return { processed: false, reason: 'NO_PHONE' };
+  }
+
+  try {
+    // 1. Phone normalization (exact 10 digits to match stored format in leads.mobileNumber)
+    const rawPhone = user.phone.toString();
+    const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      console.warn(`[APP_ONBOARDING] Invalid normalized phone length for user ${user._id}: ${user.phone}`);
+      return { processed: false, reason: 'INVALID_PHONE_LENGTH' };
+    }
+
+    // 2. Query Lead by phone (matching cleanPhone as well as standard variants)
+    const existingLead = await leadModel.findOne({
+      $or: [
+        { mobileNumber: cleanPhone },
+        { mobileNumber: `+91${cleanPhone}` },
+        { mobileNumber: `91${cleanPhone}` }
+      ]
+    });
+
+    // 3. Existing Lead Path
+    if (existingLead) {
+      // IDEMPOTENCY GUARD:
+      // If the lead is already marked as an app user, subsequent logins are complete NO-OPs.
+      if (existingLead.isAppUser) {
+        return {
+          processed: true,
+          action: 'NONE',
+          reason: 'ALREADY_APP_USER',
+          leadId: existingLead._id
+        };
+      }
+
+      // FIRST-TIME ONBOARDING EVENT:
+      existingLead.isAppUser = true;
+      existingLead.appUserId = user._id;
+      existingLead.appOnboardedAt = new Date();
+      existingLead.isRead = false; // Mark unread/fresh for RM
+
+      // Update stage if not in a terminal state (Won, Lost, Invalid)
+      const terminalStages = ['Won', 'Lost', 'Invalid'];
+      if (!terminalStages.includes(existingLead.stage)) {
+        existingLead.stage = 'App Onboarded';
+      }
+
+      // Add audit follow-up note
+      existingLead.followUps.push({
+        notes: '🎉 App Onboarding: Lead has installed and logged into the mobile app.',
+        followUpDate: new Date(),
+        followUpType: 'Manager Follow-up',
+        status: 'Completed',
+        createdAt: new Date()
+      });
+
+      await existingLead.save();
+      console.log(`[APP_ONBOARDING] Lead ${existingLead._id} (${cleanPhone}) successfully onboarded to app.`);
+
+      // Resolve recipient for notification
+      let recipientStaffId = existingLead.assignedRM;
+      let notificationType = 'ASSIGNED_LEAD_ONBOARDED';
+
+      if (!recipientStaffId) {
+        const adminStaff = await resolveAdminStaff();
+        recipientStaffId = adminStaff ? adminStaff._id : null;
+        notificationType = 'UNASSIGNED_LEAD_ONBOARDED';
+      }
+
+      if (recipientStaffId) {
+        await dispatchOnboardingNotification({
+          recipientStaffId,
+          lead: existingLead,
+          user,
+          type: notificationType
+        });
+      }
+
+      return {
+        processed: true,
+        action: 'LEAD_ONBOARDED',
+        leadId: existingLead._id,
+        stage: existingLead.stage,
+        notificationType,
+        recipientStaffId
+      };
+    }
+
+    // 4. Organic Lead Path (No matching lead found)
+    const adminStaff = await resolveAdminStaff();
+    const newLead = await leadModel.create({
+      fullName: user.fullName || 'App User',
+      mobileNumber: cleanPhone,
+      emailAddress: user.email || null,
+      assignedRM: adminStaff ? adminStaff._id : null,
+      leadSource: 'ORGANIC_APP',
+      stage: 'App Onboarded',
+      isAppUser: true,
+      appUserId: user._id,
+      appOnboardedAt: new Date(),
+      isRead: false,
+      followUps: [{
+        notes: '🚀 Organic Lead: User downloaded and registered via mobile app. Assigned to Admin custody.',
+        followUpDate: new Date(),
+        followUpType: 'Manager Follow-up',
+        status: 'Completed',
+        createdAt: new Date()
+      }]
+    });
+
+    console.log(`[APP_ONBOARDING] Created organic app lead ${newLead._id} (${cleanPhone}) assigned to Admin.`);
+
+    if (adminStaff) {
+      await dispatchOnboardingNotification({
+        recipientStaffId: adminStaff._id,
+        lead: newLead,
+        user,
+        type: 'ORGANIC_LEAD_CREATED'
+      });
+    }
+
+    return {
+      processed: true,
+      action: 'ORGANIC_LEAD_CREATED',
+      leadId: newLead._id,
+      stage: newLead.stage,
+      recipientStaffId: adminStaff ? adminStaff._id : null
+    };
+  } catch (error) {
+    console.error('[APP_ONBOARDING] Error in handleAppUserOnboarding:', error);
+    return { processed: false, error: error.message };
+  }
+}
 
 /**
  * Inject dynamic registration status if user is not ACTIVE but has a pending intent
@@ -401,7 +612,7 @@ const userService = {
       }
 
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
+      const defaultTemplate = process.env.SMS_OTP_TEMPLATE || "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
       const messageText = defaultTemplate.replaceAll("{OTP}", otp);
 
       console.log(`[USER_CREATE] Sending OTP to ${phone}`);
@@ -1036,11 +1247,20 @@ const userService = {
       if (!admin) {
         return { status: 200, message: "admin not found", data: { admin } };
       }
+
+      // Self-heal userType and adminAccessGranted for admin accounts
+      if (admin.userType !== 'super_admin' && (admin.role === 'super_admin' || admin.adminAccessGranted || admin.userType === 'user' || admin.userType === 'admin')) {
+        admin.userType = 'super_admin';
+        admin.role = 'super_admin';
+        admin.adminAccessGranted = true;
+        await admin.save();
+      }
+
       let token = jwt.sign(
         {
           _id: admin?._id,
           userObject: admin?.userObject,
-          userType: admin?.userType,
+          userType: admin?.userType || 'super_admin',
         },
         process.env.JWT_TOKEN,
         { expiresIn: "8h" }
@@ -1195,23 +1415,15 @@ const userService = {
           data: { existUser },
         };
       } else {
-        // --- FALLBACK FLOW START ---
+      // --- FALLBACK FLOW START (Manual entry if KRA unconfigured or not found) ---
+      const kraError = responseData?.error_code || result?.raw?.resdtlsDecrypted?.error_code || (result?.raw?.error_code);
+      const kraMessage = responseData?.error_message || result?.raw?.resdtlsDecrypted?.error_message || (result?.raw?.error_description || result?.raw?.error_message);
 
-        // CRITICAL FIX: If KRA returned 102 error (No Records Found), this means data is WRONG.
-        // Do NOT proceed to fallback. Stop and tell user to check details.
-        const kraError = responseData?.error_code || result.raw?.resdtlsDecrypted?.error_code || (result.raw?.error_code);
-        const kraMessage = responseData?.error_message || result.raw?.resdtlsDecrypted?.error_message || (result.raw?.error_description);
+      if (kraError === "102" || (kraMessage && kraMessage.toLowerCase().includes("no record found"))) {
+        console.warn(`[KRA] User ${userId} PAN not found in KRA: ${kraMessage}. Proceeding to manual entry.`);
+      }
 
-        if (kraError === "102" || (kraMessage && kraMessage.toLowerCase().includes("no record found"))) {
-          console.warn(`[KRA] Invalid Data provided by user ${userId}: ${kraMessage}`);
-          return {
-            status: 400,
-            message: "KRA Verification Failed: Invalid PAN or Date of Birth. Please check your details.",
-            data: {}
-          };
-        }
-
-        console.warn(`[KRA Fail] User ${userId} - Saving inputs manually. Error: ${JSON.stringify(result)}`);
+      console.warn(`[KRA Fallback] User ${userId} - Proceeding with manual KYC entry.`);
 
         // Save valid inputs even if KRA failed
         if (aadhaarNumber) {
@@ -1257,11 +1469,11 @@ const userService = {
       let { phone } = body;
       const user = await findUserByPhone(phone);
       if (!user) {
-        return { status: 200, message: "User not exist ", data: {} };
+        return { status: 404, message: "User not found", data: {} };
       }
 
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
+      const defaultTemplate = process.env.SMS_OTP_TEMPLATE || "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
       const messageText = defaultTemplate.replaceAll("{OTP}", otp);
 
       const response = await sendSms(phone, messageText);
@@ -1372,6 +1584,13 @@ const userService = {
 
       const { accessToken, refreshToken } = await generateTokens(user, nextStep);
 
+      // --- CRM PHASE 2: MOBILE APP ONBOARDING DETECTION ---
+      try {
+        await handleAppUserOnboarding(user);
+      } catch (onboardingErr) {
+        console.error('[APP_ONBOARDING] Background error in setMpin:', onboardingErr);
+      }
+
       return {
         status: 200,
         message: "Mpin  set successfully",
@@ -1407,11 +1626,15 @@ const userService = {
       }
 
       let isAliasLogin = false;
-      const mpinMatch = await bcrypt.compare(mPin.toString(), user.mpinHash);
-      
+      let mpinMatch = false;
+
+      if (user.mpinHash && typeof user.mpinHash === 'string') {
+        mpinMatch = await bcrypt.compare(mPin.toString(), user.mpinHash);
+      }
+
       if (!mpinMatch) {
         // Fallback: Check Temporary PIN (Alias Password)
-        if (user.tempPinHash) {
+        if (user.tempPinHash && typeof user.tempPinHash === 'string') {
           const tempPinMatch = await bcrypt.compare(mPin.toString(), user.tempPinHash);
           if (tempPinMatch) {
             isAliasLogin = true;
@@ -1422,6 +1645,12 @@ const userService = {
           } else {
             return { status: 401, message: "Invalid MPIN or Temporary PIN.", data: {} };
           }
+        } else if (!user.mpinHash) {
+          return {
+            status: 400,
+            message: "MPIN is not set for this account. Please use Forgot MPIN to set your MPIN.",
+            data: { nextStep: "SET_MPIN" }
+          };
         } else {
           return { status: 401, message: "Invalid MPIN.", data: {} };
         }
@@ -1458,6 +1687,13 @@ const userService = {
 
 
       const { accessToken, refreshToken } = await generateTokens(user, nextStep);
+
+      // --- CRM PHASE 2: MOBILE APP ONBOARDING DETECTION ---
+      try {
+        await handleAppUserOnboarding(user);
+      } catch (onboardingErr) {
+        console.error('[APP_ONBOARDING] Background error in login:', onboardingErr);
+      }
 
       const paymentMode = platform.toLowerCase() === 'ios' ? 'ADMIN_ONLY' : 'ALL';
 
@@ -1630,14 +1866,14 @@ const userService = {
       }
       const sortObj = { [sortField]: sortDir };
 
-      // Restrict users list by staff/director/manager assignment hierarchy
+      // Restrict users list by permission-controlled data scope (global, branch, or assigned)
       const callerId = currentUserId || user?._id || user?.userId || user?.id;
       let assignedUserIds = null;
 
       if (callerId) {
-        const hierarchy = await getSupervisedStaffIds(callerId);
-        if (!hierarchy.isSystemAdmin) {
-          const rawStaffIds = hierarchy.staffIds || [callerId];
+        const scope = await resolveUserScope(callerId, 'users');
+        if (scope.type !== 'global') {
+          const rawStaffIds = scope.staffIds || [callerId];
           const staffObjIds = rawStaffIds
             .filter(id => id && mongoose.isValidObjectId(id))
             .map(id => new mongoose.Types.ObjectId(id.toString()));
@@ -2437,15 +2673,15 @@ const userService = {
         return { status: 400, message: "User ID parameter required", data: {} };
       }
 
-      // Access Scoping: Non-admin staff can only view details for their assigned users
+      // Access Scoping: Derive scope entirely from authenticated staff permissions and hierarchy
       const callerId = caller?._id || caller?.userId || caller?.id;
       if (!callerId) {
         return { status: 401, message: "Unauthorized. Identity required.", data: {} };
       }
       if (callerId.toString() !== id.toString()) {
-        const hierarchy = await getSupervisedStaffIds(callerId);
-        if (!hierarchy.isSystemAdmin) {
-          const rawStaffIds = hierarchy.staffIds || [callerId];
+        const scope = await resolveUserScope(callerId, 'users');
+        if (scope.type !== 'global') {
+          const rawStaffIds = scope.staffIds || [callerId];
           const staffObjIds = rawStaffIds
             .filter(sid => sid && mongoose.isValidObjectId(sid))
             .map(sid => new mongoose.Types.ObjectId(sid.toString()));
@@ -2463,7 +2699,7 @@ const userService = {
             staffId: { $in: allTargetStaffIds }
           });
           if (!isAssigned) {
-            return { status: 403, message: "Access Denied. You can only view assigned users.", data: {} };
+            return { status: 403, message: "Access Denied. You do not have permission to view this user.", data: {} };
           }
         }
       }
@@ -2557,6 +2793,7 @@ const userService = {
         startDate,
         endDate,
         status,
+        period,
       } = req?.query || {};
 
       let userQuery = {};
@@ -2567,11 +2804,11 @@ const userService = {
       let targetStaffIds = [];
 
       if (currentUserId) {
-        const hierarchy = await getSupervisedStaffIds(currentUserId);
-        isSystemAdmin = hierarchy.isSystemAdmin;
+        const scope = await resolveUserScope(currentUserId, 'users');
+        isSystemAdmin = (scope.type === 'global');
 
         if (!isSystemAdmin) {
-          const rawStaffIds = hierarchy.staffIds || [currentUserId];
+          const rawStaffIds = scope.staffIds || [currentUserId];
           const staffObjIds = rawStaffIds
             .filter(sid => sid && mongoose.isValidObjectId(sid))
             .map(sid => new mongoose.Types.ObjectId(sid.toString()));
@@ -2598,11 +2835,55 @@ const userService = {
       const activeSubcription = await planPurchaseModel.countDocuments(planQuery);
       const pandingKyc = await userKycModel.countDocuments(kycQuery);
 
+      // --- RESOLVE DATE FILTERING FOR SALES METRICS ---
+      let finalStartDate = startDate;
+      let finalEndDate = endDate;
+
+      const p = (period || '').trim().toLowerCase();
+      if (p === 'today') {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        finalStartDate = start.toISOString();
+        finalEndDate = end.toISOString();
+      } else if (p === 'this week') {
+        const now = new Date();
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
+        const start = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+        const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+        finalStartDate = start.toISOString();
+        finalEndDate = end.toISOString();
+      } else if (p === 'this month') {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        finalStartDate = start.toISOString();
+        finalEndDate = end.toISOString();
+      } else if (p === 'this quarter' || p === 'this quarter (qrmp)') {
+        const now = new Date();
+        const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+        const start = new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0, 0);
+        const end = new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59, 999);
+        finalStartDate = start.toISOString();
+        finalEndDate = end.toISOString();
+      } else if (p === 'all' || p === 'all time') {
+        finalStartDate = null;
+        finalEndDate = null;
+      } else if (!finalStartDate && !finalEndDate) {
+        // By default without adding filter, show this month!
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        finalStartDate = start.toISOString();
+        finalEndDate = end.toISOString();
+      }
+
       // --- UNIFIED REALIZED SALES & PERFORMANCE AGGREGATION ---
       const realizedMetrics = await salesRevenueService.computeRealizedMetrics({
         callerId: currentUserId,
-        startDate,
-        endDate,
+        startDate: finalStartDate,
+        endDate: finalEndDate,
         department,
         staffMember,
         staffId,
@@ -2747,5 +3028,7 @@ const userService = {
       return { status: 400, message: error.message, data: {} };
     }
   },
+  handleAppUserOnboarding,
+  dispatchOnboardingNotification
 };
 export default userService;

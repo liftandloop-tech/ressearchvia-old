@@ -14,6 +14,8 @@ class SubscriptionCard extends StatelessWidget {
     required this.headerStatus,
     this.footerStatus,
     this.isPartial = false,
+    this.paymentMethod,
+    this.utrNumber,
     this.onViewInstallments,
     this.onPayInstallment,
     this.onTap,
@@ -28,6 +30,8 @@ class SubscriptionCard extends StatelessWidget {
   final SubscriptionStatus headerStatus;
   final SubscriptionStatus? footerStatus;
   final bool isPartial;
+  final String? paymentMethod;
+  final String? utrNumber;
   final VoidCallback? onViewInstallments;
   final VoidCallback? onPayInstallment;
   final VoidCallback? onTap;
@@ -302,6 +306,67 @@ class SubscriptionCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (paymentMethod != null || (utrNumber != null && utrNumber!.isNotEmpty)) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (paymentMethod != null)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Payment Method',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: Color(0xff6B7280),
+                            ),
+                          ),
+                          Text(
+                            paymentMethod == 'RAZORPAY' || paymentMethod == 'ONLINE'
+                                ? 'Razorpay'
+                                : (paymentMethod == 'BANK_TRANSFER' ? 'Bank Transfer' : paymentMethod!),
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xff1F2937),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (utrNumber != null && utrNumber!.isNotEmpty)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'UTR / Ref ID',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: Color(0xff6B7280),
+                            ),
+                          ),
+                          Text(
+                            utrNumber!,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xff1F2937),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
             if (isPartial && (onViewInstallments != null || onPayInstallment != null)) ...[
               const SizedBox(height: 12),
               const Divider(height: 1, color: Color(0xffE5E7EB)),

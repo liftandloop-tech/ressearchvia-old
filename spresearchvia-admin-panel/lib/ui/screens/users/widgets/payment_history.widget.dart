@@ -12,6 +12,27 @@ class PaymentHistory extends StatelessWidget {
   final bool showEditColumn;
   const PaymentHistory({super.key, this.userId, this.showEditColumn = true});
 
+  String _formatPaymentMethod(String rawMethod) {
+    final m = rawMethod.trim().toUpperCase();
+    if (m.isEmpty) return '';
+    if (m == 'BANK_TRANSFER' || m == 'OFFLINE' || m == 'MANUAL' || m == 'BANK' || m.contains('TRANSFER')) {
+      return 'Bank Transfer';
+    }
+    if (m == 'RAZORPAY') return 'Razorpay';
+    if (m.startsWith('RAZORPAY_')) {
+      final sub = m.replaceFirst('RAZORPAY_', '');
+      return 'Razorpay ($sub)';
+    }
+    if (m == 'UPI' || m == 'NETBANKING' || m == 'CARD' || m == 'EMI' || m == 'ONLINE') {
+      return m == 'ONLINE' ? 'Razorpay' : 'Razorpay ($m)';
+    }
+    return rawMethod
+        .toLowerCase()
+        .split('_')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
   void _showRefundBreakdownDialog(BuildContext context, Map<String, dynamic> refund) {
     final originalAmount = refund['originalAmount'] ?? refund['amount'] ?? 0;
     final refundAmount = refund['amount'] ?? 0;
@@ -412,15 +433,23 @@ class PaymentHistory extends StatelessWidget {
                           statusUpper.contains('REFUND') ||
                           sourceStr == 'refund';
 
-                      String? refundSubtitle;
+                      String? rowSubtitle;
                       if (isRefund) {
                         final orig = payment['originalAmount'];
                         final deduction = payment['deductionAmount'];
                         if (orig != null && deduction != null) {
-                          refundSubtitle = 'Paid: ₹$orig | Used Service Fee: ₹$deduction';
+                          rowSubtitle = 'Paid: ₹$orig | Used Service Fee: ₹$deduction';
                         } else if (payment['reason'] != null) {
-                          refundSubtitle = '${payment['reason']}';
+                          rowSubtitle = '${payment['reason']}';
                         }
+                      } else {
+                        final rawMethod = (payment['method'] ?? payment['paymentMethod'] ?? '').toString();
+                        final String methodDisplay = _formatPaymentMethod(rawMethod);
+                        final utr = (payment['utrNumber'] ?? payment['transactionId'] ?? payment['paymentId'] ?? '').toString();
+                        final parts = <String>[];
+                        if (methodDisplay.isNotEmpty) parts.add('Method: $methodDisplay');
+                        if (utr.isNotEmpty && utr != 'N/A') parts.add('UTR: $utr');
+                        if (parts.isNotEmpty) rowSubtitle = parts.join(' | ');
                       }
 
                       final amountDisplay = isRefund
@@ -430,7 +459,7 @@ class PaymentHistory extends StatelessWidget {
                       return PaymentTableRow(
                         showEdit: showEditColumn,
                         isRefund: isRefund,
-                        subtitle: refundSubtitle,
+                        subtitle: rowSubtitle,
                         onViewDetails: isRefund ? () => _showRefundBreakdownDialog(context, payment) : null,
                         onEdit: (!isRefund &&
                                 showEditColumn &&

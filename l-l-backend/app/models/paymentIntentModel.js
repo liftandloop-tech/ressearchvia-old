@@ -50,7 +50,7 @@ const paymentIntentSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ["RAZORPAY", "BANK_TRANSFER", "ADMIN_ENTITLEMENT", "OFFLINE", "MANUAL"],
+        enum: ["RAZORPAY", "BANK_TRANSFER", "ADMIN_ENTITLEMENT", "OFFLINE", "MANUAL", "ONLINE"],
         default: "RAZORPAY"
     },
     preferredSegmentId: {

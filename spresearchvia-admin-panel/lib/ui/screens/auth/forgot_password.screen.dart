@@ -74,6 +74,12 @@ class ForgotPassword extends StatelessWidget {
                 key: controller.formKey,
                 child: ForgotPasswordTextField(
                   controller: controller.emailController,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    if (!controller.isLoading.value) {
+                      controller.sendResetLink();
+                    }
+                  },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';

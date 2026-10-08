@@ -473,6 +473,8 @@ class _SubscriptionHistoryScreenState extends State<SubscriptionHistoryScreen> {
                               headerStatus: segment.headerStatus,
                               footerStatus: segment.footerStatus,
                               isPartial: isPartial,
+                              paymentMethod: segment.paymentMethod,
+                              utrNumber: segment.utrNumber,
                               onViewInstallments: isPartial ? () => _showInstallmentHistoryDialog(context, segment.partialPaymentsHistory) : null,
                               onPayInstallment: shouldShowPayButton
                                 ? () {

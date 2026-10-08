@@ -217,9 +217,24 @@ class StaffController extends GetxController {
     }
     _loadFiltersFromUrl();
     initDefaultEducationEntries();
-    fetchStaffList();
-    fetchRolesList();
-    fetchDepartmentsList();
+    final auth = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    if (auth != null && auth.isAuthenticated.value) {
+      fetchStaffList();
+      fetchRolesList();
+      fetchDepartmentsList();
+    } else if (auth != null) {
+      ever(auth.isAuthenticated, (bool isAuth) {
+        if (isAuth) {
+          fetchStaffList();
+          fetchRolesList();
+          fetchDepartmentsList();
+        }
+      });
+    } else {
+      fetchStaffList();
+      fetchRolesList();
+      fetchDepartmentsList();
+    }
 
     // Listen to changes on filtering variables to dynamically keep the URL in sync
     ever(filterName, (_) => updateUrlQueryParameters());

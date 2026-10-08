@@ -82,10 +82,14 @@ class ActiveSegmentCard extends StatelessWidget {
         final segment = segments.first;
 
         // Parse segment data
-        final segmentName = segment['segmentName'] ?? 'Segment';
-        final validity = segment['validity'];
-        final endDate = segment['endDate'] != null
-            ? DateTime.parse(segment['endDate'])
+        final segmentName = segment['segmentName'] ??
+            (segment['segmentId'] is Map ? segment['segmentId']['segmentName'] : null) ??
+            segment['planName'] ??
+            'Segment';
+        final validity = segment['validity'] ?? segment['days'];
+        final endDateRaw = segment['endDate'] ?? segment['expiryDate'];
+        final endDate = endDateRaw != null
+            ? DateTime.tryParse(endDateRaw.toString())
             : null;
 
         // Calculate days remaining

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/config/app.strings.dart';
@@ -39,23 +40,46 @@ class Login extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppTheme.loginBackground,
         body: Center(
-          child: Container(
-            width: cardWidth,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: AppTheme.white,
-              borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.enter): () {
+                if (!controller.isLoading.value) {
+                  if (controller.isAdminTab.value) {
+                    controller.adminLogin();
+                  } else {
+                    controller.staffLogin();
+                  }
+                }
+              },
+              const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+                if (!controller.isLoading.value) {
+                  if (controller.isAdminTab.value) {
+                    controller.adminLogin();
+                  } else {
+                    controller.staffLogin();
+                  }
+                }
+              },
+            },
+            child: Focus(
+              autofocus: false,
+              child: Container(
+                width: cardWidth,
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: AppTheme.white,
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                 Image.asset(
                   'assets/images/sp_logo.png',
                   width: double.infinity,
@@ -150,8 +174,8 @@ class Login extends StatelessWidget {
                 // Tab Content
                 Obx(
                   () => controller.isAdminTab.value
-                      ? _buildAdminLogin(controller)
-                      : _buildStaffLogin(controller),
+                      ? _buildAdminLogin(context, controller)
+                      : _buildStaffLogin(context, controller),
                 ),
 
                 const SizedBox(height: 20),
@@ -202,10 +226,12 @@ class Login extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
-  Widget _buildAdminLogin(LoginController controller) {
+  Widget _buildAdminLogin(BuildContext context, LoginController controller) {
     return Column(
       children: [
         Form(
@@ -216,6 +242,14 @@ class Login extends StatelessWidget {
                 label: AppStrings.emailAddress,
                 hint: AppStrings.enterEmail,
                 controller: controller.emailController,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  if (controller.passwordController.text.trim().isEmpty) {
+                    FocusScope.of(context).nextFocus();
+                  } else if (!controller.isLoading.value) {
+                    controller.adminLogin();
+                  }
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your email';
@@ -231,6 +265,12 @@ class Login extends StatelessWidget {
                 controller: controller.passwordController,
                 obscurePassword: controller.obscurePassword,
                 onToggleVisibility: controller.togglePasswordVisibility,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) {
+                  if (!controller.isLoading.value) {
+                    controller.adminLogin();
+                  }
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your password';
@@ -338,7 +378,7 @@ class Login extends StatelessWidget {
     );
   }
 
-  Widget _buildStaffLogin(LoginController controller) {
+  Widget _buildStaffLogin(BuildContext context, LoginController controller) {
     return Column(
       children: [
         Form(
@@ -350,6 +390,14 @@ class Login extends StatelessWidget {
                 hint: 'Enter your mobile',
                 controller: controller.mobileController,
                 keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) {
+                  if (controller.mpinController.text.trim().isEmpty) {
+                    FocusScope.of(context).nextFocus();
+                  } else if (!controller.isLoading.value) {
+                    controller.staffLogin();
+                  }
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your mobile number';
@@ -367,6 +415,12 @@ class Login extends StatelessWidget {
                 controller: controller.mpinController,
                 keyboardType: TextInputType.number,
                 obscureText: true,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) {
+                  if (!controller.isLoading.value) {
+                    controller.staffLogin();
+                  }
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter MPIN';

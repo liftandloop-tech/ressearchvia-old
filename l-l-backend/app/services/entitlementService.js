@@ -24,14 +24,27 @@ export const grantEntitlement = async ({
     let startDate = customStartDate ? new Date(customStartDate) : now;
     let newEndDate = null;
 
-    // 1. Check for existing active entitlement to extend (Stacking)
-    // For PLAN type, search for existing plan + SAME segment.
+    // 1. If granting a paid plan, revoke any active REGISTRATION_TRIAL entitlements for this user
+    if (type === 'PLAN' && grantReason !== 'REGISTRATION_TRIAL') {
+        await Entitlement.updateMany({
+            userId,
+            type: 'PLAN',
+            grantReason: 'REGISTRATION_TRIAL',
+            status: 'ACTIVE'
+        }, {
+            $set: { status: 'REVOKED', remarks: 'Superseded by paid plan' }
+        }).session(session);
+    }
+
+    // 2. Check for existing active entitlement to extend (Stacking)
+    // For PLAN type, search for existing non-trial plan + SAME segment.
     const existingEntitlement = await Entitlement.findOne({
         userId,
         type,
         resourceId: resourceId || undefined,
         segmentId: segmentId || undefined,
         status: 'ACTIVE',
+        grantReason: grantReason === 'REGISTRATION_TRIAL' ? 'REGISTRATION_TRIAL' : { $ne: 'REGISTRATION_TRIAL' },
         $or: [
             { endDate: null }, // Existing Lifetime
             { endDate: { $gte: now } } // Existing Active Term
@@ -39,7 +52,6 @@ export const grantEntitlement = async ({
     }).session(session).sort({ endDate: -1 });
 
     if (existingEntitlement) {
-        // ... (Upgrade to Lifetime and Extend Term logic remains the same)
         if (isLifetime) {
             existingEntitlement.endDate = null;
             existingEntitlement.grantReason = grantReason;
@@ -56,6 +68,7 @@ export const grantEntitlement = async ({
             newEndDate = extendedDate;
 
             existingEntitlement.endDate = newEndDate;
+            existingEntitlement.grantReason = grantReason;
             existingEntitlement.sourceRefId = sourceRefId;
             if (remarks) existingEntitlement.remarks = remarks;
             await existingEntitlement.save({ session });

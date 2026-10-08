@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
@@ -24,9 +25,66 @@ class LeadsController extends GetxController {
   var currentPage = 1.obs;
   final int itemsPerPage = 50;
   var searchQuery = ''.obs;
+  var filterName = ''.obs;
+  var filterMobile = ''.obs;
+  var filterLocation = ''.obs;
   var selectedStage = ''.obs;
   var selectedRMId = ''.obs;
   var selectedFilterPoolId = ''.obs;
+  var activeQuickTab = 'all'.obs;
+  var selectedLeadSource = ''.obs;
+  var filterIsAppUser = Rxn<bool>();
+
+  var sortColumn = RxnString();
+  var sortAscending = true.obs;
+
+  bool get hasActiveFilters =>
+      searchQuery.value.isNotEmpty ||
+      filterName.value.isNotEmpty ||
+      filterMobile.value.isNotEmpty ||
+      filterLocation.value.isNotEmpty ||
+      selectedStage.value.isNotEmpty ||
+      selectedRMId.value.isNotEmpty ||
+      selectedFilterPoolId.value.isNotEmpty ||
+      activeQuickTab.value != 'all' ||
+      selectedLeadSource.value.isNotEmpty ||
+      filterIsAppUser.value != null;
+
+  void setQuickTab(String tab) {
+    if (activeQuickTab.value == tab) return;
+    activeQuickTab.value = tab;
+    currentPage.value = 1;
+
+    switch (tab) {
+      case 'admin':
+        selectedRMId.value = 'admin';
+        selectedLeadSource.value = '';
+        filterIsAppUser.value = null;
+        break;
+      case 'app_onboarded':
+        selectedRMId.value = '';
+        selectedLeadSource.value = '';
+        filterIsAppUser.value = true;
+        break;
+      case 'organic':
+        selectedRMId.value = '';
+        selectedLeadSource.value = 'ORGANIC_APP';
+        filterIsAppUser.value = null;
+        break;
+      case 'ex_staff':
+        selectedRMId.value = '';
+        selectedLeadSource.value = 'ORPHANED_STAFF';
+        filterIsAppUser.value = null;
+        break;
+      case 'all':
+      default:
+        selectedRMId.value = '';
+        selectedLeadSource.value = '';
+        filterIsAppUser.value = null;
+        break;
+    }
+    fetchLeads();
+  }
 
   // Pools state
   var leadPoolsList = <LeadPoolModel>[].obs;
@@ -41,6 +99,16 @@ class LeadsController extends GetxController {
   var unreadMax = 50.obs;
   var isPulling = false.obs;
   var pullMessage = ''.obs;
+  var isPullPanelOpen = false.obs;
+  var isTableFullScreen = false.obs;
+
+  void toggleTableFullScreen([bool? value]) {
+    if (value != null) {
+      isTableFullScreen.value = value;
+    } else {
+      isTableFullScreen.toggle();
+    }
+  }
 
   // Staff dropdown list
   var staffList = <StaffModel>[].obs;
@@ -64,13 +132,125 @@ class LeadsController extends GetxController {
   var followUpType = 'Call'.obs;
   var followUpStatus = 'Pending'.obs;
 
+  Timer? _onboardingCheckTimer;
+  DateTime? _lastSeenOnboardedAt;
+
   @override
   void onInit() {
     super.onInit();
-    fetchLeadPools();
-    fetchLeads();
-    fetchStaffDropdown();
-    fetchPullStats();
+    final auth = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    if (auth != null && !auth.isAuthenticated.value) {
+      ever(auth.isAuthenticated, (bool isAuth) {
+        if (isAuth) {
+          fetchLeadPools();
+          fetchLeads();
+          fetchStaffDropdown();
+          fetchPullStats();
+          _startOnboardingPolling();
+        }
+      });
+    } else {
+      fetchLeadPools();
+      fetchLeads();
+      fetchStaffDropdown();
+      fetchPullStats();
+      _startOnboardingPolling();
+    }
+  }
+
+  @override
+  void onClose() {
+    _onboardingCheckTimer?.cancel();
+    super.onClose();
+  }
+
+  void _startOnboardingPolling() {
+    _onboardingCheckTimer?.cancel();
+    _onboardingCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      checkRecentAppOnboardings();
+    });
+  }
+
+  Future<void> checkRecentAppOnboardings() async {
+    final auth = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    if (auth == null || !auth.isAuthenticated.value) return;
+
+    try {
+      final res = await _leadService.getLeads(
+        page: 1,
+        limit: 1,
+        isAppUser: true,
+      );
+      if (res.leads.isNotEmpty) {
+        final latest = res.leads.first;
+        final onboardedAt = latest.appOnboardedAt ?? latest.createdAt;
+        if (_lastSeenOnboardedAt == null) {
+          _lastSeenOnboardedAt = onboardedAt;
+          return;
+        }
+        if (onboardedAt.isAfter(_lastSeenOnboardedAt!)) {
+          _lastSeenOnboardedAt = onboardedAt;
+          _showOnboardingNotification(latest);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking recent onboarding leads: $e');
+    }
+  }
+
+  void _showOnboardingNotification(LeadModel lead) {
+    Get.closeCurrentSnackbar();
+    Get.rawSnackbar(
+      titleText: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.phone_android, size: 12, color: Colors.white),
+                SizedBox(width: 4),
+                Text(
+                  'APP ONBOARDED',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              lead.fullName.isNotEmpty ? lead.fullName : lead.mobileNumber,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      messageText: Text(
+        'Lead (${lead.mobileNumber}) has onboarded the mobile app! Tap to view.',
+        style: const TextStyle(color: Colors.white70, fontSize: 12),
+      ),
+      duration: const Duration(seconds: 8),
+      backgroundColor: const Color(0xFF1E293B),
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 8,
+      onTap: (_) {
+        setQuickTab('app_onboarded');
+        searchQuery.value = lead.mobileNumber;
+        fetchLeads();
+      },
+    );
   }
 
   Future<void> fetchLeadPools() async {
@@ -106,9 +286,16 @@ class LeadsController extends GetxController {
         page: currentPage.value,
         limit: itemsPerPage,
         search: searchQuery.value,
+        name: filterName.value,
+        mobile: filterMobile.value,
+        location: filterLocation.value,
         stage: selectedStage.value,
         assignedRM: selectedRMId.value,
         leadPoolId: selectedFilterPoolId.value.isNotEmpty ? selectedFilterPoolId.value : null,
+        leadSource: selectedLeadSource.value.isNotEmpty ? selectedLeadSource.value : null,
+        isAppUser: filterIsAppUser.value,
+        sortBy: sortColumn.value,
+        sortOrder: sortAscending.value ? 'asc' : 'desc',
       );
       if (res.error == null) {
         leadsList.assignAll(res.leads);
@@ -119,6 +306,22 @@ class LeadsController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void toggleSort(String column) {
+    if (sortColumn.value == column) {
+      if (sortAscending.value) {
+        sortAscending.value = false;
+      } else {
+        sortColumn.value = null;
+        sortAscending.value = true;
+      }
+    } else {
+      sortColumn.value = column;
+      sortAscending.value = true;
+    }
+    currentPage.value = 1;
+    fetchLeads();
   }
 
   Future<void> fetchStaffDropdown() async {
@@ -154,20 +357,43 @@ class LeadsController extends GetxController {
     }
   }
 
-  void updateFilters({String? search, String? stage, String? rmId, String? poolId}) {
+  void updateFilters({
+    String? search,
+    String? name,
+    String? mobile,
+    String? location,
+    String? stage,
+    String? rmId,
+    String? poolId,
+    String? leadSource,
+    bool? isAppUser,
+  }) {
     if (search != null) searchQuery.value = search;
+    if (name != null) filterName.value = name;
+    if (mobile != null) filterMobile.value = mobile;
+    if (location != null) filterLocation.value = location;
     if (stage != null) selectedStage.value = stage;
     if (rmId != null) selectedRMId.value = rmId;
     if (poolId != null) selectedFilterPoolId.value = poolId;
+    if (leadSource != null) selectedLeadSource.value = leadSource;
+    if (isAppUser != null) filterIsAppUser.value = isAppUser;
     currentPage.value = 1;
     fetchLeads();
   }
 
   void resetFilters() {
+    activeQuickTab.value = 'all';
     searchQuery.value = '';
+    filterName.value = '';
+    filterMobile.value = '';
+    filterLocation.value = '';
     selectedStage.value = '';
     selectedRMId.value = '';
     selectedFilterPoolId.value = '';
+    selectedLeadSource.value = '';
+    filterIsAppUser.value = null;
+    sortColumn.value = null;
+    sortAscending.value = true;
     currentPage.value = 1;
     fetchLeads();
   }

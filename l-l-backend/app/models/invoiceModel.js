@@ -8,12 +8,12 @@ const invoiceSchema = new mongoose.Schema({
     },
     segmentId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
+        default: null,
         ref: "segments"
     },
     userActiveSegmentsId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
+        default: null,
         ref: "userActiveSegment"
     },
     invoiceNumber: {

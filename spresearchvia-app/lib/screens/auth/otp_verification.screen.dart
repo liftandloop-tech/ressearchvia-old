@@ -1,13 +1,88 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth.controller.dart';
 import '../../widgets/app_logo.dart';
-import '../../core/routes/app_routes.dart';
 import 'set_mpin.screen.dart';
 import 'widgets/pin_input_boxes.dart';
 
-class OtpVerificationScreen extends StatelessWidget {
+class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({super.key});
+
+  @override
+  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+}
+
+class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+  Timer? _timer;
+  int _remainingSeconds = 30;
+  bool _isResending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    setState(() {
+      _remainingSeconds = 30;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _resendOtp(String phone) async {
+    if (_remainingSeconds > 0 || _isResending) return;
+
+    setState(() {
+      _isResending = true;
+    });
+
+    try {
+      final authController = Get.find<AuthController>();
+      final digits = phone.replaceAll(RegExp(r'\D'), '');
+      final cleanPhone = digits.length >= 10 ? digits.substring(digits.length - 10) : phone;
+      final success = await authController.sendOtp(cleanPhone);
+      if (success && mounted) {
+        _startTimer();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatMaskedPhone(String phone) {
+    if (phone.isEmpty) return '';
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.length >= 10) {
+      final last10 = digits.substring(digits.length - 10);
+      return '+91-${last10.replaceRange(0, 6, 'XXXXXX')}';
+    }
+    return phone;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,12 +90,7 @@ class OtpVerificationScreen extends StatelessWidget {
     final args = Get.arguments as Map<String, dynamic>?;
     final String phone = (args?['phone'] as String?) ?? '';
     final String flow = (args?['flow'] as String?) ?? 'login';
-    String maskedPhone = phone;
-    if (phone.startsWith('91') && phone.length >= 12) {
-      final local = phone.substring(2);
-
-      maskedPhone = '+91-${local.replaceRange(0, 6, 'XXXXXX')}';
-    }
+    final maskedPhone = _formatMaskedPhone(phone);
 
     Future<void> verifyOtp(String otp) async {
       final success = await authController.verifyOtp(otp);
@@ -104,14 +174,50 @@ class OtpVerificationScreen extends StatelessWidget {
                           color: Color(0xff9CA3AF),
                         ),
                       ),
-                      const SizedBox(height: 40),
-                      const Text(
-                        'Resend OTP in 26 s',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xff6B7280),
+                      const SizedBox(height: 36),
+                      // Dynamic OTP Timer & Resend Button
+                      if (_remainingSeconds > 0)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.timer_outlined,
+                              size: 16,
+                              color: Color(0xff6B7280),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Resend OTP in ${_remainingSeconds}s',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xff6B7280),
+                              ),
+                            ),
+                          ],
+                        )
+                      else if (_isResending)
+                        const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xff0B3A70),
+                          ),
+                        )
+                      else
+                        TextButton.icon(
+                          onPressed: () => _resendOtp(phone),
+                          icon: const Icon(Icons.refresh, size: 16, color: Color(0xff0B3A70)),
+                          label: const Text(
+                            'Resend OTP Now',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xff0B3A70),
+                            ),
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 24),
                       const Row(
                         mainAxisAlignment: MainAxisAlignment.center,

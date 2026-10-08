@@ -154,94 +154,101 @@ class TableSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rowsWidget = isExpanded
-        ? Expanded(
-            child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: rowCount,
-              separatorBuilder: (context, _) =>
-                  const Divider(height: 1, color: AppTheme.gray100),
-              itemBuilder: (context, index) => _buildRow(index),
-            ),
-          )
-        : Column(
-            children: List.generate(rowCount, (index) {
-              return Column(
-                children: [
-                  _buildRow(index),
-                  if (index < rowCount - 1)
-                    const Divider(height: 1, color: AppTheme.gray100),
-                ],
-              );
-            }),
-          );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool shouldExpand =
+            isExpanded || (constraints.hasBoundedHeight && constraints.maxHeight.isFinite);
 
-    return AppShimmer(
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.gray200),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: isExpanded ? MainAxisSize.max : MainAxisSize.min,
-          children: [
-            // Header Row
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              color: AppTheme.gray50,
-              child: Row(
-                children: List.generate(
-                  columnCount,
-                  (index) => Expanded(
-                    flex: (hasAvatarColumn && index == 1) ? 2 : 1,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: ShimmerBox(
-                        height: 14,
-                        width: index == 0 ? 60 : (index == 1 ? 140 : 80),
-                        borderRadius: 4,
+        final rowsWidget = shouldExpand
+            ? Expanded(
+                child: ListView.separated(
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: rowCount,
+                  separatorBuilder: (context, _) =>
+                      const Divider(height: 1, color: AppTheme.gray100),
+                  itemBuilder: (context, index) => _buildRow(index),
+                ),
+              )
+            : Column(
+                children: List.generate(rowCount, (index) {
+                  return Column(
+                    children: [
+                      _buildRow(index),
+                      if (index < rowCount - 1)
+                        const Divider(height: 1, color: AppTheme.gray100),
+                    ],
+                  );
+                }),
+              );
+
+        return AppShimmer(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.gray200),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: shouldExpand ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                // Header Row
+                Container(
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  color: AppTheme.gray50,
+                  child: Row(
+                    children: List.generate(
+                      columnCount,
+                      (index) => Expanded(
+                        flex: (hasAvatarColumn && index == 1) ? 2 : 1,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: ShimmerBox(
+                            height: 14,
+                            width: index == 0 ? 60 : (index == 1 ? 140 : 80),
+                            borderRadius: 4,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const Divider(height: 1, color: AppTheme.gray200),
+                const Divider(height: 1, color: AppTheme.gray200),
 
-            // Skeleton Data Rows
-            rowsWidget,
+                // Skeleton Data Rows
+                rowsWidget,
 
-            // Bottom Pagination Skeleton
-            if (showPaginationBar)
-              Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: AppTheme.gray200)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const ShimmerBox(height: 14, width: 140),
-                    Row(
-                      children: const [
-                        ShimmerBox(height: 28, width: 28, borderRadius: 4),
-                        SizedBox(width: 6),
-                        ShimmerBox(height: 28, width: 28, borderRadius: 4),
-                        SizedBox(width: 6),
-                        ShimmerBox(height: 28, width: 28, borderRadius: 4),
+                // Bottom Pagination Skeleton
+                if (showPaginationBar)
+                  Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: AppTheme.gray200)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const ShimmerBox(height: 14, width: 140),
+                        Row(
+                          children: const [
+                            ShimmerBox(height: 28, width: 28, borderRadius: 4),
+                            SizedBox(width: 6),
+                            ShimmerBox(height: 28, width: 28, borderRadius: 4),
+                            SizedBox(width: 6),
+                            ShimmerBox(height: 28, width: 28, borderRadius: 4),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

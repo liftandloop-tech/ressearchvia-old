@@ -191,7 +191,8 @@ class AuthController extends GetxController {
 
       if (response.statusCode == 200) {
         final data = response.data;
-        if (data['message'] == 'User not exist') {
+        final message = (data['message'] ?? '').toString().trim().toLowerCase();
+        if (message.contains('not exist') || message.contains('not found')) {
           SnackbarService.showError('User not found. Please sign up first.');
           return false;
         }
