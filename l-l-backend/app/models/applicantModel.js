@@ -140,6 +140,11 @@ const applicantSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  onboardingStatus: {
+    type: String,
+    enum: ["PENDING", "DOCUMENTS_UPLOADED", "VERIFIED"],
+    default: "PENDING"
+  },
 
   // Candidate Profile & Bio-Data
   dob: {

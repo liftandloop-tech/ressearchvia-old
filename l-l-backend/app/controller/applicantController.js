@@ -299,6 +299,9 @@ const applicantController = {
             if (!applicant.documents) applicant.documents = {};
             applicant.documents[type] = req.file.path;
             applicant.markModified('documents');
+            if (applicant.photoUrl && applicant.resumeUrl && applicant.panUrl && applicant.aadhaarUrl) {
+                applicant.onboardingStatus = applicant.kycVideoUrl ? 'VERIFIED' : 'DOCUMENTS_UPLOADED';
+            }
             await applicant.save();
 
             res.status(200).send({ status: 200, message: `${type} uploaded successfully`, data: { applicant } });
@@ -320,6 +323,7 @@ const applicantController = {
             }
 
             applicant.kycVideoUrl = req.file.path;
+            applicant.onboardingStatus = 'VERIFIED';
             await applicant.save();
 
             res.status(200).send({ status: 200, message: "KYC Video uploaded successfully", data: { applicant } });
@@ -550,6 +554,9 @@ const applicantController = {
             delete data.emailOtpExpires;
             delete data.mobileOtp;
             delete data.mobileOtpExpires;
+            if (!data.onboardingStatus) {
+                data.onboardingStatus = data.kycVideoUrl ? 'VERIFIED' : (data.isVerified ? 'VERIFIED' : 'PENDING');
+            }
 
             res.status(200).send({ status: 200, message: "Applicant retrieved successfully", data: { applicant: data } });
         } catch (error) {
@@ -659,6 +666,8 @@ const applicantController = {
                 applicant.mobileOtp = null;
             }
 
+            applicant.isVerified = true;
+            applicant.verifiedAt = new Date();
             await applicant.save();
 
             res.status(200).send({

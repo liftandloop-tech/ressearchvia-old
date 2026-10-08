@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/recruitment/applicant_profile.controller.dart';
-import 'package:spresearch_web/ui/widgets/button.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 import '../../../config/app.config.dart';
 
@@ -58,8 +57,6 @@ class ApplicantOnboardScreen extends StatelessWidget {
                     );
                   }
 
-                  final contactsVerified = applicant.isEmailVerified && applicant.isMobileVerified;
-
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -91,7 +88,7 @@ class ApplicantOnboardScreen extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            'Applicant ID: ${applicant.staffId}',
+                                            'Applicant ID: ${(applicant.applicantId != null && applicant.applicantId!.isNotEmpty) ? applicant.applicantId! : applicant.staffId}',
                                             style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                                           ),
                                         ],
@@ -140,7 +137,7 @@ class ApplicantOnboardScreen extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Applicant ID: ${applicant.staffId}',
+                                        'Applicant ID: ${(applicant.applicantId != null && applicant.applicantId!.isNotEmpty) ? applicant.applicantId! : applicant.staffId}',
                                         style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                                       ),
                                     ],
@@ -165,58 +162,6 @@ class ApplicantOnboardScreen extends StatelessWidget {
                             ),
                       const Divider(height: 36),
 
-                      // Contact Verification Block
-                      if (!contactsVerified) ...[
-                        Text(
-                          'Verify Your Contact Information',
-                          style: TextStyle(fontSize: isMobile ? 15 : 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A5F)),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Please enter the verification codes sent to your registered phone and email.',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: isMobile ? 12 : 13),
-                        ),
-                        const SizedBox(height: 18),
-                        isMobile
-                            ? Column(
-                                children: [
-                                  TextField(
-                                    controller: controller.mobileOtpController,
-                                    decoration: const InputDecoration(labelText: 'Mobile OTP *', border: OutlineInputBorder()),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                    controller: controller.emailOtpController,
-                                    decoration: const InputDecoration(labelText: 'Email OTP *', border: OutlineInputBorder()),
-                                  ),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: controller.mobileOtpController,
-                                      decoration: const InputDecoration(labelText: 'Mobile OTP *', border: OutlineInputBorder()),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: controller.emailOtpController,
-                                      decoration: const InputDecoration(labelText: 'Email OTP *', border: OutlineInputBorder()),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                        const SizedBox(height: 20),
-                        Button(
-                          title: 'Verify Details',
-                          buttonType: ButtonType.blue,
-                          onTap: () => controller.verifyOtps(),
-                        ),
-                        const Divider(height: 44),
-                      ],
-
                       // Documents Upload Stepper
                       Text(
                         'Onboarding Document Checklist',
@@ -224,26 +169,24 @@ class ApplicantOnboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        contactsVerified
-                            ? 'Upload required files to complete your registration.'
-                            : 'Verify email & mobile numbers above to unlock document uploads.',
+                        'Upload required files to complete your registration.',
                         style: TextStyle(color: AppTheme.textSecondary, fontSize: isMobile ? 12 : 13),
                       ),
                       const SizedBox(height: 20),
 
-                      _buildUploadRow(context, 'Profile Photo', 'photo', applicant.photoUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'Profile Photo', 'photo', applicant.photoUrl, controller, isMobile: isMobile),
                       const SizedBox(height: 12),
-                      _buildUploadRow(context, 'Resume / CV', 'resume', applicant.resumeUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'Resume / CV', 'resume', applicant.resumeUrl, controller, isMobile: isMobile),
                       const SizedBox(height: 12),
-                      _buildUploadRow(context, 'PAN Card', 'pan', applicant.panUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'PAN Card', 'pan', applicant.panUrl, controller, isMobile: isMobile),
                       const SizedBox(height: 12),
-                      _buildUploadRow(context, 'Aadhaar Card', 'aadhaar', applicant.aadhaarUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'Aadhaar Card', 'aadhaar', applicant.aadhaarUrl, controller, isMobile: isMobile),
                       const SizedBox(height: 12),
-                      _buildUploadRow(context, 'NISM Certificate', 'nism', applicant.nismUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'NISM Certificate', 'nism', applicant.nismUrl, controller, isMobile: isMobile),
                       const SizedBox(height: 12),
-                      _buildUploadRow(context, 'Highest Education Certificate', 'education', applicant.highestEducationUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'Highest Education Certificate', 'education', applicant.highestEducationUrl, controller, isMobile: isMobile),
                       const SizedBox(height: 12),
-                      _buildUploadRow(context, 'KYC Verification Video', 'video', applicant.kycVideoUrl, contactsVerified, controller, isMobile: isMobile),
+                      _buildUploadRow(context, 'KYC Verification Video', 'video', applicant.kycVideoUrl, controller, isMobile: isMobile),
 
                       if (applicant.onboardingStatus == 'VERIFIED') ...[
                         const SizedBox(height: 28),
@@ -284,7 +227,6 @@ class ApplicantOnboardScreen extends StatelessWidget {
     String title,
     String type,
     String? fileUrl,
-    bool verified,
     ApplicantProfileController controller, {
     bool isMobile = false,
   }) {
@@ -402,7 +344,7 @@ class ApplicantOnboardScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     ElevatedButton.icon(
-                      onPressed: (verified && !isUploading) ? () => controller.uploadDoc(type) : null,
+                      onPressed: !isUploading ? () => controller.uploadDoc(type) : null,
                       icon: isUploading
                           ? const SizedBox(
                               width: 14,
@@ -512,7 +454,7 @@ class ApplicantOnboardScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 ElevatedButton.icon(
-                  onPressed: (verified && !isUploading) ? () => controller.uploadDoc(type) : null,
+                  onPressed: !isUploading ? () => controller.uploadDoc(type) : null,
                   icon: isUploading
                       ? const SizedBox(
                           width: 14,
