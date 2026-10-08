@@ -18,13 +18,15 @@ class TradingCallTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       if (reportController.isTradingCallsLoading.value &&
-          reportController.tradingCalls.isEmpty) {
+          reportController.tradingCalls.isEmpty &&
+          reportController.selectedOutcomeFilter.value == null) {
         return const Center(
           child: CircularProgressIndicator(color: AppTheme.primaryBlue),
         );
       }
 
-      if (reportController.tradingCalls.isEmpty) {
+      if (reportController.tradingCalls.isEmpty &&
+          reportController.selectedOutcomeFilter.value == null) {
         if (!reportController.hasActiveSubscription.value) {
           return Center(
             child: SingleChildScrollView(
@@ -120,7 +122,6 @@ class TradingCallTab extends StatelessWidget {
         onNotification: (ScrollNotification scrollInfo) {
           if (!reportController.isTradingCallsLoadingMore.value &&
               reportController.tradingCallsHasMore.value &&
-              selectedFilter == null &&
               scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
             reportController.loadMoreTradingCalls();
           }
@@ -133,7 +134,7 @@ class TradingCallTab extends StatelessWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 1 + (displayCalls.isEmpty ? 1 : displayCalls.length) +
-                (reportController.isTradingCallsLoadingMore.value && selectedFilter == null ? 1 : 0),
+                (reportController.isTradingCallsLoadingMore.value ? 1 : 0),
             itemBuilder: (context, index) {
               // Item 0: Accuracy Card & Filter Chips Header
               if (index == 0) {
@@ -153,6 +154,14 @@ class TradingCallTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       _buildFilterChips(stats),
+                      if (reportController.isTradingCallsLoading.value) ...[
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(
+                          minHeight: 2,
+                          backgroundColor: Colors.transparent,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                        ),
+                      ],
                     ],
                   ),
                 );
@@ -160,6 +169,14 @@ class TradingCallTab extends StatelessWidget {
 
               // Empty Filter Result State
               if (displayCalls.isEmpty) {
+                if (reportController.isTradingCallsLoading.value) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppTheme.primaryBlue),
+                    ),
+                  );
+                }
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 40),
                   child: Center(

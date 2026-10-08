@@ -14,6 +14,7 @@ const staffRoutes = () => {
     Router.post("/staff-login", staffController.staffLogin)
     Router.post("/staff-mpin-login", staffController.staffMpinLogin)
     Router.post("/staff-otp-verify", staffController.staffOtpVerify)
+    Router.get("/my-rm", auth.tokenVerified, staffController.getUserAssignedRM)
     Router.get("/assigned-users", auth.tokenVerified, adminOnly, checkPermission('Users', 'read'), usersController.userList)
     Router.post("/create", auth.tokenVerified, checkPermission('Staff', 'create'), staffController.staffCreate)
     Router.put("/reset", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.staffReset)

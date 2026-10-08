@@ -23,6 +23,7 @@ class ResearchReport {
   final bool isLocked;
   final DateTime? planStartDate;
   final DateTime? reportPublishedDate;
+  final TradingCallOutcome? explicitOutcome;
 
   ResearchReport({
     required this.id,
@@ -44,6 +45,7 @@ class ResearchReport {
     this.reportPublishedDate,
     this.youtubeUrl,
     this.updates = const [],
+    this.explicitOutcome,
   });
 
   bool get isPublished => publishedStatus == 'published';
@@ -91,7 +93,26 @@ class ResearchReport {
                   ))
               .toList()
           : [],
+      explicitOutcome: _parseOutcome(json['callStatus'] ?? json['outcome']),
     );
+  }
+
+  static TradingCallOutcome? _parseOutcome(dynamic value) {
+    if (value == null) return null;
+    final s = value.toString().toLowerCase().trim();
+    if (s == 'target_achieved' || s == 'targetachieved' || s == 'target_hit' || s == 'target') {
+      return TradingCallOutcome.targetAchieved;
+    }
+    if (s == 'partial_profit' || s == 'partiallybooked' || s == 'partial' || s == 'partially_booked') {
+      return TradingCallOutcome.partiallyBooked;
+    }
+    if (s == 'stoploss_hit' || s == 'stoplosshit' || s == 'stoploss' || s == 'sl_hit') {
+      return TradingCallOutcome.stoplossHit;
+    }
+    if (s == 'active') {
+      return TradingCallOutcome.active;
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -235,6 +256,8 @@ enum TradingCallOutcome {
 
 extension ResearchReportOutcome on ResearchReport {
   TradingCallOutcome get outcome {
+    if (explicitOutcome != null) return explicitOutcome!;
+
     // Check updates in reverse order (latest decisive outcome first)
     for (int i = updates.length - 1; i >= 0; i--) {
       final s = updates[i].normalizedStatus;

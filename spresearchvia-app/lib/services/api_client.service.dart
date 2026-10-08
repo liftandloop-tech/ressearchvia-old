@@ -123,6 +123,13 @@ class ApiClient {
         return;
       }
 
+      if (error.response?.statusCode == 404 && !isUserNotFound) {
+        // 404 Not Found on an endpoint or resource is NOT an authentication failure.
+        // Reject immediately to allow the calling service/controller to handle it.
+        handler.reject(error);
+        return;
+      }
+
 
       // Avoid looping if error comes from refresh token endpoint or login itself
       // Also force logout if user is strictly not found in DB or suspended

@@ -312,39 +312,6 @@ class ApplicantRegistrationController extends GetxController {
       return;
     }
 
-    // 5. Work Experience (if applicant indicated having experience)
-    if (hasWorkExperience.value) {
-      if (previousCompanyController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter your Current / Last Organisation',
-            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (currentDesignationController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter your Current Designation',
-            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (experienceYearsController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter your Total Experience in Years',
-            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (lastCtcController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter your Total Current CTC',
-            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (expectedSalaryController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter your Expected CTC',
-            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (noticePeriodController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter your Notice Period (Days)',
-            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red.shade900);
-        return;
-      }
-    }
 
     // 6. Emergency Contact
     if (emergencyNameController.text.trim().isEmpty ||

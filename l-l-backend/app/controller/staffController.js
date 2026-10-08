@@ -85,8 +85,7 @@ const staffController = {
 
     getUserAssignedRM: async (req, res) => {
         try {
-            // Get user ID from the authenticated user (from JWT token)
-            const userId = req.user._id;
+            const userId = req.user?._id || req.user?.userId || req.user?.id;
             const response = await staffService.getUserAssignedRM({ userId });
             res.status(response.status).send(response);
         } catch (error) {

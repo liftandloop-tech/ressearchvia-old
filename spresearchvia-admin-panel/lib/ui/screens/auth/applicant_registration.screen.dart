@@ -487,8 +487,8 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               _buildResponsiveRow(
                 isMobile,
                 [
-                  _buildTextField(controller: controller.previousCompanyController, label: 'Current / Last Organisation *', hint: 'Company name'),
-                  _buildTextField(controller: controller.currentDesignationController, label: 'Current Designation *', hint: 'Role / Designation'),
+                  _buildTextField(controller: controller.previousCompanyController, label: 'Current / Last Organisation', hint: 'Company name'),
+                  _buildTextField(controller: controller.currentDesignationController, label: 'Current Designation', hint: 'Role / Designation'),
                 ],
               ),
               const SizedBox(height: 14),
@@ -504,7 +504,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                 isMobile,
                 [
                   _buildTextField(controller: controller.reporteesCountController, label: 'Number of Direct Reportees', hint: '0 if none'),
-                  _buildTextField(controller: controller.experienceYearsController, label: 'Total Experience (Years) *', hint: 'e.g. 3'),
+                  _buildTextField(controller: controller.experienceYearsController, label: 'Total Experience (Years)', hint: 'e.g. 3'),
                 ],
               ),
               const SizedBox(height: 14),
@@ -519,12 +519,12 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               _buildResponsiveRow(
                 isMobile,
                 [
-                  _buildTextField(controller: controller.lastCtcController, label: 'Total Current CTC (Annual INR) *', hint: 'e.g. 6,00,000'),
-                  _buildTextField(controller: controller.expectedSalaryController, label: 'Expected CTC (Annual INR) *', hint: 'e.g. 7,50,000'),
+                  _buildTextField(controller: controller.lastCtcController, label: 'Total Current CTC (Annual INR)', hint: 'e.g. 6,00,000'),
+                  _buildTextField(controller: controller.expectedSalaryController, label: 'Expected CTC (Annual INR)', hint: 'e.g. 7,50,000'),
                 ],
               ),
               const SizedBox(height: 14),
-              _buildTextField(controller: controller.noticePeriodController, label: 'Notice Period (Days) *', hint: 'e.g. 15 Days, Immediate'),
+              _buildTextField(controller: controller.noticePeriodController, label: 'Notice Period (Days)', hint: 'e.g. 15 Days, Immediate'),
             ],
           );
         }),

@@ -101,6 +101,7 @@ abstract class ApiConfig {
     String search = '',
     String? startDate,
     String? endDate,
+    String? outcome,
   }) {
     final buffer = StringBuffer(
       '/reports/user-report-list/$userId?reportType=${Uri.encodeComponent(reportType)}&page=$page&pageSize=$pageSize',
@@ -113,6 +114,9 @@ abstract class ApiConfig {
     }
     if (endDate != null && endDate.isNotEmpty) {
       buffer.write('&endDate=${Uri.encodeComponent(endDate)}');
+    }
+    if (outcome != null && outcome.isNotEmpty) {
+      buffer.write('&outcome=${Uri.encodeComponent(outcome)}');
     }
     return buffer.toString();
   }

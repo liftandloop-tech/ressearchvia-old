@@ -313,8 +313,20 @@ const reportService = {
     userReportList: async ({ params, query }) => {
         try {
             let { id } = params
-            let { reportType, date, search, startDate, endDate, page, pageSize } = query;
+            let { reportType, date, search, startDate, endDate, page, pageSize, outcome, callStatus } = query;
             let queryArg = {}
+
+            let filterOutcome = null;
+            const rawOutcome = (outcome || callStatus || '').toLowerCase().trim();
+            if (rawOutcome === 'target_achieved' || rawOutcome === 'targetachieved' || rawOutcome === 'target_hit' || rawOutcome === 'target') {
+                filterOutcome = 'target_achieved';
+            } else if (rawOutcome === 'partial_profit' || rawOutcome === 'partiallybooked' || rawOutcome === 'partially_booked' || rawOutcome === 'partial') {
+                filterOutcome = 'partial_profit';
+            } else if (rawOutcome === 'stoploss_hit' || rawOutcome === 'stoplosshit' || rawOutcome === 'stoploss' || rawOutcome === 'sl_hit') {
+                filterOutcome = 'stoploss_hit';
+            } else if (rawOutcome === 'active') {
+                filterOutcome = 'active';
+            }
 
             // Handle Pagination - First page loads 20, subsequent pages load 10
             page = page ? parseInt(page) : 1;
@@ -559,10 +571,60 @@ const reportService = {
                 }
             });
 
-            // 5. Enhance ALL reports with access metadata (DO NOT drop or truncate reports)
+            // 5. Calculate Trading Call Accuracy status helper
+            const getReportCallStatus = (report) => {
+                const updates = report.updates || [];
+                // Check updates in reverse order (latest decisive outcome first)
+                for (let i = updates.length - 1; i >= 0; i--) {
+                    const u = updates[i];
+                    const s = (u.status || '').toLowerCase().trim();
+                    const t = (u.text || '').toLowerCase();
+
+                    if (s === 'target_achieved' || s === 'target' || s === 'target achieved' || s === 'full_profit' || s === 'tgt_achieved' || s === 'tgt_hit' ||
+                        t.includes('target achieved') || t.includes('target hit') || t.includes('tgt achieved') || t.includes('tgt hit') ||
+                        t.includes('full profit') || t.includes('all targets') || t.includes('target met')) {
+                        return 'target_achieved';
+                    }
+                    if (s === 'partial_profit' || s === 'partial' || s === 'partial profit' || s === 'part_profit' ||
+                        t.includes('partial profit') || t.includes('part profit') || t.includes('book partial') || t.includes('partially booked')) {
+                        return 'partial_profit';
+                    }
+                    if (s === 'stoploss_hit' || s === 'stoploss' || s === 'stop_loss' || s === 'sl_hit' || s === 'stop loss hit' || s === 'sl' ||
+                        t.includes('sl hit') || t.includes('stoploss') || t.includes('stop loss') || t.includes('sl triggered') || t.includes('hit sl') || t.includes('exit sl')) {
+                        return 'stoploss_hit';
+                    }
+                }
+
+                // Fallback check on title and description
+                const combined = ((report.title || '') + ' ' + (report.description || '')).toLowerCase();
+                if (combined.includes('target achieved') || combined.includes('target hit') || combined.includes('tgt achieved') || combined.includes('tgt hit')) {
+                    return 'target_achieved';
+                }
+                if (combined.includes('partial profit') || combined.includes('partially booked') || combined.includes('book partial')) {
+                    return 'partial_profit';
+                }
+                if (combined.includes('stop loss hit') || combined.includes('stoploss hit') || combined.includes('sl hit') || combined.includes('sl triggered') || combined.includes('exit sl')) {
+                    return 'stoploss_hit';
+                }
+
+                return 'active';
+            };
+
+            let targetAchievedCount = 0;
+            let partiallyBookedCount = 0;
+            let stoplossHitCount = 0;
+            let activeCallsCount = 0;
+
+            // 5.5 Enhance ALL reports with access metadata & evaluated call status
             const allFilteredReports = allReports.map(report => {
                 const reportObj = report.toObject();
                 const reportPublishedDate = new Date(report.published_at || report.createdAt);
+                const callStatus = getReportCallStatus(reportObj);
+
+                if (callStatus === 'target_achieved') targetAchievedCount++;
+                else if (callStatus === 'partial_profit') partiallyBookedCount++;
+                else if (callStatus === 'stoploss_hit') stoplossHitCount++;
+                else activeCallsCount++;
 
                 // Find the earliest segment start date that covers this report
                 let earliestPlanStart = null;
@@ -576,67 +638,16 @@ const reportService = {
                     });
                 }
 
-                // Report lock overlay removed per UX requirement (all entitled reports accessible)
                 return {
                     ...reportObj,
+                    callStatus: callStatus,
+                    outcome: callStatus,
                     accessMetadata: {
                         isLocked: false,
                         planStartDate: earliestPlanStart,
                         reportPublishedDate: reportPublishedDate
                     }
                 };
-            });
-
-            // 5.5 Calculate Trading Call Accuracy statistics across all accessible reports (target achieved, partially booked, stoploss hit)
-            const getReportCallStatus = (report) => {
-                const updates = report.updates || [];
-                // Check updates in reverse order (latest decisive outcome first)
-                for (let i = updates.length - 1; i >= 0; i--) {
-                    const u = updates[i];
-                    const s = (u.status || '').toLowerCase().trim();
-                    const t = (u.text || '').toLowerCase();
-
-                    if (s === 'target_achieved' || s === 'target' || s === 'target achieved' || s === 'full_profit' || s === 'tgt_achieved' ||
-                        t.includes('target achieved') || t.includes('target hit') || t.includes('tgt achieved') ||
-                        t.includes('full profit') || t.includes('all targets') || t.includes('target met')) {
-                        return 'target_achieved';
-                    }
-                    if (s === 'partial_profit' || s === 'partial' || s === 'partial profit' || s === 'part_profit' ||
-                        t.includes('partial profit') || t.includes('part profit') || t.includes('book partial') || t.includes('partially booked')) {
-                        return 'partial_profit';
-                    }
-                    if (s === 'stoploss_hit' || s === 'stoploss' || s === 'stop_loss' || s === 'sl_hit' || s === 'stop loss hit' ||
-                        t.includes('sl hit') || t.includes('stoploss') || t.includes('stop loss') || t.includes('sl triggered') || t.includes('hit sl')) {
-                        return 'stoploss_hit';
-                    }
-                }
-
-                // Fallback check on title and description
-                const combined = ((report.title || '') + ' ' + (report.description || '')).toLowerCase();
-                if (combined.includes('target achieved') || combined.includes('target hit') || combined.includes('tgt achieved')) {
-                    return 'target_achieved';
-                }
-                if (combined.includes('partial profit') || combined.includes('partially booked') || combined.includes('book partial')) {
-                    return 'partial_profit';
-                }
-                if (combined.includes('stop loss hit') || combined.includes('stoploss hit') || combined.includes('sl hit') || combined.includes('sl triggered')) {
-                    return 'stoploss_hit';
-                }
-
-                return 'active';
-            };
-
-            let targetAchievedCount = 0;
-            let partiallyBookedCount = 0;
-            let stoplossHitCount = 0;
-            let activeCallsCount = 0;
-
-            allFilteredReports.forEach(r => {
-                const status = getReportCallStatus(r);
-                if (status === 'target_achieved') targetAchievedCount++;
-                else if (status === 'partial_profit') partiallyBookedCount++;
-                else if (status === 'stoploss_hit') stoplossHitCount++;
-                else activeCallsCount++;
             });
 
             const totalCalls = allFilteredReports.length;
@@ -655,6 +666,11 @@ const reportService = {
                 accuracyRate
             };
 
+            // Filter reports by requested outcome if filter active
+            const reportsToPaginate = filterOutcome
+                ? allFilteredReports.filter(r => r.callStatus === filterOutcome)
+                : allFilteredReports;
+
             // 6. Pagination offset calculation
             // Handles both uniform pageSize and mobile variable pageSize (page 1: 20, page 2+: 10)
             let startIndex;
@@ -671,15 +687,15 @@ const reportService = {
             }
 
             const endIndex = startIndex + pageSize;
-            const finalReports = allFilteredReports.slice(startIndex, endIndex);
+            const finalReports = reportsToPaginate.slice(startIndex, endIndex);
 
             return {
                 status: 200,
                 message: finalReports.length > 0 ? "User Report List" : "No reports found",
                 data: {
                     reports: finalReports,
-                    totalReports: allFilteredReports.length,
-                    hasMore: endIndex < allFilteredReports.length,
+                    totalReports: reportsToPaginate.length,
+                    hasMore: endIndex < reportsToPaginate.length,
                     hasActiveSubscription: true,
                     page,
                     pageSize,

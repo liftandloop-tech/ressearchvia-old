@@ -30,14 +30,21 @@ class ReportController extends GetxController {
   final thisMonthAccuracyStats = Rx<TradingAccuracyStats>(const TradingAccuracyStats());
   final selectedOutcomeFilter = Rxn<TradingCallOutcome>();
 
-  List<ResearchReport> get filteredTradingCalls {
-    if (selectedOutcomeFilter.value == null) {
-      return tradingCalls;
+  String? _getOutcomeQueryParam(TradingCallOutcome? outcome) {
+    if (outcome == null) return null;
+    switch (outcome) {
+      case TradingCallOutcome.targetAchieved:
+        return 'target_achieved';
+      case TradingCallOutcome.partiallyBooked:
+        return 'partial_profit';
+      case TradingCallOutcome.stoplossHit:
+        return 'stoploss_hit';
+      case TradingCallOutcome.active:
+        return 'active';
     }
-    return tradingCalls
-        .where((r) => r.outcome == selectedOutcomeFilter.value)
-        .toList();
   }
+
+  List<ResearchReport> get filteredTradingCalls => tradingCalls;
 
   TradingAccuracyStats get effectiveAccuracy =>
       tradingAccuracyStats.value.totalCalls > 0
@@ -76,6 +83,9 @@ class ReportController extends GetxController {
   void onInit() {
     super.onInit();
     fetchThisMonthCounts();
+    ever(selectedOutcomeFilter, (_) {
+      fetchTradingCalls(refresh: true);
+    });
   }
 
   Future<void> fetchThisMonthCounts() async {
@@ -292,6 +302,7 @@ class ReportController extends GetxController {
           search: searchQuery.value,
           startDate: startDate.value,
           endDate: endDate.value,
+          outcome: _getOutcomeQueryParam(selectedOutcomeFilter.value),
         ),
       );
 
