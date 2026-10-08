@@ -2125,6 +2125,7 @@ const planPurchaseService = {
                 // Given the recent partial implementation, we can skip this loose query to avoid false positives.
                 // The new system relies on sourceRefId.
               }
+            }
 
 
               // HNI Custom Plan Override (Logic preserved)
