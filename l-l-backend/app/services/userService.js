@@ -111,6 +111,8 @@ const syncUserDevice = async (user, deviceId, platform = 'android') => {
 
   user.sessionDeviceId = deviceId;
   user.sessionIssuedAt = new Date();
+  if (!user.userObject) user.userObject = {};
+  user.markModified('userObject');
   await user.save();
 
   // 1. Mark all devices of this user as Inactive
@@ -724,7 +726,8 @@ const userService = {
         email: email,
         registrationFeePaid: true, // Auto-mark fee as paid
         adminAccessGranted: true, // Explicit admin grant
-        mpinStatus: "TEMP" // Force MPIN change on first login
+        mpinStatus: "TEMP", // Force MPIN change on first login
+        userObject: {}
       });
 
       // Handle custom plan assignments (Legacy and New structured format)
@@ -1481,6 +1484,8 @@ const userService = {
         user.otp = otp;
         user.otpExpires = Date.now() + 5 * 60 * 1000;
         user.userType = "user";
+        if (!user.userObject) user.userObject = {};
+        user.markModified('userObject');
         await user.save();
         return { status: 200, message: "OTP send your phone ", data: {} };
       }

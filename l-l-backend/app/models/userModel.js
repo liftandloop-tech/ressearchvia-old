@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
     },
     userObject: {
         type: Object,
-        required: true
+        default: {}
     },
     panNumber: {
         type: String,
@@ -255,6 +255,6 @@ const userSchema = new mongoose.Schema({
         type: Object,
         default: {}
     }
-}, { timestamps: true, versionKey: false });
+}, { timestamps: true, versionKey: false, minimize: false });
 const users = mongoose.model("users", userSchema);
 export default users;
