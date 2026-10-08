@@ -482,6 +482,7 @@ const segmentsService = {
               userId: intent.userId,
               type: 'PLAN',
               resourceId: bundlePlanId,
+              segmentId: intent.preferredSegmentId || null,
               days: trialDays,
               isLifetime: false,
               grantedBy: 'ADMIN',

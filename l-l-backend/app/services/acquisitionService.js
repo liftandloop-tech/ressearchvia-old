@@ -1168,6 +1168,21 @@ export const approvePartialPayment = async (paymentIntentId, historyId, adminId,
             console.error("Error managing invoice for partial payment:", invoiceErr);
         }
 
+        // Cleanup: If a plan (partial or full) is approved, revoke any active REGISTRATION_TRIAL for this user
+        if (paymentIntent.purchaseType === 'PLAN') {
+            await Entitlement.updateMany(
+                {
+                    userId: paymentIntent.userId,
+                    type: 'PLAN',
+                    grantReason: 'REGISTRATION_TRIAL',
+                    status: 'ACTIVE'
+                },
+                {
+                    $set: { status: 'REVOKED', remarks: 'Revoked due to plan purchase/approval' }
+                }
+            );
+        }
+
         // 6. Sync with Entitlements
         const entitlement = await Entitlement.findOne({
             userId: paymentIntent.userId,
@@ -1203,21 +1218,6 @@ export const approvePartialPayment = async (paymentIntentId, historyId, adminId,
                 segmentId: paymentIntent.preferredSegmentId,
                 remarks: comment || null
             });
-        }
-
-        // Cleanup: If a plan (partial or full) is approved, revoke any active REGISTRATION_TRIAL for this user
-        if (paymentIntent.purchaseType === 'PLAN') {
-            await Entitlement.updateMany(
-                {
-                    userId: paymentIntent.userId,
-                    type: 'PLAN',
-                    grantReason: 'REGISTRATION_TRIAL',
-                    status: 'ACTIVE'
-                },
-                {
-                    $set: { status: 'REVOKED', remarks: 'Revoked due to plan purchase/approval' }
-                }
-            );
         }
 
         // --- NEW: Sync with PlanPurchase (Mobile App Visibility) ---

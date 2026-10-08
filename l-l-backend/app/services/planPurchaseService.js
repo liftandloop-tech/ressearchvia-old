@@ -2064,35 +2064,43 @@ const planPurchaseService = {
                 }
               }
 
-              if (!paymentIntent) {
-                // Fallback: Check if there's a matching PaymentIntent for this user and plan/segment
-                paymentIntent = await PaymentIntent.findOne({
-                  userId: id,
-                  status: 'PAID',
-                  $or: [
-                    { preferredPlanId: ent.resourceId?._id || ent.resourceId },
-                    { planId: ent.resourceId?._id || ent.resourceId },
-                    { preferredSegmentId: ent.segmentId?._id || ent.segmentId }
-                  ]
-                }).sort({ createdAt: -1 });
-              }
-
-              // 2. Logic to determine isPartial and Correct Amount
-              if (paymentIntent) {
-                // Found a linked Payment Intent (e.g. Partial Grant)
-                paymentIntentId = paymentIntent._id;
-                isPartial = paymentIntent.isPartial || false;
-
-                if (isPartial && paymentIntent.amountPaid !== undefined) {
-                  amount = paymentIntent.amountPaid; // Use actual paid amount for partials
-                }
-                if (paymentIntent.notes) {
-                  remarks = paymentIntent.notes;
-                } else if (!remarks && ent.grantReason === 'MANUAL_PARTIAL') {
-                  remarks = "Partial Payment Grant";
+              if (ent.grantReason === 'REGISTRATION_TRIAL') {
+                // Free Registration Trial: Strictly isolate from paid PaymentIntents
+                paymentIntent = null;
+                paymentIntentId = null;
+                amount = 0;
+                isPartial = false;
+              } else {
+                if (!paymentIntent) {
+                  // Fallback: Check if there's a matching PaymentIntent for this user and plan/segment (PAID PLANS ONLY)
+                  paymentIntent = await PaymentIntent.findOne({
+                    userId: id,
+                    status: 'PAID',
+                    purchaseType: 'PLAN',
+                    $or: [
+                      { preferredPlanId: ent.resourceId?._id || ent.resourceId },
+                      { planId: ent.resourceId?._id || ent.resourceId },
+                      { preferredSegmentId: ent.segmentId?._id || ent.segmentId }
+                    ]
+                  }).sort({ createdAt: -1 });
                 }
 
-              } else if (ent.grantReason === 'MANUAL') {
+                // 2. Logic to determine isPartial and Correct Amount
+                if (paymentIntent) {
+                  // Found a linked Payment Intent (e.g. Partial Grant)
+                  paymentIntentId = paymentIntent._id;
+                  isPartial = paymentIntent.isPartial || false;
+
+                  if (isPartial && paymentIntent.amountPaid !== undefined) {
+                    amount = paymentIntent.amountPaid; // Use actual paid amount for partials
+                  }
+                  if (paymentIntent.notes) {
+                    remarks = paymentIntent.notes;
+                  } else if (!remarks && ent.grantReason === 'MANUAL_PARTIAL') {
+                    remarks = "Partial Payment Grant";
+                  }
+
+                } else if (ent.grantReason === 'MANUAL') {
                 // If no PaymentIntent found, it might be a Legacy PlanPurchase (Full Grant)
                 // Check PlanPurchase if sourceRefId points to it
                 if (ent.sourceRefId) {

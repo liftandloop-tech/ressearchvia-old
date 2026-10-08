@@ -75,6 +75,20 @@ class CurrentSubscriptionDetails extends StatelessWidget {
               return true;
             }).toList();
 
+            // Sort so active paid plans appear first, followed by trials and historical records
+            subscriptions.sort((a, b) {
+              final aIsTrial = a['isTrial'] == true || a['grantReason'] == 'REGISTRATION_TRIAL';
+              final bIsTrial = b['isTrial'] == true || b['grantReason'] == 'REGISTRATION_TRIAL';
+              if (aIsTrial != bIsTrial) {
+                return aIsTrial ? 1 : -1; // Paid plans first
+              }
+              final aStatus = (a['status'] ?? '').toString().toLowerCase();
+              final bStatus = (b['status'] ?? '').toString().toLowerCase();
+              if (aStatus == 'active' && bStatus != 'active') return -1;
+              if (bStatus == 'active' && aStatus != 'active') return 1;
+              return 0;
+            });
+
             if (subscriptions.isEmpty) {
               return const Text('No segment subscriptions found.');
             }
@@ -107,7 +121,7 @@ class CurrentSubscriptionDetails extends StatelessWidget {
                                     Flexible(
                                       child: Text(
                                         sub['isTrial'] == true
-                                            ? 'Registration Trial'
+                                            ? 'Registration Trial (${sub['packageName'] ?? 'Bundled'})'
                                             : (sub['packageName'] ??
                                                   'Unknown Plan'),
                                         style: TextStyle(
@@ -635,6 +649,7 @@ class CurrentSubscriptionDetails extends StatelessWidget {
         color = AppTheme.warningOrange;
         break;
       case 'cancelled':
+      case 'revoked':
         color = AppTheme.errorRed;
         break;
       default:

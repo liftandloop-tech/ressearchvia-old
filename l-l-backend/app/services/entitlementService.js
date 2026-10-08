@@ -25,12 +25,29 @@ export const grantEntitlement = async ({
     let newEndDate = null;
 
     // 1. If granting a paid plan, revoke any active REGISTRATION_TRIAL entitlements for this user
+    let regIntentIds = [];
     if (type === 'PLAN' && grantReason !== 'REGISTRATION_TRIAL') {
+        try {
+            const PaymentIntent = (await import("../models/paymentIntentModel.js")).default;
+            const regIntents = await PaymentIntent.find({
+                userId,
+                purchaseType: 'REGISTRATION'
+            }).select('_id').session(session).lean();
+            regIntentIds = regIntents.map(r => r._id.toString());
+        } catch (e) {
+            // fallback
+        }
+
+        const revokeConditions = [{ grantReason: 'REGISTRATION_TRIAL' }];
+        if (regIntentIds.length > 0) {
+            revokeConditions.push({ sourceRefId: { $in: regIntentIds } });
+        }
+
         await Entitlement.updateMany({
             userId,
             type: 'PLAN',
-            grantReason: 'REGISTRATION_TRIAL',
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            $or: revokeConditions
         }, {
             $set: { status: 'REVOKED', remarks: 'Superseded by paid plan' }
         }).session(session);
@@ -38,7 +55,7 @@ export const grantEntitlement = async ({
 
     // 2. Check for existing active entitlement to extend (Stacking)
     // For PLAN type, search for existing non-trial plan + SAME segment.
-    const existingEntitlement = await Entitlement.findOne({
+    const stackingQuery = {
         userId,
         type,
         resourceId: resourceId || undefined,
@@ -49,7 +66,13 @@ export const grantEntitlement = async ({
             { endDate: null }, // Existing Lifetime
             { endDate: { $gte: now } } // Existing Active Term
         ]
-    }).session(session).sort({ endDate: -1 });
+    };
+
+    if (type === 'PLAN' && grantReason !== 'REGISTRATION_TRIAL' && regIntentIds.length > 0) {
+        stackingQuery.sourceRefId = { $nin: regIntentIds };
+    }
+
+    const existingEntitlement = await Entitlement.findOne(stackingQuery).session(session).sort({ endDate: -1 });
 
     if (existingEntitlement) {
         if (isLifetime) {
