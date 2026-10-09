@@ -671,16 +671,16 @@ class ApplicantProfileScreen extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             ElevatedButton.icon(
-              onPressed: isUploading ? null : () => controller.uploadDoc(type),
+              onPressed: isUploading ? null : () => (isVideo ? controller.handleVideoKyc(context) : controller.uploadDoc(type)),
               icon: isUploading
                   ? const SizedBox(
                       width: 12,
                       height: 12,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
                     )
-                  : Icon(hasFile ? Icons.swap_horiz : Icons.file_upload_outlined, size: 13),
+                  : Icon(isVideo ? (hasFile ? Icons.videocam : Icons.videocam_outlined) : (hasFile ? Icons.swap_horiz : Icons.file_upload_outlined), size: 13),
               label: Text(
-                isUploading ? 'Uploading...' : (hasFile ? 'Replace' : 'Upload'),
+                isUploading ? 'Uploading...' : (isVideo ? (hasFile ? 'Re-record' : 'Record / Upload') : (hasFile ? 'Replace' : 'Upload')),
                 style: const TextStyle(fontSize: 11.5),
               ),
               style: ElevatedButton.styleFrom(

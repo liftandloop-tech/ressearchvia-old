@@ -10,6 +10,7 @@ import '../../models/role.model.dart';
 import '../staff/staff.controller.dart';
 import '../staff/staff_management.controller.dart';
 import 'applicants_list.controller.dart';
+import '../../ui/widgets/video_kyc_recorder_dialog.widget.dart';
 
 class ApplicantProfileController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
@@ -22,6 +23,30 @@ class ApplicantProfileController extends GetxController {
   var applicant = Rxn<StaffModel>();
   final selectedTabIndex = 0.obs;
   void setTab(int index) => selectedTabIndex.value = index;
+
+  Future<void> handleVideoKyc(BuildContext context) async {
+    final name = applicant.value?.fullName ?? '';
+    await VideoKycRecorderDialog.showChoice(
+      context: context,
+      applicantName: name,
+      onVideoRecorded: (bytes, filename) async {
+        uploadingDocType.value = 'video';
+        final res = await _applicantService.uploadApplicantVideo(applicantId.value, bytes, filename);
+        uploadingDocType.value = '';
+        if (res.success) {
+          if (res.applicant != null) {
+            applicant.value = res.applicant;
+          }
+          applicant.refresh();
+          fetchDetails(showLoading: false);
+          Get.snackbar('Upload Success', 'KYC Video uploaded successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
+        } else {
+          Get.snackbar('Upload Failed', res.message ?? 'An error occurred during upload', backgroundColor: Colors.red.withValues(alpha: 0.1));
+        }
+      },
+      onFallbackUpload: () => uploadDoc('video'),
+    );
+  }
 
   // Approval validation errors & state
   final roleError = ''.obs;
@@ -180,7 +205,11 @@ class ApplicantProfileController extends GetxController {
   }
 
   void promptUploadChoice(BuildContext context, String type) {
-    uploadDoc(type);
+    if (type == 'video') {
+      handleVideoKyc(context);
+    } else {
+      uploadDoc(type);
+    }
   }
 
   // Approval Controllers and Methods

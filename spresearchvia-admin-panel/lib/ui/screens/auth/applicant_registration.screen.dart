@@ -1075,15 +1075,15 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     ElevatedButton.icon(
-                      onPressed: isUploading ? null : () => controller.uploadDoc(type),
+                      onPressed: isUploading ? null : () => (isVideo ? controller.handleVideoKyc(context) : controller.uploadDoc(type)),
                       icon: isUploading
                           ? const SizedBox(
                               width: 14,
                               height: 14,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
                             )
-                          : Icon(hasFile ? Icons.swap_horiz : Icons.file_upload_outlined, size: 14),
-                      label: Text(isUploading ? 'Uploading...' : (hasFile ? 'Replace' : 'Upload'), style: const TextStyle(fontSize: 12)),
+                          : Icon(isVideo ? (hasFile ? Icons.videocam : Icons.videocam_outlined) : (hasFile ? Icons.swap_horiz : Icons.file_upload_outlined), size: 14),
+                      label: Text(isUploading ? 'Uploading...' : (isVideo ? (hasFile ? 'Re-record / Replace' : 'Record / Upload') : (hasFile ? 'Replace' : 'Upload')), style: const TextStyle(fontSize: 12)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: hasFile ? const Color(0xFFF1F5F9) : const Color(0xFF1E3A5F),
                         foregroundColor: hasFile ? const Color(0xFF334155) : Colors.white,
@@ -1185,15 +1185,15 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 ElevatedButton.icon(
-                  onPressed: isUploading ? null : () => controller.uploadDoc(type),
+                  onPressed: isUploading ? null : () => (isVideo ? controller.handleVideoKyc(context) : controller.uploadDoc(type)),
                   icon: isUploading
                       ? const SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
                         )
-                      : Icon(hasFile ? Icons.swap_horiz : Icons.file_upload_outlined, size: 14),
-                  label: Text(isUploading ? 'Uploading...' : (hasFile ? 'Replace' : 'Upload'), style: const TextStyle(fontSize: 12)),
+                      : Icon(isVideo ? (hasFile ? Icons.videocam : Icons.videocam_outlined) : (hasFile ? Icons.swap_horiz : Icons.file_upload_outlined), size: 14),
+                  label: Text(isUploading ? 'Uploading...' : (isVideo ? (hasFile ? 'Re-record / Replace' : 'Record / Upload') : (hasFile ? 'Replace' : 'Upload')), style: const TextStyle(fontSize: 12)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: hasFile ? const Color(0xFFF1F5F9) : const Color(0xFF1E3A5F),
                     foregroundColor: hasFile ? const Color(0xFF334155) : Colors.white,

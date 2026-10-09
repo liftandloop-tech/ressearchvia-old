@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/applicant.service.dart';
 import '../../models/staff.model.dart';
+import '../../ui/widgets/video_kyc_recorder_dialog.widget.dart';
 
 class ApplicantRegistrationController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
@@ -13,6 +14,29 @@ class ApplicantRegistrationController extends GetxController {
   var isVerified = false.obs;
   var applicantId = ''.obs;
   var currentApplicant = Rxn<StaffModel>();
+
+  Future<void> handleVideoKyc(BuildContext context) async {
+    final name = currentApplicant.value?.fullName ?? nameController.text.trim();
+    await VideoKycRecorderDialog.showChoice(
+      context: context,
+      applicantName: name,
+      onVideoRecorded: (bytes, filename) async {
+        uploadingDocType.value = 'video';
+        final res = await _applicantService.uploadApplicantVideo(applicantId.value, bytes, filename);
+        uploadingDocType.value = '';
+        if (res.success) {
+          if (res.applicant != null) {
+            currentApplicant.value = res.applicant;
+          }
+          currentApplicant.refresh();
+          Get.snackbar('Upload Success', 'KYC Video uploaded successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
+        } else {
+          Get.snackbar('Upload Failed', res.message ?? 'An error occurred during upload', backgroundColor: Colors.red.withValues(alpha: 0.1));
+        }
+      },
+      onFallbackUpload: () => uploadDoc('video'),
+    );
+  }
 
   // Dynamic Open Roles from DB
   var openRoles = <Map<String, dynamic>>[].obs;
@@ -499,7 +523,11 @@ class ApplicantRegistrationController extends GetxController {
   }
 
   void promptUploadChoice(BuildContext context, String type) {
-    uploadDoc(type);
+    if (type == 'video') {
+      handleVideoKyc(context);
+    } else {
+      uploadDoc(type);
+    }
   }
 
   @override
