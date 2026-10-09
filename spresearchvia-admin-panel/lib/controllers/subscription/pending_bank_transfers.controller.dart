@@ -2864,6 +2864,7 @@ class PendingBankTransfersController extends GetxController {
     '37': (name: 'Andhra Pradesh', panCode: 'AP'),
     '38': (name: 'Ladakh', panCode: 'LA'),
     '97': (name: 'Other Territory', panCode: 'OT'),
+    '99': (name: 'Centre Jurisdiction', panCode: '-'),
   };
 
   static ({String name, String code, String panCode, bool isIntraState}) resolveStateInfo(

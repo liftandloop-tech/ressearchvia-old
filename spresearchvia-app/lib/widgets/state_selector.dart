@@ -3,18 +3,25 @@ import 'package:get/get.dart';
 import '../core/constants/state_map.dart' as map_utils;
 
 final List<String> indianStates = [
+  'Andaman and Nicobar Islands',
   'Andhra Pradesh',
   'Arunachal Pradesh',
   'Assam',
   'Bihar',
+  'Chandigarh',
   'Chhattisgarh',
+  'Dadra & Nagar Haveli and Daman & Diu',
+  'Delhi',
   'Goa',
   'Gujarat',
   'Haryana',
   'Himachal Pradesh',
+  'Jammu and Kashmir',
   'Jharkhand',
   'Karnataka',
   'Kerala',
+  'Ladakh',
+  'Lakshadweep',
   'Madhya Pradesh',
   'Maharashtra',
   'Manipur',
@@ -22,6 +29,7 @@ final List<String> indianStates = [
   'Mizoram',
   'Nagaland',
   'Odisha',
+  'Puducherry',
   'Punjab',
   'Rajasthan',
   'Sikkim',
@@ -31,6 +39,8 @@ final List<String> indianStates = [
   'Uttar Pradesh',
   'Uttarakhand',
   'West Bengal',
+  'Other Territory',
+  'Centre Jurisdiction',
 ];
 
 class StateSelectorController extends GetxController {

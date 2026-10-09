@@ -180,7 +180,7 @@ const userkycService = {
                 "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat", "25": "Daman & Diu",
                 "26": "Dadra & Nagar Haveli and Daman & Diu", "27": "Maharashtra", "28": "Andhra Pradesh", "29": "Karnataka", "30": "Goa",
                 "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu", "34": "Puducherry", "35": "Andaman & Nicobar Islands",
-                "36": "Telangana", "37": "Andhra Pradesh (New)", "97": "Other Territory", "96": "Other Country"
+                "36": "Telangana", "37": "Andhra Pradesh (New)", "38": "Ladakh", "97": "Other Territory", "99": "Centre Jurisdiction", "96": "Other Country"
             };
 
             // Check if KYC is already verified

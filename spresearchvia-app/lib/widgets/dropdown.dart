@@ -56,18 +56,25 @@ class StateSelector extends StatelessWidget {
   final ValueChanged<String?> onChanged;
 
   final List<String> indianStates = [
+    'Andaman and Nicobar Islands',
     'Andhra Pradesh',
     'Arunachal Pradesh',
     'Assam',
     'Bihar',
+    'Chandigarh',
     'Chhattisgarh',
+    'Dadra & Nagar Haveli and Daman & Diu',
+    'Delhi',
     'Goa',
     'Gujarat',
     'Haryana',
     'Himachal Pradesh',
+    'Jammu and Kashmir',
     'Jharkhand',
     'Karnataka',
     'Kerala',
+    'Ladakh',
+    'Lakshadweep',
     'Madhya Pradesh',
     'Maharashtra',
     'Manipur',
@@ -75,6 +82,7 @@ class StateSelector extends StatelessWidget {
     'Mizoram',
     'Nagaland',
     'Odisha',
+    'Puducherry',
     'Punjab',
     'Rajasthan',
     'Sikkim',
@@ -84,6 +92,8 @@ class StateSelector extends StatelessWidget {
     'Uttar Pradesh',
     'Uttarakhand',
     'West Bengal',
+    'Other Territory',
+    'Centre Jurisdiction',
   ];
 
   Widget _createOverlayWidget(
