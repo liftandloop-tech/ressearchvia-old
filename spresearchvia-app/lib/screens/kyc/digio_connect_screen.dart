@@ -193,16 +193,18 @@ class DigioConnectScreen extends StatelessWidget {
           }
           tokenId ??= digioData['token']?.toString();
 
+          final String finalIdentifier = (digioData['identifier'] ?? email ?? '').toString();
+
           debugPrint('DEBUG: Extracted docId: $docId');
           debugPrint('DEBUG: Extracted tokenId: $tokenId');
-          debugPrint('DEBUG: Email: $email');
+          debugPrint('DEBUG: Identifier: $finalIdentifier');
           
           if (docId != null && tokenId != null) {
               debugPrint('DEBUG: Opening Digio WebView Fallback...');
               
               final result = await Get.to(() => DigioWebViewScreen(
                   docId: docId,
-                  identifier: email!,
+                  identifier: finalIdentifier,
                   token: tokenId!,
                   environment: "production", // Reverting to Production as per .env keys
               ));

@@ -67,6 +67,19 @@ class ApiErrorHandler {
 
     if (data is Map<String, dynamic>) {
       message = data['message'] ?? data['error'] ?? data['msg'] ?? message;
+      // If message is generic (e.g., 'Request failed with status code 400'), check nested payload for specific error
+      if ((message.toLowerCase().contains('status code') || message == 'Error Occurred' || message == 'Invalid Request') && data['data'] != null) {
+        final nestedData = data['data'];
+        if (nestedData is Map) {
+          if (nestedData['digio'] is Map && nestedData['digio']['message'] != null) {
+            message = nestedData['digio']['message'].toString();
+          } else if (nestedData['message'] != null) {
+            message = nestedData['message'].toString();
+          } else if (nestedData['error'] != null) {
+            message = nestedData['error'].toString();
+          }
+        }
+      }
     } else if (data is String) {
       if (data.isNotEmpty) {
         if (data.toLowerCase().contains('<!doctype html>') || data.toLowerCase().contains('<html>')) {

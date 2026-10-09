@@ -538,23 +538,52 @@ const userkycService = {
                 : `${rawDigioBase}/v2/client/document/upload`;
             const CLIENT_ID = (process.env.DIGIO_CLIENT_ID || "").trim();
             const CLIENT_SECRET = (process.env.DIGIO_CLIENT_SECRET_ID || "").trim();
-            
-            const signerEmail = email || userDetails.email || u.APP_EMAIL;
-            const signerName = name || userDetails.fullName || u.APP_NAME;
 
             if (!CLIENT_ID || !CLIENT_SECRET) {
                 return { status: 400, message: "Digio API credentials (DIGIO_CLIENT_ID / DIGIO_CLIENT_SECRET_ID) are missing or not configured on the server", data: {} };
             }
 
-            if (!signerEmail) {
-                return { status: 400, message: "Email identifier is required for Digio request", data: {} };
+            // Email validation helper
+            const isValidEmail = (em) => {
+                if (!em || typeof em !== 'string') return false;
+                const trimmed = em.trim().toLowerCase();
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+            };
+
+            // Mobile number extraction (clean 10 digits)
+            const rawMobile = userDetails?.phone || u?.APP_MOB_NO || body?.phone || '';
+            const cleanMobile = rawMobile ? String(rawMobile).replace(/\D/g, '').slice(-10) : null;
+
+            // Determine signer identifier: Primary = valid Email, Fallback = 10-digit Mobile
+            const candidateEmail = (email || userDetails?.email || u?.APP_EMAIL || '').trim();
+            let signerIdentifier = null;
+
+            if (isValidEmail(candidateEmail)) {
+                signerIdentifier = candidateEmail;
+            } else if (cleanMobile && cleanMobile.length === 10) {
+                signerIdentifier = cleanMobile;
+            } else if (candidateEmail && candidateEmail.length > 0) {
+                signerIdentifier = candidateEmail;
+            }
+
+            if (!signerIdentifier) {
+                return { 
+                    status: 400, 
+                    message: "A valid email address or 10-digit mobile number is required for Digio Aadhaar signing", 
+                    data: {} 
+                };
+            }
+
+            let signerName = (name || userDetails?.fullName || u?.APP_NAME || '').trim();
+            if (!signerName) {
+                signerName = `User ${cleanMobile || 'Client'}`;
             }
 
             const authHeader = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64");
             const requestData = {
                 signers: [
                     {
-                        identifier: signerEmail,
+                        identifier: signerIdentifier,
                         name: signerName,
                         sign_type: "Aadhaar",
                         reason: "Service Agreement"
@@ -568,7 +597,7 @@ const userkycService = {
                 will_self_sign: true,
                 generate_access_token: true,
                 sign_coordinates: {
-                    [signerEmail]: {
+                    [signerIdentifier]: {
                         "1": [{
                             llx: 376.55,
                             lly: 67.89,
@@ -640,18 +669,32 @@ const userkycService = {
                 const tokenData = {
                     id: responseData.id || responseData.document_id,
                     tokenId: extractedToken,
-                    access_token: responseData.access_token
+                    access_token: responseData.access_token,
+                    identifier: signerIdentifier
                 };
 
-                return { status: 200, message: "kyc initialized", data: { digio: userKyc, sdkResponse: responseData, tokens: tokenData } };
+                return { 
+                    status: 200, 
+                    message: "kyc initialized", 
+                    data: { 
+                        digio: userKyc, 
+                        sdkResponse: responseData, 
+                        tokens: tokenData,
+                        identifier: signerIdentifier
+                    } 
+                };
             } else {
                 return { status: 400, message: "Digio initialization failed", data: { digio: response.data } };
             }
         } catch (error) {
             console.error("Digio Error:", error.response?.data || error.message);
+            const digioErrorMsg = error.response?.data?.message || 
+                                 (typeof error.response?.data === 'string' ? error.response?.data : null) ||
+                                 error.response?.data?.error || 
+                                 error.message;
             return { 
                 status: error.response?.status || 400, 
-                message: error.message, 
+                message: digioErrorMsg, 
                 data: { digio: error.response?.data || error.message } 
             };
         }
