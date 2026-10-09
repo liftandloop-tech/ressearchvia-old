@@ -187,8 +187,28 @@ const applicantController = {
                 });
                 await applicant.save();
             } else {
-                const count = await applicantModel.countDocuments();
-                const appSeq = `APP-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+                // Generate next unique sequential applicant ID (APP-YYYY-XXXX)
+                const currentYear = new Date().getFullYear();
+                const yearPrefix = `APP-${currentYear}-`;
+                const lastApplicant = await applicantModel
+                    .findOne({ applicantId: new RegExp(`^${yearPrefix}`) })
+                    .sort({ applicantId: -1 })
+                    .lean();
+
+                let nextSeqNum = 1;
+                if (lastApplicant && lastApplicant.applicantId) {
+                    const parts = lastApplicant.applicantId.split('-');
+                    const lastNum = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(lastNum)) {
+                        nextSeqNum = lastNum + 1;
+                    }
+                }
+
+                let appSeq = `${yearPrefix}${String(nextSeqNum).padStart(4, '0')}`;
+                while (await applicantModel.exists({ applicantId: appSeq })) {
+                    nextSeqNum++;
+                    appSeq = `${yearPrefix}${String(nextSeqNum).padStart(4, '0')}`;
+                }
 
                 applicant = await applicantModel.create({
                     applicantId: appSeq,
