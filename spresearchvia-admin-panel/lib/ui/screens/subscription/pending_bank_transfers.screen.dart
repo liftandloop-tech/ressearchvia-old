@@ -1760,6 +1760,22 @@ class PendingBankTransfersScreen extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
+                      if (canApprove &&
+                          status != 'PAID' &&
+                          status != 'APPROVED' &&
+                          status != 'REJECTED') ...[
+                        Button(
+                          title: "+ Approve Installment (UTR & Slip)",
+                          buttonType: ButtonType.green,
+                          size: ButtonSize.small,
+                          icon: Icons.add_task,
+                          onTap: () => controller.showApproveWithProofDialog(
+                            payment,
+                            onPaymentUpdated: onPaymentUpdated,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                       Text(
                         "${history.length} Installment${history.length == 1 ? '' : 's'} recorded",
                         style:
@@ -1775,11 +1791,33 @@ class PendingBankTransfersScreen extends StatelessWidget {
                         color: Colors.grey[50],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Center(
-                        child: Text(
-                          "No installments uploaded yet",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
+                      child: Column(
+                        children: [
+                          const Center(
+                            child: Text(
+                              "No installments uploaded yet",
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ),
+                          if (canApprove &&
+                              status != 'PAID' &&
+                              status != 'APPROVED' &&
+                              status != 'REJECTED') ...[
+                            const SizedBox(height: 12),
+                            Center(
+                              child: Button(
+                                title: "Approve Payment (UTR & Slip)",
+                                buttonType: ButtonType.green,
+                                size: ButtonSize.medium,
+                                icon: Icons.verified,
+                                onTap: () => controller.showApproveWithProofDialog(
+                                  payment,
+                                  onPaymentUpdated: onPaymentUpdated,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     )
                   else
@@ -1956,6 +1994,19 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                               controller: controller,
                                               discount: discount,
                                               payment: payment,
+                                            );
+                                          },
+                                        ),
+                                        Button(
+                                          title: "Approve (UTR & Slip)",
+                                          buttonType: ButtonType.green,
+                                          size: ButtonSize.small,
+                                          icon: Icons.receipt_long,
+                                          onTap: () {
+                                            controller.showApproveWithProofDialog(
+                                              payment,
+                                              installment: inst,
+                                              onPaymentUpdated: onPaymentUpdated,
                                             );
                                           },
                                         ),
@@ -2176,11 +2227,26 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 10),
                                     ],
-                                    if (canApprove)
+                                    if (canApprove) ...[
                                       Expanded(
                                         child: Button(
-                                          title: "Approve & Activate",
+                                          title: "Approve (UTR & Slip)",
                                           buttonType: ButtonType.green,
+                                          size: ButtonSize.medium,
+                                          icon: Icons.receipt_long,
+                                          onTap: () {
+                                            controller.showApproveWithProofDialog(
+                                              payment,
+                                              onPaymentUpdated: onPaymentUpdated,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Button(
+                                          title: "Quick Approve",
+                                          buttonType: ButtonType.blue,
                                           size: ButtonSize.medium,
                                           onTap: () {
                                             _showRemarkPopup(
@@ -2193,6 +2259,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                                           },
                                         ),
                                       ),
+                                    ],
                                     if (canApprove && canReject)
                                       const SizedBox(width: 8),
                                     if (canReject)

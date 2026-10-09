@@ -1,7 +1,69 @@
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 import 'package:spresearch_web/services/api.service.dart';
 
 class AcquisitionService extends ApiService {
+  Future<bool> adminApproveWithProof({
+    required String paymentIntentId,
+    required String utrNumber,
+    required double amountPaid,
+    String paymentMethod = 'RAZORPAY',
+    String? historyId,
+    String? comment,
+    double? discount,
+    List<dynamic>? files,
+  }) async {
+    try {
+      if (files != null && files.isNotEmpty) {
+        List<MultipartFile> multipartList = [];
+        for (var f in files) {
+          if (f.bytes != null) {
+            multipartList.add(MultipartFile(f.bytes!, filename: f.name));
+          }
+        }
+        final formData = FormData({
+          'paymentIntentId': paymentIntentId,
+          'utrNumber': utrNumber,
+          'amountPaid': amountPaid.toString(),
+          'paymentMethod': paymentMethod,
+          if (historyId != null && historyId.isNotEmpty) 'historyId': historyId,
+          if (comment != null && comment.isNotEmpty) 'comment': comment,
+          if (discount != null && discount > 0) 'discount': discount.toString(),
+          'file': multipartList,
+        });
+        final response = await post('/acquisition/admin-approve-with-proof', formData);
+        if (response.status.hasError) {
+          debugPrint(
+            'Error in adminApproveWithProof (FormData): ${response.statusText} - Body: ${response.body}',
+          );
+          return false;
+        }
+        return response.body['status'] == 200;
+      } else {
+        final body = {
+          'paymentIntentId': paymentIntentId,
+          'utrNumber': utrNumber,
+          'amountPaid': amountPaid,
+          'paymentMethod': paymentMethod,
+          if (historyId != null && historyId.isNotEmpty) 'historyId': historyId,
+          if (comment != null && comment.isNotEmpty) 'comment': comment,
+          if (discount != null && discount > 0) 'discount': discount,
+        };
+        final response = await post('/acquisition/admin-approve-with-proof', body);
+        if (response.status.hasError) {
+          debugPrint(
+            'Error in adminApproveWithProof (JSON): ${response.statusText} - Body: ${response.body}',
+          );
+          return false;
+        }
+        return response.body['status'] == 200;
+      }
+    } catch (e) {
+      debugPrint('Error in adminApproveWithProof: $e');
+      return false;
+    }
+  }
+
   Future<bool> approvePartialPayment({
     required String paymentIntentId,
     required String historyId,

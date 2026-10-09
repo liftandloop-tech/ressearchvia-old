@@ -76,7 +76,7 @@ class RegistrationScreenController extends GetxController {
         final success = await planPurchaseController.verifyPayment(
           paymentId: paymentId!,
           razorpayOrderId: orderId!,
-          razorpayPaymentId: paymentId,
+          razorpayPaymentId: '',
           razorpaySignature: '',
         );
 

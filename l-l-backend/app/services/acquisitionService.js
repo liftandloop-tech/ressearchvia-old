@@ -68,17 +68,25 @@ export const initiateRegistrationPurchase = async (userId, type, paymentMode, se
         }).sort({ createdAt: -1 });
 
         if (existingPartialReg) {
+            const hasActiveSlips = existingPartialReg.partialPaymentsHistory && existingPartialReg.partialPaymentsHistory.some(h => h.status === 'APPROVED' || h.status === 'PENDING');
             if (paymentMode !== 'BANK_TRANSFER') {
-                throw new Error('You have an ongoing partial registration payment. Please complete it via Bank Transfer.');
+                if (hasActiveSlips || existingPartialReg.status === 'VERIFICATION_PENDING') {
+                    throw new Error('You have an ongoing partial registration payment under review. Please complete it via Bank Transfer or wait for approval.');
+                }
+                // User chose Online Razorpay payment: gracefully supersede the empty bank transfer intent
+                existingPartialReg.status = 'REJECTED';
+                existingPartialReg.notes = (existingPartialReg.notes || '') + '\n[System]: Superseded by user switching to online Razorpay payment';
+                await existingPartialReg.save();
+            } else {
+                return {
+                    amount: existingPartialReg.totalAmount,
+                    currency: 'INR',
+                    paymentIntentId: existingPartialReg._id,
+                    message: 'Existing partial registration payment found.',
+                    isPartial: true,
+                    totalToPay: existingPartialReg.totalAmount
+                };
             }
-            return {
-                amount: existingPartialReg.totalAmount,
-                currency: 'INR',
-                paymentIntentId: existingPartialReg._id,
-                message: 'Existing partial registration payment found.',
-                isPartial: true,
-                totalToPay: existingPartialReg.totalAmount
-            };
         }
 
         const existingNonPartialReg = await PaymentIntent.findOne({
@@ -101,6 +109,11 @@ export const initiateRegistrationPurchase = async (userId, type, paymentMode, se
                     isPartial: false,
                     totalToPay: existingNonPartialReg.totalAmount
                 };
+            } else {
+                // User chose Online Razorpay payment: supersede empty bank transfer intent
+                existingNonPartialReg.status = 'REJECTED';
+                existingNonPartialReg.notes = (existingNonPartialReg.notes || '') + '\n[System]: Superseded by user switching to online Razorpay payment';
+                await existingNonPartialReg.save();
             }
         }
 
@@ -309,21 +322,27 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
             if (existingPending.status === 'VERIFICATION_PENDING') {
                 throw new Error('Your previous plan payment is currently under verification. Please wait for admin approval.');
             }
-            if (existingPending.isPartial && existingPending.planId?._id?.toString() === plan._id.toString()) {
-                if (paymentMode !== 'BANK_TRANSFER') {
-                    throw new Error('You have an ongoing partial payment for this plan. Please complete it via Bank Transfer.');
+            const hasActiveSlips = existingPending.partialPaymentsHistory && existingPending.partialPaymentsHistory.some(h => h.status === 'APPROVED' || h.status === 'PENDING');
+            if (paymentMode !== 'BANK_TRANSFER') {
+                if (hasActiveSlips) {
+                    throw new Error('You have an ongoing partial payment with uploaded installments. Please complete it via Bank Transfer.');
                 }
-                return {
-                    amount: existingPending.totalAmount,
-                    currency: 'INR',
-                    paymentIntentId: existingPending._id,
-                    message: 'Existing partial payment found. Please upload your next installment.',
-                    isPartial: true,
-                    totalToPay: existingPending.totalAmount
-                };
-            }
-            if (!existingPending.isPartial && existingPending.planId?._id?.toString() === plan._id.toString()) {
-                if (paymentMode === 'BANK_TRANSFER') {
+                // User chose online Razorpay payment instead of empty bank transfer: supersede
+                existingPending.status = 'REJECTED';
+                existingPending.notes = (existingPending.notes || '') + '\n[System]: Superseded by user switching to online Razorpay payment';
+                await existingPending.save();
+            } else {
+                if (existingPending.isPartial && existingPending.planId?._id?.toString() === plan._id.toString()) {
+                    return {
+                        amount: existingPending.totalAmount,
+                        currency: 'INR',
+                        paymentIntentId: existingPending._id,
+                        message: 'Existing partial payment found. Please upload your next installment.',
+                        isPartial: true,
+                        totalToPay: existingPending.totalAmount
+                    };
+                }
+                if (!existingPending.isPartial && existingPending.planId?._id?.toString() === plan._id.toString()) {
                     return {
                         amount: existingPending.totalAmount,
                         currency: 'INR',
@@ -333,8 +352,8 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
                         totalToPay: existingPending.totalAmount
                     };
                 }
+                throw new Error(`You have a pending order for "${existingPending.planId?.planName || 'a plan'}". Please complete or wait for verification before purchasing another plan.`);
             }
-            throw new Error(`You have a pending order for "${existingPending.planId?.planName || 'a plan'}". Please complete or wait for verification before purchasing another plan.`);
         }
 
         // 3. Razorpay idempotency — same order returned if < 10 min old
@@ -1335,6 +1354,405 @@ export const approvePartialPayment = async (paymentIntentId, historyId, adminId,
     }
 };
 
+export const adminApproveWithProof = async ({
+    paymentIntentId,
+    utrNumber,
+    amountPaid,
+    paymentMethod = 'RAZORPAY',
+    historyId,
+    comment,
+    discount = 0,
+    adminId,
+    files = [],
+    req
+}) => {
+    try {
+        const paymentIntent = await PaymentIntent.findById(paymentIntentId);
+        if (!paymentIntent) throw new Error("Payment Intent not found");
+
+        if (!utrNumber || !utrNumber.trim()) {
+            throw new Error("Transaction UTR or Reference ID is required");
+        }
+        utrNumber = utrNumber.trim();
+
+        const imageUrls = (files || []).map(file => file.location || `uploads/receipts/${file.filename}`);
+        const firstImageUrl = imageUrls[0] || null;
+
+        let parsedAmount = parseFloat(amountPaid);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+            parsedAmount = paymentIntent.remainingAmount || paymentIntent.totalAmount;
+        }
+
+        paymentIntent.utrNumber = utrNumber;
+        if (paymentMethod === 'RAZORPAY' && utrNumber.startsWith('pay_')) {
+            paymentIntent.paymentId = utrNumber;
+        } else if (!paymentIntent.paymentId) {
+            paymentIntent.paymentId = `MANUAL_ADMIN_${adminId || 'System'}`;
+        }
+        paymentIntent.paymentMethod = paymentMethod;
+        if (imageUrls.length > 0) {
+            paymentIntent.proofImage = firstImageUrl;
+            paymentIntent.proofImages = (paymentIntent.proofImages || []).concat(imageUrls);
+        }
+        if (comment) {
+            paymentIntent.notes = paymentIntent.notes ? `${paymentIntent.notes}\n[Admin] ${comment}` : `[Admin] ${comment}`;
+        }
+        if (discount && Number(discount) > 0) {
+            paymentIntent.discount = (paymentIntent.discount || 0) + Number(discount);
+        }
+
+        if (paymentIntent.isPartial) {
+            let historyItem = null;
+            if (historyId && paymentIntent.partialPaymentsHistory && paymentIntent.partialPaymentsHistory.length > 0) {
+                historyItem = paymentIntent.partialPaymentsHistory.id(historyId);
+            }
+
+            if (historyItem) {
+                historyItem.status = 'APPROVED';
+                historyItem.verifiedAt = new Date();
+                historyItem.verifiedBy = adminId;
+                historyItem.amountPaid = parsedAmount;
+                historyItem.utrNumber = utrNumber;
+                historyItem.paymentMethod = paymentMethod;
+                if (imageUrls.length > 0) {
+                    historyItem.proofImage = firstImageUrl;
+                    historyItem.proofImages = (historyItem.proofImages || []).concat(imageUrls);
+                }
+                if (comment) historyItem.note = comment;
+            } else {
+                paymentIntent.partialPaymentsHistory.push({
+                    amountPaid: parsedAmount,
+                    transactionDate: new Date(),
+                    proofImage: firstImageUrl,
+                    proofImages: imageUrls,
+                    status: 'APPROVED',
+                    utrNumber: utrNumber,
+                    verifiedAt: new Date(),
+                    verifiedBy: adminId,
+                    paymentMethod: paymentMethod,
+                    note: comment || null
+                });
+            }
+
+            const approvedPayments = paymentIntent.partialPaymentsHistory.filter(h => h.status === 'APPROVED');
+            const totalPaid = approvedPayments.reduce((sum, h) => sum + (h.amountPaid || 0), 0);
+
+            const originalPrice = paymentIntent.originalPlanAmount || paymentIntent.totalAmount;
+            const discountedTarget = Math.max(0, originalPrice - (paymentIntent.discount || 0));
+            paymentIntent.totalAmount = originalPrice;
+            paymentIntent.partialTotalTarget = discountedTarget;
+
+            const originalDuration = paymentIntent.originalDuration || 365;
+            const multiplier = (paymentIntent.purchaseType === 'REGISTRATION' || paymentIntent.packageName?.toLowerCase().includes("registration")) ? 1 : 1.5;
+
+            let perDayCharge = paymentIntent.perDayCharge;
+            let maxAllowedDays = paymentIntent.maxAllowedDays;
+
+            if (!perDayCharge || perDayCharge === 0 || !maxAllowedDays || maxAllowedDays === 0 || (discount && Number(discount) > 0)) {
+                paymentIntent.perDayCharge = discountedTarget > 0 ? (discountedTarget * multiplier / originalDuration) : 1;
+                paymentIntent.maxAllowedDays = Math.floor(discountedTarget / paymentIntent.perDayCharge);
+                perDayCharge = paymentIntent.perDayCharge;
+                maxAllowedDays = paymentIntent.maxAllowedDays;
+            }
+
+            let amountUsedForDays = totalPaid;
+            let walletBalance = 0;
+            if (totalPaid > discountedTarget) {
+                amountUsedForDays = discountedTarget;
+                walletBalance = totalPaid - discountedTarget;
+            }
+
+            const totalDaysToGrant = Math.ceil(amountUsedForDays / perDayCharge);
+            let finalDays = Math.min(totalDaysToGrant, maxAllowedDays);
+
+            if (paymentIntent.purchaseType === 'REGISTRATION' || paymentIntent.packageName?.toLowerCase().includes("registration")) {
+                if (paymentIntent.packageName?.toLowerCase().includes("gold") || paymentIntent.packageName?.toLowerCase().includes("lifetime")) {
+                    paymentIntent.originalDuration = 3652;
+                } else if (paymentIntent.packageName?.toLowerCase().includes("silver") || paymentIntent.packageName?.toLowerCase().includes("yearly")) {
+                    paymentIntent.originalDuration = 365;
+                }
+                finalDays = paymentIntent.originalDuration || 365;
+                paymentIntent.partialTotalTarget = discountedTarget;
+                paymentIntent.perDayCharge = discountedTarget / finalDays;
+                paymentIntent.maxAllowedDays = finalDays;
+            }
+
+            if (totalPaid >= discountedTarget) {
+                finalDays = paymentIntent.originalDuration || 365;
+                paymentIntent.partialTotalTarget = discountedTarget;
+                paymentIntent.perDayCharge = discountedTarget / finalDays;
+                paymentIntent.maxAllowedDays = finalDays;
+            }
+
+            paymentIntent.amountPaid = totalPaid;
+            paymentIntent.remainingAmount = Math.max(0, discountedTarget - totalPaid);
+            paymentIntent.walletBalance = walletBalance;
+
+            if (!paymentIntent.serviceStartDate) {
+                paymentIntent.serviceStartDate = new Date();
+            }
+            const expiryDate = new Date(paymentIntent.serviceStartDate);
+            expiryDate.setDate(expiryDate.getDate() + finalDays + (paymentIntent.manualDaysAdjustment || 0));
+            paymentIntent.currentExpiryDate = expiryDate;
+
+            if (totalPaid >= (discountedTarget - 1)) {
+                paymentIntent.status = 'PAID';
+            } else {
+                paymentIntent.status = 'PENDING_BANK_TRANSFER';
+            }
+            await paymentIntent.save();
+        } else {
+            const originalPrice = paymentIntent.originalPlanAmount || paymentIntent.totalAmount;
+            const discountedTarget = Math.max(0, originalPrice - (paymentIntent.discount || 0));
+            paymentIntent.totalAmount = originalPrice;
+            paymentIntent.amountPaid = parsedAmount;
+            paymentIntent.remainingAmount = Math.max(0, discountedTarget - parsedAmount);
+            paymentIntent.status = 'PAID';
+            paymentIntent.verifiedAt = new Date();
+            paymentIntent.verifiedBy = adminId;
+            if (!paymentIntent.serviceStartDate) {
+                paymentIntent.serviceStartDate = new Date();
+            }
+            const isLifetime = (paymentIntent.originalDuration === 3652 || paymentIntent.baseAmount === 10000 || paymentIntent.totalAmount >= 10000 || paymentIntent.packageName?.toLowerCase().includes("gold") || paymentIntent.packageName?.toLowerCase().includes("lifetime"));
+            const durationDays = paymentIntent.originalDuration || (isLifetime ? 3652 : 365);
+            const expiryDate = new Date(paymentIntent.serviceStartDate);
+            expiryDate.setDate(expiryDate.getDate() + durationDays + (paymentIntent.manualDaysAdjustment || 0));
+            paymentIntent.currentExpiryDate = isLifetime ? null : expiryDate;
+            await paymentIntent.save();
+        }
+
+        // --- Entitlements & User Sync ---
+        if (paymentIntent.purchaseType === 'REGISTRATION') {
+            const target = paymentIntent.partialTotalTarget || paymentIntent.totalAmount;
+            const isFull = paymentIntent.amountPaid >= (target - 1);
+            const isLifetime = (paymentIntent.originalDuration === 3652 || paymentIntent.baseAmount === 10000 || paymentIntent.totalAmount >= 10000 || paymentIntent.packageName?.toLowerCase().includes("gold") || paymentIntent.packageName?.toLowerCase().includes("lifetime"));
+            const detectedType = isLifetime ? 'LIFETIME' : 'YEARLY';
+
+            const regEntitlement = await Entitlement.findOne({
+                userId: paymentIntent.userId,
+                type: 'REGISTRATION',
+                status: { $in: ['ACTIVE', 'SUSPENDED'] }
+            });
+
+            if (regEntitlement) {
+                regEntitlement.startDate = paymentIntent.serviceStartDate;
+                regEntitlement.endDate = isLifetime ? null : paymentIntent.currentExpiryDate;
+                regEntitlement.status = 'ACTIVE';
+                if (comment) regEntitlement.remarks = regEntitlement.remarks ? `${regEntitlement.remarks} | ${comment}` : comment;
+                await regEntitlement.save();
+            } else {
+                await grantEntitlement({
+                    userId: paymentIntent.userId,
+                    type: 'REGISTRATION',
+                    isLifetime,
+                    days: isLifetime ? 3652 : 365,
+                    startDate: paymentIntent.serviceStartDate,
+                    grantedBy: 'ADMIN',
+                    grantReason: paymentMethod === 'RAZORPAY' ? 'ONLINE_PAYMENT' : 'OFFLINE_PAYMENT',
+                    sourceRefId: paymentIntent._id.toString(),
+                    remarks: comment || null
+                });
+            }
+
+            await User.findByIdAndUpdate(paymentIntent.userId, {
+                registrationStatus: 'ACTIVE',
+                registrationFeePaid: isFull,
+                registrationExpiry: isLifetime ? null : paymentIntent.currentExpiryDate,
+                registrationType: detectedType
+            });
+
+            const trialExists = await Entitlement.findOne({
+                userId: paymentIntent.userId,
+                type: 'PLAN',
+                grantReason: 'REGISTRATION_TRIAL'
+            });
+
+            if (!trialExists && paymentIntent.preferredPlanId) {
+                let trialDays = isLifetime ? 7 : 5;
+                try {
+                    const settings = await GeneralSettings.find({
+                        key: { $in: ['trial_days_yearly', 'trial_days_lifetime'] }
+                    });
+                    const keyToFind = isLifetime ? 'trial_days_lifetime' : 'trial_days_yearly';
+                    const setting = settings.find(s => s.key === keyToFind);
+                    if (setting) trialDays = parseInt(setting.value) || (isLifetime ? 7 : 5);
+                } catch (err) {
+                    console.error("Error fetching trial settings in adminApproveWithProof:", err);
+                }
+
+                await grantEntitlement({
+                    userId: paymentIntent.userId,
+                    type: 'PLAN',
+                    resourceId: paymentIntent.preferredPlanId,
+                    segmentId: paymentIntent.preferredSegmentId,
+                    days: trialDays,
+                    isLifetime: false,
+                    grantedBy: 'ADMIN',
+                    grantReason: 'REGISTRATION_TRIAL',
+                    sourceRefId: paymentIntent._id.toString()
+                });
+            }
+        } else if (paymentIntent.purchaseType === 'PLAN') {
+            await Entitlement.updateMany(
+                {
+                    userId: paymentIntent.userId,
+                    type: 'PLAN',
+                    grantReason: 'REGISTRATION_TRIAL',
+                    status: 'ACTIVE'
+                },
+                {
+                    $set: { status: 'REVOKED', remarks: 'Revoked due to plan purchase/approval' }
+                }
+            );
+
+            const planEntitlement = await Entitlement.findOne({
+                userId: paymentIntent.userId,
+                type: 'PLAN',
+                resourceId: paymentIntent.planId,
+                sourceRefId: paymentIntent._id.toString(),
+                status: { $in: ['ACTIVE', 'SUSPENDED'] }
+            });
+
+            const daysToGrant = Math.ceil((paymentIntent.currentExpiryDate - paymentIntent.serviceStartDate) / (1000 * 60 * 60 * 24)) || 30;
+
+            if (planEntitlement) {
+                planEntitlement.startDate = paymentIntent.serviceStartDate;
+                planEntitlement.endDate = paymentIntent.currentExpiryDate;
+                planEntitlement.status = 'ACTIVE';
+                if (paymentIntent.preferredSegmentId) planEntitlement.segmentId = paymentIntent.preferredSegmentId;
+                if (comment) planEntitlement.remarks = planEntitlement.remarks ? `${planEntitlement.remarks} | ${comment}` : comment;
+                await planEntitlement.save();
+            } else {
+                await grantEntitlement({
+                    userId: paymentIntent.userId,
+                    type: 'PLAN',
+                    resourceId: paymentIntent.planId,
+                    days: daysToGrant,
+                    startDate: paymentIntent.serviceStartDate,
+                    grantedBy: 'ADMIN',
+                    grantReason: paymentMethod === 'RAZORPAY' ? 'ONLINE_PAYMENT' : 'OFFLINE_PAYMENT',
+                    sourceRefId: paymentIntent._id.toString(),
+                    segmentId: paymentIntent.preferredSegmentId,
+                    remarks: comment || null
+                });
+            }
+
+            if (paymentIntent.preferredSegmentId) {
+                await userActiveSegmentModel.findOneAndUpdate(
+                    { userId: paymentIntent.userId, segmentId: paymentIntent.preferredSegmentId },
+                    {
+                        isActive: true,
+                        purchaseDate: paymentIntent.serviceStartDate || new Date(),
+                        expiryDate: paymentIntent.currentExpiryDate
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+
+            const plan = await SegmentsPlan.findById(paymentIntent.planId);
+            const correctedPackageName = plan ? `${plan.segmentsName || ''} - ${plan.planName}` : (paymentIntent.packageName || 'Custom Plan');
+
+            let planPurchase = await PlanPurchase.findOne({
+                userId: paymentIntent.userId,
+                $or: [
+                    { linkedPaymentIntent: paymentIntent._id },
+                    { remarks: { $regex: paymentIntent._id.toString() } }
+                ]
+            });
+
+            const isFullPlan = paymentIntent.amountPaid >= (paymentIntent.partialTotalTarget || paymentIntent.totalAmount);
+
+            if (planPurchase) {
+                planPurchase.packageName = correctedPackageName;
+                planPurchase.startDate = paymentIntent.serviceStartDate;
+                planPurchase.endDate = paymentIntent.currentExpiryDate;
+                planPurchase.status = 'active';
+                planPurchase.isPartial = !isFullPlan;
+                if (isFullPlan) planPurchase.validity = paymentIntent.originalDuration || 30;
+                if (comment) planPurchase.remarks = planPurchase.remarks ? `${planPurchase.remarks} | ${comment}` : comment;
+                await planPurchase.save();
+            } else {
+                await PlanPurchase.create({
+                    userId: paymentIntent.userId,
+                    packageName: correctedPackageName,
+                    validity: isFullPlan ? (paymentIntent.originalDuration || 30) : (paymentIntent.maxAllowedDays || 30),
+                    startDate: paymentIntent.serviceStartDate,
+                    endDate: paymentIntent.currentExpiryDate,
+                    status: 'active',
+                    basicAmount: paymentIntent.baseAmount,
+                    cgstAmount: paymentIntent.gstAmount / 2,
+                    sgstAmount: paymentIntent.gstAmount / 2,
+                    totalPlanAmount: paymentIntent.totalAmount,
+                    gstAmount: paymentIntent.gstAmount,
+                    discount: paymentIntent.discount || 0,
+                    paymentMethod: paymentMethod === 'RAZORPAY' ? 'ONLINE' : 'OFFLINE',
+                    isPartial: !isFullPlan,
+                    remarks: `LinkedIntent:${paymentIntent._id.toString()}${comment ? ' | Admin: ' + comment : ''}`
+                });
+            }
+        }
+
+        // --- Invoice Sync ---
+        try {
+            let invoice = await invoiceModel.findOne({
+                userId: paymentIntent.userId,
+                paymentRefId: paymentIntent._id.toString()
+            });
+
+            const gstPercent = paymentIntent.gstRateUsed || 18;
+            const totalPaid = paymentIntent.amountPaid;
+            const totalBase = Math.round((totalPaid / (1 + gstPercent / 100)) * 100) / 100;
+            const totalGst = totalPaid - totalBase;
+
+            if (!invoice) {
+                const count = await invoiceModel.countDocuments();
+                const invoiceNumber = `INV-${Date.now()}-${count + 1}`;
+                invoice = await invoiceModel.create({
+                    userId: paymentIntent.userId,
+                    invoiceNumber: invoiceNumber,
+                    paymentMode: paymentMethod === 'RAZORPAY' ? 'ONLINE' : 'OFFLINE',
+                    amount: totalPaid,
+                    gstAmount: totalGst,
+                    paymentRefId: paymentIntent._id.toString(),
+                    generatedBy: 'ADMIN',
+                    status: 'paid'
+                });
+            } else {
+                invoice.amount = totalPaid;
+                invoice.gstAmount = totalGst;
+                invoice.paymentMode = paymentMethod === 'RAZORPAY' ? 'ONLINE' : 'OFFLINE';
+                await invoice.save();
+            }
+        } catch (invoiceErr) {
+            console.error("Error managing invoice in adminApproveWithProof:", invoiceErr);
+        }
+
+        // --- Audit Activity Log ---
+        try {
+            await activityLogService.logPaymentApproved({
+                userId: paymentIntent.userId,
+                amount: parsedAmount,
+                paymentId: utrNumber,
+                performedBy: adminId,
+                req
+            });
+        } catch (logErr) {
+            console.error("Error logging payment approved in adminApproveWithProof:", logErr);
+        }
+
+        return {
+            success: true,
+            status: paymentIntent.status,
+            amountPaid: paymentIntent.amountPaid,
+            remainingAmount: paymentIntent.remainingAmount,
+            expiryDate: paymentIntent.currentExpiryDate,
+            utrNumber: paymentIntent.utrNumber
+        };
+    } catch (error) {
+        throw error;
+    }
+};
+
 export const handleExpiredPartials = async () => {
     const now = new Date();
     // 1. Find partial intents that have expired and have a wallet balance
@@ -1884,24 +2302,48 @@ export const expireAbandonedIntents = async (thresholdMinutes = 10) => {
         try {
             const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
 
-            const result = await PaymentIntent.updateMany(
-                {
-                    status: 'CREATED',
-                    $or: [
-                        { amountPaid: { $exists: false } },
-                        { amountPaid: 0 },
-                        { amountPaid: null }
-                    ],
-                    createdAt: { $lt: cutoff }
-                },
-                { $set: { status: 'FAILED' } }
-            );
+            // 1. Fetch candidates older than cutoff
+            const candidates = await PaymentIntent.find({
+                status: 'CREATED',
+                $or: [
+                    { amountPaid: { $exists: false } },
+                    { amountPaid: 0 },
+                    { amountPaid: null }
+                ],
+                createdAt: { $lt: cutoff }
+            }).limit(50);
 
-            if (result.modifiedCount > 0) {
-                console.log(`[expireAbandonedIntents] Marked ${result.modifiedCount} abandoned PaymentIntent(s) as FAILED (threshold: ${thresholdMinutes} min).`);
+            let verifiedCount = 0;
+            let expiredCount = 0;
+
+            for (const cand of candidates) {
+                // If this intent has a genuine Razorpay order ID, double-check Razorpay API first!
+                if (cand.razorpayOrderId && cand.razorpayOrderId.startsWith('order_')) {
+                    try {
+                        const payments = await getRazorpay().orders.fetchPayments(cand.razorpayOrderId);
+                        const capturedPayment = payments?.items?.find(p => p.status === 'captured');
+                        if (capturedPayment) {
+                            console.log(`[expireAbandonedIntents] Detected captured payment ${capturedPayment.id} for order ${cand.razorpayOrderId}! Auto-verifying instead of failing.`);
+                            await verifyPayment(cand.razorpayOrderId, capturedPayment.id, null);
+                            verifiedCount++;
+                            continue; // Skip failing this intent
+                        }
+                    } catch (rzpErr) {
+                        console.warn(`[expireAbandonedIntents] Could not check order ${cand.razorpayOrderId} with Razorpay: ${rzpErr.message}`);
+                    }
+                }
+
+                // If not paid on Razorpay, safely mark as FAILED
+                cand.status = 'FAILED';
+                await cand.save();
+                expiredCount++;
             }
 
-            return { expired: result.modifiedCount };
+            if (verifiedCount > 0 || expiredCount > 0) {
+                console.log(`[expireAbandonedIntents] Processed: ${verifiedCount} auto-verified & activated, ${expiredCount} marked as FAILED (cutoff: ${thresholdMinutes}m).`);
+            }
+
+            return { verified: verifiedCount, expired: expiredCount };
         } catch (error) {
             attempt++;
 

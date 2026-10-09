@@ -22,6 +22,7 @@ const acquisitionRoutes = () => {
     // Offline Flow (Admin)
     Router.post("/admin-onboard", auth.tokenVerified, adminOnly, acquisitionController.adminOnboardUser);
     Router.post("/approve-partial-payment", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.approvePartialPayment);
+    Router.post("/admin-approve-with-proof", auth.tokenVerified, adminStrictOnlyNoStaff, (req, res, next) => { req.query.type = 'payment-proof'; next(); }, upload.array('file', 5), acquisitionController.adminApproveWithProof);
     Router.post("/reject-partial-payment", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.rejectPartialPayment);
     Router.post("/update-payment-discount", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.updatePaymentDiscount);
     Router.post("/update-subscription-metadata", auth.tokenVerified, adminStrictOnlyNoStaff, acquisitionController.updateSubscriptionMetadata);

@@ -151,3 +151,30 @@ export const updateSubscriptionMetadata = async (req, res) => {
     }
 };
 
+export const adminApproveWithProof = async (req, res) => {
+    try {
+        const { paymentIntentId, utrNumber, amountPaid, paymentMethod, historyId, comment, discount } = req.body;
+        const files = req.files || [];
+        const adminId = req.user?._id || req.user?.userId;
+        if (!paymentIntentId) throw new Error("Missing Payment Intent ID");
+        if (!utrNumber || !utrNumber.trim()) throw new Error("Transaction UTR or Reference ID is required");
+
+        const result = await acquisitionService.adminApproveWithProof({
+            paymentIntentId,
+            utrNumber: utrNumber.trim(),
+            amountPaid,
+            paymentMethod: paymentMethod || 'RAZORPAY',
+            historyId,
+            comment,
+            discount: discount ? Number(discount) : 0,
+            adminId,
+            files,
+            req
+        });
+        res.status(200).json({ status: 200, message: "Payment approved with proof successfully", data: result });
+    } catch (error) {
+        console.error("Error in adminApproveWithProof controller:", error);
+        res.status(400).json({ status: 400, message: error.message });
+    }
+};
+

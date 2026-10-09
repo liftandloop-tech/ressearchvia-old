@@ -1764,6 +1764,446 @@ class PendingBankTransfersController extends GetxController {
     }
   }
 
+  Future<bool> adminApproveWithProof({
+    required String paymentIntentId,
+    required String utrNumber,
+    required double amountPaid,
+    String paymentMethod = 'RAZORPAY',
+    String? historyId,
+    String? comment,
+    double? discount,
+    List<PlatformFile>? files,
+  }) async {
+    if (!canApprovePayments) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can approve payments.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return false;
+    }
+
+    try {
+      isLoading.value = true;
+      final success = await _acquisitionService.adminApproveWithProof(
+        paymentIntentId: paymentIntentId,
+        utrNumber: utrNumber,
+        amountPaid: amountPaid,
+        paymentMethod: paymentMethod,
+        historyId: historyId,
+        comment: comment,
+        discount: discount,
+        files: files,
+      );
+      if (success) {
+        await fetchPendingTransfers();
+        if (Get.isRegistered<UserManagementController>()) {
+          Get.find<UserManagementController>().fetchUsers();
+        }
+        return true;
+      }
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void showApproveWithProofDialog(
+    Map<String, dynamic> payment, {
+    Map<String, dynamic>? installment,
+    Function(Map<String, dynamic>)? onPaymentUpdated,
+  }) {
+    if (!canApprovePayments) {
+      Get.snackbar(
+        "Permission Denied",
+        "Only administrators can approve payments.",
+        backgroundColor: Colors.red[100],
+        colorText: Colors.red[900],
+      );
+      return;
+    }
+
+    final paymentIntentId = payment['_id']?.toString() ?? '';
+    final String? historyId = installment?['_id']?.toString();
+
+    double defaultAmount = 0.0;
+    if (installment != null) {
+      defaultAmount = (installment['amountPaid'] is num)
+          ? (installment['amountPaid'] as num).toDouble()
+          : (double.tryParse(installment['amountPaid']?.toString() ?? '0') ?? 0.0);
+    } else {
+      final rem = (payment['remainingAmount'] is num)
+          ? (payment['remainingAmount'] as num).toDouble()
+          : (double.tryParse(payment['remainingAmount']?.toString() ?? '0') ?? 0.0);
+      final tot = (payment['totalAmount'] is num)
+          ? (payment['totalAmount'] as num).toDouble()
+          : (double.tryParse(payment['totalAmount']?.toString() ?? '0') ?? 0.0);
+      final paid = (payment['amountPaid'] is num)
+          ? (payment['amountPaid'] as num).toDouble()
+          : (double.tryParse(payment['amountPaid']?.toString() ?? '0') ?? 0.0);
+
+      if (rem > 0) {
+        defaultAmount = rem;
+      } else if (tot > paid && (tot - paid) > 0) {
+        defaultAmount = tot - paid;
+      } else {
+        defaultAmount = tot > 0 ? tot : 5900.0;
+      }
+    }
+
+    final TextEditingController utrController = TextEditingController(
+      text: (installment != null
+              ? installment['utrNumber']?.toString()
+              : payment['utrNumber']?.toString()) ??
+          '',
+    );
+    final TextEditingController amountController = TextEditingController(
+      text: defaultAmount > 0
+          ? (defaultAmount % 1 == 0
+              ? defaultAmount.toInt().toString()
+              : defaultAmount.toStringAsFixed(2))
+          : '',
+    );
+    final TextEditingController commentController = TextEditingController();
+    final TextEditingController discountController = TextEditingController();
+
+    final selectedPaymentMethod = 'RAZORPAY'.obs;
+    final selectedFileNames = <String>[].obs;
+    List<PlatformFile> selectedFiles = [];
+
+    Future<void> pickScreenshot() async {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+        allowMultiple: true,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        selectedFiles = result.files;
+        selectedFileNames.value = result.files.map((f) => f.name).toList();
+      }
+    }
+
+    final userObj = payment['userId'];
+    final String clientName = (userObj is Map ? (userObj['fullName'] ?? userObj['name']) : null) ?? 'Client';
+    final String clientMobile = (userObj is Map ? (userObj['mobile'] ?? userObj['phone']) : null) ?? '';
+    final String planName = payment['packageName'] ?? (payment['purchaseType'] == 'REGISTRATION' ? 'Registration Fee' : 'Plan');
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.verified, color: Colors.green, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Approve Payment (UTR & Slip)",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    "$clientName ${clientMobile.isNotEmpty ? '($clientMobile)' : ''} • $planName",
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 20, color: Colors.blue),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "Approving will record the transaction UTR, link screenshot proof, activate the client's entitlements immediately, and issue an invoice.",
+                          style: TextStyle(fontSize: 12, color: Colors.blue[900]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    const Text(
+                      "Transaction UTR / Reference ID",
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text("*", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: utrController,
+                  decoration: const InputDecoration(
+                    hintText: "e.g. pay_XXXXX or 12-digit Bank UTR / RRN",
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.tag, size: 20),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                "Amount Paid",
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text("*", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: amountController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              prefixText: "₹ ",
+                              hintText: "0.00",
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Payment Method",
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Obx(() => DropdownButtonFormField<String>(
+                            value: selectedPaymentMethod.value,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'RAZORPAY', child: Text('Razorpay / Online')),
+                              DropdownMenuItem(value: 'BANK_TRANSFER', child: Text('Bank Transfer (NEFT/IMPS)')),
+                              DropdownMenuItem(value: 'UPI', child: Text('UPI / QR Code')),
+                              DropdownMenuItem(value: 'CASH', child: Text('Cash / Other')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) selectedPaymentMethod.value = val;
+                            },
+                          )),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                const Text(
+                  "Payment Screenshot / Slip (Optional)",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: pickScreenshot,
+                      icon: const Icon(Icons.upload_file, size: 18),
+                      label: Obx(() => Text(
+                        selectedFileNames.isEmpty
+                            ? "UPLOAD SCREENSHOT"
+                            : "${selectedFileNames.length} File(s) Selected",
+                      )),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Obx(() => Text(
+                        selectedFileNames.isEmpty
+                            ? "No screenshot selected (optional if verified in Razorpay)"
+                            : selectedFileNames.join(", "),
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      )),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                const Text(
+                  "Admin Remark / Note (Optional)",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: commentController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    hintText: "Add note (e.g. Verified via Razorpay dashboard)...",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    const Text(
+                      "Discount Applied (₹, Optional):",
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 120,
+                      child: TextField(
+                        controller: discountController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          prefixText: "₹ ",
+                          hintText: "0",
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text("CANCEL"),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            icon: const Icon(Icons.check_circle_outline, size: 18),
+            label: const Text(
+              "APPROVE & ACTIVATE",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onPressed: () async {
+              final utr = utrController.text.trim();
+              if (utr.isEmpty) {
+                Get.snackbar("UTR Required", "Please enter the Transaction UTR or Reference ID",
+                    backgroundColor: Colors.red, colorText: Colors.white);
+                return;
+              }
+              final amt = double.tryParse(amountController.text);
+              if (amt == null || amt <= 0) {
+                Get.snackbar("Invalid Amount", "Please enter a valid amount greater than 0",
+                    backgroundColor: Colors.red, colorText: Colors.white);
+                return;
+              }
+              final discount = double.tryParse(discountController.text) ?? 0.0;
+
+              Get.showOverlay(
+                asyncFunction: () async {
+                  final success = await adminApproveWithProof(
+                    paymentIntentId: paymentIntentId,
+                    utrNumber: utr,
+                    amountPaid: amt,
+                    paymentMethod: selectedPaymentMethod.value,
+                    historyId: historyId,
+                    comment: commentController.text.trim(),
+                    discount: discount > 0 ? discount : null,
+                    files: selectedFiles.isNotEmpty ? selectedFiles : null,
+                  );
+
+                  if (success) {
+                    Get.back(); // close dialog
+                    Get.snackbar(
+                      "Success",
+                      "Payment approved & verified! Entitlements activated.",
+                      backgroundColor: Colors.green,
+                      colorText: Colors.white,
+                    );
+                    if (onPaymentUpdated != null) {
+                      payment['status'] = 'PAID';
+                      payment['amountPaid'] = amt;
+                      payment['utrNumber'] = utr;
+                      onPaymentUpdated(payment);
+                    }
+                  } else {
+                    Get.snackbar(
+                      "Error",
+                      "Failed to approve payment. Please check server logs.",
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                    );
+                  }
+                },
+                loadingWidget: const Center(
+                  child: Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text("Approving payment & activating entitlements..."),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> updateDiscount(String intentId, double discount) async {
     if (!canTakePaymentActions) {
       Get.snackbar(
