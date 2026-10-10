@@ -293,53 +293,17 @@ class ApplicantProfileController extends GetxController {
     }
   }
 
-  Future<bool> approveApplicant() async {
-    roleError.value = '';
-    supervisorError.value = '';
-    mpinError.value = '';
+  final isPromoting = false.obs;
+  final isRejecting = false.obs;
+  final isUpdatingStage = false.obs;
 
-    bool hasErrors = false;
-    final hasRole = (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty) ||
-        selectedRole.value.isNotEmpty;
-    if (!hasRole) {
-      roleError.value = 'Please select a role for the new staff member';
-      hasErrors = true;
-    }
-
-    final hasSupervisor = selectedSupervisorId.value != null && selectedSupervisorId.value!.isNotEmpty;
-    if (!hasSupervisor) {
-      supervisorError.value = 'Please select reporting supervisor';
-      hasErrors = true;
-    }
-
-    final mpin = mpinController.text.trim();
-    if (mpin.isEmpty || mpin.length != 4 || int.tryParse(mpin) == null) {
-      mpinError.value = 'Enter a valid 4-digit numeric MPIN';
-      hasErrors = true;
-    }
-
-    if (hasErrors) {
-      Get.snackbar('Validation Alert', 'Please fill all required fields marked with *', backgroundColor: Colors.orange.withValues(alpha: 0.1));
-      return false;
-    }
-
-    isApproving.value = true;
+  Future<bool> promoteToStaff({String? note}) async {
+    isPromoting.value = true;
     try {
-      final isDirectAdmin = selectedSupervisorId.value == 'admin';
-      final data = {
-        if (selectedRoleId.value != null && selectedRoleId.value!.isNotEmpty)
-          'roleId': selectedRoleId.value,
-        'role': selectedRole.value,
-        if (selectedDepartment.value.isNotEmpty)
-          'deparment': selectedDepartment.value,
-        'mpin': mpin,
-        'assignedDirector': isDirectAdmin ? 'admin' : selectedSupervisorId.value,
-        'assignedDirectorName': isDirectAdmin ? 'Admin' : selectedSupervisorName.value,
-        'isViewOnly': isViewOnly.value,
-        'joiningDate': joiningDateController.text.trim().isEmpty ? null : joiningDateController.text.trim(),
-      };
-
-      final success = await _applicantService.approveApplicant(applicantId.value, data);
+      final success = await _applicantService.promoteApplicant(
+        applicantId.value,
+        note: note,
+      );
       if (success) {
         await fetchDetails(showLoading: false);
         applicant.refresh();
@@ -352,13 +316,90 @@ class ApplicantProfileController extends GetxController {
         if (Get.isRegistered<StaffManagementController>()) {
           Get.find<StaffManagementController>().fetchStaff();
         }
+        Get.snackbar(
+          'Candidate Promoted',
+          '${applicant.value?.name ?? "Applicant"} has been promoted to Staff. You can configure their Role, Reporting Authority, and MPIN from the Staff page.',
+          backgroundColor: Colors.green.withValues(alpha: 0.15),
+          duration: const Duration(seconds: 4),
+        );
         return true;
       } else {
-        Get.snackbar('Error', 'Failed to approve applicant', backgroundColor: Colors.red.withValues(alpha: 0.1));
+        Get.snackbar('Promotion Failed', 'Failed to promote applicant to staff', backgroundColor: Colors.red.withValues(alpha: 0.15));
         return false;
       }
+    } catch (e) {
+      Get.snackbar('Error', 'An error occurred during promotion: $e', backgroundColor: Colors.red.withValues(alpha: 0.15));
+      return false;
     } finally {
-      isApproving.value = false;
+      isPromoting.value = false;
+    }
+  }
+
+  // Alias for backward compatibility
+  Future<bool> approveApplicant() async {
+    return promoteToStaff();
+  }
+
+  Future<bool> rejectApplicant({String? reason}) async {
+    isRejecting.value = true;
+    try {
+      final success = await _applicantService.rejectApplicant(
+        applicantId.value,
+        reason: reason,
+      );
+      if (success) {
+        await fetchDetails(showLoading: false);
+        applicant.refresh();
+        if (Get.isRegistered<ApplicantsListController>()) {
+          Get.find<ApplicantsListController>().fetchApplicants();
+        }
+        Get.snackbar(
+          'Candidate Rejected',
+          '${applicant.value?.name ?? "Applicant"} application has been rejected.',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+        );
+        return true;
+      } else {
+        Get.snackbar('Rejection Failed', 'Failed to reject applicant', backgroundColor: Colors.red.withValues(alpha: 0.15));
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'An error occurred during rejection: $e', backgroundColor: Colors.red.withValues(alpha: 0.15));
+      return false;
+    } finally {
+      isRejecting.value = false;
+    }
+  }
+
+  Future<bool> updateStage(String newStage, {String? note}) async {
+    isUpdatingStage.value = true;
+    try {
+      final success = await _applicantService.updateApplicantStage(
+        applicantId.value,
+        newStage,
+        note: note,
+      );
+      if (success) {
+        await fetchDetails(showLoading: false);
+        applicant.refresh();
+        if (Get.isRegistered<ApplicantsListController>()) {
+          Get.find<ApplicantsListController>().fetchApplicants();
+        }
+        Get.snackbar(
+          'Stage Updated',
+          'Applicant stage updated to $newStage',
+          backgroundColor: Colors.blue.withValues(alpha: 0.15),
+        );
+        return true;
+      } else {
+        Get.snackbar('Update Failed', 'Failed to update applicant stage', backgroundColor: Colors.red.withValues(alpha: 0.15));
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'An error occurred updating stage: $e', backgroundColor: Colors.red.withValues(alpha: 0.15));
+      return false;
+    } finally {
+      isUpdatingStage.value = false;
     }
   }
 }

@@ -367,6 +367,7 @@ class StaffModel {
   final String? photoUrl;
   final String? resumeUrl;
   final String stage;
+  final String? rejectionReason;
   final String? dob;
   final String? gender;
   final int? experienceYears;
@@ -418,6 +419,7 @@ class StaffModel {
     this.photoUrl,
     this.resumeUrl,
     this.stage = 'Applicant',
+    this.rejectionReason,
     this.dob,
     this.gender,
     this.experienceYears,
@@ -516,6 +518,7 @@ class StaffModel {
       photoUrl: _safeString(json['photoUrl']),
       resumeUrl: _safeString(json['resumeUrl']),
       stage: _safeString(json['stage']) ?? 'Applicant',
+      rejectionReason: _safeString(json['rejectionReason']),
       dob: _safeString(json['dob']),
       gender: _safeString(json['gender']),
       experienceYears: json['experienceYears'] != null

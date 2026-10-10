@@ -4,7 +4,6 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/recruitment/applicant_profile.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
-import 'package:spresearch_web/ui/widgets/button.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
@@ -70,7 +69,7 @@ class ApplicantProfileScreen extends StatelessWidget {
                     const SizedBox(height: 18),
 
                     // Minimal Hero Header Card
-                    _buildHeroCard(context, applicant),
+                    _buildHeroCard(context, controller, applicant),
                     const SizedBox(height: 20),
 
                     // Sleek Segmented Tab Selector
@@ -106,15 +105,30 @@ class ApplicantProfileScreen extends StatelessWidget {
   // ---------------------------------------------------------------------------
   // Top Header Area
   // ---------------------------------------------------------------------------
+  static const List<Map<String, String>> _kAllStages = [
+    {'key': 'APPLIED', 'label': 'Applied'},
+    {'key': 'SCREENING', 'label': 'Screening'},
+    {'key': 'SHORTLISTED', 'label': 'Shortlisted'},
+    {'key': 'INTERVIEW', 'label': 'Interview'},
+    {'key': 'SELECTED', 'label': 'Selected'},
+    {'key': 'OFFER_SENT', 'label': 'Offer Sent'},
+    {'key': 'PROMOTED', 'label': 'Promote to Staff'},
+    {'key': 'REJECTED', 'label': 'Reject'},
+    {'key': 'WITHDRAWN', 'label': 'Withdrawn'},
+  ];
+
   Widget _buildHeader(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
     final authController = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
     final currentUser = authController?.user.value;
     final canApproveApplicant = currentUser?.isAdmin == true || (currentUser?.has('staff.approve_applicant') ?? false);
 
-    final isApproved = applicant.stage == 'Employee' ||
+    final isApproved = applicant.stage.toUpperCase() == 'PROMOTED' ||
+        applicant.stage == 'Employee' ||
         applicant.stage == 'OFFER_ACCEPTED' ||
-        applicant.rawJson?['convertedToStaffId'] != null;
-    final convertedId = applicant.rawJson?['convertedToStaffId'];
+        applicant.rawJson?['convertedToStaffId'] != null ||
+        applicant.rawJson?['convertedStaffId'] != null;
+    final convertedId = applicant.rawJson?['convertedToStaffId'] ?? applicant.rawJson?['convertedStaffId'];
+    final isRejected = applicant.stage.toUpperCase() == 'REJECTED';
 
     return Row(
       children: [
@@ -151,6 +165,54 @@ class ApplicantProfileScreen extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        // Stage update quick dropdown
+        if (canApproveApplicant && !isApproved) ...[
+          PopupMenuButton<String>(
+            tooltip: 'Update Applicant Stage',
+            onSelected: (val) => _showUpdateStageDialog(context, controller, applicant, val),
+            itemBuilder: (ctx) => _kAllStages.map((s) => PopupMenuItem(
+                  value: s['key']!,
+                  child: Row(
+                    children: [
+                      Icon(
+                        s['key'] == 'PROMOTED'
+                            ? Icons.how_to_reg_rounded
+                            : s['key'] == 'REJECTED'
+                                ? Icons.cancel_outlined
+                                : Icons.flag_outlined,
+                        size: 16,
+                        color: s['key'] == 'PROMOTED'
+                            ? const Color(0xFF16A34A)
+                            : s['key'] == 'REJECTED'
+                                ? const Color(0xFFDC2626)
+                                : const Color(0xFF475569),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(s['label']!, style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                )).toList(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.swap_horiz_rounded, size: 16, color: Color(0xFF475569)),
+                  SizedBox(width: 6),
+                  Text('Update Stage', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                  SizedBox(width: 4),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
+
         if (isApproved && convertedId != null) ...[
           ElevatedButton.icon(
             onPressed: () => Get.toNamed('/staff/details/$convertedId'),
@@ -165,12 +227,27 @@ class ApplicantProfileScreen extends StatelessWidget {
             ),
           ),
         ] else if (canApproveApplicant) ...[
+          // Operation 1: Reject
+          OutlinedButton.icon(
+            onPressed: () => _showRejectDialog(context, controller, applicant),
+            icon: const Icon(Icons.close_rounded, size: 15),
+            label: const Text('Reject', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFDC2626),
+              side: const BorderSide(color: Color(0xFFFCA5A5)),
+              backgroundColor: isRejected ? const Color(0xFFFEF2F2) : Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Operation 2: Promote to Staff
           ElevatedButton.icon(
-            onPressed: () => _showApproveDialog(context, controller, applicant),
+            onPressed: () => _showPromoteDialog(context, controller, applicant),
             icon: const Icon(Icons.how_to_reg_rounded, size: 16),
             label: const Text('Promote to Staff', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryBlue,
+              backgroundColor: const Color(0xFF16A34A),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -185,7 +262,7 @@ class ApplicantProfileScreen extends StatelessWidget {
   // ---------------------------------------------------------------------------
   // Minimal Hero Card
   // ---------------------------------------------------------------------------
-  Widget _buildHeroCard(BuildContext context, StaffModel applicant) {
+  Widget _buildHeroCard(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
     final stage = applicant.stage.isNotEmpty ? applicant.stage : 'Applied';
     final w = applicant.walkInForm;
 
@@ -239,8 +316,26 @@ class ApplicantProfileScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Stage Pill
-                        _buildStagePill(stage),
+                        // Interactive Stage Pill Dropdown
+                        PopupMenuButton<String>(
+                          tooltip: 'Click to change stage',
+                          onSelected: (val) => _showUpdateStageDialog(context, controller, applicant, val),
+                          itemBuilder: (ctx) => _kAllStages.map((s) => PopupMenuItem(
+                                value: s['key']!,
+                                child: Text(s['label']!),
+                              )).toList(),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildStagePill(stage),
+                                const SizedBox(width: 3),
+                                const Icon(Icons.arrow_drop_down, size: 16, color: Color(0xFF64748B)),
+                              ],
+                            ),
+                          ),
+                        ),
                         if (applicant.staffId.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -268,6 +363,54 @@ class ApplicantProfileScreen extends StatelessWidget {
               ),
             ],
           ),
+          if (applicant.stage.toUpperCase() == 'REJECTED') ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.cancel_outlined, size: 18, color: Color(0xFFDC2626)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Application Rejected${(applicant.rejectionReason != null && applicant.rejectionReason!.isNotEmpty) ? ' • Reason: ${applicant.rejectionReason}' : ''}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFB91C1C)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (applicant.stage.toUpperCase() == 'PROMOTED') ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_user_rounded, size: 18, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Candidate Promoted to Staff • Configure Role, Reporting Authority & MPIN on Staff page.',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
@@ -309,6 +452,7 @@ class ApplicantProfileScreen extends StatelessWidget {
     switch (stage.toUpperCase()) {
       case 'SELECTED':
       case 'OFFER_ACCEPTED':
+      case 'PROMOTED':
       case 'EMPLOYEE':
         bg = const Color(0xFFF0FDF4);
         border = const Color(0xFFBBF7D0);
@@ -887,15 +1031,18 @@ class ApplicantProfileScreen extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // Approval / Promotion Dialog
+  // Promotion, Rejection & Stage Update Dialogs
   // ---------------------------------------------------------------------------
-  void _showApproveDialog(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
+  void _showPromoteDialog(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
     final authController = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
     final currentUser = authController?.user.value;
     final canApproveApplicant = currentUser?.isAdmin == true || (currentUser?.has('staff.approve_applicant') ?? false);
-    if (!canApproveApplicant) return;
+    if (!canApproveApplicant) {
+      Get.snackbar('Access Denied', 'You do not have permission to promote applicants.', backgroundColor: Colors.red.withValues(alpha: 0.15));
+      return;
+    }
 
-    controller.resetApproveForm();
+    final noteController = TextEditingController();
 
     showDialog(
       context: context,
@@ -904,144 +1051,308 @@ class ApplicantProfileScreen extends StatelessWidget {
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: Container(
-            width: 480,
-            padding: const EdgeInsets.all(28),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Promote ${applicant.name} to Staff',
-                        style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  // Role Selector
-                  Obx(() => DropdownButtonFormField<String>(
-                        initialValue: controller.selectedRoleId.value,
-                        decoration: InputDecoration(
-                          labelText: 'Select Role *',
-                          border: const OutlineInputBorder(),
-                          errorText: controller.roleError.value.isNotEmpty ? controller.roleError.value : null,
-                        ),
-                        hint: const Text('Select Role'),
-                        items: controller.availableRoles
-                            .map((r) => DropdownMenuItem(
-                                  value: r.id,
-                                  child: Text(
-                                    r.departmentName != null && r.departmentName!.isNotEmpty
-                                        ? '${r.name} (${r.departmentName})'
-                                        : r.name,
-                                  ),
-                                ))
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null) controller.updateRole(val);
-                        },
-                      )),
-                  Obx(() {
-                    final dept = controller.selectedDepartment.value;
-                    if (dept.isEmpty) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 4),
-                      child: Text(
-                        'Department: $dept (Auto-assigned)',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 16),
-                  // Reporting To (Supervisor) Selector
-                  Obx(() => DropdownButtonFormField<String>(
-                        initialValue: controller.selectedSupervisorId.value,
-                        decoration: InputDecoration(
-                          labelText: 'Reporting To (Supervisor) *',
-                          border: const OutlineInputBorder(),
-                          errorText: controller.supervisorError.value.isNotEmpty ? controller.supervisorError.value : null,
-                        ),
-                        hint: const Text('Select Reporting Supervisor'),
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: 'admin',
-                            child: Text('Direct to Admin'),
+            width: 460,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
                           ),
-                          ...controller.availableSupervisors.map((s) => DropdownMenuItem<String>(
-                                value: s.id,
-                                child: Text(
-                                  s.department.isNotEmpty
-                                      ? '${s.name} (${s.department})'
-                                      : s.name,
-                                ),
-                              )),
-                        ],
-                        onChanged: (val) => controller.updateSupervisor(val),
-                      )),
-                  const SizedBox(height: 16),
-                  // MPIN Input
-                  Obx(() => TextField(
-                        controller: controller.mpinController,
-                        maxLength: 4,
-                        keyboardType: TextInputType.number,
-                        onChanged: (val) {
-                          if (controller.mpinError.value.isNotEmpty) {
-                            controller.mpinError.value = '';
-                          }
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Set Employee MPIN *',
-                          hintText: 'Enter 4-digit numeric code',
-                          border: const OutlineInputBorder(),
-                          counterText: '',
-                          errorText: controller.mpinError.value.isNotEmpty ? controller.mpinError.value : null,
+                          child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF16A34A), size: 22),
                         ),
-                      )),
-                  const SizedBox(height: 16),
-                  // Joining Date
-                  TextField(
-                    controller: controller.joiningDateController,
-                    decoration: const InputDecoration(labelText: 'Joining Date', border: OutlineInputBorder()),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Promote to Staff',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Are you sure you want to promote ${applicant.name} to an active Staff member?',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: const Text('Cancel'),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF2563EB)),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Role, Reporting Authority (Supervisor), and Employee MPIN can be configured anytime from the Staff Management page.',
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.4),
+                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Obx(() => Button(
-                            title: controller.isApproving.value ? 'Approving...' : 'Approve & Create Staff',
-                            buttonType: ButtonType.green,
-                            onTap: controller.isApproving.value
-                                ? null
-                                : () async {
-                                    final success = await controller.approveApplicant();
-                                    if (success) {
-                                      if (dialogContext.mounted) {
-                                        Navigator.of(dialogContext, rootNavigator: true).pop();
-                                      }
-                                      Get.snackbar(
-                                        'Candidate Hired',
-                                        '${applicant.name} has been promoted to Staff and agreement initiated.',
-                                        backgroundColor: Colors.green.withValues(alpha: 0.1),
-                                      );
-                                    }
-                                  },
-                          )),
                     ],
-                  )
-                ],
-              ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Promotion Note (Optional)',
+                    hintText: 'e.g. Selected in final interview round',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 12),
+                    Obx(() => ElevatedButton.icon(
+                          onPressed: controller.isPromoting.value
+                              ? null
+                              : () async {
+                                  final note = noteController.text.trim();
+                                  final success = await controller.promoteToStaff(note: note.isNotEmpty ? note : null);
+                                  if (success && dialogContext.mounted) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                },
+                          icon: controller.isPromoting.value
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.check_circle_outline, size: 16),
+                          label: Text(controller.isPromoting.value ? 'Promoting...' : 'Confirm & Promote'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showRejectDialog(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
+    final authController = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;
+    final currentUser = authController?.user.value;
+    final canApproveApplicant = currentUser?.isAdmin == true || (currentUser?.has('staff.approve_applicant') ?? false);
+    if (!canApproveApplicant) {
+      Get.snackbar('Access Denied', 'You do not have permission to reject applicants.', backgroundColor: Colors.red.withValues(alpha: 0.15));
+      return;
+    }
+
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: Container(
+            width: 460,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFECACA)),
+                          ),
+                          child: const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Reject Application',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Are you sure you want to reject the application for ${applicant.name}?',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Rejection Reason / Note (Optional)',
+                    hintText: 'e.g. Candidate does not meet experience requirements or salary mismatch',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 12),
+                    Obx(() => ElevatedButton.icon(
+                          onPressed: controller.isRejecting.value
+                              ? null
+                              : () async {
+                                  final reason = reasonController.text.trim();
+                                  final success = await controller.rejectApplicant(reason: reason.isNotEmpty ? reason : null);
+                                  if (success && dialogContext.mounted) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                },
+                          icon: controller.isRejecting.value
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.block_flipped, size: 16),
+                          label: Text(controller.isRejecting.value ? 'Rejecting...' : 'Confirm Rejection'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showUpdateStageDialog(BuildContext context, ApplicantProfileController controller, StaffModel applicant, String targetStage) {
+    if (targetStage.toUpperCase() == 'PROMOTED') {
+      _showPromoteDialog(context, controller, applicant);
+      return;
+    }
+    if (targetStage.toUpperCase() == 'REJECTED') {
+      _showRejectDialog(context, controller, applicant);
+      return;
+    }
+
+    final noteController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: Container(
+            width: 440,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Update Stage to $targetStage',
+                      style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Move ${applicant.name} from "${applicant.stage}" to "$targetStage".',
+                  style: const TextStyle(fontSize: 13.5, color: Color(0xFF475569)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Stage Change Note (Optional)',
+                    hintText: 'e.g. Cleared technical interview round',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 12),
+                    Obx(() => ElevatedButton(
+                          onPressed: controller.isUpdatingStage.value
+                              ? null
+                              : () async {
+                                  final note = noteController.text.trim();
+                                  final success = await controller.updateStage(targetStage, note: note.isNotEmpty ? note : null);
+                                  if (success && dialogContext.mounted) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                          ),
+                          child: Text(controller.isUpdatingStage.value ? 'Updating...' : 'Update Stage'),
+                        )),
+                  ],
+                ),
+              ],
             ),
           ),
         );

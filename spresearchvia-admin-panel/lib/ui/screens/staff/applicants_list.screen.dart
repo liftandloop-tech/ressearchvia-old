@@ -203,7 +203,12 @@ class ApplicantsListScreen extends StatelessWidget {
                       rows: controller.applicants.map((applicant) {
                         final contactsVerified = applicant.isEmailVerified && applicant.isMobileVerified;
                         final stage = applicant.stage.toUpperCase();
-                        final isHired = stage == 'OFFER_ACCEPTED' || stage == 'EMPLOYEE';
+                        final isPromoted = stage == 'PROMOTED' ||
+                            stage == 'OFFER_ACCEPTED' ||
+                            stage == 'EMPLOYEE' ||
+                            applicant.rawJson?['convertedToStaffId'] != null ||
+                            applicant.rawJson?['convertedStaffId'] != null;
+                        final isRejected = stage == 'REJECTED';
 
                         Color stageBg = const Color(0xFFEFF6FF);
                         Color stageColor = const Color(0xFF2563EB);
@@ -217,6 +222,10 @@ class ApplicantsListScreen extends StatelessWidget {
                           stageBg = const Color(0xFFFFFBEB);
                           stageColor = const Color(0xFFD97706);
                           stageDisplay = 'Screening';
+                        } else if (stage == 'SHORTLISTED') {
+                          stageBg = const Color(0xFFFAF5FF);
+                          stageColor = const Color(0xFF9333EA);
+                          stageDisplay = 'Shortlisted';
                         } else if (stage == 'INTERVIEW') {
                           stageBg = const Color(0xFFFAF5FF);
                           stageColor = const Color(0xFF7C3AED);
@@ -225,10 +234,14 @@ class ApplicantsListScreen extends StatelessWidget {
                           stageBg = const Color(0xFFF0FDFA);
                           stageColor = const Color(0xFF0D9488);
                           stageDisplay = 'Selected';
-                        } else if (isHired) {
+                        } else if (stage == 'OFFER_SENT') {
+                          stageBg = const Color(0xFFFEF3C7);
+                          stageColor = const Color(0xFFB45309);
+                          stageDisplay = 'Offer Sent';
+                        } else if (stage == 'PROMOTED' || isPromoted) {
                           stageBg = const Color(0xFFF0FDF4);
                           stageColor = const Color(0xFF16A34A);
-                          stageDisplay = 'Hired';
+                          stageDisplay = 'Promoted';
                         } else if (stage == 'REJECTED') {
                           stageBg = const Color(0xFFFEF2F2);
                           stageColor = const Color(0xFFDC2626);
@@ -351,7 +364,7 @@ class ApplicantsListScreen extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: stageBg,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: stageColor.withOpacity(0.2)),
+                                  border: Border.all(color: stageColor.withValues(alpha: 0.2)),
                                 ),
                                 child: Text(
                                   stageDisplay,
@@ -374,11 +387,16 @@ class ApplicantsListScreen extends StatelessWidget {
                                     icon: const Icon(Icons.remove_red_eye_outlined, size: 19, color: Color(0xFF2563EB)),
                                     onPressed: () => Get.toNamed('/applicant/${applicant.id}'),
                                   ),
-                                  if (!isHired) ...[
+                                  if (!isPromoted && !isRejected) ...[
                                     IconButton(
-                                      tooltip: 'Quick Hire & Convert',
-                                      icon: const Icon(Icons.person_add_alt_1_outlined, size: 19, color: Color(0xFF16A34A)),
-                                      onPressed: () => _showQuickApproveDialog(context, controller, applicant),
+                                      tooltip: 'Promote to Staff',
+                                      icon: const Icon(Icons.how_to_reg_rounded, size: 19, color: Color(0xFF16A34A)),
+                                      onPressed: () => _showQuickPromoteDialog(context, controller, applicant),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Reject Application',
+                                      icon: const Icon(Icons.cancel_outlined, size: 19, color: Color(0xFFDC2626)),
+                                      onPressed: () => _showQuickRejectDialog(context, controller, applicant),
                                     ),
                                   ],
                                 ],
@@ -398,19 +416,12 @@ class ApplicantsListScreen extends StatelessWidget {
     );
   }
 
-  void _showQuickApproveDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
-    controller.selectedRoleId.value = null;
-    controller.selectedRole.value = applicant.role;
-    controller.selectedSupervisorId.value = null;
-    controller.selectedSupervisorName.value = null;
-    controller.mpinController.clear();
-    controller.isViewOnly.value = false;
-
+  void _showQuickPromoteDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Hire & Convert ${applicant.name}'),
+        title: Text('Promote ${applicant.name} to Staff'),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -418,54 +429,57 @@ class ApplicantsListScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Converting candidate into an active operational Staff member and initiating their employment agreement.',
-                style: TextStyle(fontSize: 12.5, color: AppTheme.textSecondary),
+                'Are you sure you want to promote this candidate to active Staff member?\n\nRole, Reporting Authority (Supervisor), and Employee MPIN can be configured anytime from the Staff page.',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
               ),
-              const SizedBox(height: 16),
-              // Role Selector
-              Obx(() => DropdownButtonFormField<String>(
-                initialValue: controller.selectedRoleId.value,
-                decoration: const InputDecoration(
-                  labelText: 'Staff Role / Designation *',
-                  border: OutlineInputBorder(),
-                ),
-                hint: const Text('Select Role'),
-                items: controller.availableRoles.map((r) => DropdownMenuItem(
-                  value: r.id,
-                  child: Text(r.name),
-                )).toList(),
-                onChanged: (val) {
-                  if (val != null) controller.updateRole(val);
-                },
-              )),
-              const SizedBox(height: 14),
-              // Supervisor Selector
-              Obx(() => DropdownButtonFormField<String>(
-                initialValue: controller.selectedSupervisorId.value,
-                decoration: const InputDecoration(
-                  labelText: 'Reporting Supervisor *',
-                  border: OutlineInputBorder(),
-                ),
-                hint: const Text('Select Supervisor'),
-                items: [
-                  const DropdownMenuItem(value: 'admin', child: Text('Direct to Admin')),
-                  ...controller.availableSupervisors.map((s) => DropdownMenuItem(
-                    value: s.id,
-                    child: Text(s.department.isNotEmpty ? '${s.name} (${s.department})' : s.name),
-                  )),
-                ],
-                onChanged: (val) => controller.updateSupervisor(val),
-              )),
-              const SizedBox(height: 14),
-              // MPIN
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(dialogCtx).pop();
+              await controller.promoteApplicant(applicant.id);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm & Promote'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuickRejectDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Reject ${applicant.name}'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Are you sure you want to reject this applicant?',
+                style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+              ),
+              const SizedBox(height: 12),
               TextField(
-                controller: controller.mpinController,
-                maxLength: 4,
-                keyboardType: TextInputType.number,
+                controller: reasonController,
+                maxLines: 2,
                 decoration: const InputDecoration(
-                  labelText: 'Set 4-Digit MPIN *',
+                  labelText: 'Rejection Reason (Optional)',
                   border: OutlineInputBorder(),
-                  counterText: '',
                 ),
               ),
             ],
@@ -478,13 +492,15 @@ class ApplicantsListScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              await controller.approveApplicant(applicant.id);
+              final reason = reasonController.text.trim();
+              Navigator.of(dialogCtx).pop();
+              await controller.rejectApplicant(applicant.id, reason: reason.isNotEmpty ? reason : null);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF16A34A),
+              backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Confirm & Hire'),
+            child: const Text('Confirm Rejection'),
           ),
         ],
       ),

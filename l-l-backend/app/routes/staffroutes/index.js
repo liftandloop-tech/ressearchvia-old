@@ -57,6 +57,10 @@ const staffRoutes = () => {
     // Admin applicant review & approval
     Router.get("/applicants", auth.tokenVerified, adminOnly, applicantController.listApplicants)
     Router.post("/applicant/approve/:id", auth.tokenVerified, adminOnly, applicantController.approveApplicant)
+    Router.post("/applicant/promote/:id", auth.tokenVerified, adminOnly, applicantController.approveApplicant)
+    Router.post("/applicant/stage/:id", auth.tokenVerified, adminOnly, applicantController.updateApplicantStage)
+    Router.put("/applicant/stage/:id", auth.tokenVerified, adminOnly, applicantController.updateApplicantStage)
+    Router.post("/applicant/reject/:id", auth.tokenVerified, adminOnly, applicantController.rejectApplicant)
     Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, applicantController.saveEvaluationRemarks)
 
     // Document uploads for staff onboarding

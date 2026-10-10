@@ -949,7 +949,13 @@ const applicantController = {
             const filter = {};
 
             if (stage && stage !== 'ALL') {
-                filter.stage = stage;
+                if (stage === 'PROMOTED') {
+                    filter.$or = [{ stage: 'PROMOTED' }, { stage: 'OFFER_ACCEPTED' }, { convertedStaffId: { $ne: null } }];
+                } else if (stage === 'OFFER_ACCEPTED') {
+                    filter.$or = [{ stage: 'OFFER_ACCEPTED' }, { stage: 'PROMOTED' }];
+                } else {
+                    filter.stage = stage;
+                }
             }
 
             if (search && search.trim().length > 0) {
@@ -990,6 +996,98 @@ const applicantController = {
         }
     },
 
+    updateApplicantStage: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { stage, note } = req.body;
+
+            const validStages = [
+                "APPLIED",
+                "SCREENING",
+                "SHORTLISTED",
+                "INTERVIEW",
+                "SELECTED",
+                "OFFER_SENT",
+                "OFFER_ACCEPTED",
+                "ONBOARDING",
+                "PROMOTED",
+                "REJECTED",
+                "WITHDRAWN"
+            ];
+
+            if (!stage || !validStages.includes(stage.toUpperCase())) {
+                return res.status(400).send({
+                    status: 400,
+                    message: `Invalid stage. Valid stages are: ${validStages.join(', ')}`,
+                    data: {}
+                });
+            }
+
+            const targetStage = stage.toUpperCase();
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            const prevStage = applicant.stage;
+            applicant.stage = targetStage;
+            if (targetStage === 'REJECTED' && note) {
+                applicant.rejectionReason = note;
+            }
+
+            applicant.stageHistory.push({
+                stage: targetStage,
+                note: note || `Stage updated from ${prevStage} to ${targetStage}`,
+                changedBy: req.user?._id || null,
+                changedAt: new Date()
+            });
+
+            await applicant.save();
+
+            res.status(200).send({
+                status: 200,
+                message: `Applicant stage updated to ${targetStage} successfully`,
+                data: { applicant }
+            });
+        } catch (error) {
+            console.error("[updateApplicantStage Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    rejectApplicant: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { rejectionReason, reason, note } = req.body;
+            const effectiveReason = rejectionReason || reason || note || 'Application rejected by reviewer';
+
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            applicant.stage = 'REJECTED';
+            applicant.rejectionReason = effectiveReason;
+            applicant.stageHistory.push({
+                stage: 'REJECTED',
+                note: effectiveReason,
+                changedBy: req.user?._id || null,
+                changedAt: new Date()
+            });
+
+            await applicant.save();
+
+            res.status(200).send({
+                status: 200,
+                message: "Applicant rejected successfully",
+                data: { applicant }
+            });
+        } catch (error) {
+            console.error("[rejectApplicant Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
     approveApplicant: async (req, res) => {
         try {
             const { id } = req.params;
@@ -1004,31 +1102,35 @@ const applicantController = {
                 assignedDirectorName,
                 supervisorId,
                 supervisorName,
-                reportingTo
+                reportingTo,
+                note
             } = req.body;
-
-            const effectiveSupervisorId = assignedDirector || supervisorId || reportingTo;
-            const effectiveSupervisorName = assignedDirectorName || supervisorName;
-
-            if ((!roleId && !role && !deparment) || !mpin) {
-                return res.status(400).send({ status: 400, message: "Role and MPIN are required to approve staff", data: {} });
-            }
-
-            if (!effectiveSupervisorId && !effectiveSupervisorName) {
-                return res.status(400).send({ status: 400, message: "Reporting authority (Supervisor or Direct Admin) is required to approve staff", data: {} });
-            }
 
             const applicant = await applicantModel.findById(id).select('+password');
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant record not found", data: {} });
             }
 
-            // Resolve role and department
-            const resolved = await resolveRoleAndDepartment({
-                roleId,
-                roleName: role,
-                fallbackDept: deparment
-            });
+            const effectiveSupervisorId = assignedDirector || supervisorId || reportingTo || null;
+            const effectiveSupervisorName = assignedDirectorName || supervisorName || null;
+
+            // Resolve role and department gracefully (defaults to applicant info or unassigned)
+            const targetRoleId = roleId || applicant.targetRoleId || null;
+            const targetRoleName = role || applicant.targetRole || null;
+            const targetDeptName = deparment || applicant.targetDepartment || null;
+
+            let resolved = { roleId: null, roleName: null, departmentId: null, departmentName: null };
+            if (targetRoleId || targetRoleName || targetDeptName) {
+                try {
+                    resolved = await resolveRoleAndDepartment({
+                        roleId: targetRoleId,
+                        roleName: targetRoleName,
+                        fallbackDept: targetDeptName
+                    });
+                } catch (e) {
+                    console.warn("[approveApplicant] Role resolution warning:", e.message);
+                }
+            }
 
             // Check if already an employee in staffModel
             let staff = await staffModel.findOne({
@@ -1051,12 +1153,11 @@ const applicantController = {
                     finalSupervisorName = effectiveSupervisorName.trim();
                 } else {
                     const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName status');
-                    if (supervisor && supervisor.status && supervisor.status.toLowerCase() !== 'active') {
-                        return res.status(400).send({ status: 400, message: "Cannot assign an inactive supervisor to new staff", data: {} });
-                    }
                     finalSupervisorName = supervisor ? supervisor.fullName : null;
                 }
             }
+
+            const effectiveMpin = mpin ? mpin.toString().trim() : '0000';
 
             if (!staff) {
                 // Generate a unique staff ID
@@ -1086,7 +1187,7 @@ const applicantController = {
                     role: resolved.roleName,
                     departmentId: resolved.departmentId,
                     deparment: resolved.departmentName,
-                    mpin: mpin.toString().trim(),
+                    mpin: effectiveMpin,
                     assignedDirector: finalSupervisorId,
                     assignedDirectorName: finalSupervisorName,
                     isViewOnly: isViewOnly === true || isViewOnly === 'true',
@@ -1100,16 +1201,20 @@ const applicantController = {
                 if (applicant.password) {
                     staff.password = applicant.password;
                 }
-                staff.roleId = resolved.roleId;
-                staff.role = resolved.roleName;
-                staff.departmentId = resolved.departmentId;
-                staff.deparment = resolved.departmentName;
-                staff.mpin = mpin.toString().trim();
-                staff.joiningDate = joiningDate ? new Date(joiningDate) : new Date();
+                if (resolved.roleId) staff.roleId = resolved.roleId;
+                if (resolved.roleName) staff.role = resolved.roleName;
+                if (resolved.departmentId) staff.departmentId = resolved.departmentId;
+                if (resolved.departmentName) staff.deparment = resolved.departmentName;
+                if (mpin) staff.mpin = effectiveMpin;
+                staff.joiningDate = joiningDate ? new Date(joiningDate) : (staff.joiningDate || new Date());
                 staff.status = 'Active';
-                staff.assignedDirector = finalSupervisorId;
-                staff.assignedDirectorName = finalSupervisorName;
-                staff.isViewOnly = isViewOnly === true || isViewOnly === 'true';
+                if (finalSupervisorId || isDirectAdmin) {
+                    staff.assignedDirector = finalSupervisorId;
+                    staff.assignedDirectorName = finalSupervisorName;
+                }
+                if (isViewOnly !== undefined) {
+                    staff.isViewOnly = isViewOnly === true || isViewOnly === 'true';
+                }
                 if (!staff.agreementStatus || staff.agreementStatus === 'NOT_INITIATED') {
                     staff.agreementStatus = 'PENDING_SIGNATURE';
                 }
@@ -1117,12 +1222,12 @@ const applicantController = {
             }
 
             // Update applicant stage and link
-            applicant.stage = 'OFFER_ACCEPTED';
+            applicant.stage = 'PROMOTED';
             applicant.convertedStaffId = staff._id;
             applicant.hiredAt = new Date();
             applicant.stageHistory.push({
-                stage: 'OFFER_ACCEPTED',
-                note: `Applicant hired as ${resolved.roleName} (Staff ID: ${staff.staffId})`,
+                stage: 'PROMOTED',
+                note: note || `Applicant promoted to Staff (Staff ID: ${staff.staffId})`,
                 changedBy: req.user?._id || null,
                 changedAt: new Date()
             });
@@ -1147,7 +1252,7 @@ const applicantController = {
 
             res.status(200).send({
                 status: 200,
-                message: "Applicant approved and hired as Staff successfully",
+                message: "Applicant promoted to Staff successfully",
                 data: { staff: updatedStaff || staff, applicant }
             });
         } catch (error) {

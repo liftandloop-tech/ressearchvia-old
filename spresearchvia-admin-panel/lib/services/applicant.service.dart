@@ -286,12 +286,43 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<bool> approveApplicant(String id, Map<String, dynamic> data) async {
+  Future<bool> approveApplicant(String id, [Map<String, dynamic>? data]) async {
     try {
-      final response = await post('/staff/applicant/approve/$id', data);
+      final response = await post('/staff/applicant/approve/$id', data ?? {});
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error approving applicant: $e');
+      return false;
+    }
+  }
+
+  Future<bool> promoteApplicant(String id, {String? note}) async {
+    return approveApplicant(id, {
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    });
+  }
+
+  Future<bool> updateApplicantStage(String id, String stage, {String? note}) async {
+    try {
+      final response = await post('/staff/applicant/stage/$id', {
+        'stage': stage,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating applicant stage: $e');
+      return false;
+    }
+  }
+
+  Future<bool> rejectApplicant(String id, {String? reason}) async {
+    try {
+      final response = await post('/staff/applicant/reject/$id', {
+        if (reason != null && reason.trim().isNotEmpty) 'rejectionReason': reason.trim(),
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error rejecting applicant: $e');
       return false;
     }
   }
