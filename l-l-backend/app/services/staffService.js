@@ -326,13 +326,78 @@ const staffService = {
 
   staffLogin: async ({ body }) => {
     try {
-      let { phone } = body
-      const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
-      const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
-      const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
-      const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
-      const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
+      const { email, phone, password, identifier } = body;
+      const cleanEmail = (email || (identifier && identifier.includes('@') ? identifier : '') || '').trim().toLowerCase();
+
+      // Branch 1: Direct Email/Password or Phone/Password Login
+      if (password && (cleanEmail || phone || identifier)) {
+        let staffQuery = [];
+        if (cleanEmail) {
+          staffQuery.push({ emailAddress: cleanEmail });
+        }
+        const lookupPhone = phone || (identifier && !identifier.includes('@') ? identifier : null);
+        if (lookupPhone) {
+          const cleanP = lookupPhone.toString().replace(/\D/g, '');
+          const last10 = cleanP.slice(-10);
+          staffQuery.push({ mobileNumber: lookupPhone });
+          staffQuery.push({ mobileNumber: cleanP });
+          staffQuery.push({ mobileNumber: last10 });
+          staffQuery.push({ mobileNumber: parseInt(last10, 10) });
+          staffQuery.push({ mobileNumber: `91${last10}` });
+          staffQuery.push({ mobileNumber: `+91${last10}` });
+        }
+
+        let staff = await staffModel.findOne({ $or: staffQuery }).select('+password');
+        if (!staff) {
+          return { status: 400, message: "Staff member not found with these credentials", data: {} };
+        }
+
+        if (staff.status && (staff.status.toLowerCase() === 'inactive' || staff.status.toLowerCase() === 'deactivated')) {
+          return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
+        }
+
+        if (!staff.password) {
+          return { status: 400, message: "Password not set for this account. Please log in with MPIN or Mobile OTP.", data: {} };
+        }
+
+        const isMatch = await bcrypt.compare(password.toString(), staff.password);
+        if (!isMatch) {
+          return { status: 400, message: "Invalid email or password", data: {} };
+        }
+
+        // Seed default Admin role if needed
+        await roleService.seedAdminRole();
+        if (!staff.roleId && (staff.deparment || "").toLowerCase() === 'admin') {
+          const adminRole = await roleModel.findOne({ name: 'Admin' });
+          if (adminRole) {
+            staff.roleId = adminRole._id;
+            await staff.save();
+          }
+        }
+
+        staff = await staffModel.findById(staff._id)
+          .populate('departmentId')
+          .populate({
+            path: 'roleId',
+            populate: { path: 'permissionGroups' }
+          });
+
+        const token = jwt.sign(
+          {
+            _id: staff._id.toString(),
+            fullName: staff.fullName,
+            phone: staff.mobileNumber,
+            userType: staff.deparment,
+            isViewOnly: staff.isViewOnly || false
+          },
+          process.env.JWT_TOKEN,
+          { expiresIn: '8h' }
+        );
+
+        return { status: 200, message: "Login successfully", data: { token, staff } };
+      }
+
+      // Branch 2: Mobile Number OTP Dispatch (Fallback)
       const cleanPhone = phone ? phone.toString().replace(/[^0-9]/g, '') : '';
       const last10 = cleanPhone.slice(-10);
 
@@ -347,12 +412,20 @@ const staffService = {
         ]
       });
       if (!staff) {
-        return { status: 200, message: "staff not found", data: {} }
+        return { status: 200, message: "staff not found", data: {} };
       }
 
       if (staff.status && (staff.status.toLowerCase() === 'inactive' || staff.status.toLowerCase() === 'deactivated')) {
         return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
       }
+
+      const otp = Math.floor(1000 + Math.random() * 9000).toString();
+      const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
+      const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
+      const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
+      const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
+      const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
+
       const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
       const messageText = defaultTemplate.replaceAll('{OTP}', otp);
       const message = encodeURIComponent(messageText);
@@ -362,11 +435,10 @@ const staffService = {
         staff.otp = otp;
         staff.otpExpires = Date.now() + 5 * 60 * 1000;
         await staff.save();
-        return { status: 200, message: "OTP send your phone ", data: {} }
+        return { status: 200, message: "OTP send your phone ", data: {} };
       }
     } catch (error) {
-      return { status: 400, message: error.message, data: {} }
-
+      return { status: 400, message: error.message, data: {} };
     }
   },
   staffOtpVerify: async ({ body }) => {

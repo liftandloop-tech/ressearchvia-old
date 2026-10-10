@@ -5,57 +5,57 @@ import '../../services/applicant.service.dart';
 class ApplicantContinueInitController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
 
-  final identifierController = TextEditingController();
-  final otpController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
   var isLoading = false.obs;
-  var isOtpSent = false.obs;
-  var otpType = ''.obs; // 'email' or 'mobile'
+  var obscurePassword = true.obs;
 
-  Future<void> sendOtp() async {
-    final identifier = identifierController.text.trim();
-
-    if (identifier.isEmpty) {
-      Get.snackbar('Alert', 'Please enter your registered mobile number or email address', backgroundColor: Colors.orange.withOpacity(0.1));
-      return;
-    }
-
-    isLoading.value = true;
-    try {
-      final res = await _applicantService.initiateContinueApplication(identifier);
-      if (res.success && res.otpType != null) {
-        otpType.value = res.otpType!;
-        isOtpSent.value = true;
-        Get.snackbar(
-          'Verification Code Sent',
-          'An OTP has been sent to your registered ${otpType.value == 'email' ? 'email address' : 'mobile number'}',
-          backgroundColor: Colors.green.withOpacity(0.1),
-        );
-      } else {
-        Get.snackbar('Error', res.error ?? 'Failed to send verification code', backgroundColor: Colors.red.withOpacity(0.1));
-      }
-    } finally {
-      isLoading.value = false;
-    }
+  void togglePasswordVisibility() {
+    obscurePassword.value = !obscurePassword.value;
   }
 
-  Future<void> verifyOtpAndContinue() async {
-    final identifier = identifierController.text.trim();
-    final otp = otpController.text.trim();
+  Future<void> loginAndContinue() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
 
-    if (otp.isEmpty) {
-      Get.snackbar('Alert', 'Please enter the verification OTP', backgroundColor: Colors.orange.withOpacity(0.1));
+    if (email.isEmpty) {
+      Get.snackbar('Mandatory Field Missing', 'Please enter your registered Email Address',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+      return;
+    }
+
+    if (!email.contains('@')) {
+      Get.snackbar('Invalid Input', 'Please enter a valid Email Address',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+      return;
+    }
+
+    if (password.isEmpty) {
+      Get.snackbar('Mandatory Field Missing', 'Please enter your Password',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
       return;
     }
 
     isLoading.value = true;
     try {
-      final res = await _applicantService.verifyContinueApplication(identifier, otp, otpType.value);
-      if (res.error == null && res.applicantId != null) {
-        Get.offNamed('/apply/continue/${res.applicantId}');
-        Get.snackbar('Success', 'Verification successful. Welcome to your onboarding page.', backgroundColor: Colors.green.withOpacity(0.1));
+      final res = await _applicantService.continueLogin(email, password);
+      if (res.success && res.applicant != null) {
+        final applicantData = res.applicant!;
+        final appId = applicantData['_id']?.toString() ?? applicantData['id']?.toString() ?? '';
+        final step = res.currentStep;
+
+        Get.offAllNamed('/apply', arguments: {
+          'applicant': applicantData,
+          'token': res.token,
+          'step': step,
+        });
+
+        Get.snackbar('Welcome Back', 'Application draft restored successfully.',
+            backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade900);
       } else {
-        Get.snackbar('Verification Failed', res.error ?? 'OTP is incorrect', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Login Failed', res.message ?? 'Invalid email or password',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
       }
     } finally {
       isLoading.value = false;

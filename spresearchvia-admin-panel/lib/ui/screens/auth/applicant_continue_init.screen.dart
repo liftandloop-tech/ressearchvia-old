@@ -24,7 +24,8 @@ class ApplicantContinueInitScreen extends StatelessWidget {
                 horizontal: isMobile ? 12 : 16,
               ),
               child: Container(
-                width: 450,
+                constraints: const BoxConstraints(maxWidth: 450),
+                width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -57,56 +58,54 @@ class ApplicantContinueInitScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Enter your registered email or mobile number to complete or resume your application.',
+                        'Enter your registered email and password to resume your job application.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppTheme.textSecondary, fontSize: isMobile ? 12 : 13),
                       ),
                       const SizedBox(height: 24),
 
-                      // Identifier
+                      // Email Address
                       TextField(
-                        controller: controller.identifierController,
-                        enabled: !controller.isOtpSent.value,
+                        controller: controller.emailController,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
-                          labelText: 'Email or Mobile Number *',
+                          labelText: 'Email Address *',
+                          prefixIcon: Icon(Icons.email_outlined, size: 20),
                           border: OutlineInputBorder(),
-                          hintText: 'Enter registered mobile or email',
+                          hintText: 'Enter your registered email',
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
-                      if (controller.isOtpSent.value) ...[
-                        const Divider(height: 28),
-                        Text(
-                          'Verification Code Sent (${controller.otpType.value.toUpperCase()})',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF1E3A5F)),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: controller.otpController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Enter OTP *',
-                            border: OutlineInputBorder(),
-                            hintText: 'Enter 6-digit verification code',
+                      // Password
+                      Obx(
+                        () => TextField(
+                          controller: controller.passwordController,
+                          obscureText: controller.obscurePassword.value,
+                          decoration: InputDecoration(
+                            labelText: 'Password *',
+                            prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                            border: const OutlineInputBorder(),
+                            hintText: 'Enter your password',
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                controller.obscurePassword.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                size: 20,
+                              ),
+                              onPressed: controller.togglePasswordVisibility,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 20),
-                      ],
+                      ),
+                      const SizedBox(height: 24),
 
                       if (controller.isLoading.value)
                         const Center(child: CircularProgressIndicator())
                       else
                         Button(
-                          title: controller.isOtpSent.value ? 'Verify & Continue' : 'Send Verification OTP',
+                          title: 'Login & Continue Application',
                           buttonType: ButtonType.blue,
-                          onTap: () {
-                            if (controller.isOtpSent.value) {
-                              controller.verifyOtpAndContinue();
-                            } else {
-                              controller.sendOtp();
-                            }
-                          },
+                          onTap: controller.loginAndContinue,
                         ),
                       const SizedBox(height: 20),
                       Wrap(
@@ -120,7 +119,7 @@ class ApplicantContinueInitScreen extends StatelessWidget {
                           InkWell(
                             onTap: () => Get.toNamed('/apply'),
                             child: const Text(
-                              'Submit Walk-In Application',
+                              'Create Application Account',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,

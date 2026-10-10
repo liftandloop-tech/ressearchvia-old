@@ -37,6 +37,14 @@ const staffRoutes = () => {
 
     // Public applicant routes
     Router.get("/applicant/roles", roleController.getPublicRoles)
+    Router.post("/applicant/create-account", applicantController.createAccount)
+    Router.post("/applicant/verify-account-email", applicantController.verifyAccountEmail)
+    Router.post("/applicant/resend-email-otp", applicantController.resendEmailOtp)
+    Router.post("/applicant/continue-login", applicantController.continueLogin)
+    Router.post("/applicant/send-mobile-otp", applicantController.sendMobileOtp)
+    Router.post("/applicant/verify-mobile-otp", applicantController.verifyMobileOtp)
+    Router.put("/applicant/save-step/:id", applicantController.saveStep)
+    Router.post("/applicant/finalize-application/:id", applicantController.finalizeApplication)
     Router.post("/applicant/register", applicantController.registerApplicant)
     Router.post("/applicant/update-contact", applicantController.updateContactAndResendOtp)
     Router.post("/applicant/verify", applicantController.verifyOtp)

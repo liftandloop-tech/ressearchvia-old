@@ -40,32 +40,35 @@ class Login extends StatelessWidget {
       child: Scaffold(
         backgroundColor: AppTheme.loginBackground,
         body: Center(
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.enter): () {
-                if (!controller.isLoading.value) {
-                  if (controller.isAdminTab.value) {
-                    controller.adminLogin();
-                  } else {
-                    controller.staffLogin();
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.enter): () {
+                  if (!controller.isLoading.value) {
+                    if (controller.isAdminTab.value) {
+                      controller.adminLogin();
+                    } else {
+                      controller.staffLogin();
+                    }
                   }
-                }
-              },
-              const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
-                if (!controller.isLoading.value) {
-                  if (controller.isAdminTab.value) {
-                    controller.adminLogin();
-                  } else {
-                    controller.staffLogin();
+                },
+                const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+                  if (!controller.isLoading.value) {
+                    if (controller.isAdminTab.value) {
+                      controller.adminLogin();
+                    } else {
+                      controller.staffLogin();
+                    }
                   }
-                }
+                },
               },
-            },
-            child: Focus(
-              autofocus: false,
-              child: Container(
-                width: cardWidth,
-                padding: const EdgeInsets.all(32),
+              child: Focus(
+                autofocus: false,
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: cardWidth),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
                   color: AppTheme.white,
                   borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
@@ -228,6 +231,7 @@ class Login extends StatelessWidget {
       ),
     ),
   ),
+),
 );
 }
 
@@ -387,60 +391,171 @@ class Login extends StatelessWidget {
     return AutofillGroup(
       child: Column(
         children: [
+          // Mode Switcher: Mobile + MPIN vs Email + Password
+          Obx(
+            () => Container(
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(3),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => controller.toggleStaffMode(false),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: !controller.isStaffPasswordMode.value ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: !controller.isStaffPasswordMode.value
+                              ? [const BoxShadow(color: Color(0x10000000), blurRadius: 4, offset: Offset(0, 1))]
+                              : null,
+                        ),
+                        child: Text(
+                          'Mobile & MPIN',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: !controller.isStaffPasswordMode.value ? FontWeight.w600 : FontWeight.w500,
+                            color: !controller.isStaffPasswordMode.value ? AppTheme.primaryBlue : const Color(0xFF64748B),
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => controller.toggleStaffMode(true),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: controller.isStaffPasswordMode.value ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: controller.isStaffPasswordMode.value
+                              ? [const BoxShadow(color: Color(0x10000000), blurRadius: 4, offset: Offset(0, 1))]
+                              : null,
+                        ),
+                        child: Text(
+                          'Email & Password',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: controller.isStaffPasswordMode.value ? FontWeight.w600 : FontWeight.w500,
+                            color: controller.isStaffPasswordMode.value ? AppTheme.primaryBlue : const Color(0xFF64748B),
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           Form(
             key: controller.staffFormKey,
-            child: Column(
-              children: [
-                CustomTextField(
-                  label: 'Mobile No',
-                  hint: 'Enter your mobile',
-                  controller: controller.mobileController,
-                  keyboardType: TextInputType.phone,
-                  autofillHints: const [AutofillHints.telephoneNumber, AutofillHints.username],
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) {
-                    if (controller.mpinController.text.trim().isEmpty) {
-                      FocusScope.of(context).nextFocus();
-                    } else if (!controller.isLoading.value) {
-                      controller.staffLogin();
-                    }
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your mobile number';
-                    }
-                    if (value.length != 10) {
-                      return 'Please enter a valid 10-digit mobile number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  label: 'MPIN',
-                  hint: 'Enter MPIN',
-                  controller: controller.mpinController,
-                  keyboardType: TextInputType.number,
-                  obscureText: true,
-                  autofillHints: const [AutofillHints.password],
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) {
-                    if (!controller.isLoading.value) {
-                      controller.staffLogin();
-                    }
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter MPIN';
-                    }
-                    if (value.length < 4) {
-                      return 'MPIN must be at least 4 digits';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
+            child: Obx(() {
+              if (controller.isStaffPasswordMode.value) {
+                return Column(
+                  children: [
+                    CustomTextField(
+                      label: 'Staff Email',
+                      hint: 'Enter your staff email',
+                      controller: controller.staffEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email, AutofillHints.username],
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!GetUtils.isEmail(value)) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    LoginPasswordField(
+                      controller: controller.staffPasswordController,
+                      obscurePassword: controller.obscureStaffPassword,
+                      onToggleVisibility: controller.toggleStaffPasswordVisibility,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!controller.isLoading.value) {
+                          controller.staffLogin();
+                        }
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                children: [
+                  CustomTextField(
+                    label: 'Mobile No',
+                    hint: 'Enter your mobile',
+                    controller: controller.mobileController,
+                    keyboardType: TextInputType.phone,
+                    autofillHints: const [AutofillHints.telephoneNumber, AutofillHints.username],
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) {
+                      if (controller.mpinController.text.trim().isEmpty) {
+                        FocusScope.of(context).nextFocus();
+                      } else if (!controller.isLoading.value) {
+                        controller.staffLogin();
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your mobile number';
+                      }
+                      if (value.length != 10) {
+                        return 'Please enter a valid 10-digit mobile number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  CustomTextField(
+                    label: 'MPIN',
+                    hint: 'Enter MPIN',
+                    controller: controller.mpinController,
+                    keyboardType: TextInputType.number,
+                    obscureText: true,
+                    autofillHints: const [AutofillHints.password],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!controller.isLoading.value) {
+                        controller.staffLogin();
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter MPIN';
+                      }
+                      if (value.length < 4) {
+                        return 'MPIN must be at least 4 digits';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              );
+            }),
           ),
         const SizedBox(height: 12),
         Row(

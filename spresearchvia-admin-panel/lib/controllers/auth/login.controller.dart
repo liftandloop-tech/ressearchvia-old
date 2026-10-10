@@ -19,13 +19,16 @@ class LoginController extends GetxController {
   // Staff login controllers
   final mobileController = TextEditingController();
   final mpinController = TextEditingController();
+  final staffEmailController = TextEditingController();
+  final staffPasswordController = TextEditingController();
 
   // Observable states
   var isAdminTab = true.obs;
+  var isStaffPasswordMode = false.obs;
   var rememberMe = false.obs;
   var obscurePassword = true.obs;
+  var obscureStaffPassword = true.obs;
   var isLoading = false.obs;
-  // var otpSent = false.obs; // Removed
 
   void switchToAdminTab() {
     isAdminTab.value = true;
@@ -37,6 +40,11 @@ class LoginController extends GetxController {
     _resetAdminForm();
   }
 
+  void toggleStaffMode(bool usePassword) {
+    isStaffPasswordMode.value = usePassword;
+    staffFormKey.currentState?.reset();
+  }
+
   void _resetAdminForm() {
     emailController.clear();
     passwordController.clear();
@@ -46,7 +54,8 @@ class LoginController extends GetxController {
   void _resetStaffForm() {
     mobileController.clear();
     mpinController.clear();
-    // otpSent.value = false; // Removed
+    staffEmailController.clear();
+    staffPasswordController.clear();
     staffFormKey.currentState?.reset();
   }
 
@@ -56,6 +65,10 @@ class LoginController extends GetxController {
 
   void togglePasswordVisibility() {
     obscurePassword.value = !obscurePassword.value;
+  }
+
+  void toggleStaffPasswordVisibility() {
+    obscureStaffPassword.value = !obscureStaffPassword.value;
   }
 
   Future<void> adminLogin() async {
@@ -83,10 +96,7 @@ class LoginController extends GetxController {
     } else {
       TextInput.finishAutofillContext(shouldSave: true);
     }
-    // Success case is handled by AuthController (navigates to dashboard)
   }
-
-  // requestOtp is removed
 
   Future<void> staffLogin() async {
     if (!staffFormKey.currentState!.validate()) {
@@ -95,17 +105,20 @@ class LoginController extends GetxController {
 
     isLoading.value = true;
 
-    // Call backend API to login with MPIN
-    final result = await _authService.staffMpinLogin(
-      mobileController.text,
-      mpinController.text,
-    );
+    final result = isStaffPasswordMode.value
+        ? await _authService.staffEmailPasswordLogin(
+            staffEmailController.text,
+            staffPasswordController.text,
+          )
+        : await _authService.staffMpinLogin(
+            mobileController.text,
+            mpinController.text,
+          );
 
     isLoading.value = false;
 
     if (result.user != null && result.token != null) {
       TextInput.finishAutofillContext(shouldSave: true);
-      // Save to AuthController and navigate
       await _authController.staffLoginSuccess(result.user!, result.token!);
 
       Get.snackbar(
@@ -118,12 +131,14 @@ class LoginController extends GetxController {
     } else {
       Get.snackbar(
         'Login Failed',
-        result.error ?? 'Invalid Mobile or MPIN',
+        result.error ?? (isStaffPasswordMode.value ? 'Invalid Email or Password' : 'Invalid Mobile or MPIN'),
         backgroundColor: Colors.red,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
       );
-      mpinController.clear();
+      if (!isStaffPasswordMode.value) {
+        mpinController.clear();
+      }
     }
   }
 

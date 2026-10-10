@@ -4,8 +4,35 @@ import emailService from "../services/emailService.js";
 import axios from "axios";
 import staffService, { resolveRoleAndDepartment } from "../services/staffService.js";
 import roleModel from "../models/roleModel.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
+
+const generateNextApplicantId = async () => {
+    const currentYear = new Date().getFullYear();
+    const yearPrefix = `APP-${currentYear}-`;
+    const lastApplicant = await applicantModel
+        .findOne({ applicantId: new RegExp(`^${yearPrefix}`) })
+        .sort({ applicantId: -1 })
+        .lean();
+
+    let nextSeqNum = 1;
+    if (lastApplicant && lastApplicant.applicantId) {
+        const parts = lastApplicant.applicantId.split('-');
+        const lastNum = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(lastNum)) {
+            nextSeqNum = lastNum + 1;
+        }
+    }
+
+    let appSeq = `${yearPrefix}${String(nextSeqNum).padStart(4, '0')}`;
+    while (await applicantModel.exists({ applicantId: appSeq })) {
+        nextSeqNum++;
+        appSeq = `${yearPrefix}${String(nextSeqNum).padStart(4, '0')}`;
+    }
+    return appSeq;
+};
 
 /**
  * Normalizes a mobile number to 91XXXXXXXXXX (12 digits, prefixed with 91).
@@ -92,6 +119,476 @@ const sendEmailOtp = async (email, otp) => {
 };
 
 const applicantController = {
+    createAccount: async (req, res) => {
+        try {
+            const { emailAddress, password } = req.body;
+            if (!emailAddress || !password) {
+                return res.status(400).send({ status: 400, message: "Email and password are required", data: {} });
+            }
+
+            const cleanEmail = emailAddress.trim().toLowerCase();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(cleanEmail)) {
+                return res.status(400).send({ status: 400, message: "Please enter a valid email address", data: {} });
+            }
+
+            if (password.length < 6) {
+                return res.status(400).send({ status: 400, message: "Password must be at least 6 characters long", data: {} });
+            }
+
+            // Check if already an employee in staffModel
+            const existingStaff = await staffModel.findOne({ emailAddress: cleanEmail });
+            if (existingStaff) {
+                return res.status(400).send({ status: 400, message: "A staff member is already registered with this email. Please log in on the Staff Login tab.", data: {} });
+            }
+
+            // Check if existing applicant
+            let applicant = await applicantModel.findOne({ emailAddress: cleanEmail }).select('+password');
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const emailOtp = generateOtp();
+            const expiry = new Date(Date.now() + 10 * 60000);
+
+            if (applicant) {
+                if (!applicant.isDraft && applicant.stage !== 'DRAFT') {
+                    return res.status(400).send({
+                        status: 400,
+                        message: "An application has already been submitted with this email. Please use Continue Application.",
+                        data: { alreadySubmitted: true }
+                    });
+                }
+                applicant.password = hashedPassword;
+                applicant.emailOtp = emailOtp;
+                applicant.emailOtpExpires = expiry;
+                applicant.isEmailVerified = false;
+                await applicant.save();
+            } else {
+                const applicantId = await generateNextApplicantId();
+                applicant = await applicantModel.create({
+                    applicantId,
+                    emailAddress: cleanEmail,
+                    password: hashedPassword,
+                    fullName: "",
+                    isDraft: true,
+                    currentStep: 1,
+                    emailOtp,
+                    emailOtpExpires: expiry,
+                    isEmailVerified: false,
+                    stage: 'APPLIED',
+                    stageHistory: [{
+                        stage: 'APPLIED',
+                        note: 'Applicant account created',
+                        changedAt: new Date()
+                    }]
+                });
+            }
+
+            await sendEmailOtp(cleanEmail, emailOtp);
+
+            return res.status(200).send({
+                status: 200,
+                message: "Verification code sent to your email address",
+                data: {
+                    applicantId: applicant._id,
+                    emailAddress: cleanEmail
+                }
+            });
+        } catch (error) {
+            console.error("[createAccount Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    verifyAccountEmail: async (req, res) => {
+        try {
+            const { applicantId, emailOtp } = req.body;
+            if (!applicantId || !emailOtp) {
+                return res.status(400).send({ status: 400, message: "Applicant ID and email OTP are required", data: {} });
+            }
+
+            const applicant = await applicantModel.findById(applicantId);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant profile not found", data: {} });
+            }
+
+            const now = Date.now();
+            const emailExpired = !applicant.emailOtpExpires || new Date(applicant.emailOtpExpires).getTime() < now;
+            if (String(applicant.emailOtp).trim() !== String(emailOtp).trim() || emailExpired) {
+                return res.status(400).send({ status: 400, message: "Invalid or expired Email OTP", data: {} });
+            }
+
+            applicant.isEmailVerified = true;
+            applicant.emailOtp = null;
+            applicant.emailOtpExpires = null;
+            await applicant.save();
+
+            const token = jwt.sign(
+                { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
+                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
+                { expiresIn: '24h' }
+            );
+
+            const data = applicant.toObject();
+            delete data.password;
+            delete data.emailOtp;
+            delete data.mobileOtp;
+
+            return res.status(200).send({
+                status: 200,
+                message: "Email verified successfully",
+                data: { applicant: data, token, currentStep: applicant.currentStep || 1 }
+            });
+        } catch (error) {
+            console.error("[verifyAccountEmail Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    resendEmailOtp: async (req, res) => {
+        try {
+            const { applicantId, emailAddress } = req.body;
+            let query = {};
+            if (applicantId) query._id = applicantId;
+            else if (emailAddress) query.emailAddress = emailAddress.trim().toLowerCase();
+            else return res.status(400).send({ status: 400, message: "Applicant ID or email is required", data: {} });
+
+            const applicant = await applicantModel.findOne(query);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            const emailOtp = generateOtp();
+            applicant.emailOtp = emailOtp;
+            applicant.emailOtpExpires = new Date(Date.now() + 10 * 60000);
+            await applicant.save();
+
+            await sendEmailOtp(applicant.emailAddress, emailOtp);
+
+            return res.status(200).send({
+                status: 200,
+                message: "New verification code sent to your email",
+                data: { applicantId: applicant._id, emailAddress: applicant.emailAddress }
+            });
+        } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    continueLogin: async (req, res) => {
+        try {
+            const { emailAddress, password } = req.body;
+            if (!emailAddress || !password) {
+                return res.status(400).send({ status: 400, message: "Email address and password are required", data: {} });
+            }
+
+            const cleanEmail = emailAddress.trim().toLowerCase();
+
+            // First check if staff
+            const existingStaff = await staffModel.findOne({ emailAddress: cleanEmail });
+            if (existingStaff && existingStaff.status && existingStaff.status.toLowerCase() === 'active') {
+                return res.status(400).send({
+                    status: 400,
+                    message: "You are already an active staff member! Please log in on the Staff Login tab.",
+                    data: { isStaff: true }
+                });
+            }
+
+            const applicant = await applicantModel.findOne({ emailAddress: cleanEmail }).select('+password');
+            if (!applicant) {
+                return res.status(400).send({ status: 400, message: "No application found with this email. Please create an account first.", data: {} });
+            }
+
+            if (!applicant.password) {
+                return res.status(400).send({ status: 400, message: "Password not set for this application. Please reset or contact HR.", data: {} });
+            }
+
+            const isMatch = await bcrypt.compare(password, applicant.password);
+            if (!isMatch) {
+                return res.status(400).send({ status: 400, message: "Invalid email or password", data: {} });
+            }
+
+            const token = jwt.sign(
+                { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
+                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
+                { expiresIn: '24h' }
+            );
+
+            const data = applicant.toObject();
+            delete data.password;
+            delete data.emailOtp;
+            delete data.mobileOtp;
+
+            return res.status(200).send({
+                status: 200,
+                message: "Login successful",
+                data: {
+                    applicant: data,
+                    token,
+                    currentStep: applicant.currentStep || 1
+                }
+            });
+        } catch (error) {
+            console.error("[continueLogin Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    sendMobileOtp: async (req, res) => {
+        try {
+            const { applicantId, mobileNumber } = req.body;
+            if (!applicantId || !mobileNumber) {
+                return res.status(400).send({ status: 400, message: "Applicant ID and mobile number are required", data: {} });
+            }
+
+            const phoneInfo = normalizeIndianMobile(mobileNumber);
+            if (!phoneInfo.valid) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "Please enter a valid 10-digit Indian mobile number",
+                    data: {}
+                });
+            }
+
+            const applicant = await applicantModel.findById(applicantId);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            // Check if mobile number belongs to an active staff member
+            const existingStaff = await staffModel.findOne({
+                mobileNumber: phoneInfo.numeric12,
+                _id: { $ne: applicant.convertedStaffId }
+            });
+            if (existingStaff) {
+                return res.status(400).send({ status: 400, message: "This mobile number is already registered to a staff member", data: {} });
+            }
+
+            const mobileOtp = generateOtp();
+            applicant.mobileOtp = mobileOtp;
+            applicant.mobileOtpExpires = new Date(Date.now() + 10 * 60000);
+            await applicant.save();
+
+            await sendMobileOtp(phoneInfo.normalized12, mobileOtp);
+
+            return res.status(200).send({
+                status: 200,
+                message: `OTP sent to ${phoneInfo.normalized12}`,
+                data: { mobileNumber: phoneInfo.normalized12 }
+            });
+        } catch (error) {
+            console.error("[sendMobileOtp Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    verifyMobileOtp: async (req, res) => {
+        try {
+            const { applicantId, mobileNumber, otp } = req.body;
+            if (!applicantId || !mobileNumber || !otp) {
+                return res.status(400).send({ status: 400, message: "Applicant ID, mobile number, and OTP are required", data: {} });
+            }
+
+            const phoneInfo = normalizeIndianMobile(mobileNumber);
+            if (!phoneInfo.valid) {
+                return res.status(400).send({ status: 400, message: "Invalid mobile number format", data: {} });
+            }
+
+            const applicant = await applicantModel.findById(applicantId);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            const now = Date.now();
+            const mobileExpired = !applicant.mobileOtpExpires || new Date(applicant.mobileOtpExpires).getTime() < now;
+            if (String(applicant.mobileOtp).trim() !== String(otp).trim() || mobileExpired) {
+                return res.status(400).send({ status: 400, message: "Invalid or expired Mobile OTP", data: {} });
+            }
+
+            applicant.mobileNumber = phoneInfo.numeric12;
+            applicant.isMobileVerified = true;
+            applicant.mobileOtp = null;
+            applicant.mobileOtpExpires = null;
+            if (applicant.walkInForm) {
+                applicant.walkInForm.mobileNumber = phoneInfo.normalized12;
+                applicant.markModified('walkInForm');
+            }
+            await applicant.save();
+
+            return res.status(200).send({
+                status: 200,
+                message: "Mobile number verified successfully",
+                data: { isMobileVerified: true, mobileNumber: phoneInfo.numeric12 }
+            });
+        } catch (error) {
+            console.error("[verifyMobileOtp Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    saveStep: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { step, stepData } = req.body;
+
+            const applicant = await applicantModel.findById(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            if (!stepData) {
+                return res.status(400).send({ status: 400, message: "Step data is required", data: {} });
+            }
+
+            // Step 1: Personal Info
+            if (stepData.title !== undefined) applicant.title = stepData.title;
+            if (stepData.firstName !== undefined) applicant.firstName = stepData.firstName;
+            if (stepData.middleName !== undefined) applicant.middleName = stepData.middleName;
+            if (stepData.lastName !== undefined) applicant.lastName = stepData.lastName;
+            if (stepData.fatherName !== undefined) applicant.fatherName = stepData.fatherName;
+            if (stepData.fullName !== undefined) applicant.fullName = stepData.fullName;
+            else if (applicant.firstName || applicant.lastName) {
+                applicant.fullName = [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ').trim();
+            }
+
+            if (stepData.dob !== undefined) applicant.dob = stepData.dob ? new Date(stepData.dob) : applicant.dob;
+            if (stepData.gender !== undefined) applicant.gender = stepData.gender;
+            if (stepData.maritalStatus !== undefined) applicant.maritalStatus = stepData.maritalStatus;
+            if (stepData.currentLocation !== undefined) applicant.currentLocation = stepData.currentLocation;
+            if (stepData.skypeOrLinkedIn !== undefined) applicant.skypeOrLinkedIn = stepData.skypeOrLinkedIn;
+            if (stepData.alternateEmail !== undefined) applicant.alternateEmail = stepData.alternateEmail;
+
+            // Identity & Documents
+            if (stepData.panNumber !== undefined) applicant.panNumber = stepData.panNumber;
+            if (stepData.confirmPanNumber !== undefined) applicant.confirmPanNumber = stepData.confirmPanNumber;
+            if (stepData.passportNumber !== undefined) applicant.passportNumber = stepData.passportNumber;
+            if (stepData.proofOfAddressType !== undefined) applicant.proofOfAddressType = stepData.proofOfAddressType;
+            if (stepData.proofOfAddressUrl !== undefined) applicant.proofOfAddressUrl = stepData.proofOfAddressUrl;
+            if (stepData.panUrl !== undefined) applicant.panUrl = stepData.panUrl;
+            if (stepData.photoUrl !== undefined) applicant.photoUrl = stepData.photoUrl;
+
+            // Target Role
+            if (stepData.appliedRoleId !== undefined) {
+                applicant.targetRoleId = stepData.appliedRoleId;
+                const r = await roleModel.findById(stepData.appliedRoleId);
+                if (r) {
+                    applicant.targetRole = r.name;
+                    if (r.departmentId) applicant.targetDepartment = r.departmentId.name || null;
+                }
+            } else if (stepData.targetRole !== undefined) {
+                applicant.targetRole = stepData.targetRole;
+            }
+
+            // Step 2: Contact details (PROTECT mobileNumber if already verified!)
+            if (!applicant.isMobileVerified && stepData.mobileNumber) {
+                const p = normalizeIndianMobile(stepData.mobileNumber);
+                if (p.valid) applicant.mobileNumber = p.numeric12;
+            }
+            if (stepData.currentAddress !== undefined) applicant.currentAddress = stepData.currentAddress;
+            if (stepData.permanentAddress !== undefined) applicant.permanentAddress = stepData.permanentAddress;
+            if (stepData.telephoneResidence !== undefined) applicant.telephoneResidence = stepData.telephoneResidence;
+
+            // Step 3: Education
+            if (stepData.highestQualification !== undefined) applicant.highestQualification = stepData.highestQualification;
+            if (stepData.majorSubject !== undefined) applicant.majorSubject = stepData.majorSubject;
+            if (stepData.instituteUniversity !== undefined) applicant.instituteUniversity = stepData.instituteUniversity;
+            if (stepData.yearOfPassing !== undefined) applicant.yearOfPassing = Number(stepData.yearOfPassing);
+            if (stepData.percentageGrade !== undefined) applicant.percentageGrade = stepData.percentageGrade;
+            if (stepData.academicGap !== undefined) applicant.academicGap = Boolean(stepData.academicGap);
+            if (stepData.academicGapDetails !== undefined) applicant.academicGapDetails = stepData.academicGapDetails;
+            if (stepData.backlogsCount !== undefined) applicant.backlogsCount = stepData.backlogsCount;
+            if (stepData.highestEducationUrl !== undefined) applicant.highestEducationUrl = stepData.highestEducationUrl;
+
+            // Step 4: Professional Qualifications
+            if (stepData.professionalQualifications !== undefined) applicant.professionalQualifications = stepData.professionalQualifications;
+            if (stepData.nismUrl !== undefined) applicant.nismUrl = stepData.nismUrl;
+
+            // Step 5: Occupational & Emergency Contact
+            if (stepData.hasWorkExperience !== undefined) applicant.hasWorkExperience = Boolean(stepData.hasWorkExperience);
+            if (stepData.experienceYears !== undefined) applicant.experienceYears = Number(stepData.experienceYears);
+            if (stepData.previousCompany !== undefined) applicant.previousCompany = stepData.previousCompany;
+            if (stepData.currentDesignation !== undefined) applicant.currentDesignation = stepData.currentDesignation;
+            if (stepData.reportingManagerName !== undefined) applicant.reportingManagerName = stepData.reportingManagerName;
+            if (stepData.reportingManagerDesignation !== undefined) applicant.reportingManagerDesignation = stepData.reportingManagerDesignation;
+            if (stepData.reporteesCount !== undefined) applicant.reporteesCount = Number(stepData.reporteesCount);
+            if (stepData.fixedSalary !== undefined) applicant.fixedSalary = stepData.fixedSalary;
+            if (stepData.bonusIncentive !== undefined) applicant.bonusIncentive = stepData.bonusIncentive;
+            if (stepData.lastCtc !== undefined) applicant.lastCtc = stepData.lastCtc;
+            if (stepData.expectedSalary !== undefined) applicant.expectedSalary = stepData.expectedSalary;
+            if (stepData.noticePeriod !== undefined) applicant.noticePeriod = stepData.noticePeriod;
+            if (stepData.resumeUrl !== undefined) applicant.resumeUrl = stepData.resumeUrl;
+            if (stepData.careerGapDetails !== undefined) applicant.careerGapDetails = stepData.careerGapDetails;
+            if (stepData.previousEmploymentHistory !== undefined) applicant.previousEmploymentHistory = stepData.previousEmploymentHistory;
+            if (stepData.emergencyContact !== undefined) applicant.emergencyContact = stepData.emergencyContact;
+            if (stepData.walkInForm !== undefined) {
+                applicant.walkInForm = { ...(applicant.walkInForm || {}), ...stepData.walkInForm };
+                applicant.markModified('walkInForm');
+            }
+
+            // Update current step
+            const nextStepNum = Number(step) || applicant.currentStep;
+            applicant.currentStep = Math.max(applicant.currentStep || 1, nextStepNum);
+            await applicant.save();
+
+            const data = applicant.toObject();
+            delete data.password;
+            delete data.emailOtp;
+            delete data.mobileOtp;
+
+            return res.status(200).send({
+                status: 200,
+                message: "Step saved successfully",
+                data: { applicant: data, currentStep: applicant.currentStep }
+            });
+        } catch (error) {
+            console.error("[saveStep Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    finalizeApplication: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const applicant = await applicantModel.findById(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            if (!applicant.isEmailVerified) {
+                return res.status(400).send({ status: 400, message: "Email verification is required before submission", data: {} });
+            }
+
+            if (!applicant.isMobileVerified) {
+                return res.status(400).send({ status: 400, message: "Mobile number verification is required before submission", data: {} });
+            }
+
+            applicant.isDraft = false;
+            applicant.stage = 'APPLIED';
+            applicant.currentStep = 6;
+            applicant.isVerified = true;
+            applicant.verifiedAt = new Date();
+            applicant.stageHistory.push({
+                stage: 'APPLIED',
+                note: 'Multi-step application submitted and confirmed by applicant',
+                changedAt: new Date()
+            });
+
+            await applicant.save();
+
+            const data = applicant.toObject();
+            delete data.password;
+            delete data.emailOtp;
+            delete data.mobileOtp;
+
+            return res.status(200).send({
+                status: 200,
+                message: "Application submitted successfully! Our HR team will review your profile.",
+                data: { applicant: data }
+            });
+        } catch (error) {
+            console.error("[finalizeApplication Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
     registerApplicant: async (req, res) => {
         try {
             const { fullName, mobileNumber, emailAddress, dob, gender, currentAddress, permanentAddress, emergencyContact, experienceYears, previousCompany, lastCtc, appliedRoleId } = req.body;
@@ -505,7 +1002,7 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Reporting authority (Supervisor or Direct Admin) is required to approve staff", data: {} });
             }
 
-            const applicant = await applicantModel.findById(id);
+            const applicant = await applicantModel.findById(id).select('+password');
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant record not found", data: {} });
             }
@@ -555,6 +1052,7 @@ const applicantController = {
                     staffId,
                     fullName: applicant.fullName,
                     emailAddress: applicant.emailAddress.toLowerCase(),
+                    password: applicant.password || null,
                     mobileNumber: applicant.mobileNumber,
                     countryCode: applicant.countryCode || "+91",
                     dob: applicant.dob,
@@ -583,6 +1081,9 @@ const applicantController = {
                 // Update existing staff record
                 staff.applicantId = applicant._id;
                 staff.fullName = applicant.fullName;
+                if (applicant.password) {
+                    staff.password = applicant.password;
+                }
                 staff.roleId = resolved.roleId;
                 staff.role = resolved.roleName;
                 staff.departmentId = resolved.departmentId;

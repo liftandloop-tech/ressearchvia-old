@@ -304,6 +304,53 @@ class AuthService extends ApiService {
     }
   }
 
+  // Staff (Employee) Login - Email & Password
+  Future<({UserModel? user, String? token, String? error})> staffEmailPasswordLogin(
+    String email,
+    String password,
+  ) async {
+    try {
+      debugPrint('Staff email/password login for: $email');
+
+      final response = await post('/staff/staff-login', {
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      });
+
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body;
+
+        if (data['status'] == 200 && data['data'] != null) {
+          final staffData = data['data']['staff'];
+          final token = data['data']['token'];
+
+          if (token != null) {
+            await _saveToken(token as String);
+            await _saveUserData(staffData);
+
+            final user = UserModel.fromJson(staffData);
+            return (user: user, token: token, error: null);
+          }
+        }
+
+        return (
+          user: null,
+          token: null,
+          error: (data['message'] ?? 'Login failed') as String,
+        );
+      } else {
+        return (
+          user: null,
+          token: null,
+          error: response.body?['message']?.toString() ?? 'Login failed',
+        );
+      }
+    } catch (e) {
+      debugPrint('Staff email/password login error: $e');
+      return (user: null, token: null, error: 'Network error: $e');
+    }
+  }
+
   // Staff (Manager) Login - MPIN
   Future<({UserModel? user, String? token, String? error})> staffMpinLogin(
     String phone,

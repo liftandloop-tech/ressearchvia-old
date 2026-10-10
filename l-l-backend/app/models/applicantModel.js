@@ -33,8 +33,8 @@ const applicantSchema = new mongoose.Schema({
   // Basic Info
   fullName: {
     type: String,
-    required: true,
-    trim: true
+    trim: true,
+    default: ""
   },
   emailAddress: {
     type: String,
@@ -43,14 +43,117 @@ const applicantSchema = new mongoose.Schema({
     lowercase: true,
     index: true
   },
+  password: {
+    type: String,
+    select: false,
+    default: null
+  },
   mobileNumber: {
     type: Number,
-    required: true,
-    index: true
+    index: true,
+    default: null
   },
   countryCode: {
     type: String,
     default: "+91"
+  },
+
+  // Structured Personal Information
+  title: {
+    type: String,
+    enum: ["Mr", "Ms", "Mrs", null],
+    default: null
+  },
+  firstName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  middleName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  lastName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  fatherName: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  alternateEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: null
+  },
+
+  // Identity & Verification Documents
+  panNumber: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  confirmPanNumber: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  passportNumber: {
+    type: String,
+    trim: true,
+    default: null
+  },
+  proofOfAddressType: {
+    type: String,
+    default: "Aadhaar"
+  },
+  proofOfAddressUrl: {
+    type: String,
+    default: null
+  },
+  telephoneResidence: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+
+  // Educational & Professional Qualifications
+  highestQualification: {
+    type: String,
+    default: null
+  },
+  majorSubject: {
+    type: String,
+    default: null
+  },
+  instituteUniversity: {
+    type: String,
+    default: null
+  },
+  yearOfPassing: {
+    type: Number,
+    default: null
+  },
+  percentageGrade: {
+    type: String,
+    default: null
+  },
+  professionalQualifications: {
+    type: mongoose.Schema.Types.Mixed,
+    default: []
+  },
+
+  // Form Progress & Draft Status
+  currentStep: {
+    type: Number,
+    default: 1
+  },
+  isDraft: {
+    type: Boolean,
+    default: true
   },
 
   // Target Role & Department
@@ -155,6 +258,18 @@ const applicantSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  maritalStatus: {
+    type: String,
+    default: null
+  },
+  currentLocation: {
+    type: String,
+    default: null
+  },
+  skypeOrLinkedIn: {
+    type: String,
+    default: null
+  },
   currentAddress: {
     type: mongoose.Schema.Types.Mixed,
     default: null
@@ -162,6 +277,62 @@ const applicantSchema = new mongoose.Schema({
   permanentAddress: {
     type: mongoose.Schema.Types.Mixed,
     default: null
+  },
+  academicGap: {
+    type: Boolean,
+    default: false
+  },
+  academicGapDetails: {
+    type: String,
+    default: null
+  },
+  backlogsCount: {
+    type: String,
+    default: null
+  },
+  hasWorkExperience: {
+    type: Boolean,
+    default: false
+  },
+  currentDesignation: {
+    type: String,
+    default: null
+  },
+  reportingManagerName: {
+    type: String,
+    default: null
+  },
+  reportingManagerDesignation: {
+    type: String,
+    default: null
+  },
+  reporteesCount: {
+    type: Number,
+    default: 0
+  },
+  fixedSalary: {
+    type: String,
+    default: null
+  },
+  bonusIncentive: {
+    type: String,
+    default: null
+  },
+  expectedSalary: {
+    type: String,
+    default: null
+  },
+  noticePeriod: {
+    type: String,
+    default: null
+  },
+  careerGapDetails: {
+    type: String,
+    default: null
+  },
+  previousEmploymentHistory: {
+    type: mongoose.Schema.Types.Mixed,
+    default: []
   },
   emergencyContact: {
     name: { type: String, default: null },
