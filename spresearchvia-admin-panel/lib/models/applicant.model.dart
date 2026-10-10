@@ -57,6 +57,7 @@ class ApplicantModel {
   final String? kycVideoUrl;
   final String? photoUrl;
   final String? resumeUrl;
+  final String? relievingLetterUrl;
   final String? dob;
   final String? gender;
   final int? experienceYears;
@@ -94,6 +95,7 @@ class ApplicantModel {
     this.kycVideoUrl,
     this.photoUrl,
     this.resumeUrl,
+    this.relievingLetterUrl,
     this.dob,
     this.gender,
     this.experienceYears,
@@ -181,6 +183,7 @@ class ApplicantModel {
       kycVideoUrl: _safeString(json['kycVideoUrl']),
       photoUrl: _safeString(json['photoUrl'] ?? json['walkInForm']?['passportPhoto']),
       resumeUrl: _safeString(json['resumeUrl']),
+      relievingLetterUrl: _safeString(json['relievingLetterUrl']),
       dob: _safeString(json['dob']),
       gender: _safeString(json['gender']),
       experienceYears: json['experienceYears'] != null
@@ -217,6 +220,7 @@ class ApplicantModel {
       'onboardingStatus': onboardingStatus,
       'photoUrl': photoUrl,
       'resumeUrl': resumeUrl,
+      if (relievingLetterUrl != null) 'relievingLetterUrl': relievingLetterUrl,
       'panUrl': panUrl,
       'aadhaarUrl': aadhaarUrl,
       'nismUrl': nismUrl,

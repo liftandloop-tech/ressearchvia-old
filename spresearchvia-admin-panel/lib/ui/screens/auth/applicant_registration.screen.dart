@@ -125,7 +125,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _buildPrerequisiteItem('2. Recent passport size photograph (in JPEG/PNG format, below 1MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('3. Government Photo ID & Address Proof (Aadhaar Card / PAN Card)'),
+          _buildPrerequisiteItem('3. Government Photo ID & Address Proof (Aadhaar Card / Passport / Voter ID / DL)'),
           const SizedBox(height: 16),
           _buildPrerequisiteItem('4. Educational certificates & marksheets (from 10th / Graduation onwards)'),
           const SizedBox(height: 16),
@@ -705,7 +705,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Upload boxes: Photo & PAN
+        // Upload boxes: Candidate's Photo & Image of Proof of Address
         _buildResponsiveRow(
           isMobile,
           [
@@ -717,74 +717,36 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               onSpecTap: () => _showSpecDialog(context, 'Photograph Specifications', '1. In JPEG/JPG format below 1MB.\n2. Recent passport-sized photograph on plain light background.\n3. Clear full face view.'),
             ),
             _buildUploadBox(
-              title: 'PAN *',
-              specText: 'View PAN Specifications',
-              uploadedUrlObs: controller.panUrl,
-              onTap: () => controller.pickAndUploadDoc('pan'),
-              onSpecTap: () => _showSpecDialog(context, 'PAN Specifications', '1. Clear scan of PAN Card in JPG format.\n2. All details including signature & photo must be clearly visible.'),
+              title: 'Image of Proof of Address *',
+              specText: 'View POA Specifications',
+              uploadedUrlObs: controller.proofOfAddressUrl,
+              onTap: () => controller.pickAndUploadDoc('aadhaar'),
+              onSpecTap: () => _showSpecDialog(context, 'Proof of Address Specifications', '1. Scan copy of selected address proof.\n2. Both front and back pages in JPG or PDF format below 1MB.'),
             ),
           ],
         ),
         const SizedBox(height: 20),
 
-        // PAN Number & Confirm PAN
-        _buildResponsiveRow(
-          isMobile,
-          [
-            _buildTextField(
-              controller: controller.panNumberController,
-              label: 'PAN Number *',
-              hint: 'e.g. ABCDE1234F',
+        // Proof of Address Type
+        Obx(
+          () => DropdownButtonFormField<String>(
+            value: controller.selectedProofOfAddress.value,
+            decoration: InputDecoration(
+              labelText: 'Proof of Address Type *',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             ),
-            _buildTextField(
-              controller: controller.confirmPanNumberController,
-              label: 'Confirm PAN Number *',
-              hint: 'Re-enter PAN Number',
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Passport & Proof of Address Type
-        _buildResponsiveRow(
-          isMobile,
-          [
-            _buildTextField(
-              controller: controller.passportNumberController,
-              label: 'Passport Number',
-              hint: 'Enter Passport Number (if any)',
-            ),
-            Obx(
-              () => DropdownButtonFormField<String>(
-                value: controller.selectedProofOfAddress.value,
-                decoration: InputDecoration(
-                  labelText: 'Proof of Address *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                ),
-                items: ['Aadhaar', 'Passport', 'Voter ID', 'Driving License']
-                    .map((item) => DropdownMenuItem(value: item, child: Text(item, style: const TextStyle(fontSize: 13))))
-                    .toList(),
-                onChanged: (val) => controller.selectedProofOfAddress.value = val ?? 'Aadhaar',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // Upload Proof of Address
-        _buildUploadBox(
-          title: 'Image of Proof of Address *',
-          specText: 'View POA Specifications',
-          uploadedUrlObs: controller.proofOfAddressUrl,
-          onTap: () => controller.pickAndUploadDoc('aadhaar'),
-          onSpecTap: () => _showSpecDialog(context, 'Proof of Address Specifications', '1. Scan copy of selected address proof.\n2. Both front and back pages in JPG or PDF format below 1MB.'),
+            items: ['Aadhaar', 'Passport', 'Voter ID', 'Driving License']
+                .map((item) => DropdownMenuItem(value: item, child: Text(item, style: const TextStyle(fontSize: 13))))
+                .toList(),
+            onChanged: (val) => controller.selectedProofOfAddress.value = val ?? 'Aadhaar',
+          ),
         ),
         const SizedBox(height: 24),
 
-        // Notice: Name and DOB as per PAN Card
+        // Notice: Name and DOB as per Government ID
         const Text(
-          '* Name (First Name, Middle Name, Last Name) and Date of Birth should be as per PAN Card.',
+          '* Name (First Name, Middle Name, Last Name) and Date of Birth should be as per Government ID / Proof of Address.',
           style: TextStyle(color: Color(0xFFDC2626), fontSize: 12.5, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 14),
@@ -875,7 +837,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             ),
             _buildTextField(
               controller: controller.alternateEmailController,
-              label: 'Alternate Email ID *',
+              label: 'Alternate Email ID',
               hint: 'secondary@example.com',
             ),
           ],
@@ -1013,7 +975,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         _buildResponsiveRow(
           isMobile,
           [
-            _buildTextField(controller: controller.pincodeController, label: 'Pincode *', hint: '6-digit pincode'),
+            _buildTextField(controller: controller.pincodeController, label: 'Pincode', hint: '6-digit pincode'),
             Row(
               children: [
                 SizedBox(
@@ -1139,23 +1101,32 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     if (!controller.isMobileVerified.value)
                       ElevatedButton(
-                        onPressed: controller.isVerifyingMobile.value ? null : controller.handleSendMobileOtp,
+                        onPressed: (controller.isVerifyingMobile.value || controller.mobileOtpCountdown.value > 0)
+                            ? null
+                            : controller.handleSendMobileOtp,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryNavy,
+                          backgroundColor: controller.mobileOtpCountdown.value > 0
+                              ? const Color(0xFF94A3B8)
+                              : primaryNavy,
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 20, vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         child: controller.isVerifyingMobile.value
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
+                            : Text(
+                                controller.mobileOtpCountdown.value > 0
+                                    ? 'Retry in ${controller.mobileOtpCountdown.value}s'
+                                    : (controller.isMobileOtpSent.value ? 'Resend' : 'Verify'),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
                       ),
                   ],
                 ),
               ),
               const SizedBox(height: 8),
 
-              // Mobile Verified status label or Inline OTP input
+              // Mobile Verified status label or Inline OTP input (Hidden until Verify is tapped)
               Obx(() {
                 if (controller.isMobileVerified.value) {
                   return const Row(
@@ -1168,6 +1139,10 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                       ),
                     ],
                   );
+                }
+
+                if (!controller.isMobileOtpSent.value) {
+                  return const SizedBox.shrink();
                 }
 
                 return Column(
@@ -1233,7 +1208,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               () => DropdownButtonFormField<String>(
                 value: controller.highestQualification.value,
                 decoration: InputDecoration(
-                  labelText: 'Highest Qualification *',
+                  labelText: 'Highest Qualification',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 items: ['Graduation', 'Post graduation', '12th', '10th', 'Diploma', 'Doctorate']
@@ -1246,7 +1221,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               () => DropdownButtonFormField<String>(
                 value: controller.majorSubject.value,
                 decoration: InputDecoration(
-                  labelText: 'Major subject *',
+                  labelText: 'Major Subject',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 items: ['Engineering', 'Commerce', 'Science', 'Arts', 'Management', 'Finance', 'Other']
@@ -1264,14 +1239,14 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           [
             _buildTextField(
               controller: controller.instituteUniversityController,
-              label: 'Institute/University *',
+              label: 'Institute/University',
               hint: 'e.g. Vaishnav Vidyapeeth',
             ),
             Obx(
               () => DropdownButtonFormField<String>(
                 value: controller.yearOfPassing.value,
                 decoration: InputDecoration(
-                  labelText: 'Year Of Passing *',
+                  labelText: 'Year Of Passing',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 items: List.generate(25, (index) => (2026 - index).toString())
@@ -1289,7 +1264,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           [
             _buildTextField(
               controller: controller.percentageGradeController,
-              label: 'Percentage/Grade *',
+              label: 'Percentage/Grade',
               hint: 'e.g. 7.9 or 75%',
             ),
             _buildTextField(
@@ -1337,7 +1312,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: controller.academicGapDetailsController,
-                    label: 'Academic Gap Details *',
+                    label: 'Academic Gap Details',
                     hint: 'e.g. 1 year gap due to competitive exams preparation',
                   ),
                 ],
@@ -1349,7 +1324,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
 
         // Degree Document Upload
         _buildUploadBox(
-          title: 'Highest Qualification Degree / Marksheet *',
+          title: 'Highest Qualification Degree / Marksheet',
           specText: 'View Degree Specifications',
           uploadedUrlObs: controller.highestEducationUrl,
           onTap: () => controller.pickAndUploadDoc('highestEducation'),
@@ -1516,6 +1491,14 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                   _buildTextField(controller: controller.careerGapController, label: 'Career Gap Details (if any)', hint: 'Reason for employment gap'),
                 ],
               ),
+              const SizedBox(height: 16),
+              _buildUploadBox(
+                title: 'Upload Relieving Letter *',
+                specText: 'View Relieving Letter Specifications',
+                uploadedUrlObs: controller.relievingLetterUrl,
+                onTap: () => controller.pickAndUploadDoc('relievingLetter'),
+                onSpecTap: () => _showSpecDialog(context, 'Relieving Letter Specifications', '1. Relieving letter or experience certificate from last employer.\n2. PDF or JPG format below 5MB.'),
+              ),
             ],
           );
         }),
@@ -1584,7 +1567,6 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             _buildPreviewRow('Current Location:', controller.currentLocationController.text, isMobile: isMobile),
             if (controller.skypeAddressController.text.isNotEmpty)
               _buildPreviewRow('LinkedIn / Skype:', controller.skypeAddressController.text, isMobile: isMobile),
-            _buildPreviewRow('PAN Number:', controller.panNumberController.text, isMobile: isMobile),
             _buildPreviewRow('Applied Position:', controller.appliedPositionController.text.isNotEmpty ? controller.appliedPositionController.text : 'Candidate', isMobile: isMobile),
             const SizedBox(height: 6),
             Wrap(
@@ -1592,7 +1574,6 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _buildDocBadge('Photo', controller.photoUrl.value.isNotEmpty),
-                _buildDocBadge('PAN Card', controller.panUrl.value.isNotEmpty),
                 _buildDocBadge('Address Proof', controller.proofOfAddressUrl.value.isNotEmpty),
               ],
             ),
@@ -1700,7 +1681,15 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                 _buildPreviewRow('Career Gap:', controller.careerGapController.text, isMobile: isMobile),
             ],
             const SizedBox(height: 6),
-            _buildDocBadge('Updated Resume / CV', controller.resumeUrl.value.isNotEmpty),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _buildDocBadge('Updated Resume / CV', controller.resumeUrl.value.isNotEmpty),
+                if (!controller.isFresher.value)
+                  _buildDocBadge('Relieving Letter', controller.relievingLetterUrl.value.isNotEmpty),
+              ],
+            ),
             const Divider(height: 20),
             _buildPreviewRow('Emergency Contact:', '${controller.emergencyNameController.text} (${controller.emergencyRelationController.text}) - ${controller.emergencyPhoneController.text}', isMobile: isMobile),
           ],

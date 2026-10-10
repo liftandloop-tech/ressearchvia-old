@@ -732,6 +732,10 @@ class ApplicantProfileScreen extends StatelessWidget {
           _buildDocRow(context, controller, 'NISM Certification', 'nism', applicant.nismUrl, Icons.verified_user_outlined),
           const SizedBox(height: 10),
           _buildDocRow(context, controller, 'Highest Education Degree', 'education', applicant.highestEducationUrl, Icons.school_outlined),
+          if (applicant.relievingLetterUrl != null && applicant.relievingLetterUrl!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildDocRow(context, controller, 'Relieving Letter', 'relieving', applicant.relievingLetterUrl, Icons.work_history_outlined),
+          ],
           const SizedBox(height: 10),
           _buildDocRow(context, controller, 'KYC Verification Video', 'video', applicant.kycVideoUrl, Icons.videocam_outlined, isVideo: true),
         ],

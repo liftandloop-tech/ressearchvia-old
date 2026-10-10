@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
@@ -35,10 +36,6 @@ class ApplicantRegistrationController extends GetxController {
 
   // Step 1: Personal Information Form Controllers
   final photoUrl = ''.obs;
-  final panUrl = ''.obs;
-  final panNumberController = TextEditingController();
-  final confirmPanNumberController = TextEditingController();
-  final passportNumberController = TextEditingController();
   var selectedProofOfAddress = 'Aadhaar'.obs;
   final proofOfAddressUrl = ''.obs;
   var selectedTitle = 'Mr'.obs;
@@ -68,6 +65,9 @@ class ApplicantRegistrationController extends GetxController {
   final phoneController = TextEditingController();
   var isMobileVerified = false.obs;
   var isVerifyingMobile = false.obs;
+  var isMobileOtpSent = false.obs;
+  var mobileOtpCountdown = 0.obs;
+  Timer? _mobileOtpTimer;
   final mobileOtpInputController = TextEditingController();
   var sameAsCurrentAddress = false.obs;
   final permanentStreetController = TextEditingController();
@@ -109,6 +109,7 @@ class ApplicantRegistrationController extends GetxController {
   final noticePeriodDaysController = TextEditingController();
   final careerGapController = TextEditingController();
   final resumeUrl = ''.obs;
+  final relievingLetterUrl = ''.obs;
   final emergencyNameController = TextEditingController();
   final emergencyRelationController = TextEditingController();
   final emergencyPhoneController = TextEditingController();
@@ -160,12 +161,8 @@ class ApplicantRegistrationController extends GetxController {
     currentLocationController.text = data['currentLocation']?.toString() ?? '';
     skypeAddressController.text = data['skypeOrLinkedIn']?.toString() ?? '';
     alternateEmailController.text = data['alternateEmail']?.toString() ?? '';
-    panNumberController.text = data['panNumber']?.toString() ?? '';
-    confirmPanNumberController.text = data['confirmPanNumber']?.toString() ?? data['panNumber']?.toString() ?? '';
-    passportNumberController.text = data['passportNumber']?.toString() ?? '';
     selectedProofOfAddress.value = data['proofOfAddressType']?.toString() ?? 'Aadhaar';
     photoUrl.value = data['photoUrl']?.toString() ?? '';
-    panUrl.value = data['panUrl']?.toString() ?? '';
     proofOfAddressUrl.value = data['proofOfAddressUrl']?.toString() ?? '';
     appliedPositionController.text = data['targetRole']?.toString() ?? '';
 
@@ -223,6 +220,7 @@ class ApplicantRegistrationController extends GetxController {
     noticePeriodDaysController.text = data['noticePeriod']?.toString() ?? '';
     careerGapController.text = data['careerGapDetails']?.toString() ?? '';
     resumeUrl.value = data['resumeUrl']?.toString() ?? '';
+    relievingLetterUrl.value = data['relievingLetterUrl']?.toString() ?? '';
     if (data['emergencyContact'] is Map) {
       final emg = data['emergencyContact'] as Map;
       emergencyNameController.text = emg['name']?.toString() ?? '';
@@ -370,7 +368,21 @@ class ApplicantRegistrationController extends GetxController {
 
   // --- Step 2: In-Screen Mobile OTP Methods ---
 
+  void startMobileOtpTimer() {
+    _mobileOtpTimer?.cancel();
+    mobileOtpCountdown.value = 59;
+    _mobileOtpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mobileOtpCountdown.value > 0) {
+        mobileOtpCountdown.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   Future<void> handleSendMobileOtp() async {
+    if (mobileOtpCountdown.value > 0) return;
+
     final phone = phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
     if (phone.length < 10) {
       Get.snackbar('Invalid Mobile Number', 'Please enter a valid 10-digit mobile number',
@@ -382,6 +394,8 @@ class ApplicantRegistrationController extends GetxController {
     try {
       final res = await _applicantService.sendMobileOtp(applicantId.value, phone);
       if (res.success) {
+        isMobileOtpSent.value = true;
+        startMobileOtpTimer();
         Get.snackbar('SMS Code Dispatched', 'A 4-digit verification code was sent to +91 $phone',
             backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade900);
       } else {
@@ -407,6 +421,8 @@ class ApplicantRegistrationController extends GetxController {
       final res = await _applicantService.verifyMobileOtp(applicantId.value, phone, otp);
       if (res.success) {
         isMobileVerified.value = true;
+        _mobileOtpTimer?.cancel();
+        mobileOtpCountdown.value = 0;
         mobileOtpInputController.clear();
         Get.snackbar('Mobile Verified', 'Your mobile number +91 $phone has been verified successfully and locked.',
             backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade900);
@@ -426,16 +442,6 @@ class ApplicantRegistrationController extends GetxController {
 
     // Validate Step 1
     if (step == 1) {
-      if (panNumberController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter PAN Number',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (confirmPanNumberController.text.trim().toUpperCase() != panNumberController.text.trim().toUpperCase()) {
-        Get.snackbar('Validation Error', 'PAN Number and Confirm PAN Number do not match',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-        return;
-      }
       if (firstNameController.text.trim().isEmpty) {
         Get.snackbar('Mandatory Field Missing', 'Please enter First Name',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
@@ -472,12 +478,8 @@ class ApplicantRegistrationController extends GetxController {
         'currentLocation': currentLocationController.text.trim(),
         'skypeOrLinkedIn': skypeAddressController.text.trim(),
         'alternateEmail': alternateEmailController.text.trim(),
-        'panNumber': panNumberController.text.trim().toUpperCase(),
-        'confirmPanNumber': confirmPanNumberController.text.trim().toUpperCase(),
-        'passportNumber': passportNumberController.text.trim(),
         'proofOfAddressType': selectedProofOfAddress.value,
         'photoUrl': photoUrl.value,
-        'panUrl': panUrl.value,
         'proofOfAddressUrl': proofOfAddressUrl.value,
         'targetRole': (selectedRole.value?['name']?.toString() ?? appliedPositionController.text).trim(),
         'appliedRoleId': selectedRole.value?['id'] ?? selectedRole.value?['_id'],
@@ -495,11 +497,6 @@ class ApplicantRegistrationController extends GetxController {
       }
       if (cityController.text.trim().isEmpty) {
         Get.snackbar('Mandatory Field Missing', 'Please enter City',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (pincodeController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter Pincode',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
@@ -536,24 +533,13 @@ class ApplicantRegistrationController extends GetxController {
       return;
     }
 
-    // Validate Step 3
+    // Validate Step 3 (Educational details are optional)
     if (step == 3) {
-      if (instituteUniversityController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter Institute / University Name',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-        return;
-      }
-      if (percentageGradeController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please enter Percentage / Grade',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-        return;
-      }
-
       await _saveStepDraft(3, {
         'highestQualification': highestQualification.value,
         'majorSubject': majorSubject.value,
         'instituteUniversity': instituteUniversityController.text.trim(),
-        'yearOfPassing': int.tryParse(yearOfPassing.value) ?? 2023,
+        'yearOfPassing': int.tryParse(yearOfPassing.value),
         'percentageGrade': percentageGradeController.text.trim(),
         'academicGap': academicGap.value,
         'academicGapDetails': academicGapDetailsController.text.trim(),
@@ -595,6 +581,11 @@ class ApplicantRegistrationController extends GetxController {
               backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
           return;
         }
+        if (relievingLetterUrl.value.isEmpty) {
+          Get.snackbar('Mandatory Field Missing', 'Please upload your Relieving Letter from previous employer',
+              backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+          return;
+        }
       }
       if (emergencyNameController.text.trim().isEmpty || emergencyPhoneController.text.trim().isEmpty) {
         Get.snackbar('Mandatory Field Missing', 'Please complete Emergency Contact Person Name and Phone Number',
@@ -618,6 +609,7 @@ class ApplicantRegistrationController extends GetxController {
         'noticePeriod': isFresher.value ? null : noticePeriodDaysController.text.trim(),
         'careerGapDetails': isFresher.value ? null : careerGapController.text.trim(),
         'resumeUrl': resumeUrl.value,
+        'relievingLetterUrl': isFresher.value ? null : relievingLetterUrl.value,
         'emergencyContact': {
           'name': emergencyNameController.text.trim(),
           'relation': emergencyRelationController.text.trim(),
@@ -708,8 +700,6 @@ class ApplicantRegistrationController extends GetxController {
             final app = res.applicant!;
             if (type == 'photo') {
               docUrl = app.photoUrl ?? filename;
-            } else if (type == 'pan' || type == 'pancard') {
-              docUrl = app.panUrl ?? filename;
             } else if (type == 'aadhaar' || type == 'poa') {
               docUrl = app.aadhaarUrl ?? filename;
             } else if (type == 'nism' || type == 'certificate') {
@@ -718,15 +708,17 @@ class ApplicantRegistrationController extends GetxController {
               docUrl = app.resumeUrl ?? filename;
             } else if (type == 'highestEducation' || type == 'degree' || type == 'education') {
               docUrl = app.highestEducationUrl ?? filename;
+            } else if (type == 'relievingLetter' || type == 'relieving' || type == 'relieving_letter') {
+              docUrl = app.relievingLetterUrl ?? filename;
             }
           }
 
           if (type == 'photo') photoUrl.value = docUrl;
-          if (type == 'pan' || type == 'pancard') panUrl.value = docUrl;
           if (type == 'aadhaar' || type == 'poa') proofOfAddressUrl.value = docUrl;
           if (type == 'nism' || type == 'certificate') certDocumentUrl.value = docUrl;
           if (type == 'resume') resumeUrl.value = docUrl;
           if (type == 'highestEducation' || type == 'degree' || type == 'education') highestEducationUrl.value = docUrl;
+          if (type == 'relievingLetter' || type == 'relieving' || type == 'relieving_letter') relievingLetterUrl.value = docUrl;
 
           Get.snackbar('Upload Successful', '${type.toUpperCase()} file uploaded',
               backgroundColor: Colors.green.withOpacity(0.1));
@@ -749,9 +741,6 @@ class ApplicantRegistrationController extends GetxController {
     confirmPasswordController.dispose();
     emailOtpInputController.dispose();
 
-    panNumberController.dispose();
-    confirmPanNumberController.dispose();
-    passportNumberController.dispose();
     firstNameController.dispose();
     middleNameController.dispose();
     lastNameController.dispose();
@@ -791,6 +780,7 @@ class ApplicantRegistrationController extends GetxController {
     emergencyNameController.dispose();
     emergencyRelationController.dispose();
     emergencyPhoneController.dispose();
+    _mobileOtpTimer?.cancel();
 
     super.onClose();
   }

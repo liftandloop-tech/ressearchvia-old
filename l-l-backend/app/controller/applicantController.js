@@ -526,6 +526,7 @@ const applicantController = {
             if (stepData.expectedSalary !== undefined) applicant.expectedSalary = stepData.expectedSalary;
             if (stepData.noticePeriod !== undefined) applicant.noticePeriod = stepData.noticePeriod;
             if (stepData.resumeUrl !== undefined) applicant.resumeUrl = stepData.resumeUrl;
+            if (stepData.relievingLetterUrl !== undefined) applicant.relievingLetterUrl = stepData.relievingLetterUrl;
             if (stepData.careerGapDetails !== undefined) applicant.careerGapDetails = stepData.careerGapDetails;
             if (stepData.previousEmploymentHistory !== undefined) applicant.previousEmploymentHistory = stepData.previousEmploymentHistory;
             if (stepData.emergencyContact !== undefined) applicant.emergencyContact = stepData.emergencyContact;
@@ -899,7 +900,10 @@ const applicantController = {
                 highestEducation: 'highestEducationUrl',
                 degree: 'highestEducationUrl',
                 photo: 'photoUrl',
-                resume: 'resumeUrl'
+                resume: 'resumeUrl',
+                relieving: 'relievingLetterUrl',
+                relievingLetter: 'relievingLetterUrl',
+                relieving_letter: 'relievingLetterUrl'
             };
             const field = fieldMap[type];
             if (!field) {
@@ -910,7 +914,7 @@ const applicantController = {
             if (!applicant.documents) applicant.documents = {};
             applicant.documents[type] = req.file.path;
             applicant.markModified('documents');
-            if (applicant.photoUrl && applicant.resumeUrl && applicant.panUrl && applicant.aadhaarUrl) {
+            if (applicant.photoUrl && applicant.resumeUrl && applicant.aadhaarUrl) {
                 applicant.onboardingStatus = applicant.kycVideoUrl ? 'VERIFIED' : 'DOCUMENTS_UPLOADED';
             }
             await applicant.save();

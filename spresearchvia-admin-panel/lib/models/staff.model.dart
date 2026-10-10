@@ -366,6 +366,7 @@ class StaffModel {
   final String? agreementSignature;
   final String? photoUrl;
   final String? resumeUrl;
+  final String? relievingLetterUrl;
   final String stage;
   final String? rejectionReason;
   final String? dob;
@@ -418,6 +419,7 @@ class StaffModel {
     this.agreementSignature,
     this.photoUrl,
     this.resumeUrl,
+    this.relievingLetterUrl,
     this.stage = 'Applicant',
     this.rejectionReason,
     this.dob,
@@ -517,6 +519,7 @@ class StaffModel {
       agreementSignature: _safeString(json['agreementSignature']),
       photoUrl: _safeString(json['photoUrl']),
       resumeUrl: _safeString(json['resumeUrl']),
+      relievingLetterUrl: _safeString(json['relievingLetterUrl']),
       stage: _safeString(json['stage']) ?? 'Applicant',
       rejectionReason: _safeString(json['rejectionReason']),
       dob: _safeString(json['dob']),
@@ -574,6 +577,7 @@ class StaffModel {
       'isMobileVerified': isMobileVerified,
       'photoUrl': photoUrl,
       'resumeUrl': resumeUrl,
+      if (relievingLetterUrl != null) 'relievingLetterUrl': relievingLetterUrl,
       'stage': stage,
       'dob': dob,
       'gender': gender,

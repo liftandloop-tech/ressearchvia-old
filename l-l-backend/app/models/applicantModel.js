@@ -367,6 +367,10 @@ const applicantSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  relievingLetterUrl: {
+    type: String,
+    default: null
+  },
   kycVideoUrl: {
     type: String,
     default: null
