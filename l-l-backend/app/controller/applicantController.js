@@ -1183,6 +1183,7 @@ const applicantController = {
                     panUrl: applicant.panUrl,
                     joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
                     status: 'Active',
+                    stage: 'Employee',
                     roleId: resolved.roleId,
                     role: resolved.roleName,
                     departmentId: resolved.departmentId,
@@ -1208,6 +1209,7 @@ const applicantController = {
                 if (mpin) staff.mpin = effectiveMpin;
                 staff.joiningDate = joiningDate ? new Date(joiningDate) : (staff.joiningDate || new Date());
                 staff.status = 'Active';
+                staff.stage = 'Employee';
                 if (finalSupervisorId || isDirectAdmin) {
                     staff.assignedDirector = finalSupervisorId;
                     staff.assignedDirectorName = finalSupervisorName;

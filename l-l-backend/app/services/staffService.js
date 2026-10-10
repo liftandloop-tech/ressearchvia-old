@@ -837,8 +837,24 @@ const staffService = {
   },
   staffList: async ({ query = {}, user }) => {
     try {
+      // Auto-heal: Ensure any promoted applicant in staffModel has stage = 'Employee'
+      await staffModel.updateMany(
+        {
+          $or: [
+            { applicantId: { $ne: null } },
+            { status: { $in: ['Active', 'active'] } }
+          ],
+          stage: 'Applicant'
+        },
+        { $set: { stage: 'Employee' } }
+      );
+
       let mongoQuery = {
-        stage: { $ne: 'Applicant' }
+        $or: [
+          { stage: 'Employee' },
+          { stage: { $ne: 'Applicant' } },
+          { applicantId: { $ne: null } }
+        ]
       };
 
       // Status filtering: Default to Active only unless explicitly requested
