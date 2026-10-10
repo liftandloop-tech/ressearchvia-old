@@ -12,6 +12,7 @@ const stageHistorySchema = new mongoose.Schema({
       "OFFER_SENT",
       "OFFER_ACCEPTED",
       "ONBOARDING",
+      "PROMOTED",
       "REJECTED",
       "WITHDRAWN"
     ],
