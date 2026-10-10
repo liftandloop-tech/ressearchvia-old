@@ -6,8 +6,19 @@ import staffService, { resolveRoleAndDepartment } from "../services/staffService
 import roleModel from "../models/roleModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
+
+const findApplicantByIdOrCustomId = async (id) => {
+    if (!id) return null;
+    const strId = String(id).trim();
+    if (mongoose.Types.ObjectId.isValid(strId)) {
+        const doc = await applicantModel.findById(strId);
+        if (doc) return doc;
+    }
+    return await applicantModel.findOne({ applicantId: strId });
+};
 
 const generateNextApplicantId = async () => {
     const currentYear = new Date().getFullYear();
@@ -205,7 +216,7 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Applicant ID and email OTP are required", data: {} });
             }
 
-            const applicant = await applicantModel.findById(applicantId);
+            const applicant = await findApplicantByIdOrCustomId(applicantId);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant profile not found", data: {} });
             }
@@ -392,7 +403,7 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Invalid mobile number format", data: {} });
             }
 
-            const applicant = await applicantModel.findById(applicantId);
+            const applicant = await findApplicantByIdOrCustomId(applicantId);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
@@ -429,7 +440,7 @@ const applicantController = {
             const { id } = req.params;
             const { step, stepData } = req.body;
 
-            const applicant = await applicantModel.findById(id);
+            const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
@@ -547,7 +558,7 @@ const applicantController = {
     finalizeApplication: async (req, res) => {
         try {
             const { id } = req.params;
-            const applicant = await applicantModel.findById(id);
+            const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
@@ -872,22 +883,27 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "No file uploaded", data: {} });
             }
 
-            const applicant = await applicantModel.findById(id);
+            const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
 
             const fieldMap = {
                 pan: 'panUrl',
+                pancard: 'panUrl',
                 aadhaar: 'aadhaarUrl',
+                poa: 'aadhaarUrl',
                 nism: 'nismUrl',
+                certificate: 'nismUrl',
                 education: 'highestEducationUrl',
+                highestEducation: 'highestEducationUrl',
+                degree: 'highestEducationUrl',
                 photo: 'photoUrl',
                 resume: 'resumeUrl'
             };
             const field = fieldMap[type];
             if (!field) {
-                return res.status(400).send({ status: 400, message: "Invalid document type", data: {} });
+                return res.status(400).send({ status: 400, message: "Invalid document type: " + type, data: {} });
             }
 
             applicant[field] = req.file.path;
@@ -912,7 +928,7 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "No video file uploaded", data: {} });
             }
 
-            const applicant = await applicantModel.findById(id);
+            const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
@@ -1143,7 +1159,7 @@ const applicantController = {
     getApplicantDetails: async (req, res) => {
         try {
             const { id } = req.params;
-            const applicant = await applicantModel.findById(id);
+            const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }
@@ -1284,7 +1300,7 @@ const applicantController = {
             const { id } = req.params;
             const { recruiterRemarks, interviewerRemarks } = req.body;
 
-            const applicant = await applicantModel.findById(id);
+            const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
             }

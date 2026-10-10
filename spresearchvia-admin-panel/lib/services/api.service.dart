@@ -87,14 +87,33 @@ class ApiService extends GetConnect {
     httpClient.addRequestModifier<dynamic>((request) async {
       InactivityService.recordIfRegistered();
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final token = prefs.getString('auth_token');
-        if (token != null && token.isNotEmpty) {
-          // Backend expects raw token without "Bearer " prefix
-          request.headers['Authorization'] = token;
-          debugPrint('Added auth header for ${request.url}');
-        } else {
-          debugPrint('No auth token found for ${request.url}');
+        final urlStr = request.url.toString();
+        // Public applicant routes do not use staff auth tokens
+        final isApplicantPublicEndpoint = urlStr.contains('/staff/applicant/') ||
+            urlStr.contains('/applicant/create-account') ||
+            urlStr.contains('/applicant/verify-account-email') ||
+            urlStr.contains('/applicant/resend-email-otp') ||
+            urlStr.contains('/applicant/continue-login') ||
+            urlStr.contains('/applicant/send-mobile-otp') ||
+            urlStr.contains('/applicant/verify-mobile-otp') ||
+            urlStr.contains('/applicant/save-step') ||
+            urlStr.contains('/applicant/finalize-application') ||
+            urlStr.contains('/applicant/register') ||
+            urlStr.contains('/applicant/upload-doc') ||
+            urlStr.contains('/applicant/upload-video') ||
+            urlStr.contains('/applicant/continue-init') ||
+            urlStr.contains('/applicant/continue-verify');
+
+        if (!isApplicantPublicEndpoint) {
+          final prefs = await SharedPreferences.getInstance();
+          final token = prefs.getString('auth_token');
+          if (token != null && token.isNotEmpty) {
+            // Backend expects raw token without "Bearer " prefix
+            request.headers['Authorization'] = token;
+            debugPrint('Added auth header for ${request.url}');
+          } else {
+            debugPrint('No auth token found for ${request.url}');
+          }
         }
         
         // Remove content-length to avoid "Refused to set unsafe header" in browser/web
@@ -116,6 +135,18 @@ class ApiService extends GetConnect {
         debugPrint(
           'API Error: ${request.method} ${request.url} -> ${response.statusCode} ${response.statusText}',
         );
+
+        final urlStr = request.url.toString();
+        final isApplicantRequest = urlStr.contains('/applicant/') ||
+            urlStr.contains('/staff/applicant/') ||
+            urlStr.contains('/applicant');
+        final isPublicPage = AppRoutes.isPublicRoute(Get.currentRoute);
+
+        // Guard: NEVER trigger staff logout or redirect to login screen for public applicant endpoints or when applicant is on public pages
+        if (isApplicantRequest || isPublicPage) {
+          debugPrint('Bypassing auth guard for applicant endpoint or public route: $urlStr');
+          return response;
+        }
 
         // Handle "Token not valid" (400) or Unauthorized (401)
         // The backend returns 400 for jwt verification failure with message "Token not valid"

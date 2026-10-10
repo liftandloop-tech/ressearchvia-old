@@ -44,8 +44,12 @@ const ALLOWED_EXTENSIONS_BY_TYPE = {
   'pancard': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'pan': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'aadhaar': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'poa': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'nism': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'certificate': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'education': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'highestEducation': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'degree': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'photo': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
   'resume': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'serviceAgreement': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
@@ -191,7 +195,7 @@ const storage = multer.diskStorage({
     let uploadPath = "app/uploads/";
     if (type === "image") {
       uploadPath = "app/uploads/image";
-    } else if (type === "pancard" || type === "pan" || type === "nism" || type === "education" || type === "photo" || type === "resume" || type === "serviceAgreement" || type === "agreement" || type === "signedDocument" || type === 'aadhaar') {
+    } else if (type === "pancard" || type === "pan" || type === "nism" || type === "certificate" || type === "education" || type === "highestEducation" || type === "degree" || type === "photo" || type === "resume" || type === "serviceAgreement" || type === "agreement" || type === "signedDocument" || type === 'aadhaar' || type === 'poa') {
       uploadPath = "app/uploads/kycimg";
     } else if (type === 'report') {
       uploadPath = "app/uploads/reports";

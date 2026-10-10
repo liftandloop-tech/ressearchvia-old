@@ -703,13 +703,30 @@ class ApplicantRegistrationController extends GetxController {
 
         uploadingDocType.value = '';
         if (res.success) {
-          final docUrl = res.applicant?.panUrl ?? res.applicant?.photoUrl ?? res.applicant?.aadhaarUrl ?? filename;
+          String docUrl = filename;
+          if (res.applicant != null) {
+            final app = res.applicant!;
+            if (type == 'photo') {
+              docUrl = app.photoUrl ?? filename;
+            } else if (type == 'pan' || type == 'pancard') {
+              docUrl = app.panUrl ?? filename;
+            } else if (type == 'aadhaar' || type == 'poa') {
+              docUrl = app.aadhaarUrl ?? filename;
+            } else if (type == 'nism' || type == 'certificate') {
+              docUrl = app.nismUrl ?? filename;
+            } else if (type == 'resume') {
+              docUrl = app.resumeUrl ?? filename;
+            } else if (type == 'highestEducation' || type == 'degree' || type == 'education') {
+              docUrl = app.highestEducationUrl ?? filename;
+            }
+          }
+
           if (type == 'photo') photoUrl.value = docUrl;
-          if (type == 'pan') panUrl.value = docUrl;
+          if (type == 'pan' || type == 'pancard') panUrl.value = docUrl;
           if (type == 'aadhaar' || type == 'poa') proofOfAddressUrl.value = docUrl;
           if (type == 'nism' || type == 'certificate') certDocumentUrl.value = docUrl;
           if (type == 'resume') resumeUrl.value = docUrl;
-          if (type == 'highestEducation' || type == 'degree') highestEducationUrl.value = docUrl;
+          if (type == 'highestEducation' || type == 'degree' || type == 'education') highestEducationUrl.value = docUrl;
 
           Get.snackbar('Upload Successful', '${type.toUpperCase()} file uploaded',
               backgroundColor: Colors.green.withOpacity(0.1));

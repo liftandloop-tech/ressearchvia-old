@@ -7,6 +7,7 @@ import '../../services/staff.service.dart';
 import '../../services/role_permission.service.dart';
 import '../../models/staff.model.dart';
 import '../../models/role.model.dart';
+import '../../config/routes.config.dart';
 import '../staff/staff.controller.dart';
 import '../staff/staff_management.controller.dart';
 import 'applicants_list.controller.dart';
@@ -69,7 +70,10 @@ class ApplicantProfileController extends GetxController {
     if (applicantId.value.isNotEmpty) {
       fetchDetails(showLoading: true);
     }
-    fetchRolesAndSupervisors();
+    // Only fetch staff/admin roles & supervisors if not on a public applicant onboarding page
+    if (!AppRoutes.isPublicRoute(Get.currentRoute)) {
+      fetchRolesAndSupervisors();
+    }
   }
 
   Future<void> fetchRolesAndSupervisors() async {
