@@ -300,11 +300,11 @@ class ApplicantProfileController extends GetxController {
   Future<bool> promoteToStaff({String? note}) async {
     isPromoting.value = true;
     try {
-      final success = await _applicantService.promoteApplicant(
+      final result = await _applicantService.promoteApplicant(
         applicantId.value,
         note: note,
       );
-      if (success) {
+      if (result.success) {
         await fetchDetails(showLoading: false);
         applicant.refresh();
         if (Get.isRegistered<ApplicantsListController>()) {
@@ -324,7 +324,12 @@ class ApplicantProfileController extends GetxController {
         );
         return true;
       } else {
-        Get.snackbar('Promotion Failed', 'Failed to promote applicant to staff', backgroundColor: Colors.red.withValues(alpha: 0.15));
+        Get.snackbar(
+          'Promotion Failed',
+          result.message ?? 'Failed to promote applicant to staff',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+          duration: const Duration(seconds: 4),
+        );
         return false;
       }
     } catch (e) {
@@ -343,11 +348,11 @@ class ApplicantProfileController extends GetxController {
   Future<bool> rejectApplicant({String? reason}) async {
     isRejecting.value = true;
     try {
-      final success = await _applicantService.rejectApplicant(
+      final result = await _applicantService.rejectApplicant(
         applicantId.value,
         reason: reason,
       );
-      if (success) {
+      if (result.success) {
         await fetchDetails(showLoading: false);
         applicant.refresh();
         if (Get.isRegistered<ApplicantsListController>()) {
@@ -360,7 +365,12 @@ class ApplicantProfileController extends GetxController {
         );
         return true;
       } else {
-        Get.snackbar('Rejection Failed', 'Failed to reject applicant', backgroundColor: Colors.red.withValues(alpha: 0.15));
+        Get.snackbar(
+          'Rejection Failed',
+          result.message ?? 'Failed to reject applicant',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+          duration: const Duration(seconds: 4),
+        );
         return false;
       }
     } catch (e) {
@@ -374,12 +384,12 @@ class ApplicantProfileController extends GetxController {
   Future<bool> updateStage(String newStage, {String? note}) async {
     isUpdatingStage.value = true;
     try {
-      final success = await _applicantService.updateApplicantStage(
+      final result = await _applicantService.updateApplicantStage(
         applicantId.value,
         newStage,
         note: note,
       );
-      if (success) {
+      if (result.success) {
         await fetchDetails(showLoading: false);
         applicant.refresh();
         if (Get.isRegistered<ApplicantsListController>()) {
@@ -392,7 +402,12 @@ class ApplicantProfileController extends GetxController {
         );
         return true;
       } else {
-        Get.snackbar('Update Failed', 'Failed to update applicant stage', backgroundColor: Colors.red.withValues(alpha: 0.15));
+        Get.snackbar(
+          'Update Failed',
+          result.message ?? 'Failed to update applicant stage',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+          duration: const Duration(seconds: 4),
+        );
         return false;
       }
     } catch (e) {

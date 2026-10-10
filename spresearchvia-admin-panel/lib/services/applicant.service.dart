@@ -286,44 +286,66 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<bool> approveApplicant(String id, [Map<String, dynamic>? data]) async {
+  Future<({bool success, String? message})> approveApplicant(String id, [Map<String, dynamic>? data]) async {
     try {
       final response = await post('/staff/applicant/approve/$id', data ?? {});
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return (success: true, message: response.body?['message']?.toString());
+      }
+      final errorMsg = response.body?['message']?.toString() ??
+          response.body?['error']?.toString() ??
+          'Operation failed (HTTP ${response.statusCode})';
+      debugPrint('approveApplicant failed: $errorMsg');
+      return (success: false, message: errorMsg);
     } catch (e) {
       debugPrint('Error approving applicant: $e');
-      return false;
+      return (success: false, message: e.toString());
     }
   }
 
-  Future<bool> promoteApplicant(String id, {String? note}) async {
+  Future<({bool success, String? message})> promoteApplicant(String id, {String? note}) async {
     return approveApplicant(id, {
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
     });
   }
 
-  Future<bool> updateApplicantStage(String id, String stage, {String? note}) async {
+  Future<({bool success, String? message})> updateApplicantStage(String id, String stage, {String? note}) async {
     try {
       final response = await post('/staff/applicant/stage/$id', {
         'stage': stage,
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
       });
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return (success: true, message: response.body?['message']?.toString());
+      }
+      final errorMsg = response.body?['message']?.toString() ??
+          response.body?['error']?.toString() ??
+          'Failed to update stage (HTTP ${response.statusCode})';
+      debugPrint('updateApplicantStage failed: $errorMsg');
+      return (success: false, message: errorMsg);
     } catch (e) {
       debugPrint('Error updating applicant stage: $e');
-      return false;
+      return (success: false, message: e.toString());
     }
   }
 
-  Future<bool> rejectApplicant(String id, {String? reason}) async {
+  Future<({bool success, String? message})> rejectApplicant(String id, {String? reason}) async {
     try {
       final response = await post('/staff/applicant/reject/$id', {
         if (reason != null && reason.trim().isNotEmpty) 'rejectionReason': reason.trim(),
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       });
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        return (success: true, message: response.body?['message']?.toString());
+      }
+      final errorMsg = response.body?['message']?.toString() ??
+          response.body?['error']?.toString() ??
+          'Failed to reject applicant (HTTP ${response.statusCode})';
+      debugPrint('rejectApplicant failed: $errorMsg');
+      return (success: false, message: errorMsg);
     } catch (e) {
       debugPrint('Error rejecting applicant: $e');
-      return false;
+      return (success: false, message: e.toString());
     }
   }
 

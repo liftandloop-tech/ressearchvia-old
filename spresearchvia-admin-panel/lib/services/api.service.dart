@@ -88,8 +88,16 @@ class ApiService extends GetConnect {
       InactivityService.recordIfRegistered();
       try {
         final urlStr = request.url.toString();
+        // Admin applicant management endpoints REQUIRE staff auth tokens!
+        final isAdminApplicantEndpoint = urlStr.contains('/staff/applicant/approve') ||
+            urlStr.contains('/staff/applicant/promote') ||
+            urlStr.contains('/staff/applicant/stage') ||
+            urlStr.contains('/staff/applicant/reject') ||
+            urlStr.contains('/staff/applicant/evaluation-remarks') ||
+            urlStr.contains('/staff/applicants');
+
         // Public applicant routes do not use staff auth tokens
-        final isApplicantPublicEndpoint = urlStr.contains('/staff/applicant/') ||
+        final isApplicantPublicEndpoint = !isAdminApplicantEndpoint && (
             urlStr.contains('/applicant/create-account') ||
             urlStr.contains('/applicant/verify-account-email') ||
             urlStr.contains('/applicant/resend-email-otp') ||
@@ -99,10 +107,14 @@ class ApiService extends GetConnect {
             urlStr.contains('/applicant/save-step') ||
             urlStr.contains('/applicant/finalize-application') ||
             urlStr.contains('/applicant/register') ||
+            urlStr.contains('/applicant/update-contact') ||
+            urlStr.contains('/applicant/verify') ||
             urlStr.contains('/applicant/upload-doc') ||
             urlStr.contains('/applicant/upload-video') ||
             urlStr.contains('/applicant/continue-init') ||
-            urlStr.contains('/applicant/continue-verify');
+            urlStr.contains('/applicant/continue-verify') ||
+            urlStr.contains('/applicant/roles')
+        );
 
         if (!isApplicantPublicEndpoint) {
           final prefs = await SharedPreferences.getInstance();
@@ -137,13 +149,35 @@ class ApiService extends GetConnect {
         );
 
         final urlStr = request.url.toString();
-        final isApplicantRequest = urlStr.contains('/applicant/') ||
-            urlStr.contains('/staff/applicant/') ||
-            urlStr.contains('/applicant');
+        final isAdminApplicantEndpoint = urlStr.contains('/staff/applicant/approve') ||
+            urlStr.contains('/staff/applicant/promote') ||
+            urlStr.contains('/staff/applicant/stage') ||
+            urlStr.contains('/staff/applicant/reject') ||
+            urlStr.contains('/staff/applicant/evaluation-remarks') ||
+            urlStr.contains('/staff/applicants');
+
+        final isApplicantPublicRequest = !isAdminApplicantEndpoint && (
+            urlStr.contains('/applicant/create-account') ||
+            urlStr.contains('/applicant/verify-account-email') ||
+            urlStr.contains('/applicant/resend-email-otp') ||
+            urlStr.contains('/applicant/continue-login') ||
+            urlStr.contains('/applicant/send-mobile-otp') ||
+            urlStr.contains('/applicant/verify-mobile-otp') ||
+            urlStr.contains('/applicant/save-step') ||
+            urlStr.contains('/applicant/finalize-application') ||
+            urlStr.contains('/applicant/register') ||
+            urlStr.contains('/applicant/update-contact') ||
+            urlStr.contains('/applicant/verify') ||
+            urlStr.contains('/applicant/upload-doc') ||
+            urlStr.contains('/applicant/upload-video') ||
+            urlStr.contains('/applicant/continue-init') ||
+            urlStr.contains('/applicant/continue-verify') ||
+            urlStr.contains('/applicant/roles')
+        );
         final isPublicPage = AppRoutes.isPublicRoute(Get.currentRoute);
 
         // Guard: NEVER trigger staff logout or redirect to login screen for public applicant endpoints or when applicant is on public pages
-        if (isApplicantRequest || isPublicPage) {
+        if (isApplicantPublicRequest || isPublicPage) {
           debugPrint('Bypassing auth guard for applicant endpoint or public route: $urlStr');
           return response;
         }
