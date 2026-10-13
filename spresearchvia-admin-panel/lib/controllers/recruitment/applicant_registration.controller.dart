@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/applicant.service.dart';
 import '../../models/staff.model.dart';
+import '../../ui/widgets/video_kyc_recorder_dialog.widget.dart';
 
 class ApplicantRegistrationController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
@@ -35,6 +38,8 @@ class ApplicantRegistrationController extends GetxController {
   final appliedPositionController = TextEditingController();
 
   // Step 1: Personal Information Form Controllers
+  final resumeUrl = ''.obs;
+  final panUrl = ''.obs;
   final photoUrl = ''.obs;
   var selectedProofOfAddress = 'Aadhaar'.obs;
   final proofOfAddressUrl = ''.obs;
@@ -95,7 +100,7 @@ class ApplicantRegistrationController extends GetxController {
   final licenseMembershipDetailsController = TextEditingController();
 
   // Step 5: Occupational Details & Emergency Contact Controllers
-  var isFresher = false.obs;
+  var isFresher = true.obs; // Default to Fresher
   final currentCompanyController = TextEditingController();
   final currentDesignationController = TextEditingController();
   final totalExperienceYearsController = TextEditingController();
@@ -108,11 +113,13 @@ class ApplicantRegistrationController extends GetxController {
   final expectedSalaryController = TextEditingController();
   final noticePeriodDaysController = TextEditingController();
   final careerGapController = TextEditingController();
-  final resumeUrl = ''.obs;
   final relievingLetterUrl = ''.obs;
   final emergencyNameController = TextEditingController();
-  final emergencyRelationController = TextEditingController();
+  final emergencyRelationController = TextEditingController(text: 'Mother');
+  var selectedEmergencyRelation = 'Mother'.obs;
+  final otherRelationController = TextEditingController();
   final emergencyPhoneController = TextEditingController();
+  final kycVideoUrl = ''.obs;
 
   // Step 6: Preview & Submission State
   var isApplicationSubmitted = false.obs;
@@ -123,6 +130,14 @@ class ApplicantRegistrationController extends GetxController {
     super.onInit();
     initDefaultEducationEntries();
     fetchPublicRoles();
+
+    // Restore saved applicant draft ID if present
+    SharedPreferences.getInstance().then((prefs) {
+      final savedId = prefs.getString('applicant_draft_id');
+      if (savedId != null && savedId.isNotEmpty && applicantId.value.isEmpty) {
+        applicantId.value = savedId;
+      }
+    });
 
     // Check if initialized from Continue Application route arguments
     if (Get.arguments != null && Get.arguments is Map) {
@@ -135,6 +150,9 @@ class ApplicantRegistrationController extends GetxController {
 
   void loadExistingApplicant(Map<String, dynamic> data, int step) {
     applicantId.value = data['_id']?.toString() ?? data['id']?.toString() ?? '';
+    if (applicantId.value.isNotEmpty) {
+      SharedPreferences.getInstance().then((prefs) => prefs.setString('applicant_draft_id', applicantId.value));
+    }
     isAccountCreated.value = true;
     isEmailVerified.value = data['isEmailVerified'] == true || true;
     createAccountEmailController.text = data['emailAddress']?.toString() ?? '';
@@ -164,6 +182,8 @@ class ApplicantRegistrationController extends GetxController {
     selectedProofOfAddress.value = data['proofOfAddressType']?.toString() ?? 'Aadhaar';
     photoUrl.value = data['photoUrl']?.toString() ?? '';
     proofOfAddressUrl.value = data['proofOfAddressUrl']?.toString() ?? '';
+    panUrl.value = data['panUrl']?.toString() ?? '';
+    resumeUrl.value = data['resumeUrl']?.toString() ?? '';
     appliedPositionController.text = data['targetRole']?.toString() ?? '';
 
     // Step 2 data
@@ -206,7 +226,7 @@ class ApplicantRegistrationController extends GetxController {
     certDocumentUrl.value = data['nismUrl']?.toString() ?? '';
 
     // Step 5 data
-    isFresher.value = data['isFresher'] == true || data['hasWorkExperience'] == false;
+    isFresher.value = data['isFresher'] == true || (data['hasWorkExperience'] == false) || (!data.containsKey('isFresher') && !data.containsKey('hasWorkExperience'));
     currentCompanyController.text = data['previousCompany']?.toString() ?? '';
     currentDesignationController.text = data['currentDesignation']?.toString() ?? '';
     reportingManagerController.text = data['reportingManagerName']?.toString() ?? '';
@@ -219,12 +239,19 @@ class ApplicantRegistrationController extends GetxController {
     expectedSalaryController.text = data['expectedSalary']?.toString() ?? '';
     noticePeriodDaysController.text = data['noticePeriod']?.toString() ?? '';
     careerGapController.text = data['careerGapDetails']?.toString() ?? '';
-    resumeUrl.value = data['resumeUrl']?.toString() ?? '';
     relievingLetterUrl.value = data['relievingLetterUrl']?.toString() ?? '';
+    kycVideoUrl.value = data['kycVideoUrl']?.toString() ?? '';
     if (data['emergencyContact'] is Map) {
       final emg = data['emergencyContact'] as Map;
       emergencyNameController.text = emg['name']?.toString() ?? '';
-      emergencyRelationController.text = emg['relation']?.toString() ?? '';
+      final rel = emg['relation']?.toString() ?? 'Mother';
+      emergencyRelationController.text = rel;
+      if (['Mother', 'Father', 'Friend', 'Sister', 'Brother', 'Other'].contains(rel)) {
+        selectedEmergencyRelation.value = rel;
+      } else {
+        selectedEmergencyRelation.value = 'Other';
+        otherRelationController.text = rel;
+      }
       emergencyPhoneController.text = emg['phone']?.toString() ?? '';
     }
 
@@ -310,6 +337,7 @@ class ApplicantRegistrationController extends GetxController {
       final res = await _applicantService.createAccount(email, password);
       if (res.success && res.applicantId != null) {
         applicantId.value = res.applicantId!;
+        SharedPreferences.getInstance().then((prefs) => prefs.setString('applicant_draft_id', applicantId.value));
         isEmailOtpModalOpen.value = true;
         Get.snackbar('Code Dispatched', 'A 4-digit verification code was sent to $email',
             backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade900);
@@ -334,6 +362,13 @@ class ApplicantRegistrationController extends GetxController {
     try {
       final res = await _applicantService.verifyAccountEmail(applicantId.value, otp);
       if (res.success) {
+        if (res.applicant != null) {
+          final aid = res.applicant!['_id']?.toString() ?? res.applicant!['id']?.toString();
+          if (aid != null && aid.isNotEmpty) {
+            applicantId.value = aid;
+          }
+        }
+        SharedPreferences.getInstance().then((prefs) => prefs.setString('applicant_draft_id', applicantId.value));
         isEmailVerified.value = true;
         isAccountCreated.value = true;
         isEmailOtpModalOpen.value = false;
@@ -462,6 +497,21 @@ class ApplicantRegistrationController extends GetxController {
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
+      if (resumeUrl.value.isEmpty) {
+        Get.snackbar('Mandatory Document Missing', 'Please upload your Resume / CV',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
+      if (panUrl.value.isEmpty) {
+        Get.snackbar('Mandatory Document Missing', 'Please upload your PAN Card',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
+      if (proofOfAddressUrl.value.isEmpty) {
+        Get.snackbar('Mandatory Document Missing', 'Please upload your Aadhaar Card / Proof of Address',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
 
       await _saveStepDraft(1, {
         'title': selectedTitle.value,
@@ -478,9 +528,11 @@ class ApplicantRegistrationController extends GetxController {
         'currentLocation': currentLocationController.text.trim(),
         'skypeOrLinkedIn': skypeAddressController.text.trim(),
         'alternateEmail': alternateEmailController.text.trim(),
-        'proofOfAddressType': selectedProofOfAddress.value,
-        'photoUrl': photoUrl.value,
+        'resumeUrl': resumeUrl.value,
+        'panUrl': panUrl.value,
         'proofOfAddressUrl': proofOfAddressUrl.value,
+        'aadhaarUrl': proofOfAddressUrl.value,
+        'proofOfAddressType': selectedProofOfAddress.value,
         'targetRole': (selectedRole.value?['name']?.toString() ?? appliedPositionController.text).trim(),
         'appliedRoleId': selectedRole.value?['id'] ?? selectedRole.value?['_id'],
       });
@@ -556,8 +608,6 @@ class ApplicantRegistrationController extends GetxController {
         'professionalQualifications': [
           {
             'certificationName': selectedProfessionalCert.value,
-            'registrationNumber': certRegistrationNumberController.text.trim(),
-            'year': certYearController.text.trim(),
             'documentUrl': certDocumentUrl.value,
             'membershipDetails': licenseMembershipDetailsController.text.trim(),
           }
@@ -592,6 +642,16 @@ class ApplicantRegistrationController extends GetxController {
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
+      final phoneDigits = emergencyPhoneController.text.trim();
+      if (!RegExp(r'^\d+$').hasMatch(phoneDigits)) {
+        Get.snackbar('Invalid Emergency Contact', 'Emergency contact number must contain only numeric digits',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
+
+      final rel = selectedEmergencyRelation.value == 'Other' && otherRelationController.text.trim().isNotEmpty
+          ? otherRelationController.text.trim()
+          : (selectedEmergencyRelation.value.isNotEmpty ? selectedEmergencyRelation.value : emergencyRelationController.text.trim());
 
       await _saveStepDraft(5, {
         'isFresher': isFresher.value,
@@ -610,10 +670,11 @@ class ApplicantRegistrationController extends GetxController {
         'careerGapDetails': isFresher.value ? null : careerGapController.text.trim(),
         'resumeUrl': resumeUrl.value,
         'relievingLetterUrl': isFresher.value ? null : relievingLetterUrl.value,
+        'kycVideoUrl': kycVideoUrl.value,
         'emergencyContact': {
           'name': emergencyNameController.text.trim(),
-          'relation': emergencyRelationController.text.trim(),
-          'phone': emergencyPhoneController.text.trim(),
+          'relation': rel,
+          'phone': phoneDigits,
         },
       });
       currentStep.value = 6; // Move to Preview
@@ -672,8 +733,42 @@ class ApplicantRegistrationController extends GetxController {
 
   // --- Document Upload Handlers ---
 
+  Future<bool> ensureApplicantDraftExists() async {
+    if (applicantId.value.isNotEmpty) return true;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedId = prefs.getString('applicant_draft_id');
+      if (savedId != null && savedId.isNotEmpty) {
+        applicantId.value = savedId;
+        return true;
+      }
+
+      // Auto-create draft applicant profile if needed
+      final email = createAccountEmailController.text.trim().isNotEmpty
+          ? createAccountEmailController.text.trim().toLowerCase()
+          : (alternateEmailController.text.trim().isNotEmpty
+              ? alternateEmailController.text.trim().toLowerCase()
+              : 'applicant_${DateTime.now().millisecondsSinceEpoch}@temp.com');
+      final password = createAccountPasswordController.text.isNotEmpty
+          ? createAccountPasswordController.text
+          : 'DraftPass@123';
+
+      final res = await _applicantService.createAccount(email, password);
+      if (res.success && res.applicantId != null) {
+        applicantId.value = res.applicantId!;
+        await prefs.setString('applicant_draft_id', applicantId.value);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('ensureApplicantDraftExists error: $e');
+    }
+    return applicantId.value.isNotEmpty;
+  }
+
   Future<void> pickAndUploadDoc(String type) async {
     try {
+      await ensureApplicantDraftExists();
       FilePickerResult? result;
       result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -706,6 +801,8 @@ class ApplicantRegistrationController extends GetxController {
               docUrl = app.nismUrl ?? filename;
             } else if (type == 'resume') {
               docUrl = app.resumeUrl ?? filename;
+            } else if (type == 'pan' || type == 'pancard') {
+              docUrl = app.panUrl ?? filename;
             } else if (type == 'highestEducation' || type == 'degree' || type == 'education') {
               docUrl = app.highestEducationUrl ?? filename;
             } else if (type == 'relievingLetter' || type == 'relieving' || type == 'relieving_letter') {
@@ -717,6 +814,7 @@ class ApplicantRegistrationController extends GetxController {
           if (type == 'aadhaar' || type == 'poa') proofOfAddressUrl.value = docUrl;
           if (type == 'nism' || type == 'certificate') certDocumentUrl.value = docUrl;
           if (type == 'resume') resumeUrl.value = docUrl;
+          if (type == 'pan' || type == 'pancard') panUrl.value = docUrl;
           if (type == 'highestEducation' || type == 'degree' || type == 'education') highestEducationUrl.value = docUrl;
           if (type == 'relievingLetter' || type == 'relieving' || type == 'relieving_letter') relievingLetterUrl.value = docUrl;
 
@@ -733,55 +831,90 @@ class ApplicantRegistrationController extends GetxController {
     }
   }
 
+  final isUploadingVideo = false.obs;
+
+  Future<void> pickAndUploadVideo() async {
+    // For job applicants, Video KYC must be recorded live with camera.
+    if (Get.context != null) {
+      handleVideoKyc(Get.context!);
+    }
+  }
+
+  Future<bool> uploadRecordedVideo(Uint8List bytes, String filename) async {
+    try {
+      isUploadingVideo.value = true;
+      uploadingDocType.value = 'kycVideo';
+      await ensureApplicantDraftExists();
+
+      final applicantEmail = createAccountEmailController.text.trim().isNotEmpty
+          ? createAccountEmailController.text.trim().toLowerCase()
+          : (alternateEmailController.text.trim().isNotEmpty
+              ? alternateEmailController.text.trim().toLowerCase()
+              : null);
+
+      debugPrint('[ApplicantReg] Uploading KYC video. ID: "${applicantId.value}", email: "$applicantEmail", bytes: ${bytes.length}');
+
+      final res = await _applicantService.uploadApplicantVideo(
+        applicantId.value,
+        bytes,
+        filename,
+        email: applicantEmail,
+      );
+      isUploadingVideo.value = false;
+      uploadingDocType.value = '';
+      if (res.success) {
+        if (applicantId.value.isEmpty && res.applicant != null) {
+          final resolvedId = res.applicant?.applicantId ?? res.applicant?.id;
+          if (resolvedId != null && resolvedId.isNotEmpty) {
+            applicantId.value = resolvedId;
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('applicant_draft_id', resolvedId);
+          }
+        }
+
+        final videoPath = res.applicant?.kycVideoUrl ?? filename;
+        kycVideoUrl.value = videoPath;
+        Get.snackbar(
+          'Video KYC Recorded',
+          'Your verification video was uploaded successfully',
+          backgroundColor: const Color(0xFFECFDF5),
+          colorText: const Color(0xFF065F46),
+          icon: const Icon(Icons.check_circle, color: Color(0xFF059669)),
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Upload Failed',
+          res.message ?? 'Video upload error',
+          backgroundColor: const Color(0xFFFEF2F2),
+          colorText: const Color(0xFF991B1B),
+          icon: const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+        );
+        return false;
+      }
+    } catch (e) {
+      isUploadingVideo.value = false;
+      uploadingDocType.value = '';
+      Get.snackbar('Upload Error', e.toString(), backgroundColor: const Color(0xFFFEF2F2), colorText: const Color(0xFF991B1B));
+      return false;
+    }
+  }
+
+  void handleVideoKyc(BuildContext context) {
+    final fullName = '${firstNameController.text.trim()} ${lastNameController.text.trim()}'.trim();
+    final displayName = fullName.isNotEmpty ? fullName : 'Applicant';
+    VideoKycRecorderDialog.showRecorder(
+      context: context,
+      applicantName: displayName,
+      onVideoRecorded: (bytes, filename) async {
+        return await uploadRecordedVideo(bytes, filename);
+      },
+    );
+  }
+
   @override
   void onClose() {
-    createAccountEmailController.dispose();
-    confirmEmailController.dispose();
-    createAccountPasswordController.dispose();
-    confirmPasswordController.dispose();
-    emailOtpInputController.dispose();
-
-    firstNameController.dispose();
-    middleNameController.dispose();
-    lastNameController.dispose();
-    fatherNameController.dispose();
-    alternateEmailController.dispose();
-    dobController.dispose();
-    appliedPositionController.dispose();
-
-    addressLine1Controller.dispose();
-    addressLine2Controller.dispose();
-    addressLine3Controller.dispose();
-    cityController.dispose();
-    stateController.dispose();
-    pincodeController.dispose();
-    telephoneResidenceCodeController.dispose();
-    telephoneResidenceNumberController.dispose();
-    phoneController.dispose();
-    mobileOtpInputController.dispose();
-    permanentStreetController.dispose();
-    permanentCityController.dispose();
-    permanentStateController.dispose();
-    permanentZipController.dispose();
-
-    instituteUniversityController.dispose();
-    percentageGradeController.dispose();
-
-    certRegistrationNumberController.dispose();
-    certYearController.dispose();
-    licenseMembershipDetailsController.dispose();
-
-    currentCompanyController.dispose();
-    currentDesignationController.dispose();
-    totalExperienceYearsController.dispose();
-    annualCtcController.dispose();
-    noticePeriodDaysController.dispose();
-    reportingManagerController.dispose();
-    emergencyNameController.dispose();
-    emergencyRelationController.dispose();
-    emergencyPhoneController.dispose();
     _mobileOtpTimer?.cancel();
-
     super.onClose();
   }
 }

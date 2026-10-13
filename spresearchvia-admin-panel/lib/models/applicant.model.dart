@@ -60,6 +60,8 @@ class ApplicantModel {
   final String? relievingLetterUrl;
   final String? dob;
   final String? gender;
+  final String? fatherName;
+  final String? maritalStatus;
   final int? experienceYears;
   final String? previousCompany;
   final String? lastCtc;
@@ -98,6 +100,8 @@ class ApplicantModel {
     this.relievingLetterUrl,
     this.dob,
     this.gender,
+    this.fatherName,
+    this.maritalStatus,
     this.experienceYears,
     this.previousCompany,
     this.lastCtc,
@@ -184,8 +188,10 @@ class ApplicantModel {
       photoUrl: _safeString(json['photoUrl'] ?? json['walkInForm']?['passportPhoto']),
       resumeUrl: _safeString(json['resumeUrl']),
       relievingLetterUrl: _safeString(json['relievingLetterUrl']),
-      dob: _safeString(json['dob']),
-      gender: _safeString(json['gender']),
+      dob: StaffModel.formatDob(json['dob'] ?? json['walkInForm']?['dob']),
+      gender: _safeString(json['gender'] ?? json['walkInForm']?['gender']),
+      fatherName: _safeString(json['fatherName'] ?? json['walkInForm']?['fatherName']),
+      maritalStatus: _safeString(json['maritalStatus'] ?? json['walkInForm']?['maritalStatus']),
       experienceYears: json['experienceYears'] != null
           ? int.tryParse(json['experienceYears'].toString())
           : null,

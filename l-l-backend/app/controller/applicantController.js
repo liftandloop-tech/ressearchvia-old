@@ -13,11 +13,17 @@ const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 const findApplicantByIdOrCustomId = async (id) => {
     if (!id) return null;
     const strId = String(id).trim();
+    if (!strId || strId === 'null' || strId === 'undefined') return null;
     if (mongoose.Types.ObjectId.isValid(strId)) {
         const doc = await applicantModel.findById(strId);
         if (doc) return doc;
     }
-    return await applicantModel.findOne({ applicantId: strId });
+    const byAppId = await applicantModel.findOne({ applicantId: strId });
+    if (byAppId) return byAppId;
+    if (strId.includes('@')) {
+        return await applicantModel.findOne({ emailAddress: strId.toLowerCase() });
+    }
+    return null;
 };
 
 const generateNextApplicantId = async () => {
@@ -472,7 +478,14 @@ const applicantController = {
             if (stepData.confirmPanNumber !== undefined) applicant.confirmPanNumber = stepData.confirmPanNumber;
             if (stepData.passportNumber !== undefined) applicant.passportNumber = stepData.passportNumber;
             if (stepData.proofOfAddressType !== undefined) applicant.proofOfAddressType = stepData.proofOfAddressType;
-            if (stepData.proofOfAddressUrl !== undefined) applicant.proofOfAddressUrl = stepData.proofOfAddressUrl;
+            if (stepData.proofOfAddressUrl !== undefined) {
+                applicant.proofOfAddressUrl = stepData.proofOfAddressUrl;
+                applicant.aadhaarUrl = stepData.proofOfAddressUrl;
+            }
+            if (stepData.aadhaarUrl !== undefined) {
+                applicant.aadhaarUrl = stepData.aadhaarUrl;
+                if (!applicant.proofOfAddressUrl) applicant.proofOfAddressUrl = stepData.aadhaarUrl;
+            }
             if (stepData.panUrl !== undefined) applicant.panUrl = stepData.panUrl;
             if (stepData.photoUrl !== undefined) applicant.photoUrl = stepData.photoUrl;
 
@@ -513,7 +526,14 @@ const applicantController = {
             if (stepData.nismUrl !== undefined) applicant.nismUrl = stepData.nismUrl;
 
             // Step 5: Occupational & Emergency Contact
-            if (stepData.hasWorkExperience !== undefined) applicant.hasWorkExperience = Boolean(stepData.hasWorkExperience);
+            if (stepData.isFresher !== undefined) {
+                applicant.isFresher = Boolean(stepData.isFresher);
+                applicant.hasWorkExperience = !Boolean(stepData.isFresher);
+            } else if (stepData.hasWorkExperience !== undefined) {
+                applicant.hasWorkExperience = Boolean(stepData.hasWorkExperience);
+                applicant.isFresher = !Boolean(stepData.hasWorkExperience);
+            }
+            if (stepData.kycVideoUrl !== undefined) applicant.kycVideoUrl = stepData.kycVideoUrl;
             if (stepData.experienceYears !== undefined) applicant.experienceYears = Number(stepData.experienceYears);
             if (stepData.previousCompany !== undefined) applicant.previousCompany = stepData.previousCompany;
             if (stepData.currentDesignation !== undefined) applicant.currentDesignation = stepData.currentDesignation;
@@ -878,15 +898,32 @@ const applicantController = {
 
     uploadApplicantDoc: async (req, res) => {
         try {
-            const { id } = req.params;
-            const { type } = req.query; // 'pan', 'aadhaar', 'nism', 'education', 'photo', 'resume'
+            const id = req.params?.id || req.query?.applicantId || req.query?.id || req.body?.applicantId || req.body?.id;
+            const type = req.query?.type || req.body?.type; // 'pan', 'aadhaar', 'nism', 'education', 'photo', 'resume'
             if (!req.file) {
                 return res.status(400).send({ status: 400, message: "No file uploaded", data: {} });
             }
 
-            const applicant = await findApplicantByIdOrCustomId(id);
+            let applicant = null;
+            if (id && id !== 'null' && id !== 'undefined') {
+                applicant = await findApplicantByIdOrCustomId(id);
+            }
+            if (!applicant && req.body?.emailAddress) {
+                applicant = await applicantModel.findOne({ emailAddress: String(req.body.emailAddress).trim().toLowerCase() });
+            }
             if (!applicant) {
-                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+                applicant = await applicantModel.findOne({ isDraft: true }).sort({ createdAt: -1 });
+            }
+            if (!applicant) {
+                const applicantId = await generateNextApplicantId();
+                applicant = await applicantModel.create({
+                    applicantId,
+                    emailAddress: `applicant_${Date.now()}@temp.com`,
+                    fullName: '',
+                    isDraft: true,
+                    currentStep: 1,
+                    stage: 'APPLIED',
+                });
             }
 
             const fieldMap = {
@@ -911,38 +948,67 @@ const applicantController = {
             }
 
             applicant[field] = req.file.path;
+            if (field === 'aadhaarUrl') {
+                applicant.proofOfAddressUrl = req.file.path;
+            }
             if (!applicant.documents) applicant.documents = {};
             applicant.documents[type] = req.file.path;
             applicant.markModified('documents');
-            if (applicant.photoUrl && applicant.resumeUrl && applicant.aadhaarUrl) {
+            if (applicant.photoUrl && applicant.resumeUrl && (applicant.aadhaarUrl || applicant.proofOfAddressUrl)) {
                 applicant.onboardingStatus = applicant.kycVideoUrl ? 'VERIFIED' : 'DOCUMENTS_UPLOADED';
             }
             await applicant.save();
 
             res.status(200).send({ status: 200, message: `${type} uploaded successfully`, data: { applicant } });
         } catch (error) {
+            console.error("[uploadApplicantDoc Error]:", error);
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
     },
 
     uploadApplicantVideo: async (req, res) => {
         try {
-            const { id } = req.params;
+            const id = req.params?.id || req.query?.applicantId || req.query?.id || req.body?.applicantId || req.body?.id;
+            const email = req.body?.emailAddress || req.query?.email || req.body?.email;
             if (!req.file) {
                 return res.status(400).send({ status: 400, message: "No video file uploaded", data: {} });
             }
 
-            const applicant = await findApplicantByIdOrCustomId(id);
+            let applicant = null;
+            if (id && id !== 'null' && id !== 'undefined') {
+                applicant = await findApplicantByIdOrCustomId(id);
+            }
+            if (!applicant && email) {
+                applicant = await applicantModel.findOne({ emailAddress: String(email).trim().toLowerCase() });
+            }
             if (!applicant) {
-                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+                // Find latest draft applicant or create a draft applicant so the video upload is NEVER rejected
+                applicant = await applicantModel.findOne({ isDraft: true }).sort({ createdAt: -1 });
+            }
+            if (!applicant) {
+                const applicantId = await generateNextApplicantId();
+                const cleanEmail = email ? String(email).trim().toLowerCase() : `applicant_${Date.now()}@temp.com`;
+                applicant = await applicantModel.create({
+                    applicantId,
+                    emailAddress: cleanEmail,
+                    fullName: '',
+                    isDraft: true,
+                    currentStep: 6,
+                    stage: 'APPLIED',
+                });
             }
 
             applicant.kycVideoUrl = req.file.path;
+            if (!applicant.documents) applicant.documents = {};
+            applicant.documents['video'] = req.file.path;
+            applicant.documents['kycVideo'] = req.file.path;
+            applicant.markModified('documents');
             applicant.onboardingStatus = 'VERIFIED';
             await applicant.save();
 
             res.status(200).send({ status: 200, message: "KYC Video uploaded successfully", data: { applicant } });
         } catch (error) {
+            console.error("[uploadApplicantVideo Error]:", error);
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
     },

@@ -41,8 +41,10 @@ class ApplicantProfileController extends GetxController {
           applicant.refresh();
           fetchDetails(showLoading: false);
           Get.snackbar('Upload Success', 'KYC Video uploaded successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
+          return true;
         } else {
           Get.snackbar('Upload Failed', res.message ?? 'An error occurred during upload', backgroundColor: Colors.red.withValues(alpha: 0.1));
+          return false;
         }
       },
       onFallbackUpload: () => uploadDoc('video'),

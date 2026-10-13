@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/controllers/recruitment/applicant_registration.controller.dart';
+import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 
 class ApplicantRegistrationScreen extends StatelessWidget {
   const ApplicantRegistrationScreen({super.key});
@@ -12,7 +15,9 @@ class ApplicantRegistrationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(ApplicantRegistrationController());
+    final controller = Get.isRegistered<ApplicantRegistrationController>()
+        ? Get.find<ApplicantRegistrationController>()
+        : Get.put(ApplicantRegistrationController());
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -123,15 +128,17 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           const SizedBox(height: 24),
           _buildPrerequisiteItem('1. Updated Resume / Curriculum Vitae (PDF format, below 5MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('2. Recent passport size photograph (in JPEG/PNG format, below 1MB)'),
+          _buildPrerequisiteItem('2. Valid PAN Card (in JPG/PNG/PDF format, below 2MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('3. Government Photo ID & Address Proof (Aadhaar Card / Passport / Voter ID / DL)'),
+          _buildPrerequisiteItem('3. Valid Aadhaar Card / Address Proof (in JPG/PNG/PDF format, below 2MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('4. Educational certificates & marksheets (from 10th / Graduation onwards)'),
+          _buildPrerequisiteItem('4. Educational certificates & marksheets (Highest degree / graduation certificate)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('5. Previous employment details, last 3 months salary slips & relieving letter (if experienced candidate)'),
+          _buildPrerequisiteItem('5. Previous employment details & relieving letter (if experienced candidate)'),
           const SizedBox(height: 16),
           _buildPrerequisiteItem('6. Valid active email address and mobile number for real-time OTP verification'),
+          const SizedBox(height: 16),
+          _buildPrerequisiteItem('7. Device camera (mobile phone or laptop) for live Video KYC recording'),
         ],
       ),
     );
@@ -705,48 +712,40 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Upload boxes: Candidate's Photo & Image of Proof of Address
-        _buildResponsiveRow(
-          isMobile,
-          [
+        // Upload boxes: Resume/CV, PAN Card, and Aadhaar Card in a responsive grid
+        _buildDocumentsGrid(
+          children: [
             _buildUploadBox(
-              title: "Candidate's Photo *",
-              specText: 'View Photograph Specifications',
-              uploadedUrlObs: controller.photoUrl,
-              onTap: () => controller.pickAndUploadDoc('photo'),
-              onSpecTap: () => _showSpecDialog(context, 'Photograph Specifications', '1. In JPEG/JPG format below 1MB.\n2. Recent passport-sized photograph on plain light background.\n3. Clear full face view.'),
+              context: context,
+              title: "Resume / CV *",
+              specText: 'View Resume Specifications',
+              uploadedUrlObs: controller.resumeUrl,
+              onTap: () => controller.pickAndUploadDoc('resume'),
+              onSpecTap: () => _showSpecDialog(context, 'Resume Specifications', '1. In PDF, DOC, DOCX format below 5MB.\n2. Ensure contact information, education, and career history are accurate.'),
             ),
             _buildUploadBox(
-              title: 'Image of Proof of Address *',
-              specText: 'View POA Specifications',
+              context: context,
+              title: 'PAN Card *',
+              specText: 'View PAN Specifications',
+              uploadedUrlObs: controller.panUrl,
+              onTap: () => controller.pickAndUploadDoc('pan'),
+              onSpecTap: () => _showSpecDialog(context, 'PAN Card Specifications', '1. Clear photo or scanned copy of PAN Card.\n2. In JPG, PNG, or PDF format below 2MB.'),
+            ),
+            _buildUploadBox(
+              context: context,
+              title: 'Aadhaar Card / Address Proof *',
+              specText: 'View Aadhaar Specifications',
               uploadedUrlObs: controller.proofOfAddressUrl,
               onTap: () => controller.pickAndUploadDoc('aadhaar'),
-              onSpecTap: () => _showSpecDialog(context, 'Proof of Address Specifications', '1. Scan copy of selected address proof.\n2. Both front and back pages in JPG or PDF format below 1MB.'),
+              onSpecTap: () => _showSpecDialog(context, 'Aadhaar Specifications', '1. Clear photo or scanned copy of Aadhaar Card front and back.\n2. In JPG, PNG, or PDF format below 2MB.'),
             ),
           ],
         ),
-        const SizedBox(height: 20),
-
-        // Proof of Address Type
-        Obx(
-          () => DropdownButtonFormField<String>(
-            value: controller.selectedProofOfAddress.value,
-            decoration: InputDecoration(
-              labelText: 'Proof of Address Type *',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            ),
-            items: ['Aadhaar', 'Passport', 'Voter ID', 'Driving License']
-                .map((item) => DropdownMenuItem(value: item, child: Text(item, style: const TextStyle(fontSize: 13))))
-                .toList(),
-            onChanged: (val) => controller.selectedProofOfAddress.value = val ?? 'Aadhaar',
-          ),
-        ),
         const SizedBox(height: 24),
 
-        // Notice: Name and DOB as per Government ID
+        // Notice: Name and DOB as per Government ID / PAN Card
         const Text(
-          '* Name (First Name, Middle Name, Last Name) and Date of Birth should be as per Government ID / Proof of Address.',
+          '* Name (First Name, Middle Name, Last Name) and Date of Birth should be as per PAN Card / Government ID.',
           style: TextStyle(color: Color(0xFFDC2626), fontSize: 12.5, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 14),
@@ -1324,6 +1323,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
 
         // Degree Document Upload
         _buildUploadBox(
+          context: context,
           title: 'Highest Qualification Degree / Marksheet',
           specText: 'View Degree Specifications',
           uploadedUrlObs: controller.highestEducationUrl,
@@ -1346,39 +1346,23 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildResponsiveRow(
-          isMobile,
-          [
-            Obx(
-              () => DropdownButtonFormField<String>(
-                value: controller.selectedProfessionalCert.value,
-                decoration: InputDecoration(
-                  labelText: 'Professional Certification',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                items: ['None', 'NISM Series XV (Research Analyst)', 'NISM Series VIII (Equity Derivatives)', 'CA', 'CFA', 'CS', 'CFP']
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13))))
-                    .toList(),
-                onChanged: (val) => controller.selectedProfessionalCert.value = val ?? 'None',
-              ),
+        Obx(
+          () => DropdownButtonFormField<String>(
+            value: controller.selectedProfessionalCert.value,
+            decoration: InputDecoration(
+              labelText: 'Professional Certification',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            _buildTextField(
-              controller: controller.certRegistrationNumberController,
-              label: 'Certificate Registration Number',
-              hint: 'e.g. NISM-2023-XXXXX',
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        _buildTextField(
-          controller: controller.certYearController,
-          label: 'Year of Certification',
-          hint: 'e.g. 2023',
+            items: ['None', 'NISM Series XV (Research Analyst)', 'NISM Series VIII (Equity Derivatives)', 'CA', 'CFA', 'CS', 'CFP']
+                .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13))))
+                .toList(),
+            onChanged: (val) => controller.selectedProfessionalCert.value = val ?? 'None',
+          ),
         ),
         const SizedBox(height: 20),
 
         _buildUploadBox(
+          context: context,
           title: 'Upload Certificate Copy (PDF or JPG)',
           specText: 'View Certificate Specifications',
           uploadedUrlObs: controller.certDocumentUrl,
@@ -1493,6 +1477,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _buildUploadBox(
+                context: context,
                 title: 'Upload Relieving Letter *',
                 specText: 'View Relieving Letter Specifications',
                 uploadedUrlObs: controller.relievingLetterUrl,
@@ -1504,16 +1489,6 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         }),
 
         const SizedBox(height: 24),
-        // Resume / CV Upload
-        _buildUploadBox(
-          title: 'Upload Updated Resume / CV *',
-          specText: 'View Resume Specifications',
-          uploadedUrlObs: controller.resumeUrl,
-          onTap: () => controller.pickAndUploadDoc('resume'),
-          onSpecTap: () => _showSpecDialog(context, 'Resume Specifications', '1. PDF format below 5MB.\n2. Ensure contact details, education, and work experience are up to date.'),
-        ),
-
-        const SizedBox(height: 32),
         const Text(
           'Emergency Contact Information',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryNavy),
@@ -1523,11 +1498,210 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         _buildResponsiveRow(
           isMobile,
           [
-            _buildTextField(controller: controller.emergencyNameController, label: 'Contact Person Name *', hint: 'Full name'),
-            _buildTextField(controller: controller.emergencyRelationController, label: 'Relationship *', hint: 'e.g. Parent, Spouse'),
-            _buildTextField(controller: controller.emergencyPhoneController, label: 'Contact Number *', hint: '10-digit number'),
+            _buildTextField(
+              controller: controller.emergencyNameController,
+              label: 'Contact Person Name *',
+              hint: 'Full name',
+            ),
+            Obx(
+              () => DropdownButtonFormField<String>(
+                value: ['Mother', 'Father', 'Friend', 'Sister', 'Brother', 'Other']
+                        .contains(controller.selectedEmergencyRelation.value)
+                    ? controller.selectedEmergencyRelation.value
+                    : 'Mother',
+                decoration: InputDecoration(
+                  labelText: 'Relationship *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                ),
+                items: ['Mother', 'Father', 'Friend', 'Sister', 'Brother', 'Other']
+                    .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13))))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    controller.selectedEmergencyRelation.value = val;
+                    if (val != 'Other') {
+                      controller.emergencyRelationController.text = val;
+                    }
+                  }
+                },
+              ),
+            ),
+            _buildTextField(
+              controller: controller.emergencyPhoneController,
+              label: 'Contact Number (Digits Only) *',
+              hint: '10-digit mobile number',
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+            ),
           ],
         ),
+        Obx(() {
+          if (controller.selectedEmergencyRelation.value == 'Other') {
+            return Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: _buildTextField(
+                controller: controller.otherRelationController,
+                label: 'Specify Other Relationship *',
+                hint: 'e.g. Uncle / Guardian / Relative',
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }),
+
+        const SizedBox(height: 32),
+        const Text(
+          'Video KYC Verification',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryNavy),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Live Video KYC recording with your device camera is mandatory for applicant verification.',
+          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 14),
+
+        Obx(() {
+          final hasVideo = controller.kycVideoUrl.value.isNotEmpty;
+          final isUploading = controller.isUploadingVideo.value;
+
+          return Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: hasVideo ? const Color(0xFFF0FDF4) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasVideo ? const Color(0xFF10B981) : const Color(0xFFCBD5E1),
+                width: hasVideo ? 1.5 : 1.0,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x08000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: hasVideo ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        hasVideo ? Icons.check_circle_rounded : Icons.videocam_rounded,
+                        color: hasVideo ? const Color(0xFF10B981) : primaryNavy,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            hasVideo ? 'Video KYC Completed' : 'Record Video KYC *',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E293B)),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            hasVideo
+                                ? 'Verification video successfully recorded and verified.'
+                                : 'Use your mobile camera or laptop webcam to record your live verification declaration.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: hasVideo ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: isUploading ? null : () => controller.handleVideoKyc(context),
+                      icon: isUploading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Icon(hasVideo ? Icons.refresh_rounded : Icons.videocam_rounded, size: 18),
+                      label: Text(hasVideo ? 'Re-record Video KYC' : 'Record Video KYC with Camera'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: hasVideo ? const Color(0xFF059669) : primaryNavy,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                    if (hasVideo) ...[
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          final fullUrl = AppConfig.buildImageUrl(controller.kycVideoUrl.value);
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => FilePreviewDialog(
+                              fileName: 'Video KYC Recording',
+                              fileUrl: fullUrl,
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.play_circle_outline, size: 18),
+                        label: const Text('Preview Video'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryNavy,
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_rounded, color: Color(0xFF059669), size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Recorded (${controller.kycVideoUrl.value.split('/').last})',
+                              style: const TextStyle(color: Color(0xFF065F46), fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Note: Live camera recording is mandatory. Uploading pre-recorded video files is disabled. If your device does not have a camera, you will be prompted to continue via mobile or a laptop with camera.',
+                  style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
@@ -1573,8 +1747,9 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                _buildDocBadge('Photo', controller.photoUrl.value.isNotEmpty),
-                _buildDocBadge('Address Proof', controller.proofOfAddressUrl.value.isNotEmpty),
+                _buildDocBadge(context, 'Resume / CV', controller.resumeUrl.value.isNotEmpty, docUrl: controller.resumeUrl.value),
+                _buildDocBadge(context, 'PAN Card', controller.panUrl.value.isNotEmpty, docUrl: controller.panUrl.value),
+                _buildDocBadge(context, 'Aadhaar / Address Proof', controller.proofOfAddressUrl.value.isNotEmpty, docUrl: controller.proofOfAddressUrl.value),
               ],
             ),
           ],
@@ -1637,7 +1812,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             if (controller.backlogsCountController.text.isNotEmpty)
               _buildPreviewRow('Backlogs / ATKTs:', controller.backlogsCountController.text, isMobile: isMobile),
             const SizedBox(height: 6),
-            _buildDocBadge('Degree / Marksheet', controller.highestEducationUrl.value.isNotEmpty),
+            _buildDocBadge(context, 'Degree / Marksheet', controller.highestEducationUrl.value.isNotEmpty, docUrl: controller.highestEducationUrl.value),
           ],
         ),
         const SizedBox(height: 16),
@@ -1649,10 +1824,8 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           children: [
             _buildPreviewRow('Certification:', controller.selectedProfessionalCert.value, isMobile: isMobile),
             if (controller.selectedProfessionalCert.value != 'None') ...[
-              _buildPreviewRow('Registration Number:', controller.certRegistrationNumberController.text, isMobile: isMobile),
-              _buildPreviewRow('Year:', controller.certYearController.text, isMobile: isMobile),
               const SizedBox(height: 6),
-              _buildDocBadge('Certificate Document', controller.certDocumentUrl.value.isNotEmpty),
+              _buildDocBadge(context, 'Certificate Document', controller.certDocumentUrl.value.isNotEmpty, docUrl: controller.certDocumentUrl.value),
             ],
           ],
         ),
@@ -1685,37 +1858,61 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                _buildDocBadge('Updated Resume / CV', controller.resumeUrl.value.isNotEmpty),
+                _buildDocBadge(context, 'Video KYC', controller.kycVideoUrl.value.isNotEmpty, docUrl: controller.kycVideoUrl.value),
                 if (!controller.isFresher.value)
-                  _buildDocBadge('Relieving Letter', controller.relievingLetterUrl.value.isNotEmpty),
+                  _buildDocBadge(context, 'Relieving Letter', controller.relievingLetterUrl.value.isNotEmpty, docUrl: controller.relievingLetterUrl.value),
               ],
             ),
             const Divider(height: 20),
-            _buildPreviewRow('Emergency Contact:', '${controller.emergencyNameController.text} (${controller.emergencyRelationController.text}) - ${controller.emergencyPhoneController.text}', isMobile: isMobile),
+            _buildPreviewRow('Emergency Contact:', '${controller.emergencyNameController.text} (${controller.selectedEmergencyRelation.value == 'Other' ? controller.otherRelationController.text : controller.selectedEmergencyRelation.value}) - ${controller.emergencyPhoneController.text}', isMobile: isMobile),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildDocBadge(String label, bool isUploaded) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: isUploaded ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: isUploaded ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(isUploaded ? Icons.check_circle_outline : Icons.pending_outlined, size: 13, color: isUploaded ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
-          const SizedBox(width: 4),
-          Text(
-            '$label: ${isUploaded ? "Uploaded" : "Pending"}',
-            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: isUploaded ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
-          ),
-        ],
+  Widget _buildDocBadge(BuildContext context, String label, bool isUploaded, {String? docUrl}) {
+    return InkWell(
+      onTap: (isUploaded && docUrl != null && docUrl.isNotEmpty)
+          ? () {
+              final fullUrl = AppConfig.buildImageUrl(docUrl);
+              showDialog(
+                context: context,
+                builder: (ctx) => FilePreviewDialog(
+                  fileName: label,
+                  fileUrl: fullUrl,
+                ),
+              );
+            }
+          : null,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isUploaded ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isUploaded ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isUploaded ? Icons.check_circle_outline : Icons.pending_outlined, size: 14, color: isUploaded ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
+            const SizedBox(width: 5),
+            Text(
+              '$label: ${isUploaded ? "Uploaded" : "Pending"}',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isUploaded ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
+            ),
+            if (isUploaded && docUrl != null && docUrl.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.visibility_outlined, size: 13, color: Color(0xFF2563EB)),
+              const SizedBox(width: 2),
+              const Text(
+                'Preview',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1866,6 +2063,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
   }
 
   Widget _buildUploadBox({
+    required BuildContext context,
     required String title,
     required String specText,
     required RxString uploadedUrlObs,
@@ -1877,13 +2075,21 @@ class ApplicantRegistrationScreen extends StatelessWidget {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF334155))),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF334155)),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             InkWell(
               onTap: onSpecTap,
               child: Text(
                 specText,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
               ),
             ),
           ],
@@ -1893,48 +2099,93 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           final hasFile = uploadedUrlObs.value.isNotEmpty;
           final fileName = hasFile ? uploadedUrlObs.value.split('/').last : '';
 
-          return InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              height: 100,
-              decoration: BoxDecoration(
-                color: hasFile ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                border: Border.all(
-                  color: hasFile ? const Color(0xFF86EFAC) : const Color(0xFF94A3B8),
-                  style: BorderStyle.solid,
-                  width: 1.5,
-                ),
-                borderRadius: BorderRadius.circular(8),
+          return Container(
+            height: 104,
+            decoration: BoxDecoration(
+              color: hasFile ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+              border: Border.all(
+                color: hasFile ? const Color(0xFF86EFAC) : const Color(0xFF94A3B8),
+                style: BorderStyle.solid,
+                width: 1.5,
               ),
-              child: Center(
-                child: hasFile
-                    ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: hasFile
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
                         children: [
-                          const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+                          const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
                           const SizedBox(width: 8),
-                          Flexible(
+                          Expanded(
                             child: Text(
                               fileName,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF065F46)),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.edit, size: 16, color: Color(0xFF64748B)),
-                        ],
-                      )
-                    : const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.cloud_upload_outlined, size: 26, color: Color(0xFF64748B)),
-                          SizedBox(height: 6),
-                          Text('Click or drag file to upload', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                         ],
                       ),
-              ),
-            ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              final fullUrl = AppConfig.buildImageUrl(uploadedUrlObs.value);
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => FilePreviewDialog(
+                                  fileName: title,
+                                  fileUrl: fullUrl,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.visibility_outlined, size: 14),
+                            label: const Text('Preview', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF1E293B),
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: onTap,
+                            icon: const Icon(Icons.sync_rounded, size: 14),
+                            label: const Text('Change', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: primaryNavy,
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.cloud_upload_outlined, size: 28, color: Color(0xFF64748B)),
+                          SizedBox(height: 6),
+                          Text('Click or drag file to upload', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                        ],
+                      ),
+                    ),
+                  ),
           );
         }),
       ],
@@ -1959,6 +2210,8 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     required String label,
     required String hint,
     Widget? suffixIcon,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1967,6 +2220,8 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             hintText: hint,
             suffixIcon: suffixIcon,
@@ -2023,6 +2278,35 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           Expanded(child: children[i]),
         ],
       ],
+    );
+  }
+
+  Widget _buildDocumentsGrid({
+    required List<Widget> children,
+    double minItemWidth = 280,
+    double spacing = 16,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        int crossAxisCount = (availableWidth / (minItemWidth + spacing)).floor();
+        if (crossAxisCount < 1) crossAxisCount = 1;
+
+        final itemWidth = crossAxisCount == 1
+            ? availableWidth
+            : (availableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: children.map((child) {
+            return SizedBox(
+              width: itemWidth,
+              child: child,
+            );
+          }).toList(),
+        );
+      },
     );
   }
 

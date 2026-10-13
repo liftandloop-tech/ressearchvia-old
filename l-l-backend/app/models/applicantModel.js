@@ -296,6 +296,10 @@ const applicantSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isFresher: {
+    type: Boolean,
+    default: true
+  },
   currentDesignation: {
     type: String,
     default: null

@@ -569,30 +569,87 @@ class ApplicantProfileScreen extends StatelessWidget {
   // ---------------------------------------------------------------------------
   Widget _buildOverviewTab(StaffModel applicant) {
     final w = applicant.walkInForm;
+    final raw = applicant.rawJson ?? {};
+
+    String cleanDob(String? rawDob) {
+      if (rawDob == null || rawDob.isEmpty) return 'Not specified';
+      if (rawDob.contains('T')) return rawDob.split('T').first;
+      if (rawDob.contains(' ')) return rawDob.split(' ').first;
+      return rawDob;
+    }
+
+    // Personal fields
+    final dobVal = cleanDob(applicant.dob ?? (raw['dob']?.toString() ?? (w?.dob.isNotEmpty == true ? w!.dob : null)));
+    final fatherNameVal = applicant.fatherName ?? (raw['fatherName']?.toString() ?? 'Not specified');
+    final maritalStatusVal = applicant.maritalStatus ?? (raw['maritalStatus']?.toString() ?? (w?.maritalStatus.isNotEmpty == true ? w!.maritalStatus : 'Not specified'));
+    final genderVal = applicant.gender ?? (raw['gender']?.toString() ?? (w?.gender.isNotEmpty == true ? w!.gender : 'Not specified'));
+    final altEmailVal = applicant.alternateEmail ?? (raw['alternateEmail']?.toString() ?? 'Not specified');
+    final currentLocationVal = applicant.currentLocation ?? (raw['currentLocation']?.toString() ?? (w?.currentLocation.isNotEmpty == true ? w!.currentLocation : 'Not specified'));
+    final skypeOrLinkedInVal = applicant.skypeOrLinkedIn ?? (raw['skypeAddress']?.toString() ?? (raw['skypeOrLinkedIn']?.toString() ?? 'Not specified'));
+    final appliedPositionVal = (w?.appliedPosition.isNotEmpty == true) ? w!.appliedPosition : (raw['appliedPosition']?.toString() ?? (applicant.role.isNotEmpty ? applicant.role : 'General'));
+
+    // Emergency fields
+    final emName = applicant.emergencyContact?.name ?? (raw['emergencyContact']?['name']?.toString() ?? 'Not recorded');
+    final emRel = applicant.emergencyContact?.relation ?? (raw['emergencyContact']?['relation']?.toString() ?? 'Not recorded');
+    final emPhone = applicant.emergencyContact?.phone ?? (raw['emergencyContact']?['phone']?.toString() ?? 'Not recorded');
+
+    // Experience / Fresher
+    final isFresher = applicant.isFresher ?? (raw['isFresher'] == true || raw['isFresher'] == 'true');
+    final currentCompany = applicant.previousCompany ?? (raw['previousCompany']?.toString() ?? (raw['currentCompany']?.toString() ?? (w?.employmentList.isNotEmpty == true ? w!.employmentList.first.organisation : (w?.currentOrganisation.isNotEmpty == true ? w!.currentOrganisation : '—'))));
+    final currentDesignation = applicant.currentDesignation ?? (raw['currentDesignation']?.toString() ?? (w?.employmentList.isNotEmpty == true ? w!.employmentList.first.designation : (w?.currentDesignation.isNotEmpty == true ? w!.currentDesignation : '—')));
+    final reportingManager = applicant.reportingManagerName ?? (raw['reportingManagerName']?.toString() ?? (raw['reportingManager']?.toString() ?? (w?.reportingManagerName.isNotEmpty == true ? w!.reportingManagerName : '—')));
+    final reportingManagerDesig = applicant.reportingManagerDesignation ?? (raw['reportingManagerDesignation']?.toString() ?? (w?.reportingManagerDesignation.isNotEmpty == true ? w!.reportingManagerDesignation : '—'));
+    final String expYears = applicant.experienceYears != null ? '${applicant.experienceYears} Years' : (raw['totalExperience']?.toString() ?? (w?.totalExperience.isNotEmpty == true ? w!.totalExperience : '—'));
+    final String directReportees = applicant.reporteesCount != null ? '${applicant.reporteesCount}' : (raw['reporteesCount']?.toString() ?? (w?.reporteesCount.isNotEmpty == true ? w!.reporteesCount : '0'));
+    final fixedSal = applicant.fixedSalary ?? (raw['fixedSalary']?.toString() ?? (w?.fixedSalary.isNotEmpty == true ? w!.fixedSalary : '—'));
+    final bonusInc = applicant.bonusIncentive ?? (raw['bonusIncentive']?.toString() ?? (w?.bonusIncentive.isNotEmpty == true ? w!.bonusIncentive : '0'));
+    final currentCtc = applicant.lastCtc ?? (raw['annualCtc']?.toString() ?? (w?.totalSalary.isNotEmpty == true ? w!.totalSalary : '—'));
+    final expectedCtc = applicant.expectedSalary ?? (raw['expectedSalary']?.toString() ?? (w?.expectedSalary.isNotEmpty == true ? w!.expectedSalary : 'Negotiable'));
+    final noticePer = applicant.noticePeriod ?? (raw['noticePeriod']?.toString() ?? (w?.noticePeriod.isNotEmpty == true ? w!.noticePeriod : 'Immediate'));
+    final careerGapVal = applicant.careerGapDetails ?? (raw['careerGap']?.toString() ?? (w?.careerGap.isNotEmpty == true ? w!.careerGap : 'None'));
+
+    // Education
+    final highestQual = applicant.highestQualification ?? (raw['highestQualification']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.degree : '—'));
+    final majorSub = applicant.majorSubject ?? (raw['majorSubject']?.toString() ?? '—');
+    final univ = applicant.instituteUniversity ?? (raw['instituteUniversity']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.boardUniversity : '—'));
+    final String passYear = applicant.yearOfPassing != null ? '${applicant.yearOfPassing}' : (raw['yearOfPassing']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.passingYear : '—'));
+    final pctGrade = applicant.percentageGrade ?? (raw['percentageGrade']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.percentage : '—'));
+    final acadGap = applicant.academicGapDetails ?? (raw['academicGapDetails']?.toString() ?? (applicant.academicGap == true ? 'Yes' : 'None'));
+    final backlogs = applicant.backlogsCount ?? (raw['backlogsCount']?.toString() ?? (w?.backlogsCount.isNotEmpty == true ? w!.backlogsCount : '0'));
+
+    // Professional Certification
+    final profCert = applicant.professionalCertification ?? (raw['professionalCertification']?.toString() ?? 'None');
+    final licenseDetails = applicant.licenseMembershipDetails ?? (raw['licenseMembershipDetails']?.toString() ?? 'None');
 
     return Column(
       children: [
         _buildSectionCard(
-          title: 'Personal & Contact Information',
-          subtitle: 'Candidate identity, personal background, and primary communication points.',
+          title: 'Personal & Identity Information',
+          subtitle: 'Candidate identity, family background, and primary communication coordinates.',
           child: Column(
             children: [
               _buildRow([
                 _buildDataTile('Full Legal Name', applicant.name),
+                _buildDataTile("Father's Name", fatherNameVal),
+                _buildDataTile('Date of Birth', dobVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Gender', genderVal),
+                _buildDataTile('Marital Status', maritalStatusVal),
+                _buildDataTile('Current Location', currentLocationVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Position Applied For', appliedPositionVal),
                 _buildDataTile('Email Address', applicant.email),
+                _buildDataTile('Alternate Email', altEmailVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
                 _buildDataTile('Mobile Phone', applicant.mobile),
-              ]),
-              const SizedBox(height: 14),
-              _buildRow([
-                _buildDataTile('Date of Birth', applicant.dob ?? (w?.dob.isNotEmpty == true ? w!.dob : 'Not specified')),
-                _buildDataTile('Gender', applicant.gender ?? (w?.gender.isNotEmpty == true ? w!.gender : 'Not specified')),
-                _buildDataTile('Marital Status', (w?.maritalStatus.isNotEmpty == true) ? w!.maritalStatus : 'Not specified'),
-              ]),
-              const SizedBox(height: 14),
-              _buildRow([
-                _buildDataTile('Native Place / Domicile', (w?.nativePlace.isNotEmpty == true) ? w!.nativePlace : 'Not specified'),
-                _buildDataTile('Position Applied For', (w?.appliedPosition.isNotEmpty == true) ? w!.appliedPosition : (applicant.role.isNotEmpty ? applicant.role : 'General')),
-                _buildDataTile('Total Experience', applicant.experienceYears != null ? '${applicant.experienceYears} Years' : (w?.totalExperience.isNotEmpty == true ? w!.totalExperience : 'Fresher')),
+                _buildDataTile('LinkedIn / Skype ID', skypeOrLinkedInVal),
+                _buildDataTile('PAN Number', applicant.panNumber ?? (raw['panNumber']?.toString() ?? (applicant.panUrl != null ? 'Uploaded' : 'Not specified'))),
               ]),
             ],
           ),
@@ -602,9 +659,9 @@ class ApplicantProfileScreen extends StatelessWidget {
           title: 'Emergency & Safety Contact',
           subtitle: 'Primary contact person to notify in case of personal or workplace emergencies.',
           child: _buildRow([
-            _buildDataTile('Contact Name', applicant.emergencyContact?.name ?? 'Not recorded'),
-            _buildDataTile('Relationship', applicant.emergencyContact?.relation ?? 'Not recorded'),
-            _buildDataTile('Primary Mobile', applicant.emergencyContact?.phone ?? 'Not recorded'),
+            _buildDataTile('Contact Name', emName),
+            _buildDataTile('Relationship', emRel),
+            _buildDataTile('Contact Mobile', emPhone),
           ]),
         ),
         const SizedBox(height: 16),
@@ -614,9 +671,89 @@ class ApplicantProfileScreen extends StatelessWidget {
           child: Column(
             children: [
               _buildRow([
-                _buildDataTile('Current / Local Address', applicant.localAddress ?? (w?.currentLocation.isNotEmpty == true ? w!.currentLocation : 'Not specified')),
-                _buildDataTile('Permanent Address', applicant.permanentAddress ?? (w?.nativePlace.isNotEmpty == true ? w!.nativePlace : 'Same as current / Not specified')),
+                _buildDataTile('Current / Local Address', applicant.localAddress ?? (currentLocationVal != 'Not specified' ? currentLocationVal : 'Not specified')),
+                _buildDataTile('Permanent Address', applicant.permanentAddress ?? (applicant.localAddress ?? 'Same as current / Not specified')),
               ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildSectionCard(
+          title: 'Educational Background',
+          subtitle: 'Academic degrees, university milestones, grades, and academic gap details.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Highest Qualification', highestQual),
+                _buildDataTile('Major Subject / Stream', majorSub),
+                _buildDataTile('Institute / University', univ),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Year of Passing', passYear),
+                _buildDataTile('Percentage / Grade', pctGrade),
+                _buildDataTile('Academic Gap Details', acadGap),
+              ]),
+              if (backlogs != '0' && backlogs != '—') ...[
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Backlogs / ATKTs', backlogs),
+                  const SizedBox(),
+                  const SizedBox(),
+                ]),
+              ],
+            ],
+          ),
+        ),
+        if (profCert != 'None' && profCert != '—') ...[
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            title: 'Professional Qualifications & Certifications',
+            subtitle: 'Professional certifications, regulatory memberships, and licenses.',
+            child: _buildRow([
+              _buildDataTile('Certification', profCert),
+              _buildDataTile('License / Membership Details', licenseDetails),
+            ]),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _buildSectionCard(
+          title: 'Occupational & Work Experience',
+          subtitle: 'Employment status, compensation breakdown, management scope, and notice period.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Employment Status', isFresher ? 'Fresher' : 'Experienced ($expYears)'),
+                _buildDataTile('Current / Previous Company', isFresher ? 'N/A (Fresher)' : currentCompany),
+                _buildDataTile('Current Designation', isFresher ? 'N/A (Fresher)' : currentDesignation),
+              ]),
+              if (!isFresher) ...[
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Reporting Manager', reportingManager != '—' ? '$reportingManager ($reportingManagerDesig)' : '—'),
+                  _buildDataTile('Direct Reportees', directReportees),
+                  _buildDataTile('Total Experience', expYears),
+                ]),
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Fixed Salary (Monthly)', fixedSal),
+                  _buildDataTile('Bonus / Incentive', bonusInc),
+                  _buildDataTile('Current Total CTC', currentCtc),
+                ]),
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Expected CTC', expectedCtc),
+                  _buildDataTile('Notice Period', noticePer),
+                  _buildDataTile('Career Gap Details', careerGapVal),
+                ]),
+              ] else ...[
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Expected CTC', expectedCtc),
+                  _buildDataTile('Notice Period', noticePer),
+                  _buildDataTile('Direct Reportees', directReportees),
+                ]),
+              ],
             ],
           ),
         ),
@@ -718,26 +855,39 @@ class ApplicantProfileScreen extends StatelessWidget {
   // Tab 4: KYC & Compliance Media
   // ---------------------------------------------------------------------------
   Widget _buildDocumentsTab(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
+    final raw = applicant.rawJson ?? {};
+    final resume = applicant.resumeUrl ?? raw['resumeUrl']?.toString();
+    final pan = applicant.panUrl ?? raw['panUrl']?.toString();
+    final aadhaar = applicant.aadhaarUrl ?? raw['aadhaarUrl']?.toString();
+    final cert = applicant.certDocumentUrl ?? applicant.nismUrl ?? raw['certDocumentUrl']?.toString() ?? raw['nismUrl']?.toString();
+    final degree = applicant.highestEducationUrl ?? raw['highestEducationUrl']?.toString();
+    final relieving = applicant.relievingLetterUrl ?? raw['relievingLetterUrl']?.toString();
+    final kycVideo = applicant.kycVideoUrl ?? raw['kycVideoUrl']?.toString();
+
     return _buildSectionCard(
       title: 'Uploaded Compliance & Verification Media',
-      subtitle: 'Mandatory KYC documentation, identity proofs, and education verification files.',
+      subtitle: 'Mandatory KYC documentation, identity proofs, education verification files, and recorded video.',
       child: Column(
         children: [
-          _buildDocRow(context, controller, 'Resume / CV', 'resume', applicant.resumeUrl, Icons.description_outlined),
+          _buildDocRow(context, controller, 'Resume / CV', 'resume', resume, Icons.description_outlined),
           const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'PAN Card', 'pan', applicant.panUrl, Icons.credit_card_outlined),
+          _buildDocRow(context, controller, 'PAN Card', 'pan', pan, Icons.credit_card_outlined),
           const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'Aadhaar Card', 'aadhaar', applicant.aadhaarUrl, Icons.badge_outlined),
-          const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'NISM Certification', 'nism', applicant.nismUrl, Icons.verified_user_outlined),
-          const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'Highest Education Degree', 'education', applicant.highestEducationUrl, Icons.school_outlined),
-          if (applicant.relievingLetterUrl != null && applicant.relievingLetterUrl!.isNotEmpty) ...[
+          _buildDocRow(context, controller, 'Highest Education Degree', 'education', degree, Icons.school_outlined),
+          if (relieving != null && relieving.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _buildDocRow(context, controller, 'Relieving Letter', 'relieving', applicant.relievingLetterUrl, Icons.work_history_outlined),
+            _buildDocRow(context, controller, 'Relieving Letter', 'relieving', relieving, Icons.work_history_outlined),
+          ],
+          if (cert != null && cert.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildDocRow(context, controller, 'Professional Certificate', 'certificate', cert, Icons.verified_user_outlined),
+          ],
+          if (aadhaar != null && aadhaar.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildDocRow(context, controller, 'Address Proof / Aadhaar', 'aadhaar', aadhaar, Icons.badge_outlined),
           ],
           const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'KYC Verification Video', 'video', applicant.kycVideoUrl, Icons.videocam_outlined, isVideo: true),
+          _buildDocRow(context, controller, 'KYC Verification Video', 'video', kycVideo, Icons.videocam_outlined, isVideo: true),
         ],
       ),
     );

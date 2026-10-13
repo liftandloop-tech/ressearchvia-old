@@ -1768,7 +1768,7 @@ class PendingBankTransfersController extends GetxController {
     required String paymentIntentId,
     required String utrNumber,
     required double amountPaid,
-    String paymentMethod = 'RAZORPAY',
+    String paymentMethod = 'BANK_TRANSFER',
     String? historyId,
     String? comment,
     double? discount,
@@ -1868,7 +1868,7 @@ class PendingBankTransfersController extends GetxController {
     final TextEditingController commentController = TextEditingController();
     final TextEditingController discountController = TextEditingController();
 
-    final selectedPaymentMethod = 'RAZORPAY'.obs;
+    final selectedPaymentMethod = 'BANK_TRANSFER'.obs;
     final selectedFileNames = <String>[].obs;
     List<PlatformFile> selectedFiles = [];
 
@@ -2021,7 +2021,6 @@ class PendingBankTransfersController extends GetxController {
                               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             items: const [
-                              DropdownMenuItem(value: 'RAZORPAY', child: Text('Razorpay / Online')),
                               DropdownMenuItem(value: 'BANK_TRANSFER', child: Text('Bank Transfer (NEFT/IMPS)')),
                               DropdownMenuItem(value: 'UPI', child: Text('UPI / QR Code')),
                               DropdownMenuItem(value: 'CASH', child: Text('Cash / Other')),

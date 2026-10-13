@@ -371,9 +371,36 @@ class StaffModel {
   final String? rejectionReason;
   final String? dob;
   final String? gender;
+  final String? fatherName;
+  final String? maritalStatus;
+  final String? alternateEmail;
+  final String? currentLocation;
+  final String? skypeOrLinkedIn;
+  final String? panNumber;
+  final String? highestQualification;
+  final String? majorSubject;
+  final String? instituteUniversity;
+  final int? yearOfPassing;
+  final String? percentageGrade;
+  final bool? academicGap;
+  final String? academicGapDetails;
+  final String? backlogsCount;
+  final String? professionalCertification;
+  final String? certDocumentUrl;
+  final String? licenseMembershipDetails;
+  final bool? isFresher;
   final int? experienceYears;
   final String? previousCompany;
+  final String? currentDesignation;
+  final String? reportingManagerName;
+  final String? reportingManagerDesignation;
+  final int? reporteesCount;
+  final String? fixedSalary;
+  final String? bonusIncentive;
   final String? lastCtc;
+  final String? expectedSalary;
+  final String? noticePeriod;
+  final String? careerGapDetails;
   final String? localAddress;
   final String? permanentAddress;
   final EmergencyContactModel? emergencyContact;
@@ -424,9 +451,36 @@ class StaffModel {
     this.rejectionReason,
     this.dob,
     this.gender,
+    this.fatherName,
+    this.maritalStatus,
+    this.alternateEmail,
+    this.currentLocation,
+    this.skypeOrLinkedIn,
+    this.panNumber,
+    this.highestQualification,
+    this.majorSubject,
+    this.instituteUniversity,
+    this.yearOfPassing,
+    this.percentageGrade,
+    this.academicGap,
+    this.academicGapDetails,
+    this.backlogsCount,
+    this.professionalCertification,
+    this.certDocumentUrl,
+    this.licenseMembershipDetails,
+    this.isFresher,
     this.experienceYears,
     this.previousCompany,
+    this.currentDesignation,
+    this.reportingManagerName,
+    this.reportingManagerDesignation,
+    this.reporteesCount,
+    this.fixedSalary,
+    this.bonusIncentive,
     this.lastCtc,
+    this.expectedSalary,
+    this.noticePeriod,
+    this.careerGapDetails,
     this.localAddress,
     this.permanentAddress,
     this.emergencyContact,
@@ -436,6 +490,19 @@ class StaffModel {
   });
 
   String get fullName => name;
+
+  static String? formatDob(dynamic value) {
+    if (value == null) return null;
+    final str = value.toString().trim();
+    if (str.isEmpty || str == 'null') return null;
+    if (str.contains('T')) {
+      return str.split('T').first;
+    }
+    if (str.contains(' ')) {
+      return str.split(' ').first;
+    }
+    return str;
+  }
 
   static String? _safeString(dynamic value) {
     if (value == null) return null;
@@ -522,15 +589,42 @@ class StaffModel {
       relievingLetterUrl: _safeString(json['relievingLetterUrl']),
       stage: _safeString(json['stage']) ?? 'Applicant',
       rejectionReason: _safeString(json['rejectionReason']),
-      dob: _safeString(json['dob']),
-      gender: _safeString(json['gender']),
+      dob: formatDob(json['dob'] ?? json['walkInForm']?['dob']),
+      gender: _safeString(json['gender'] ?? json['walkInForm']?['gender']),
+      fatherName: _safeString(json['fatherName'] ?? json['walkInForm']?['fatherName']),
+      maritalStatus: _safeString(json['maritalStatus'] ?? json['walkInForm']?['maritalStatus']),
+      alternateEmail: _safeString(json['alternateEmail']),
+      currentLocation: _safeString(json['currentLocation'] ?? json['walkInForm']?['currentLocation']),
+      skypeOrLinkedIn: _safeString(json['skypeOrLinkedIn'] ?? json['skypeAddress']),
+      panNumber: _safeString(json['panNumber']),
+      highestQualification: _safeString(json['highestQualification']),
+      majorSubject: _safeString(json['majorSubject']),
+      instituteUniversity: _safeString(json['instituteUniversity']),
+      yearOfPassing: json['yearOfPassing'] != null ? int.tryParse(json['yearOfPassing'].toString()) : null,
+      percentageGrade: _safeString(json['percentageGrade']),
+      academicGap: json['academicGap'] == true || json['academicGap'] == 'true',
+      academicGapDetails: _safeString(json['academicGapDetails']),
+      backlogsCount: _safeString(json['backlogsCount']),
+      professionalCertification: _safeString(json['professionalCertification'] ?? json['selectedProfessionalCert']),
+      certDocumentUrl: _safeString(json['certDocumentUrl'] ?? json['nismUrl']),
+      licenseMembershipDetails: _safeString(json['licenseMembershipDetails']),
+      isFresher: json['isFresher'] == true || (json['hasWorkExperience'] == false),
       experienceYears: json['experienceYears'] != null
           ? int.tryParse(json['experienceYears'].toString())
           : null,
-      previousCompany: _safeString(json['previousCompany']),
-      lastCtc: _safeString(json['lastCtc']),
-      localAddress: _safeString(json['localAddress']),
-      permanentAddress: _safeString(json['permanentAddress']),
+      previousCompany: _safeString(json['previousCompany'] ?? json['currentCompany']),
+      currentDesignation: _safeString(json['currentDesignation']),
+      reportingManagerName: _safeString(json['reportingManagerName']),
+      reportingManagerDesignation: _safeString(json['reportingManagerDesignation']),
+      reporteesCount: json['reporteesCount'] != null ? int.tryParse(json['reporteesCount'].toString()) : null,
+      fixedSalary: _safeString(json['fixedSalary'] ?? json['walkInForm']?['fixedSalary']),
+      bonusIncentive: _safeString(json['bonusIncentive'] ?? json['walkInForm']?['bonusIncentive']),
+      lastCtc: _safeString(json['lastCtc'] ?? json['annualCtc']),
+      expectedSalary: _safeString(json['expectedSalary'] ?? json['walkInForm']?['expectedSalary']),
+      noticePeriod: _safeString(json['noticePeriod'] ?? json['walkInForm']?['noticePeriod']),
+      careerGapDetails: _safeString(json['careerGapDetails'] ?? json['walkInForm']?['careerGap']),
+      localAddress: _safeString(json['localAddress'] ?? (json['currentAddress'] is Map ? [json['currentAddress']['line1'], json['currentAddress']['city'], json['currentAddress']['state'], json['currentAddress']['zip']].where((e) => e != null && e.toString().isNotEmpty).join(', ') : json['currentAddress'])),
+      permanentAddress: _safeString(json['permanentAddress'] is Map ? [json['permanentAddress']['line1'] ?? json['permanentAddress']['street'], json['permanentAddress']['city'], json['permanentAddress']['state'], json['permanentAddress']['zip']].where((e) => e != null && e.toString().isNotEmpty).join(', ') : json['permanentAddress']),
       emergencyContact: contact,
       walkInForm: walkIn,
       telephonyExtension: _safeString(json['telephonyExtension']),

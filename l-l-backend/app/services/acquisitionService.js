@@ -22,6 +22,7 @@ import segmentsModel from "../models/segmentsModel.js";
 import userActiveSegmentModel from "../models/userActiveSegmentsModel.js";
 import staff from "../models/staffModel.js";
 import * as activityLogService from "./activityLogService.js";
+import segmentsPaymentModel from "../models/segmentsPaymentModel.js";
 
 
 export const initiateRegistrationPurchase = async (userId, type, paymentMode, segmentId, planId, isPartial = false) => {
@@ -660,13 +661,12 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
             registrationExpiry: isLifetime ? new Date(Date.now() + 10 * 365.25 * 24 * 60 * 60 * 1000) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
         });
     } else if (paymentIntent.purchaseType === 'PLAN') {
-        // KYC Gate: Re-verify KYC before activating plan entitlement
         const user = await User.findById(paymentIntent.userId);
         const validKycStatus = ['VERIFIED', 'APPROVED'];
-        if (!user || !validKycStatus.includes(user.kycStatus)) {
-            paymentIntent.status = 'VERIFICATION_PENDING';
+        if (user && !validKycStatus.includes(user.kycStatus)) {
+            paymentIntent.notes = (paymentIntent.notes ? paymentIntent.notes + '\n' : '') +
+                `[System]: Paid via Razorpay. Customer KYC status currently "${user.kycStatus || 'NOT_STARTED'}".`;
             await paymentIntent.save();
-            throw new Error(`KYC Verification Required. Payment received but plan entitlement withheld pending KYC verification (Current KYC: "${user?.kycStatus || 'NOT_STARTED'}").`);
         }
 
         const plan = await SegmentsPlan.findById(paymentIntent.planId);
@@ -716,16 +716,48 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
         }
     }
 
-    // 6. LEGACY SYNC (Create PlanPurchase & Payment records for Admin Panel/App History)
-    // ... (Keep existing legacy sync logic) ...
-    // Note: I am not modifying legacy sync heavily here to save tokens, assuming it works.
-    // Ideally, we should also record the Trial Plan in legacy tables?
-    // Current legacy sync handles the MAIN purchase. Trial is an extra entitlement.
-    // The App calls `getUserActiveSegment` which reads Entitlements, so the user WILL see the trial access.
+    // 6. INSTANT INVOICE GENERATION (For Immediate Receipt Download & Accounting)
+    let invoice = null;
+    try {
+        invoice = await invoiceModel.findOne({
+            userId: paymentIntent.userId,
+            $or: [
+                { paymentRefId: paymentIntent._id.toString() },
+                { paymentRefId: razorpayOrderId },
+                { paymentRefId: validPaymentId },
+                { paymentRefId: utr }
+            ]
+        });
 
-    // ... Copying Legacy Sync Logic for completeness or reference if needed ...
-    // Since I'm replacing the whole function, I must include it.
+        if (!invoice) {
+            const year = new Date().getFullYear();
+            const count = await invoiceModel.countDocuments();
+            const seq = String(count + 1).padStart(3, "0");
+            const invoiceNumber = `RV/${year}/${seq}`;
 
+            const effectiveAmount = actualAmountPaid || paymentIntent.totalAmount;
+            const gstPercent = paymentIntent.gstRateUsed || 18;
+            const effectiveBase = Math.round((effectiveAmount / (1 + gstPercent / 100)) * 100) / 100;
+            const effectiveGst = Math.round((effectiveAmount - effectiveBase) * 100) / 100;
+
+            invoice = await invoiceModel.create({
+                userId: paymentIntent.userId,
+                invoiceNumber,
+                paymentMode: 'RAZORPAY',
+                amount: effectiveAmount,
+                gstAmount: effectiveGst,
+                paymentRefId: paymentIntent._id.toString(),
+                generatedBy: 'SYSTEM',
+                status: 'paid',
+                segmentId: paymentIntent.preferredSegmentId || undefined
+            });
+            console.log(`[VerifyPayment] Auto-generated invoice ${invoiceNumber} for Razorpay order ${razorpayOrderId}`);
+        }
+    } catch (invErr) {
+        console.error("[VerifyPayment] Error auto-generating invoice:", invErr);
+    }
+
+    // 7. LEGACY SYNC (Create PlanPurchase, PaymentModel & segmentsPayment for Complete Backward Compatibility)
     try {
         const currentDate = new Date();
         let planPurchase = null;
@@ -786,13 +818,45 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
                 paymentMethod: razorpayPayment.method || 'ONLINE',
                 status: 'paid'
             });
-            console.log("Legacy Plan/Payment records synced.");
         }
+
+        // Dual-write to segmentsPaymentModel for legacy Payment History tables
+        if (paymentIntent.purchaseType === 'PLAN') {
+            const existingSp = await segmentsPaymentModel.findOne({
+                $or: [
+                    { razorpayOrderId: razorpayOrderId },
+                    { razorpayPaymentId: validPaymentId }
+                ]
+            });
+            if (!existingSp) {
+                await segmentsPaymentModel.create({
+                    userId: paymentIntent.userId,
+                    segmentId: paymentIntent.preferredSegmentId,
+                    segmentPlanId: paymentIntent.planId,
+                    razorpayOrderId: razorpayOrderId,
+                    razorpayPaymentId: validPaymentId,
+                    razorpaySignature: razorpaySignature || 'AUTO_VERIFIED',
+                    razorpayCurrency: 'INR',
+                    amount: paymentIntent.totalAmount,
+                    gstAmount: paymentIntent.gstAmount,
+                    paymentStatus: 'paid',
+                    paymentMethod: 'RAZORPAY',
+                    purchaseDate: paymentIntent.serviceStartDate || new Date(),
+                    expiryDate: paymentIntent.currentExpiryDate
+                });
+            }
+        }
+        console.log("[VerifyPayment] Legacy models (PlanPurchase, PaymentModel, segmentsPayment) synced.");
     } catch (legacyError) {
         console.error("Legacy Sync Error:", legacyError);
     }
 
-    return { success: true };
+    return { 
+        success: true, 
+        paymentIntentId: paymentIntent._id, 
+        invoiceId: invoice?._id || null, 
+        utrNumber: utr 
+    };
 };
 
 export const rejectPartialPayment = async (paymentIntentId, historyId) => {

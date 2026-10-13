@@ -3,33 +3,31 @@ import 'dart:js_interop';
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:web/web.dart' as web;
 import '../../config/app.config.dart';
 
 /// Complete in-browser Video KYC Camera Recorder
-/// Built to mirror the mobile app Video KYC experience with live camera preview,
-/// script declaration prompt, countdown, live timer, and review playback.
+/// Built exclusively for live camera recording (no pre-recorded upload option for applicants).
+/// If the device does not have a camera, a helpful popup instructs the applicant
+/// to continue via mobile or a laptop with camera support.
 class VideoKycRecorderDialog extends StatefulWidget {
   final String applicantName;
-  final Function(Uint8List bytes, String filename) onVideoRecorded;
-  final VoidCallback onFallbackUpload;
+  final Future<bool> Function(Uint8List bytes, String filename) onVideoRecorded;
 
   const VideoKycRecorderDialog({
     super.key,
     required this.applicantName,
     required this.onVideoRecorded,
-    required this.onFallbackUpload,
   });
 
-  /// Opens the choice dialog or recorder
-  static Future<void> showChoice({
+  /// Opens the recorder dialog or shows the no-camera popup if hardware is absent.
+  static Future<void> showRecorder({
     required BuildContext context,
     required String applicantName,
-    required Function(Uint8List bytes, String filename) onVideoRecorded,
-    required VoidCallback onFallbackUpload,
+    required Future<bool> Function(Uint8List bytes, String filename) onVideoRecorded,
   }) async {
-    // Check if camera device is available
     bool hasCamera = true;
     if (kIsWeb) {
       try {
@@ -38,75 +36,130 @@ class VideoKycRecorderDialog extends StatefulWidget {
         final list = devices.toDart;
         hasCamera = list.any((d) => d.kind == 'videoinput');
       } catch (_) {
-        hasCamera = true; // fallback to attempting getUserMedia
+        hasCamera = true; // Attempt in getUserMedia if device list not exposed before permission
       }
     }
 
     if (!context.mounted) return;
 
     if (!hasCamera) {
-      // PC without camera detected: directly offer file upload
-      _showNoCameraPrompt(context, onFallbackUpload);
+      showNoCameraDialog(context);
       return;
     }
 
-    // Camera is available (Mobile phone, Laptop, PC with webcam)
     showDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (ctx) => _VideoKycOptionDialog(
+      barrierDismissible: false,
+      builder: (recCtx) => VideoKycRecorderDialog(
         applicantName: applicantName,
-        onRecordSelected: () {
-          Navigator.of(ctx).pop();
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (recCtx) => VideoKycRecorderDialog(
-              applicantName: applicantName,
-              onVideoRecorded: onVideoRecorded,
-              onFallbackUpload: onFallbackUpload,
-            ),
-          );
-        },
-        onUploadSelected: () {
-          Navigator.of(ctx).pop();
-          onFallbackUpload();
-        },
+        onVideoRecorded: onVideoRecorded,
       ),
     );
   }
 
-  static void _showNoCameraPrompt(BuildContext context, VoidCallback onFallbackUpload) {
+  /// Backward-compatible alias for existing callers
+  static Future<void> showChoice({
+    required BuildContext context,
+    required String applicantName,
+    required Future<bool> Function(Uint8List bytes, String filename) onVideoRecorded,
+    VoidCallback? onFallbackUpload,
+  }) {
+    return showRecorder(
+      context: context,
+      applicantName: applicantName,
+      onVideoRecorded: onVideoRecorded,
+    );
+  }
+
+  /// Popup shown when no camera is detected on the applicant's device.
+  static void showNoCameraDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+        title: Row(
           children: [
-            Icon(Icons.videocam_off_outlined, color: Colors.orange, size: 28),
-            SizedBox(width: 12),
-            Text('No Camera Detected', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.videocam_off_rounded, color: Color(0xFFD97706), size: 28),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Text(
+                'Camera Required for Video KYC',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+            ),
           ],
         ),
-        content: const Text(
-          'We could not detect a camera connected to this device. You can upload a pre-recorded verification video from your files.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.5),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your device does not have a camera or does not support live video recording.',
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFF2563EB), size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Please continue via mobile or a laptop which supports camera or video recording.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF1E40AF), fontWeight: FontWeight.w600, height: 1.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'You can copy your application link below and open it on your smartphone or a laptop with a webcam.',
+              style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), height: 1.4),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: const Text('Close'),
           ),
           ElevatedButton.icon(
             onPressed: () {
+              final link = Uri.base.toString();
+              Clipboard.setData(ClipboardData(text: link));
+              Get.snackbar(
+                'Application Link Copied',
+                'Link copied to clipboard! Open it on your mobile device to complete Video KYC.',
+                backgroundColor: const Color(0xFFECFDF5),
+                colorText: const Color(0xFF065F46),
+                icon: const Icon(Icons.check_circle, color: Color(0xFF059669)),
+              );
               Navigator.of(ctx).pop();
-              onFallbackUpload();
             },
-            icon: const Icon(Icons.file_upload_outlined, size: 16),
-            label: const Text('Upload Video File'),
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy Application Link'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1E3A5F),
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -118,204 +171,10 @@ class VideoKycRecorderDialog extends StatefulWidget {
   State<VideoKycRecorderDialog> createState() => _VideoKycRecorderDialogState();
 }
 
-class _VideoKycOptionDialog extends StatelessWidget {
-  final String applicantName;
-  final VoidCallback onRecordSelected;
-  final VoidCallback onUploadSelected;
-
-  const _VideoKycOptionDialog({
-    required this.applicantName,
-    required this.onRecordSelected,
-    required this.onUploadSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFBFDBFE)),
-                        ),
-                        child: const Icon(Icons.video_camera_front_outlined, color: Color(0xFF2563EB), size: 24),
-                      ),
-                      const SizedBox(width: 14),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Video KYC Verification',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Identity Verification Required',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF94A3B8)),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'How would you like to provide your verification video?',
-                style: TextStyle(fontSize: 13.5, color: Color(0xFF334155), fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 18),
-
-              // Option 1: Live Camera Recording (Recommended)
-              InkWell(
-                onTap: onRecordSelected,
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF2563EB), width: 1.5),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2563EB),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.videocam, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Text(
-                                  'Record with Camera',
-                                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFECFDF5),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFA7F3D0)),
-                                  ),
-                                  child: const Text(
-                                    'Recommended',
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Instant recording via webcam / front camera with declaration script',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFF94A3B8)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Option 2: Upload File
-              InkWell(
-                onTap: onUploadSelected,
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFE2E8F0),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.file_upload_outlined, color: Color(0xFF334155), size: 24),
-                      ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Upload Existing Video File',
-                              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Select MP4, MOV, or WEBM from your device storage',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFF94A3B8)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              Center(
-                child: Text(
-                  isMobile
-                      ? 'Mobile device camera will be requested on record.'
-                      : 'Laptop or connected USB webcam will be used.',
-                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
   bool _isInitializing = true;
   bool _hasCamera = false;
+  bool _isDeviceCameraMissing = false;
   String _errorMessage = '';
   bool _isCountingDown = false;
   int _countdown = 3;
@@ -325,6 +184,14 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
   Timer? _timer;
   Timer? _countdownTimer;
 
+  bool _isSubmitting = false;
+  bool _hasSubmittedSuccess = false;
+  double _uploadProgress = 0.0;
+  String _uploadStatusText = 'Preparing upload...';
+  Timer? _uploadTimer;
+  String _submissionError = '';
+  String _recordedMimeType = 'video/webm';
+
   bool _isHindi = false;
 
   web.MediaStream? _mediaStream;
@@ -333,7 +200,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
   Uint8List? _recordedBytes;
 
   late final String _previewViewId;
-  late final String _playbackViewId;
+  String _playbackViewId = '';
   web.HTMLVideoElement? _previewVideoElement;
   web.HTMLVideoElement? _playbackVideoElement;
 
@@ -374,7 +241,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
           );
           stream = await mediaDevices.getUserMedia(constraints).toDart;
         } catch (_) {
-          // 3. Fallback to video only if mic is blocked/absent
+          // 3. Fallback to video only
           final constraints = web.MediaStreamConstraints(
             video: true.toJS,
             audio: false.toJS,
@@ -409,11 +276,22 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
       }
     } catch (e) {
       debugPrint('Camera access error: $e');
+      final errStr = e.toString().toLowerCase();
+      final isHardwareMissing = errStr.contains('notfound') ||
+          errStr.contains('not found') ||
+          errStr.contains('device') ||
+          errStr.contains('overconstrained');
+
       if (mounted) {
         setState(() {
           _hasCamera = false;
           _isInitializing = false;
-          _errorMessage = 'Camera access was blocked or is unavailable. Please allow camera access in browser permissions, or upload your video file directly.';
+          _isDeviceCameraMissing = isHardwareMissing;
+          if (isHardwareMissing) {
+            _errorMessage = 'Your device does not support a camera or video recording. Please continue via mobile or a laptop which supports camera or video recording.';
+          } else {
+            _errorMessage = 'Camera access was blocked by browser permissions. Please allow camera permissions in your browser URL bar or settings to continue.';
+          }
         });
       }
     }
@@ -423,6 +301,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
     setState(() {
       _isCountingDown = true;
       _countdown = 3;
+      _submissionError = '';
     });
 
     _countdownTimer?.cancel();
@@ -447,6 +326,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
     try {
       _recordedChunks.clear();
       _secondsRecorded = 0;
+      _submissionError = '';
 
       String mimeType = 'video/webm;codecs=vp8,opus';
       if (!web.MediaRecorder.isTypeSupported(mimeType)) {
@@ -458,6 +338,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
           }
         }
       }
+      _recordedMimeType = mimeType.isNotEmpty ? mimeType : 'video/webm';
 
       final options = mimeType.isNotEmpty
           ? web.MediaRecorderOptions(mimeType: mimeType)
@@ -502,7 +383,11 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
   void _stopRecording() {
     if (_mediaRecorder != null && _isRecording) {
       if (_secondsRecorded < 3) {
-        Get.snackbar('Alert', 'Please record for at least 3 seconds.', backgroundColor: Colors.orange.withValues(alpha: 0.15));
+        Get.snackbar(
+          'Recording Too Short',
+          'Please record for at least 3 seconds.',
+          backgroundColor: Colors.orange.withValues(alpha: 0.15),
+        );
         return;
       }
       _timer?.cancel();
@@ -514,7 +399,14 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
   }
 
   Future<void> _processRecordedVideo() async {
-    if (_recordedChunks.isEmpty) return;
+    if (_recordedChunks.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _submissionError = 'No video data captured. Please re-record.';
+        });
+      }
+      return;
+    }
     try {
       final jsChunks = _recordedChunks.toJS;
       final blob = web.Blob(jsChunks);
@@ -535,6 +427,8 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
 
       _playbackVideoElement!.setAttribute('playsinline', 'true');
 
+      // Unique view ID per recording avoids registration collision on re-record
+      _playbackViewId = 'kyc-playback-${DateTime.now().millisecondsSinceEpoch}-${DateTime.now().microsecond}';
       ui_web.platformViewRegistry.registerViewFactory(
         _playbackViewId,
         (int viewId) => _playbackVideoElement!,
@@ -543,10 +437,16 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
       if (mounted) {
         setState(() {
           _hasRecorded = true;
+          _submissionError = '';
         });
       }
     } catch (e) {
       debugPrint('Error processing video blob: $e');
+      if (mounted) {
+        setState(() {
+          _submissionError = 'Error processing recorded video. Please re-record.';
+        });
+      }
     }
   }
 
@@ -555,21 +455,102 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
       _hasRecorded = false;
       _recordedBytes = null;
       _secondsRecorded = 0;
+      _submissionError = '';
     });
   }
 
-  void _submitVideo() {
-    if (_recordedBytes != null && _recordedBytes!.isNotEmpty) {
-      final filename = 'kyc_video_${DateTime.now().millisecondsSinceEpoch}.webm';
-      widget.onVideoRecorded(_recordedBytes!, filename);
-      _cleanUp();
-      Navigator.of(context).pop();
+  Future<void> _submitVideo() async {
+    debugPrint('[VideoKYC] Submit KYC video button pressed! Bytes: ${_recordedBytes?.length}, mime: $_recordedMimeType');
+    if (_isSubmitting) return;
+
+    if (_recordedBytes == null || _recordedBytes!.isEmpty) {
+      setState(() {
+        _submissionError = 'Please record your video first before submitting.';
+      });
+      return;
+    }
+
+    if (_secondsRecorded < 3) {
+      setState(() {
+        _submissionError = 'Recording must be at least 3 seconds long.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _uploadProgress = 0.15;
+      _uploadStatusText = 'Encrypting & transferring KYC video...';
+      _submissionError = '';
+    });
+
+    // Start progress timer to smoothly advance progress while uploading
+    _uploadTimer?.cancel();
+    _uploadTimer = Timer.periodic(const Duration(milliseconds: 200), (t) {
+      if (!mounted || !_isSubmitting) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        if (_uploadProgress < 0.88) {
+          _uploadProgress += 0.04;
+          if (_uploadProgress > 0.45 && _uploadProgress < 0.70) {
+            _uploadStatusText = 'Uploading KYC video payload...';
+          } else if (_uploadProgress >= 0.70) {
+            _uploadStatusText = 'Finalizing verification record...';
+          }
+        }
+      });
+    });
+
+    try {
+      final isMp4 = _recordedMimeType.contains('mp4');
+      final ext = isMp4 ? 'mp4' : 'webm';
+      final filename = 'kyc_video_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      debugPrint('[VideoKYC] Invoking onVideoRecorded: $filename (${_recordedBytes!.length} bytes)');
+
+      final success = await widget.onVideoRecorded(_recordedBytes!, filename);
+      _uploadTimer?.cancel();
+
+      if (success) {
+        if (mounted) {
+          setState(() {
+            _uploadProgress = 1.0;
+            _uploadStatusText = 'KYC Video Uploaded Successfully!';
+            _hasSubmittedSuccess = true;
+          });
+          await Future.delayed(const Duration(milliseconds: 900));
+          _cleanUp();
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+            _uploadProgress = 0.0;
+            _submissionError = 'Video upload failed. Please verify your connection and try again.';
+          });
+        }
+      }
+    } catch (e) {
+      _uploadTimer?.cancel();
+      debugPrint('[VideoKYC] Error in _submitVideo: $e');
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _uploadProgress = 0.0;
+          _submissionError = 'Upload error: $e';
+        });
+      }
     }
   }
 
   void _cleanUp() {
     _timer?.cancel();
     _countdownTimer?.cancel();
+    _uploadTimer?.cancel();
     if (_mediaStream != null) {
       try {
         final tracks = _mediaStream!.getTracks().toDart;
@@ -634,7 +615,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // 1. Camera Live Stream or Playback View
+            // 1. Camera Live Stream or Playback View or No-Camera Screen
             if (_isInitializing) ...[
               const Center(
                 child: Column(
@@ -649,58 +630,129 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
             ] else if (!_hasCamera) ...[
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
+                  padding: const EdgeInsets.all(28),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.15),
+                          color: const Color(0xFFFEF3C7).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.videocam_off, color: Colors.redAccent, size: 48),
+                        child: const Icon(Icons.videocam_off_rounded, color: Color(0xFFFBBF24), size: 48),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 20),
                       const Text(
-                        'Camera Unavailable',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _errorMessage,
+                        'Camera Required for Video KYC',
+                        style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF334155)),
+                        ),
+                        child: Text(
+                          _isDeviceCameraMissing
+                              ? 'Your device does not support a camera or video recording. Please continue via mobile or a laptop which supports camera or video recording.'
+                              : _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13.5, height: 1.5),
+                        ),
                       ),
                       const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          widget.onFallbackUpload();
-                        },
-                        icon: const Icon(Icons.file_upload_outlined, size: 16),
-                        label: const Text('Upload Video From Files Instead'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 10,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () {
+                              _cleanUp();
+                              Navigator.of(context).pop();
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white70,
+                              side: const BorderSide(color: Colors.white30),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Close'),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              final link = Uri.base.toString();
+                              Clipboard.setData(ClipboardData(text: link));
+                              Get.snackbar(
+                                'Application Link Copied',
+                                'Link copied! Open on your mobile phone to complete Video KYC.',
+                                backgroundColor: const Color(0xFFECFDF5),
+                                colorText: const Color(0xFF065F46),
+                                icon: const Icon(Icons.check_circle, color: Color(0xFF059669)),
+                              );
+                              _cleanUp();
+                              Navigator.of(context).pop();
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 16),
+                            label: const Text('Copy Application Link'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                          if (!_isDeviceCameraMissing)
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isInitializing = true;
+                                });
+                                _initCamera();
+                              },
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Retry Camera Access'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               )
             ] else if (_hasRecorded) ...[
-              // Video Playback review
-              Positioned.fill(
-                child: HtmlElementView(viewType: _playbackViewId),
-              )
+              // Video Playback review bounded between header and bottom controls
+              Positioned(
+                top: 56,
+                bottom: 155,
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Colors.black,
+                  child: HtmlElementView(viewType: _playbackViewId),
+                ),
+              ),
             ] else ...[
-              // Live camera feed
-              Positioned.fill(
-                child: HtmlElementView(viewType: _previewViewId),
-              )
+              // Live camera feed bounded between header and bottom controls
+              Positioned(
+                top: 56,
+                bottom: 155,
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Colors.black,
+                  child: HtmlElementView(viewType: _previewViewId),
+                ),
+              ),
             ],
 
             // 2. Countdown Overlay
@@ -909,6 +961,31 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Error display if submission or recording failed
+                      if (_submissionError.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _submissionError,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       if (!_hasRecorded) ...[
                         // RECORD / STOP BUTTON
                         Row(
@@ -970,17 +1047,6 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
                             fontSize: 12,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        if (!_isRecording && !_isCountingDown)
-                          TextButton.icon(
-                            onPressed: () {
-                              _cleanUp();
-                              Navigator.of(context).pop();
-                              widget.onFallbackUpload();
-                            },
-                            icon: const Icon(Icons.file_upload_outlined, size: 14, color: Colors.white70),
-                            label: const Text('Prefer to upload a pre-recorded video file?', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          ),
                       ] else ...[
                         // REVIEW / SUBMIT CONTROLS
                         const Text(
@@ -992,7 +1058,7 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: _reRecord,
+                              onPressed: _isSubmitting ? null : _reRecord,
                               icon: const Icon(Icons.refresh, size: 16),
                               label: const Text('Re-record'),
                               style: OutlinedButton.styleFrom(
@@ -1004,11 +1070,26 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
                             ),
                             const SizedBox(width: 16),
                             ElevatedButton.icon(
-                              onPressed: _submitVideo,
-                              icon: const Icon(Icons.check_circle, size: 18),
-                              label: const Text('Submit KYC Video'),
+                              onPressed: _isSubmitting ? null : _submitVideo,
+                              icon: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    )
+                                  : Icon(
+                                      _hasSubmittedSuccess ? Icons.check_circle : Icons.check_circle_outline,
+                                      size: 18,
+                                    ),
+                              label: Text(
+                                _isSubmitting
+                                    ? 'Uploading KYC Video...'
+                                    : _hasSubmittedSuccess
+                                        ? 'Video KYC Submitted!'
+                                        : 'Submit KYC Video',
+                              ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981),
+                                backgroundColor: _hasSubmittedSuccess ? const Color(0xFF059669) : const Color(0xFF10B981),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -1019,6 +1100,127 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
                         ),
                       ],
                     ],
+                  ),
+                ),
+              ),
+
+            // 6. Prominent Upload Progress Loader Overlay
+            if (_isSubmitting)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.88),
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 30),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: _hasSubmittedSuccess
+                              ? const Color(0xFF10B981).withValues(alpha: 0.5)
+                              : const Color(0xFF38BDF8).withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 32,
+                            offset: const Offset(0, 16),
+                          )
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: _hasSubmittedSuccess
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                  : const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: _hasSubmittedSuccess
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48)
+                                : const Icon(Icons.cloud_upload_rounded, color: Color(0xFF38BDF8), size: 48),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            _hasSubmittedSuccess ? 'Upload Completed!' : 'Uploading KYC Video',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _uploadStatusText,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          // Linear progress bar
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: _uploadProgress > 0 ? _uploadProgress : null,
+                              minHeight: 10,
+                              backgroundColor: const Color(0xFF334155),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                _hasSubmittedSuccess ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _recordedBytes != null
+                                    ? '${(_recordedBytes!.length / (1024 * 1024)).toStringAsFixed(2)} MB'
+                                    : '',
+                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                '${(_uploadProgress * 100).toInt()}%',
+                                style: const TextStyle(
+                                  color: Color(0xFF38BDF8),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.shield_outlined, color: Color(0xFF10B981), size: 14),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Secure encrypted upload • Please do not close',
+                                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),

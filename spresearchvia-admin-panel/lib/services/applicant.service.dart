@@ -200,8 +200,11 @@ class ApplicantService extends ApiService {
     try {
       final formData = FormData({
         'file': MultipartFile(bytes, filename: filename),
+        if (id.isNotEmpty) 'applicantId': id,
+        'type': type,
       });
-      final response = await post('/staff/applicant/upload-doc/$id?type=$type', formData);
+      final url = id.isNotEmpty ? '/staff/applicant/upload-doc/$id?type=$type' : '/staff/applicant/upload-doc?type=$type';
+      final response = await post(url, formData);
       if (response.statusCode == 200) {
         StaffModel? applicant;
         if (response.body != null && response.body['data'] != null && response.body['data']['applicant'] != null) {
@@ -213,19 +216,39 @@ class ApplicantService extends ApiService {
         }
         return (success: true, message: response.body?['message']?.toString(), applicant: applicant);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'File upload failed', applicant: null);
+      final msg = response.body is Map ? response.body['message']?.toString() : null;
+      return (success: false, message: msg ?? 'File upload failed (${response.statusCode})', applicant: null);
     } catch (e) {
       debugPrint('Error uploading applicant file: $e');
       return (success: false, message: e.toString(), applicant: null);
     }
   }
 
-  Future<({bool success, String? message, StaffModel? applicant})> uploadApplicantVideo(String id, List<int> bytes, String filename) async {
+  Future<({bool success, String? message, StaffModel? applicant})> uploadApplicantVideo(
+    String id,
+    List<int> bytes,
+    String filename, {
+    String? email,
+  }) async {
     try {
+      final isMp4 = filename.toLowerCase().endsWith('.mp4');
+      final contentType = isMp4 ? 'video/mp4' : 'video/webm';
+      final cleanId = id.trim();
+      final hasId = cleanId.isNotEmpty && cleanId != 'null' && cleanId != 'undefined';
       final formData = FormData({
-        'file': MultipartFile(bytes, filename: filename),
+        'file': MultipartFile(bytes, filename: filename, contentType: contentType),
+        if (hasId) 'applicantId': cleanId,
+        if (email != null && email.trim().isNotEmpty) 'emailAddress': email.trim().toLowerCase(),
       });
-      final response = await post('/staff/applicant/upload-video/$id', formData);
+      final queryParam = hasId
+          ? '?applicantId=$cleanId'
+          : (email != null && email.trim().isNotEmpty
+              ? '?email=${Uri.encodeComponent(email.trim().toLowerCase())}'
+              : '');
+      final url = hasId
+          ? '/staff/applicant/upload-video/$cleanId$queryParam'
+          : '/staff/applicant/upload-video$queryParam';
+      final response = await post(url, formData);
       if (response.statusCode == 200) {
         StaffModel? applicant;
         if (response.body != null && response.body['data'] != null && response.body['data']['applicant'] != null) {
@@ -237,7 +260,8 @@ class ApplicantService extends ApiService {
         }
         return (success: true, message: response.body?['message']?.toString(), applicant: applicant);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'Video upload failed', applicant: null);
+      final msg = response.body is Map ? response.body['message']?.toString() : null;
+      return (success: false, message: msg ?? 'Video upload failed (${response.statusCode})', applicant: null);
     } catch (e) {
       debugPrint('Error uploading applicant video: $e');
       return (success: false, message: e.toString(), applicant: null);

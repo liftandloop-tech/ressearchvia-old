@@ -7,7 +7,7 @@ class AcquisitionService extends ApiService {
     required String paymentIntentId,
     required String utrNumber,
     required double amountPaid,
-    String paymentMethod = 'RAZORPAY',
+    String paymentMethod = 'BANK_TRANSFER',
     String? historyId,
     String? comment,
     double? discount,

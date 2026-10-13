@@ -971,9 +971,12 @@ const segmentsService = {
           { proofImage: { $ne: null, $exists: true } }, // Regular payment with proof (legacy)
           { 'proofImages.0': { $exists: true } }, // Regular payment with multiple proofs
           { 'partialPaymentsHistory.0': { $exists: true } }, // Partial payment with at least one history entry
-          { purchaseType: 'REGISTRATION' },
-          { paymentMethod: 'BANK_TRANSFER' }
+          { paymentMethod: { $in: ['BANK_TRANSFER', 'CASH', 'UPI', 'OFFLINE'] } },
+          { razorpayOrderId: { $regex: '^BANK_' } },
+          { razorpayOrderId: { $regex: '^MANUAL_' } }
         ];
+        // Online Razorpay orders are auto-approved and do not require bank transfer proof/approval
+        queryArgs.paymentMethod = { $ne: 'RAZORPAY' };
 
         if (status && status !== 'All') {
           if (status === 'Approved') {
@@ -1194,12 +1197,18 @@ const segmentsService = {
       const buildPaymentMapper = async (intentList) => {
         if (!intentList || intentList.length === 0) return () => null;
 
-        const intentIds = intentList.map(i => i._id.toString());
+        const lookupRefs = [];
+        for (const i of intentList) {
+          if (i._id) lookupRefs.push(i._id.toString());
+          if (i.utrNumber) lookupRefs.push(i.utrNumber);
+          if (i.paymentId) lookupRefs.push(i.paymentId);
+          if (i.razorpayOrderId) lookupRefs.push(i.razorpayOrderId);
+        }
         const segmentIds = [...new Set(intentList.map(i => i.preferredSegmentId).filter(id => id && mongoose.isValidObjectId(id)))];
         const planIds = [...new Set(intentList.map(i => i.preferredPlanId).filter(id => id && mongoose.isValidObjectId(id)))];
 
         const [invoices, segments, plans] = await Promise.all([
-          invoiceModel.find({ paymentRefId: { $in: intentIds } }).select('paymentRefId invoiceNumber').lean(),
+          invoiceModel.find({ paymentRefId: { $in: lookupRefs } }).select('paymentRefId invoiceNumber').lean(),
           segmentIds.length > 0 ? segmentsModel.find({ _id: { $in: segmentIds } }).select('segmentName').lean() : [],
           planIds.length > 0 ? segmentsPlanModel.find({ _id: { $in: planIds } }).lean() : []
         ]);
@@ -1272,7 +1281,11 @@ const segmentsService = {
             }
           }
 
-          const invoiceNumber = invoiceMap.get(intent._id.toString()) || null;
+          const invoiceNumber = invoiceMap.get(intent._id.toString())
+            || (intent.utrNumber ? invoiceMap.get(intent.utrNumber) : null)
+            || (intent.paymentId ? invoiceMap.get(intent.paymentId) : null)
+            || (intent.razorpayOrderId ? invoiceMap.get(intent.razorpayOrderId) : null)
+            || null;
 
           const isRazorpayOrder = intent.paymentMethod === 'RAZORPAY' ||
             (intent.razorpayOrderId && !intent.razorpayOrderId.startsWith('BANK_') && !intent.razorpayOrderId.startsWith('MANUAL_'));
@@ -1592,18 +1605,10 @@ const segmentsService = {
         };
       }
 
-      // KYC Gate: Re-verify KYC before activating plan entitlement
+      // KYC check: Log KYC status but do not withhold captured payment/services
       const user = await userModel.findById(segmentsPayment.userId);
-      const validKycStatus = ['VERIFIED', 'APPROVED'];
-      if (!user || !validKycStatus.includes(user.kycStatus)) {
-        segmentsPayment.paymentStatus = 'pending';
-        await segmentsPayment.save();
-        return {
-          status: 403,
-          success: false,
-          message: `KYC Verification Required. Payment received but plan entitlement withheld pending KYC verification (Current KYC: "${user?.kycStatus || 'NOT_STARTED'}").`,
-          data: {}
-        };
+      if (user && !['VERIFIED', 'APPROVED'].includes(user.kycStatus)) {
+        console.warn(`[segmentsPaymentVerify] User ${user._id} has pending/unverified KYC status (${user.kycStatus}), auto-approving captured payment.`);
       }
 
       const segmentPlan = await segmentsPlanModel.findById(segmentsPayment.segmentPlanId);
@@ -1815,6 +1820,63 @@ const segmentsService = {
       }).filter(item => item !== null);
 
       if (!activeSegments || activeSegments.length === 0) {
+        // Fallback: check for active registration bundled trial
+        const trialEnts = await Entitlement.find({
+          userId: userId,
+          type: 'PLAN',
+          status: 'ACTIVE',
+          grantReason: 'REGISTRATION_TRIAL',
+          $or: [
+            { startDate: null },
+            { startDate: { $lte: new Date(Date.now() + 60000) } }
+          ],
+          $and: [
+            {
+              $or: [
+                { endDate: null },
+                { endDate: { $gte: now } }
+              ]
+            }
+          ]
+        }).populate({
+          path: 'resourceId',
+          model: 'segmentsPlan'
+        }).populate({
+          path: 'segmentId',
+          model: 'segments'
+        });
+
+        if (trialEnts && trialEnts.length > 0) {
+          const trialSegments = trialEnts.map(ent => {
+            const plan = ent.resourceId;
+            const segObj = ent.segmentId;
+            const segName = segObj?.segmentName || segObj?.name || plan?.segmentsName || 'Trial Segment';
+            const validityDays = plan?.day || (ent.endDate && ent.startDate ? Math.round((new Date(ent.endDate) - new Date(ent.startDate)) / (1000 * 60 * 60 * 24)) : 5);
+
+            return {
+              _id: ent._id,
+              userId: ent.userId,
+              segmentId: ent.segmentId,
+              segmentName: segName,
+              purchaseDate: ent.startDate,
+              expiryDate: ent.endDate,
+              endDate: ent.endDate,
+              validity: validityDays,
+              days: validityDays,
+              isActive: true,
+              status: 'ACTIVE',
+              planName: plan?.planName ? `${plan.planName} (Trial)` : 'Registration Trial',
+              isTrial: true
+            };
+          });
+
+          return {
+            status: 200,
+            message: "Current Active Segments (Trial)",
+            data: trialSegments,
+          };
+        }
+
         return {
           status: 200,
           message: "No active segments found",
