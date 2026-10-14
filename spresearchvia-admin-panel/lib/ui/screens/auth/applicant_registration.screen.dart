@@ -126,19 +126,21 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _buildPrerequisiteItem('1. Updated Resume / Curriculum Vitae (PDF format, below 5MB)'),
+          _buildPrerequisiteItem('1. Recent Passport Size Profile Photo (in JPG/PNG format, below 2MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('2. Valid PAN Card (in JPG/PNG/PDF format, below 2MB)'),
+          _buildPrerequisiteItem('2. Updated Resume / Curriculum Vitae (PDF format, below 5MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('3. Valid Aadhaar Card / Address Proof (in JPG/PNG/PDF format, below 2MB)'),
+          _buildPrerequisiteItem('3. Valid Aadhaar Card (Front and Back both mandatory) & 12-digit Number (in JPG/PNG/PDF format, below 2MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('4. Educational certificates & marksheets (Highest degree / graduation certificate)'),
+          _buildPrerequisiteItem('4. Valid PAN Card (Optional, in JPG/PNG/PDF format, below 2MB)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('5. Previous employment details & relieving letter (if experienced candidate)'),
+          _buildPrerequisiteItem('5. Educational degree / marksheets (Highest degree certificate)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('6. Valid active email address and mobile number for real-time OTP verification'),
+          _buildPrerequisiteItem('6. NISM or Professional Certification (Optional, if applicable)'),
           const SizedBox(height: 16),
-          _buildPrerequisiteItem('7. Device camera (mobile phone or laptop) for live Video KYC recording'),
+          _buildPrerequisiteItem('7. Previous employment details & relieving letter (if experienced candidate)'),
+          const SizedBox(height: 16),
+          _buildPrerequisiteItem('8. Device camera (mobile phone or laptop) for live Video KYC recording'),
         ],
       ),
     );
@@ -508,15 +510,12 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     );
   }
 
-  // Left Stepper Sidebar with decorative bottom artwork
+  // Left Stepper Sidebar with decorative bottom artwork (3 Merged Steps)
   Widget _buildStepperSidebar(ApplicantRegistrationController controller) {
     final steps = [
-      'Personal Information',
-      'Contact Information',
-      'Educational Details',
-      'Professional Qualification',
-      'Occupational Details',
-      'Preview',
+      'Personal & Contact Details',
+      'Education & Professional Details',
+      'Occupational & KYC Details',
     ];
 
     return Container(
@@ -638,7 +637,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Step ${controller.currentStep.value} of 6',
+            'Step ${controller.currentStep.value} of 3',
             style: const TextStyle(fontWeight: FontWeight.bold, color: primaryNavy),
           ),
           Text(
@@ -653,17 +652,11 @@ class ApplicantRegistrationScreen extends StatelessWidget {
   String _getStepName(int step) {
     switch (step) {
       case 1:
-        return 'Personal Information';
+        return 'Personal & Contact Details';
       case 2:
-        return 'Contact Information';
+        return 'Education & Professional Details';
       case 3:
-        return 'Educational Details';
-      case 4:
-        return 'Professional Qualification';
-      case 5:
-        return 'Occupational Details';
-      case 6:
-        return 'Preview';
+        return 'Occupational & KYC Details';
       default:
         return '';
     }
@@ -679,32 +672,28 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (step < 6)
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'All fields marked with * are mandatory',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
-            ),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'All fields marked with * are mandatory',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
           ),
+        ),
         const SizedBox(height: 18),
-        if (step == 1) _buildStep1Personal(context, controller, isMobile),
-        if (step == 2) _buildStep2Contact(context, controller, isMobile),
-        if (step == 3) _buildStep3Education(context, controller, isMobile),
-        if (step == 4) _buildStep4Professional(context, controller, isMobile),
-        if (step == 5) _buildStep5Occupational(context, controller, isMobile),
-        if (step == 6) _buildStep6Preview(context, controller, isMobile),
+        if (step == 1) _buildStep1PersonalAndContact(context, controller, isMobile),
+        if (step == 2) _buildStep2EducationAndProfessional(context, controller, isMobile),
+        if (step == 3) _buildStep3Occupational(context, controller, isMobile),
         const SizedBox(height: 40),
-        _buildBottomNavButtons(controller, isLastStep: step == 6, isMobile: isMobile),
+        _buildBottomNavButtons(context, controller, isLastStep: step == 3, isMobile: isMobile),
       ],
     );
   }
 
   // ==========================================
-  // STEP 1: PERSONAL INFORMATION (IMAGES 2 & 3)
+  // STEP 1: PERSONAL & CONTACT INFORMATION
   // ==========================================
 
-  Widget _buildStep1Personal(
+  Widget _buildStep1PersonalAndContact(
     BuildContext context,
     ApplicantRegistrationController controller,
     bool isMobile,
@@ -712,9 +701,17 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Upload boxes: Resume/CV, PAN Card, and Aadhaar Card in a responsive grid
+        // Upload boxes: Profile Photo *, Resume/CV *, Aadhaar Card *, and PAN Card (Optional)
         _buildDocumentsGrid(
           children: [
+            _buildUploadBox(
+              context: context,
+              title: "Profile Photo *",
+              specText: 'View Photo Specs',
+              uploadedUrlObs: controller.photoUrl,
+              onTap: () => controller.pickAndUploadDoc('photo'),
+              onSpecTap: () => _showSpecDialog(context, 'Profile Photo Specifications', '1. Clear front-facing or passport size photograph.\n2. In JPG or PNG format below 2MB.'),
+            ),
             _buildUploadBox(
               context: context,
               title: "Resume / CV *",
@@ -725,27 +722,35 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             ),
             _buildUploadBox(
               context: context,
-              title: 'PAN Card *',
-              specText: 'View PAN Specifications',
-              uploadedUrlObs: controller.panUrl,
-              onTap: () => controller.pickAndUploadDoc('pan'),
-              onSpecTap: () => _showSpecDialog(context, 'PAN Card Specifications', '1. Clear photo or scanned copy of PAN Card.\n2. In JPG, PNG, or PDF format below 2MB.'),
+              title: 'Aadhaar Card (Front) *',
+              specText: 'View Specifications',
+              uploadedUrlObs: controller.proofOfAddressUrl,
+              onTap: () => controller.pickAndUploadDoc('aadhaarFront'),
+              onSpecTap: () => _showSpecDialog(context, 'Aadhaar (Front) Specifications', '1. Clear photo or scanned copy of Aadhaar Card front side showing your photo and name.\n2. In JPG, PNG, or PDF format below 2MB.'),
             ),
             _buildUploadBox(
               context: context,
-              title: 'Aadhaar Card / Address Proof *',
-              specText: 'View Aadhaar Specifications',
-              uploadedUrlObs: controller.proofOfAddressUrl,
-              onTap: () => controller.pickAndUploadDoc('aadhaar'),
-              onSpecTap: () => _showSpecDialog(context, 'Aadhaar Specifications', '1. Clear photo or scanned copy of Aadhaar Card front and back.\n2. In JPG, PNG, or PDF format below 2MB.'),
+              title: 'Aadhaar Card (Back) *',
+              specText: 'View Specifications',
+              uploadedUrlObs: controller.aadhaarBackUrl,
+              onTap: () => controller.pickAndUploadDoc('aadhaarBack'),
+              onSpecTap: () => _showSpecDialog(context, 'Aadhaar (Back) Specifications', '1. Clear photo or scanned copy of Aadhaar Card back side showing your address.\n2. In JPG, PNG, or PDF format below 2MB.'),
+            ),
+            _buildUploadBox(
+              context: context,
+              title: 'PAN Card (Optional)',
+              specText: 'View PAN Specifications',
+              uploadedUrlObs: controller.panUrl,
+              onTap: () => controller.pickAndUploadDoc('pan'),
+              onSpecTap: () => _showSpecDialog(context, 'PAN Card Specifications', '1. Clear photo or scanned copy of PAN Card (Optional).\n2. In JPG, PNG, or PDF format below 2MB.'),
             ),
           ],
         ),
         const SizedBox(height: 24),
 
-        // Notice: Name and DOB as per Government ID / PAN Card
+        // Notice: Name and DOB as per Government ID / Aadhaar Card
         const Text(
-          '* Name (First Name, Middle Name, Last Name) and Date of Birth should be as per PAN Card / Government ID.',
+          '* Name (First Name, Middle Name, Last Name) and Date of Birth should be as per Government ID / Aadhaar Card.',
           style: TextStyle(color: Color(0xFFDC2626), fontSize: 12.5, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 14),
@@ -843,6 +848,32 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        // Aadhaar Number (Mandatory) & PAN Number (Optional)
+        _buildResponsiveRow(
+          isMobile,
+          [
+            _buildTextField(
+              controller: controller.aadhaarNumberController,
+              label: 'Aadhaar Card Number *',
+              hint: '12-digit Aadhaar number',
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(12),
+              ],
+            ),
+            _buildTextField(
+              controller: controller.panNumberController,
+              label: 'PAN Card Number (Optional)',
+              hint: 'e.g. ABCDE1234F',
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(10),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
         // Gender & Marital Status
         _buildResponsiveRow(
           isMobile,
@@ -885,7 +916,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           [
             _buildTextField(
               controller: controller.currentLocationController,
-              label: 'Current Location (City) *',
+              label: 'Current City *',
               hint: 'e.g. Indore, MP',
             ),
             _buildTextField(
@@ -899,25 +930,18 @@ class ApplicantRegistrationScreen extends StatelessWidget {
 
         // Position Applied For (Live Job Openings)
         _buildRoleSelector(context, controller),
-      ],
-    );
-  }
+        const SizedBox(height: 28),
 
-  // ==========================================
-  // STEP 2: CONTACT INFORMATION (IMAGE 4)
-  // ==========================================
-
-  Widget _buildStep2Contact(
-    BuildContext context,
-    ApplicantRegistrationController controller,
-    bool isMobile,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          'Current Address',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryNavy),
+        // Section: Current Address
+        const Row(
+          children: [
+            Icon(Icons.location_on_outlined, color: primaryNavy, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Current Address',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: primaryNavy),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         _buildResponsiveRow(
@@ -997,7 +1021,7 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           children: [
             const Text(
               'Permanent Address',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryNavy),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: primaryNavy),
             ),
             Obx(
               () => Row(
@@ -1051,9 +1075,9 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         ),
         const SizedBox(height: 24),
 
-        // Mobile Number Verification Card (Image 4 exact parity)
+        // Mobile Number Section (Direct input, no OTP verification needed!)
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(12),
@@ -1064,123 +1088,40 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             children: [
               const Text(
                 'Mobile Number *',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF334155)),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF334155)),
               ),
               const SizedBox(height: 8),
-              Obx(
-                () => Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('+91', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: controller.phoneController,
-                        enabled: !controller.isMobileVerified.value,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          hintText: 'Enter 10-digit mobile number',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          filled: controller.isMobileVerified.value,
-                          fillColor: const Color(0xFFF1F5F9),
-                          suffixIcon: controller.isMobileVerified.value
-                              ? const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 22)
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    if (!controller.isMobileVerified.value)
-                      ElevatedButton(
-                        onPressed: (controller.isVerifyingMobile.value || controller.mobileOtpCountdown.value > 0)
-                            ? null
-                            : controller.handleSendMobileOtp,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: controller.mobileOtpCountdown.value > 0
-                              ? const Color(0xFF94A3B8)
-                              : primaryNavy,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 20, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: controller.isVerifyingMobile.value
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                controller.mobileOtpCountdown.value > 0
-                                    ? 'Retry in ${controller.mobileOtpCountdown.value}s'
-                                    : (controller.isMobileOtpSent.value ? 'Resend' : 'Verify'),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Mobile Verified status label or Inline OTP input (Hidden until Verify is tapped)
-              Obx(() {
-                if (controller.isMobileVerified.value) {
-                  return const Row(
-                    children: [
-                      Icon(Icons.verified_user_outlined, size: 16, color: Color(0xFF10B981)),
-                      SizedBox(width: 6),
-                      Text(
-                        'Mobile Verified',
-                        style: TextStyle(color: Color(0xFF059669), fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ],
-                  );
-                }
-
-                if (!controller.isMobileOtpSent.value) {
-                  return const SizedBox.shrink();
-                }
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Enter the OTP received on SMS to verify mobile number on this screen:',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          child: TextField(
-                            controller: controller.mobileOtpInputController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 4,
-                            decoration: const InputDecoration(
-                              hintText: '4-digit OTP',
-                              counterText: '',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                          ),
-                        ),
-                        ElevatedButton(
-                          onPressed: controller.handleVerifyMobileOtp,
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
-                          child: const Text('Submit OTP'),
-                        ),
+                    child: const Text('+91', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: controller.phoneController,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
                       ],
+                      decoration: const InputDecoration(
+                        hintText: 'Enter 10-digit mobile number',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      ),
                     ),
-                  ],
-                );
-              }),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1189,10 +1130,10 @@ class ApplicantRegistrationScreen extends StatelessWidget {
   }
 
   // ==========================================
-  // STEP 3: EDUCATIONAL DETAILS (IMAGE 5)
+  // STEP 2: EDUCATIONAL & PROFESSIONAL DETAILS
   // ==========================================
 
-  Widget _buildStep3Education(
+  Widget _buildStep2EducationAndProfessional(
     BuildContext context,
     ApplicantRegistrationController controller,
     bool isMobile,
@@ -1200,6 +1141,17 @@ class ApplicantRegistrationScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Row(
+          children: [
+            Icon(Icons.school_outlined, color: primaryNavy, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Educational Details',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: primaryNavy),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         _buildResponsiveRow(
           isMobile,
           [
@@ -1258,66 +1210,10 @@ class ApplicantRegistrationScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        _buildResponsiveRow(
-          isMobile,
-          [
-            _buildTextField(
-              controller: controller.percentageGradeController,
-              label: 'Percentage/Grade',
-              hint: 'e.g. 7.9 or 75%',
-            ),
-            _buildTextField(
-              controller: controller.backlogsCountController,
-              label: 'Total Backlogs / ATKTs (if any)',
-              hint: 'e.g. 0',
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-
-        // Academic Gap Toggle & Details
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Obx(
-            () => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Any Gap during Academic Education?',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF334155)),
-                    ),
-                    Row(
-                      children: [
-                        const Text('No', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
-                        Switch(
-                          value: controller.academicGap.value,
-                          onChanged: (val) => controller.academicGap.value = val,
-                          activeColor: primaryNavy,
-                        ),
-                        const Text('Yes', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
-                      ],
-                    ),
-                  ],
-                ),
-                if (controller.academicGap.value) ...[
-                  const SizedBox(height: 10),
-                  _buildTextField(
-                    controller: controller.academicGapDetailsController,
-                    label: 'Academic Gap Details',
-                    hint: 'e.g. 1 year gap due to competitive exams preparation',
-                  ),
-                ],
-              ],
-            ),
-          ),
+        _buildTextField(
+          controller: controller.percentageGradeController,
+          label: 'Percentage/Grade',
+          hint: 'e.g. 7.9 or 75%',
         ),
         const SizedBox(height: 20),
 
@@ -1330,61 +1226,118 @@ class ApplicantRegistrationScreen extends StatelessWidget {
           onTap: () => controller.pickAndUploadDoc('highestEducation'),
           onSpecTap: () => _showSpecDialog(context, 'Degree Specifications', '1. Clear scan or PDF of Degree Certificate or final Marksheet.\n2. PDF or JPG format below 5MB.'),
         ),
-      ],
-    );
-  }
+        const SizedBox(height: 32),
 
-  // ==========================================
-  // STEP 4: PROFESSIONAL QUALIFICATION (MOCKUP)
-  // ==========================================
-
-  Widget _buildStep4Professional(
-    BuildContext context,
-    ApplicantRegistrationController controller,
-    bool isMobile,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Obx(
-          () => DropdownButtonFormField<String>(
-            value: controller.selectedProfessionalCert.value,
-            decoration: InputDecoration(
-              labelText: 'Professional Certification',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        // Professional Qualifications & NISM Section (With Toggle)
+        const Row(
+          children: [
+            Icon(Icons.workspace_premium_outlined, color: primaryNavy, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Professional & NISM Qualifications',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: primaryNavy),
             ),
-            items: ['None', 'NISM Series XV (Research Analyst)', 'NISM Series VIII (Equity Derivatives)', 'CA', 'CFA', 'CS', 'CFP']
-                .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13))))
-                .toList(),
-            onChanged: (val) => controller.selectedProfessionalCert.value = val ?? 'None',
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Obx(
+            () => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Do you have NISM or Professional Certification?',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1E293B)),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Toggle YES if you have a certificate to select and upload. If not, keep this OFF.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Text('No', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                        Switch(
+                          value: controller.hasNismCert.value,
+                          onChanged: (val) => controller.hasNismCert.value = val,
+                          activeColor: primaryNavy,
+                        ),
+                        const Text('Yes', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ],
+                ),
+                if (controller.hasNismCert.value) ...[
+                  const Divider(height: 28),
+                  DropdownButtonFormField<String>(
+                    value: controller.selectedProfessionalCert.value == 'None'
+                        ? 'NISM Series XV (Research Analyst)'
+                        : controller.selectedProfessionalCert.value,
+                    decoration: InputDecoration(
+                      labelText: 'Select Certification *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    items: [
+                      'NISM Series XV (Research Analyst)',
+                      'NISM Series VIII (Equity Derivatives)',
+                      'NISM Series X-A (Investment Adviser Level 1)',
+                      'NISM Series X-B (Investment Adviser Level 2)',
+                      'CA',
+                      'CFA',
+                      'CS',
+                      'CFP',
+                      'Other Certification'
+                    ]
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13))))
+                        .toList(),
+                    onChanged: (val) => controller.selectedProfessionalCert.value = val ?? 'NISM Series XV (Research Analyst)',
+                  ),
+                  const SizedBox(height: 18),
+                  _buildUploadBox(
+                    context: context,
+                    title: 'Upload Certificate Copy (PDF or JPG) *',
+                    specText: 'View Certificate Specifications',
+                    uploadedUrlObs: controller.certDocumentUrl,
+                    onTap: () => controller.pickAndUploadDoc('certificate'),
+                    onSpecTap: () => _showSpecDialog(context, 'Certificate Specifications', 'PDF or JPG format below 5MB.'),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: controller.licenseMembershipDetailsController,
+                    label: 'Certificate / Membership / Registration Number',
+                    hint: 'e.g. NISM-2023-XXXXX or registration number',
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 20),
-
-        _buildUploadBox(
-          context: context,
-          title: 'Upload Certificate Copy (PDF or JPG)',
-          specText: 'View Certificate Specifications',
-          uploadedUrlObs: controller.certDocumentUrl,
-          onTap: () => controller.pickAndUploadDoc('certificate'),
-          onSpecTap: () => _showSpecDialog(context, 'Certificate Specifications', 'PDF or JPG format below 5MB.'),
-        ),
-        const SizedBox(height: 16),
-
-        _buildTextField(
-          controller: controller.licenseMembershipDetailsController,
-          label: 'License / Membership Details',
-          hint: 'Any relevant memberships or registrations',
-        ),
       ],
     );
   }
 
   // ==========================================
-  // STEP 5: OCCUPATIONAL DETAILS (MOCKUP)
+  // STEP 3: OCCUPATIONAL & KYC DETAILS
   // ==========================================
 
-  Widget _buildStep5Occupational(
+  Widget _buildStep3Occupational(
     BuildContext context,
     ApplicantRegistrationController controller,
     bool isMobile,
@@ -1707,134 +1660,254 @@ class ApplicantRegistrationScreen extends StatelessWidget {
   }
 
   // ==========================================
-  // STEP 6: PREVIEW & SUBMISSION (MOCKUP)
+  // PREVIEW DIALOG & CONTENT
   // ==========================================
 
-  Widget _buildStep6Preview(
+  void _showPreviewDialog(
     BuildContext context,
     ApplicantRegistrationController controller,
     bool isMobile,
   ) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 36,
+            vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860, maxHeight: 850),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.assignment_outlined, color: primaryNavy, size: 22),
+                          SizedBox(width: 10),
+                          Text(
+                            'Application Preview & Review',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryNavy),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                        onPressed: () => Navigator.of(dialogCtx).pop(),
+                        tooltip: 'Close Preview',
+                      ),
+                    ],
+                  ),
+                ),
+                // Body
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(22),
+                    child: _buildPreviewContent(
+                      dialogCtx,
+                      controller,
+                      isMobile,
+                      inDialog: true,
+                    ),
+                  ),
+                ),
+                // Footer
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+                    border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF475569),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Back to Form', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                      Obx(
+                        () => ElevatedButton(
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : () async {
+                                  Navigator.of(dialogCtx).pop();
+                                  await controller.submitApplicationFromStep3();
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: controller.isLoading.value
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.send_rounded, size: 16),
+                                    SizedBox(width: 8),
+                                    Text('Submit Form', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPreviewContent(
+    BuildContext context,
+    ApplicantRegistrationController controller,
+    bool isMobile, {
+    bool inDialog = false,
+  }) {
+    void goToStepAndDismiss(int step) {
+      if (inDialog) {
+        Navigator.of(context).pop();
+      }
+      controller.goToStep(step);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Application Preview & Review',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primaryNavy),
-        ),
-        const SizedBox(height: 6),
-        const Text(
-          'Please review your application details carefully before final submission. Click Edit on any section to modify details.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-        ),
-        const SizedBox(height: 24),
+        if (!inDialog) ...[
+          const Text(
+            'Application Preview & Review',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primaryNavy),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Please review your application details carefully before final submission. Click Edit on any section to modify details.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 24),
+        ],
 
-        // Personal Information Card
+        // Step 1: Personal & Contact Information Card
         _buildPreviewCard(
-          title: 'Personal Information',
-          onEdit: () => controller.goToStep(1),
+          title: '1. Personal & Contact Information',
+          onEdit: () => goToStepAndDismiss(1),
           children: [
-            _buildPreviewRow('Full Name:', '${controller.selectedTitle.value} ${controller.firstNameController.text} ${controller.middleNameController.text} ${controller.lastNameController.text}'.replaceAll(RegExp(r'\s+'), ' ').trim(), isMobile: isMobile),
+            Obx(() {
+              final photo = controller.photoUrl.value;
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: const Color(0xFFE2E8F0),
+                    backgroundImage: photo.isNotEmpty ? NetworkImage(AppConfig.buildImageUrl(photo)) : null,
+                    child: photo.isEmpty ? const Icon(Icons.person, size: 28, color: Color(0xFF94A3B8)) : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${controller.selectedTitle.value} ${controller.firstNameController.text} ${controller.middleNameController.text} ${controller.lastNameController.text}'.replaceAll(RegExp(r'\s+'), ' ').trim(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: primaryNavy),
+                        ),
+                        Text(
+                          controller.appliedPositionController.text.isNotEmpty ? controller.appliedPositionController.text : 'Job Applicant',
+                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }),
+            const SizedBox(height: 10),
             _buildPreviewRow("Father's Name:", controller.fatherNameController.text, isMobile: isMobile),
             _buildPreviewRow('Date of Birth:', controller.dobController.text, isMobile: isMobile),
             _buildPreviewRow('Gender & Marital Status:', '${controller.selectedGender.value} | ${controller.selectedMaritalStatus.value}', isMobile: isMobile),
-            _buildPreviewRow('Current Location:', controller.currentLocationController.text, isMobile: isMobile),
+            _buildPreviewRow('Current City:', controller.currentLocationController.text, isMobile: isMobile),
             if (controller.skypeAddressController.text.isNotEmpty)
               _buildPreviewRow('LinkedIn / Skype:', controller.skypeAddressController.text, isMobile: isMobile),
-            _buildPreviewRow('Applied Position:', controller.appliedPositionController.text.isNotEmpty ? controller.appliedPositionController.text : 'Candidate', isMobile: isMobile),
-            const SizedBox(height: 6),
+            _buildPreviewRow('Aadhaar Number *:', controller.aadhaarNumberController.text, isMobile: isMobile),
+            _buildPreviewRow('PAN Number (Optional):', controller.panNumberController.text.isNotEmpty ? controller.panNumberController.text : 'Not Provided', isMobile: isMobile),
+            _buildPreviewRow('Current Address:', '${controller.addressLine1Controller.text}, ${controller.cityController.text}, ${controller.selectedState.value} - ${controller.pincodeController.text}', isMobile: isMobile),
+            _buildPreviewRow('Permanent Address:', '${controller.permanentStreetController.text}, ${controller.permanentCityController.text}, ${controller.permanentStateController.text} - ${controller.permanentZipController.text}', isMobile: isMobile),
+            _buildPreviewRow('Mobile Number:', '+91 ${controller.phoneController.text}', isMobile: isMobile),
+            _buildPreviewRow('Email Address:', '${controller.createAccountEmailController.text} (Verified)', isMobile: isMobile),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 6,
               children: [
-                _buildDocBadge(context, 'Resume / CV', controller.resumeUrl.value.isNotEmpty, docUrl: controller.resumeUrl.value),
-                _buildDocBadge(context, 'PAN Card', controller.panUrl.value.isNotEmpty, docUrl: controller.panUrl.value),
-                _buildDocBadge(context, 'Aadhaar / Address Proof', controller.proofOfAddressUrl.value.isNotEmpty, docUrl: controller.proofOfAddressUrl.value),
+                _buildDocBadge(context, 'Profile Photo *', controller.photoUrl.value.isNotEmpty, docUrl: controller.photoUrl.value),
+                _buildDocBadge(context, 'Resume / CV *', controller.resumeUrl.value.isNotEmpty, docUrl: controller.resumeUrl.value),
+                _buildDocBadge(context, 'Aadhaar Card (Front) *', controller.proofOfAddressUrl.value.isNotEmpty, docUrl: controller.proofOfAddressUrl.value),
+                _buildDocBadge(context, 'Aadhaar Card (Back) *', controller.aadhaarBackUrl.value.isNotEmpty, docUrl: controller.aadhaarBackUrl.value),
+                _buildDocBadge(context, 'PAN Card (Optional)', controller.panUrl.value.isNotEmpty, docUrl: controller.panUrl.value),
               ],
             ),
           ],
         ),
         const SizedBox(height: 16),
 
-        // Contact Information Card
+        // Step 2: Educational & Professional Qualifications Card
         _buildPreviewCard(
-          title: 'Contact Information',
-          onEdit: () => controller.goToStep(2),
-          children: [
-            _buildPreviewRow('Current Address:', '${controller.addressLine1Controller.text}, ${controller.cityController.text}, ${controller.selectedState.value} - ${controller.pincodeController.text}', isMobile: isMobile),
-            _buildPreviewRow('Permanent Address:', '${controller.permanentStreetController.text}, ${controller.permanentCityController.text}, ${controller.permanentStateController.text} - ${controller.permanentZipController.text}', isMobile: isMobile),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFA7F3D0))),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle, color: Color(0xFF059669), size: 14),
-                      const SizedBox(width: 4),
-                      Text('Mobile Verified: +91 ${controller.phoneController.text} (Locked)', style: const TextStyle(color: Color(0xFF059669), fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFBFDBFE))),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle, color: Color(0xFF2563EB), size: 14),
-                      const SizedBox(width: 4),
-                      Text('Email Verified: ${controller.createAccountEmailController.text} (Locked)', style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 12)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Education Card
-        _buildPreviewCard(
-          title: 'Educational Details',
-          onEdit: () => controller.goToStep(3),
+          title: '2. Educational & Professional Qualifications',
+          onEdit: () => goToStepAndDismiss(2),
           children: [
             _buildPreviewRow('Highest Qualification:', controller.highestQualification.value, isMobile: isMobile),
             _buildPreviewRow('Major Subject:', controller.majorSubject.value, isMobile: isMobile),
             _buildPreviewRow('Institute / University:', controller.instituteUniversityController.text, isMobile: isMobile),
             _buildPreviewRow('Year of Passing:', controller.yearOfPassing.value, isMobile: isMobile),
             _buildPreviewRow('Percentage / Grade:', controller.percentageGradeController.text, isMobile: isMobile),
-            _buildPreviewRow('Academic Gap:', controller.academicGap.value ? (controller.academicGapDetailsController.text.isNotEmpty ? controller.academicGapDetailsController.text : 'Yes') : 'None', isMobile: isMobile),
-            if (controller.backlogsCountController.text.isNotEmpty)
-              _buildPreviewRow('Backlogs / ATKTs:', controller.backlogsCountController.text, isMobile: isMobile),
             const SizedBox(height: 6),
-            _buildDocBadge(context, 'Degree / Marksheet', controller.highestEducationUrl.value.isNotEmpty, docUrl: controller.highestEducationUrl.value),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Professional Qualification Card
-        _buildPreviewCard(
-          title: 'Professional Qualification',
-          onEdit: () => controller.goToStep(4),
-          children: [
-            _buildPreviewRow('Certification:', controller.selectedProfessionalCert.value, isMobile: isMobile),
-            if (controller.selectedProfessionalCert.value != 'None') ...[
+            _buildDocBadge(context, 'Degree / Marksheet *', controller.highestEducationUrl.value.isNotEmpty, docUrl: controller.highestEducationUrl.value),
+            const Divider(height: 20),
+            _buildPreviewRow('NISM Certified:', controller.hasNismCert.value ? 'Yes' : 'No (Optional)', isMobile: isMobile),
+            if (controller.hasNismCert.value) ...[
+              _buildPreviewRow('Certification Course:', controller.selectedProfessionalCert.value, isMobile: isMobile),
+              if (controller.certRegistrationNumberController.text.isNotEmpty)
+                _buildPreviewRow('Registration / Cert. No:', controller.certRegistrationNumberController.text, isMobile: isMobile),
               const SizedBox(height: 6),
-              _buildDocBadge(context, 'Certificate Document', controller.certDocumentUrl.value.isNotEmpty, docUrl: controller.certDocumentUrl.value),
+              _buildDocBadge(context, 'NISM Certificate Document', controller.certDocumentUrl.value.isNotEmpty, docUrl: controller.certDocumentUrl.value),
             ],
           ],
         ),
         const SizedBox(height: 16),
 
-        // Occupational & Work Experience Card
+        // Step 3: Occupational & KYC Details Card
         _buildPreviewCard(
-          title: 'Occupational & Work Experience',
-          onEdit: () => controller.goToStep(5),
+          title: '3. Occupational & KYC Details',
+          onEdit: () => goToStepAndDismiss(3),
           children: [
             _buildPreviewRow('Experience Status:', controller.isFresher.value ? 'Fresher' : 'Experienced (${controller.totalExperienceYearsController.text} Years)', isMobile: isMobile),
             if (!controller.isFresher.value) ...[
@@ -1858,9 +1931,9 @@ class ApplicantRegistrationScreen extends StatelessWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                _buildDocBadge(context, 'Video KYC', controller.kycVideoUrl.value.isNotEmpty, docUrl: controller.kycVideoUrl.value),
+                _buildDocBadge(context, 'Video KYC *', controller.kycVideoUrl.value.isNotEmpty, docUrl: controller.kycVideoUrl.value),
                 if (!controller.isFresher.value)
-                  _buildDocBadge(context, 'Relieving Letter', controller.relievingLetterUrl.value.isNotEmpty, docUrl: controller.relievingLetterUrl.value),
+                  _buildDocBadge(context, 'Relieving Letter *', controller.relievingLetterUrl.value.isNotEmpty, docUrl: controller.relievingLetterUrl.value),
               ],
             ),
             const Divider(height: 20),
@@ -1990,7 +2063,12 @@ class ApplicantRegistrationScreen extends StatelessWidget {
   // SHARED FORM ATOMS & BOTTOM BUTTONS
   // ==========================================
 
-  Widget _buildBottomNavButtons(ApplicantRegistrationController controller, {required bool isLastStep, required bool isMobile}) {
+  Widget _buildBottomNavButtons(
+    BuildContext context,
+    ApplicantRegistrationController controller, {
+    required bool isLastStep,
+    required bool isMobile,
+  }) {
     if (isMobile) {
       return Row(
         children: [
@@ -2007,22 +2085,38 @@ class ApplicantRegistrationScreen extends StatelessWidget {
                 child: const Text('Previous', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+          ],
+          if (isLastStep) ...[
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showPreviewDialog(context, controller, isMobile),
+                icon: const Icon(Icons.visibility_outlined, size: 16),
+                label: const Text('Preview', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2563EB),
+                  side: const BorderSide(color: Color(0xFF2563EB)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
           ],
           Expanded(
             child: ElevatedButton(
               onPressed: controller.isLoading.value
                   ? null
-                  : (isLastStep ? controller.handleFinalSubmission : controller.nextStep),
+                  : (isLastStep ? controller.submitApplicationFromStep3 : controller.nextStep),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryNavy,
+                backgroundColor: isLastStep ? const Color(0xFF059669) : primaryNavy,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               child: controller.isLoading.value
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(isLastStep ? 'Submit Application' : 'Next', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  : Text(isLastStep ? 'Submit Form' : 'Next', style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
         ],
@@ -2037,26 +2131,40 @@ class ApplicantRegistrationScreen extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               foregroundColor: primaryNavy,
               side: const BorderSide(color: borderColor),
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Previous', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 12),
+        ],
+        if (isLastStep) ...[
+          OutlinedButton.icon(
+            onPressed: () => _showPreviewDialog(context, controller, isMobile),
+            icon: const Icon(Icons.visibility_outlined, size: 18),
+            label: const Text('Preview Application', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF2563EB),
+              side: const BorderSide(color: Color(0xFF2563EB)),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
           const SizedBox(width: 14),
         ],
         ElevatedButton(
           onPressed: controller.isLoading.value
               ? null
-              : (isLastStep ? controller.handleFinalSubmission : controller.nextStep),
+              : (isLastStep ? controller.submitApplicationFromStep3 : controller.nextStep),
           style: ElevatedButton.styleFrom(
-            backgroundColor: primaryNavy,
+            backgroundColor: isLastStep ? const Color(0xFF059669) : primaryNavy,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: controller.isLoading.value
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text(isLastStep ? 'Submit Application' : 'Next', style: const TextStyle(fontWeight: FontWeight.bold)),
+              : Text(isLastStep ? 'Submit Form' : 'Next', style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );

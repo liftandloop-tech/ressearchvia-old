@@ -121,7 +121,19 @@ const staffSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    panNumber: {
+        type: String,
+        default: null
+    },
     aadhaarUrl: {
+        type: String,
+        default: null
+    },
+    aadhaarBackUrl: {
+        type: String,
+        default: null
+    },
+    aadhaarNumber: {
         type: String,
         default: null
     },

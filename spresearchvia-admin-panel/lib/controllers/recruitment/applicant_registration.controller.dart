@@ -16,7 +16,7 @@ class ApplicantRegistrationController extends GetxController {
   var uploadingDocType = ''.obs;
   var applicantId = ''.obs;
   var currentApplicant = Rxn<StaffModel>();
-  var currentStep = 1.obs; // Steps 1 to 6
+  var currentStep = 1.obs; // Steps 1 to 3 (Merged 1+2, Merged 3+4, Step 5->3)
 
   // Account Creation (Step 0) States
   var isAccountCreated = false.obs;
@@ -37,12 +37,15 @@ class ApplicantRegistrationController extends GetxController {
   var isCustomRole = false.obs;
   final appliedPositionController = TextEditingController();
 
-  // Step 1: Personal Information Form Controllers
+  // Step 1: Personal & Contact Information Form Controllers
   final resumeUrl = ''.obs;
   final panUrl = ''.obs;
   final photoUrl = ''.obs;
   var selectedProofOfAddress = 'Aadhaar'.obs;
   final proofOfAddressUrl = ''.obs;
+  final aadhaarBackUrl = ''.obs;
+  final aadhaarNumberController = TextEditingController();
+  final panNumberController = TextEditingController();
   var selectedTitle = 'Mr'.obs;
   final fullNameController = TextEditingController();
   final firstNameController = TextEditingController();
@@ -92,7 +95,8 @@ class ApplicantRegistrationController extends GetxController {
   final highestEducationUrl = ''.obs;
   var educationEntries = <EducationEntryModel>[].obs;
 
-  // Step 4: Professional Qualifications Controllers
+  // Step 2: Educational & Professional Details Controllers
+  var hasNismCert = false.obs;
   var selectedProfessionalCert = 'None'.obs;
   final certRegistrationNumberController = TextEditingController();
   final certYearController = TextEditingController();
@@ -181,12 +185,15 @@ class ApplicantRegistrationController extends GetxController {
     alternateEmailController.text = data['alternateEmail']?.toString() ?? '';
     selectedProofOfAddress.value = data['proofOfAddressType']?.toString() ?? 'Aadhaar';
     photoUrl.value = data['photoUrl']?.toString() ?? '';
-    proofOfAddressUrl.value = data['proofOfAddressUrl']?.toString() ?? '';
+    proofOfAddressUrl.value = data['proofOfAddressUrl']?.toString() ?? data['aadhaarUrl']?.toString() ?? '';
+    aadhaarBackUrl.value = data['aadhaarBackUrl']?.toString() ?? '';
     panUrl.value = data['panUrl']?.toString() ?? '';
     resumeUrl.value = data['resumeUrl']?.toString() ?? '';
     appliedPositionController.text = data['targetRole']?.toString() ?? '';
+    panNumberController.text = data['panNumber']?.toString() ?? '';
+    aadhaarNumberController.text = data['aadhaarNumber']?.toString() ?? '';
 
-    // Step 2 data
+    // Contact data
     if (data['currentAddress'] is Map) {
       final addr = data['currentAddress'] as Map;
       addressLine1Controller.text = addr['street']?.toString() ?? addr['line1']?.toString() ?? '';
@@ -209,7 +216,7 @@ class ApplicantRegistrationController extends GetxController {
     }
     isMobileVerified.value = data['isMobileVerified'] == true;
 
-    // Step 3 data
+    // Step 2 (Educational & Professional) data
     highestQualification.value = data['highestQualification']?.toString() ?? 'Graduation';
     majorSubject.value = data['majorSubject']?.toString() ?? 'Engineering';
     instituteUniversityController.text = data['instituteUniversity']?.toString() ?? '';
@@ -222,10 +229,20 @@ class ApplicantRegistrationController extends GetxController {
     backlogsCountController.text = data['backlogsCount']?.toString() ?? '';
     highestEducationUrl.value = data['highestEducationUrl']?.toString() ?? '';
 
-    // Step 4 data
     certDocumentUrl.value = data['nismUrl']?.toString() ?? '';
+    if (data['professionalQualifications'] is List && (data['professionalQualifications'] as List).isNotEmpty) {
+      final cert = (data['professionalQualifications'] as List).first;
+      if (cert is Map) {
+        selectedProfessionalCert.value = cert['certificationName']?.toString() ?? 'None';
+        licenseMembershipDetailsController.text = cert['membershipDetails']?.toString() ?? '';
+        if (cert['documentUrl'] != null && cert['documentUrl'].toString().isNotEmpty) {
+          certDocumentUrl.value = cert['documentUrl'].toString();
+        }
+      }
+    }
+    hasNismCert.value = certDocumentUrl.value.isNotEmpty || (selectedProfessionalCert.value != 'None' && selectedProfessionalCert.value.isNotEmpty);
 
-    // Step 5 data
+    // Step 3 (Occupational & KYC) data
     isFresher.value = data['isFresher'] == true || (data['hasWorkExperience'] == false) || (!data.containsKey('isFresher') && !data.containsKey('hasWorkExperience'));
     currentCompanyController.text = data['previousCompany']?.toString() ?? '';
     currentDesignationController.text = data['currentDesignation']?.toString() ?? '';
@@ -255,7 +272,15 @@ class ApplicantRegistrationController extends GetxController {
       emergencyPhoneController.text = emg['phone']?.toString() ?? '';
     }
 
-    currentStep.value = step.clamp(1, 6);
+    int mappedStep = step;
+    if (mappedStep <= 2) {
+      mappedStep = 1;
+    } else if (mappedStep <= 4) {
+      mappedStep = 2;
+    } else {
+      mappedStep = 3;
+    }
+    currentStep.value = mappedStep.clamp(1, 3);
   }
 
   void toggleSameAsCurrentAddress(bool value) {
@@ -470,12 +495,12 @@ class ApplicantRegistrationController extends GetxController {
     }
   }
 
-  // --- Step Navigation & Progress Saving ---
+  // --- Step Navigation & Progress Saving (3-Step Unified Form) ---
 
   Future<void> nextStep() async {
     final step = currentStep.value;
 
-    // Validate Step 1
+    // Validate Step 1: Personal & Contact Information
     if (step == 1) {
       if (firstNameController.text.trim().isEmpty) {
         Get.snackbar('Mandatory Field Missing', 'Please enter First Name',
@@ -497,51 +522,32 @@ class ApplicantRegistrationController extends GetxController {
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
+      if (photoUrl.value.isEmpty) {
+        Get.snackbar('Mandatory Document Missing', 'Please upload your Profile Photo',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
       if (resumeUrl.value.isEmpty) {
         Get.snackbar('Mandatory Document Missing', 'Please upload your Resume / CV',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
-      if (panUrl.value.isEmpty) {
-        Get.snackbar('Mandatory Document Missing', 'Please upload your PAN Card',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-        return;
-      }
       if (proofOfAddressUrl.value.isEmpty) {
-        Get.snackbar('Mandatory Document Missing', 'Please upload your Aadhaar Card / Proof of Address',
+        Get.snackbar('Mandatory Document Missing', 'Please upload Aadhaar Card (Front)',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
-
-      await _saveStepDraft(1, {
-        'title': selectedTitle.value,
-        'firstName': firstNameController.text.trim(),
-        'middleName': middleNameController.text.trim(),
-        'lastName': lastNameController.text.trim(),
-        'fatherName': fatherNameController.text.trim(),
-        'fullName': fullNameController.text.trim().isNotEmpty 
-            ? fullNameController.text.trim()
-            : '${firstNameController.text.trim()} ${middleNameController.text.trim()} ${lastNameController.text.trim()}'.replaceAll(RegExp(r'\s+'), ' ').trim(),
-        'dob': dobController.text.trim(),
-        'gender': selectedGender.value,
-        'maritalStatus': selectedMaritalStatus.value,
-        'currentLocation': currentLocationController.text.trim(),
-        'skypeOrLinkedIn': skypeAddressController.text.trim(),
-        'alternateEmail': alternateEmailController.text.trim(),
-        'resumeUrl': resumeUrl.value,
-        'panUrl': panUrl.value,
-        'proofOfAddressUrl': proofOfAddressUrl.value,
-        'aadhaarUrl': proofOfAddressUrl.value,
-        'proofOfAddressType': selectedProofOfAddress.value,
-        'targetRole': (selectedRole.value?['name']?.toString() ?? appliedPositionController.text).trim(),
-        'appliedRoleId': selectedRole.value?['id'] ?? selectedRole.value?['_id'],
-      });
-      currentStep.value = 2;
-      return;
-    }
-
-    // Validate Step 2
-    if (step == 2) {
+      if (aadhaarBackUrl.value.isEmpty) {
+        Get.snackbar('Mandatory Document Missing', 'Please upload Aadhaar Card (Back)',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
+      final cleanAadhaar = aadhaarNumberController.text.trim().replaceAll(RegExp(r'\D'), '');
+      if (cleanAadhaar.length != 12) {
+        Get.snackbar('Mandatory Field Missing', 'Please enter a valid 12-digit Aadhaar Number',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
       if (addressLine1Controller.text.trim().isEmpty) {
         Get.snackbar('Mandatory Field Missing', 'Please enter Address Line 1',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
@@ -552,13 +558,40 @@ class ApplicantRegistrationController extends GetxController {
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
-      if (!isMobileVerified.value) {
-        Get.snackbar('Mobile Verification Required', 'Please verify your Mobile Number before proceeding to the next step',
-            backgroundColor: Colors.orange.withOpacity(0.1), colorText: Colors.deepOrange.shade900);
+      final cleanMobile = phoneController.text.trim().replaceAll(RegExp(r'\D'), '');
+      if (cleanMobile.length < 10) {
+        Get.snackbar('Mandatory Field Missing', 'Please enter a valid 10-digit Mobile Number',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
 
-      await _saveStepDraft(2, {
+      await _saveStepDraft(1, {
+        'title': selectedTitle.value,
+        'firstName': firstNameController.text.trim(),
+        'middleName': middleNameController.text.trim(),
+        'lastName': lastNameController.text.trim(),
+        'fatherName': fatherNameController.text.trim(),
+        'fullName': fullNameController.text.trim().isNotEmpty
+            ? fullNameController.text.trim()
+            : '${firstNameController.text.trim()} ${middleNameController.text.trim()} ${lastNameController.text.trim()}'.replaceAll(RegExp(r'\s+'), ' ').trim(),
+        'dob': dobController.text.trim(),
+        'gender': selectedGender.value,
+        'maritalStatus': selectedMaritalStatus.value,
+        'currentLocation': currentLocationController.text.trim(),
+        'skypeOrLinkedIn': skypeAddressController.text.trim(),
+        'alternateEmail': alternateEmailController.text.trim(),
+        'photoUrl': photoUrl.value,
+        'resumeUrl': resumeUrl.value,
+        'panUrl': panUrl.value,
+        'panNumber': panNumberController.text.trim().toUpperCase(),
+        'aadhaarNumber': cleanAadhaar,
+        'proofOfAddressUrl': proofOfAddressUrl.value,
+        'aadhaarUrl': proofOfAddressUrl.value,
+        'aadhaarBackUrl': aadhaarBackUrl.value,
+        'proofOfAddressType': selectedProofOfAddress.value,
+        'targetRole': (selectedRole.value?['name']?.toString() ?? appliedPositionController.text).trim(),
+        'appliedRoleId': selectedRole.value?['id'] ?? selectedRole.value?['_id'],
+        'mobileNumber': cleanMobile,
         'currentAddress': {
           'line1': addressLine1Controller.text.trim(),
           'line2': addressLine2Controller.text.trim(),
@@ -581,105 +614,108 @@ class ApplicantRegistrationController extends GetxController {
           'number': telephoneResidenceNumberController.text.trim(),
         },
       });
-      currentStep.value = 3;
+      currentStep.value = 2;
       return;
     }
 
-    // Validate Step 3 (Educational details are optional)
-    if (step == 3) {
-      await _saveStepDraft(3, {
+    // Validate Step 2: Educational & Professional Details
+    if (step == 2) {
+      if (hasNismCert.value) {
+        if (selectedProfessionalCert.value == 'None' || selectedProfessionalCert.value.isEmpty) {
+          selectedProfessionalCert.value = 'NISM Series XV (Research Analyst)';
+        }
+      }
+
+      await _saveStepDraft(2, {
         'highestQualification': highestQualification.value,
         'majorSubject': majorSubject.value,
         'instituteUniversity': instituteUniversityController.text.trim(),
         'yearOfPassing': int.tryParse(yearOfPassing.value),
         'percentageGrade': percentageGradeController.text.trim(),
-        'academicGap': academicGap.value,
-        'academicGapDetails': academicGapDetailsController.text.trim(),
-        'backlogsCount': backlogsCountController.text.trim(),
         'highestEducationUrl': highestEducationUrl.value,
+        'hasNismCert': hasNismCert.value,
+        'professionalQualifications': hasNismCert.value
+            ? [
+                {
+                  'certificationName': selectedProfessionalCert.value,
+                  'documentUrl': certDocumentUrl.value,
+                  'membershipDetails': licenseMembershipDetailsController.text.trim(),
+                }
+              ]
+            : [],
+        'nismUrl': hasNismCert.value ? certDocumentUrl.value : null,
       });
-      currentStep.value = 4;
+      currentStep.value = 3;
       return;
     }
 
-    // Validate Step 4
-    if (step == 4) {
-      await _saveStepDraft(4, {
-        'professionalQualifications': [
-          {
-            'certificationName': selectedProfessionalCert.value,
-            'documentUrl': certDocumentUrl.value,
-            'membershipDetails': licenseMembershipDetailsController.text.trim(),
-          }
-        ],
-        'nismUrl': certDocumentUrl.value,
-      });
-      currentStep.value = 5;
+    // Step 3: Occupational Details (Last Step)
+    if (step == 3) {
+      await submitApplicationFromStep3();
       return;
     }
+  }
 
-    // Validate Step 5
-    if (step == 5) {
-      if (!isFresher.value) {
-        if (currentCompanyController.text.trim().isEmpty) {
-          Get.snackbar('Mandatory Field Missing', 'Please enter Current / Previous Company Name',
-              backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-          return;
-        }
-        if (currentDesignationController.text.trim().isEmpty) {
-          Get.snackbar('Mandatory Field Missing', 'Please enter Current Designation',
-              backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-          return;
-        }
-        if (relievingLetterUrl.value.isEmpty) {
-          Get.snackbar('Mandatory Field Missing', 'Please upload your Relieving Letter from previous employer',
-              backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
-          return;
-        }
-      }
-      if (emergencyNameController.text.trim().isEmpty || emergencyPhoneController.text.trim().isEmpty) {
-        Get.snackbar('Mandatory Field Missing', 'Please complete Emergency Contact Person Name and Phone Number',
+  Future<void> submitApplicationFromStep3() async {
+    if (!isFresher.value) {
+      if (currentCompanyController.text.trim().isEmpty) {
+        Get.snackbar('Mandatory Field Missing', 'Please enter Current / Previous Company Name',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
-      final phoneDigits = emergencyPhoneController.text.trim();
-      if (!RegExp(r'^\d+$').hasMatch(phoneDigits)) {
-        Get.snackbar('Invalid Emergency Contact', 'Emergency contact number must contain only numeric digits',
+      if (currentDesignationController.text.trim().isEmpty) {
+        Get.snackbar('Mandatory Field Missing', 'Please enter Current Designation',
             backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
         return;
       }
-
-      final rel = selectedEmergencyRelation.value == 'Other' && otherRelationController.text.trim().isNotEmpty
-          ? otherRelationController.text.trim()
-          : (selectedEmergencyRelation.value.isNotEmpty ? selectedEmergencyRelation.value : emergencyRelationController.text.trim());
-
-      await _saveStepDraft(5, {
-        'isFresher': isFresher.value,
-        'hasWorkExperience': !isFresher.value,
-        'previousCompany': isFresher.value ? null : currentCompanyController.text.trim(),
-        'currentDesignation': isFresher.value ? null : currentDesignationController.text.trim(),
-        'reportingManagerName': isFresher.value ? null : reportingManagerController.text.trim(),
-        'reportingManagerDesignation': isFresher.value ? null : reportingManagerDesignationController.text.trim(),
-        'reporteesCount': isFresher.value ? 0 : (int.tryParse(reporteesCountController.text.trim()) ?? 0),
-        'experienceYears': isFresher.value ? 0 : (int.tryParse(totalExperienceYearsController.text.trim()) ?? 0),
-        'fixedSalary': isFresher.value ? null : fixedSalaryController.text.trim(),
-        'bonusIncentive': isFresher.value ? null : bonusIncentiveController.text.trim(),
-        'lastCtc': isFresher.value ? null : annualCtcController.text.trim(),
-        'expectedSalary': isFresher.value ? null : expectedSalaryController.text.trim(),
-        'noticePeriod': isFresher.value ? null : noticePeriodDaysController.text.trim(),
-        'careerGapDetails': isFresher.value ? null : careerGapController.text.trim(),
-        'resumeUrl': resumeUrl.value,
-        'relievingLetterUrl': isFresher.value ? null : relievingLetterUrl.value,
-        'kycVideoUrl': kycVideoUrl.value,
-        'emergencyContact': {
-          'name': emergencyNameController.text.trim(),
-          'relation': rel,
-          'phone': phoneDigits,
-        },
-      });
-      currentStep.value = 6; // Move to Preview
+      if (relievingLetterUrl.value.isEmpty) {
+        Get.snackbar('Mandatory Field Missing', 'Please upload your Relieving Letter from previous employer',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+        return;
+      }
+    }
+    if (emergencyNameController.text.trim().isEmpty || emergencyPhoneController.text.trim().isEmpty) {
+      Get.snackbar('Mandatory Field Missing', 'Please complete Emergency Contact Person Name and Phone Number',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
       return;
     }
+    final phoneDigits = emergencyPhoneController.text.trim();
+    if (!RegExp(r'^\d+$').hasMatch(phoneDigits)) {
+      Get.snackbar('Invalid Emergency Contact', 'Emergency contact number must contain only numeric digits',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
+      return;
+    }
+
+    final rel = selectedEmergencyRelation.value == 'Other' && otherRelationController.text.trim().isNotEmpty
+        ? otherRelationController.text.trim()
+        : (selectedEmergencyRelation.value.isNotEmpty ? selectedEmergencyRelation.value : emergencyRelationController.text.trim());
+
+    await _saveStepDraft(3, {
+      'isFresher': isFresher.value,
+      'hasWorkExperience': !isFresher.value,
+      'previousCompany': isFresher.value ? null : currentCompanyController.text.trim(),
+      'currentDesignation': isFresher.value ? null : currentDesignationController.text.trim(),
+      'reportingManagerName': isFresher.value ? null : reportingManagerController.text.trim(),
+      'reportingManagerDesignation': isFresher.value ? null : reportingManagerDesignationController.text.trim(),
+      'reporteesCount': isFresher.value ? 0 : (int.tryParse(reporteesCountController.text.trim()) ?? 0),
+      'experienceYears': isFresher.value ? 0 : (int.tryParse(totalExperienceYearsController.text.trim()) ?? 0),
+      'fixedSalary': isFresher.value ? null : fixedSalaryController.text.trim(),
+      'bonusIncentive': isFresher.value ? null : bonusIncentiveController.text.trim(),
+      'lastCtc': isFresher.value ? null : annualCtcController.text.trim(),
+      'expectedSalary': isFresher.value ? null : expectedSalaryController.text.trim(),
+      'noticePeriod': isFresher.value ? null : noticePeriodDaysController.text.trim(),
+      'careerGapDetails': isFresher.value ? null : careerGapController.text.trim(),
+      'resumeUrl': resumeUrl.value,
+      'relievingLetterUrl': isFresher.value ? null : relievingLetterUrl.value,
+      'kycVideoUrl': kycVideoUrl.value,
+      'emergencyContact': {
+        'name': emergencyNameController.text.trim(),
+        'relation': rel,
+        'phone': phoneDigits,
+      },
+    });
+
+    await handleFinalSubmission();
   }
 
   void previousStep() {
@@ -689,7 +725,7 @@ class ApplicantRegistrationController extends GetxController {
   }
 
   void goToStep(int step) {
-    if (step >= 1 && step <= 6) {
+    if (step >= 1 && step <= 3) {
       currentStep.value = step;
     }
   }
@@ -703,13 +739,13 @@ class ApplicantRegistrationController extends GetxController {
     }
   }
 
-  // --- Step 6: Final Submission ---
+  // --- Final Submission ---
 
   Future<void> handleFinalSubmission() async {
     if (applicantId.value.isEmpty) return;
 
-    if (!isEmailVerified.value || !isMobileVerified.value) {
-      Get.snackbar('Verification Incomplete', 'Both Email and Mobile Number must be verified before submission',
+    if (!isEmailVerified.value) {
+      Get.snackbar('Verification Incomplete', 'Email must be verified before submission',
           backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red.shade900);
       return;
     }
@@ -795,8 +831,10 @@ class ApplicantRegistrationController extends GetxController {
             final app = res.applicant!;
             if (type == 'photo') {
               docUrl = app.photoUrl ?? filename;
-            } else if (type == 'aadhaar' || type == 'poa') {
+            } else if (type == 'aadhaar' || type == 'poa' || type == 'aadhaarFront' || type == 'aadhaar_front') {
               docUrl = app.aadhaarUrl ?? filename;
+            } else if (type == 'aadhaarBack' || type == 'aadhaar_back') {
+              docUrl = app.aadhaarBackUrl ?? filename;
             } else if (type == 'nism' || type == 'certificate') {
               docUrl = app.nismUrl ?? filename;
             } else if (type == 'resume') {
@@ -811,7 +849,8 @@ class ApplicantRegistrationController extends GetxController {
           }
 
           if (type == 'photo') photoUrl.value = docUrl;
-          if (type == 'aadhaar' || type == 'poa') proofOfAddressUrl.value = docUrl;
+          if (type == 'aadhaar' || type == 'poa' || type == 'aadhaarFront' || type == 'aadhaar_front') proofOfAddressUrl.value = docUrl;
+          if (type == 'aadhaarBack' || type == 'aadhaar_back') aadhaarBackUrl.value = docUrl;
           if (type == 'nism' || type == 'certificate') certDocumentUrl.value = docUrl;
           if (type == 'resume') resumeUrl.value = docUrl;
           if (type == 'pan' || type == 'pancard') panUrl.value = docUrl;

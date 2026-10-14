@@ -347,6 +347,7 @@ class StaffModel {
   final bool isViewOnly;
   final String? panUrl;
   final String? aadhaarUrl;
+  final String? aadhaarBackUrl;
   final String? nismUrl;
   final String? highestEducationUrl;
   final String? kycVideoUrl;
@@ -377,6 +378,7 @@ class StaffModel {
   final String? currentLocation;
   final String? skypeOrLinkedIn;
   final String? panNumber;
+  final String? aadhaarNumber;
   final String? highestQualification;
   final String? majorSubject;
   final String? instituteUniversity;
@@ -427,6 +429,7 @@ class StaffModel {
     this.isViewOnly = false,
     this.panUrl,
     this.aadhaarUrl,
+    this.aadhaarBackUrl,
     this.nismUrl,
     this.highestEducationUrl,
     this.kycVideoUrl,
@@ -457,6 +460,7 @@ class StaffModel {
     this.currentLocation,
     this.skypeOrLinkedIn,
     this.panNumber,
+    this.aadhaarNumber,
     this.highestQualification,
     this.majorSubject,
     this.instituteUniversity,
@@ -567,6 +571,7 @@ class StaffModel {
       isViewOnly: json['isViewOnly'] ?? false,
       panUrl: _safeString(json['panUrl']),
       aadhaarUrl: _safeString(json['aadhaarUrl']),
+      aadhaarBackUrl: _safeString(json['aadhaarBackUrl']),
       nismUrl: _safeString(json['nismUrl']),
       highestEducationUrl: _safeString(json['highestEducationUrl']),
       kycVideoUrl: _safeString(json['kycVideoUrl']),
@@ -594,9 +599,10 @@ class StaffModel {
       fatherName: _safeString(json['fatherName'] ?? json['walkInForm']?['fatherName']),
       maritalStatus: _safeString(json['maritalStatus'] ?? json['walkInForm']?['maritalStatus']),
       alternateEmail: _safeString(json['alternateEmail']),
-      currentLocation: _safeString(json['currentLocation'] ?? json['walkInForm']?['currentLocation']),
+      currentLocation: _safeString(json['currentLocation'] ?? json['city'] ?? json['walkInForm']?['currentLocation']),
       skypeOrLinkedIn: _safeString(json['skypeOrLinkedIn'] ?? json['skypeAddress']),
       panNumber: _safeString(json['panNumber']),
+      aadhaarNumber: _safeString(json['aadhaarNumber']),
       highestQualification: _safeString(json['highestQualification']),
       majorSubject: _safeString(json['majorSubject']),
       instituteUniversity: _safeString(json['instituteUniversity']),
@@ -663,6 +669,7 @@ class StaffModel {
       if (agreementSignature != null) 'agreementSignature': agreementSignature,
       'panUrl': panUrl,
       'aadhaarUrl': aadhaarUrl,
+      'aadhaarBackUrl': aadhaarBackUrl,
       'nismUrl': nismUrl,
       'highestEducationUrl': highestEducationUrl,
       'kycVideoUrl': kycVideoUrl,
@@ -693,6 +700,7 @@ class StaffModel {
           id == other.id &&
           panUrl == other.panUrl &&
           aadhaarUrl == other.aadhaarUrl &&
+          aadhaarBackUrl == other.aadhaarBackUrl &&
           nismUrl == other.nismUrl &&
           highestEducationUrl == other.highestEducationUrl &&
           kycVideoUrl == other.kycVideoUrl &&
@@ -709,6 +717,7 @@ class StaffModel {
         id,
         panUrl,
         aadhaarUrl,
+        aadhaarBackUrl,
         nismUrl,
         highestEducationUrl,
         kycVideoUrl,

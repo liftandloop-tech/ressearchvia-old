@@ -82,10 +82,8 @@ class ApplicantProfileScreen extends StatelessWidget {
                         case 0:
                           return _buildOverviewTab(applicant);
                         case 1:
-                          return _buildWalkInTab(applicant);
-                        case 2:
                           return _buildCareerTab(applicant);
-                        case 3:
+                        case 2:
                           return _buildDocumentsTab(context, controller, applicant);
                         default:
                           return _buildOverviewTab(applicant);
@@ -420,6 +418,7 @@ class ApplicantProfileScreen extends StatelessWidget {
             runSpacing: 8,
             children: [
               _buildMiniMetric(Icons.phone_outlined, 'Phone', applicant.mobile),
+              _buildMiniMetric(Icons.location_city_outlined, 'Current City', (applicant.currentLocation?.isNotEmpty == true) ? applicant.currentLocation! : 'Not specified'),
               _buildMiniMetric(Icons.event_outlined, 'Applied Date', (w?.applicationDate.isNotEmpty == true) ? w!.applicationDate : 'Recent'),
               _buildMiniMetric(Icons.timeline_outlined, 'Experience', applicant.experienceYears != null ? '${applicant.experienceYears} Years' : (w?.totalExperience.isNotEmpty == true ? w!.totalExperience : 'Fresher')),
               _buildMiniMetric(Icons.timer_outlined, 'Notice Period', (w?.noticePeriod.isNotEmpty == true) ? w!.noticePeriod : 'Immediate'),
@@ -518,7 +517,7 @@ class ApplicantProfileScreen extends StatelessWidget {
   // Sleek Segmented Tab Selector
   // ---------------------------------------------------------------------------
   Widget _buildTabBar(ApplicantProfileController controller) {
-    const tabs = ['Overview', 'Walk-In Form Details', 'Career & History', 'KYC & Compliance Media'];
+    const tabs = ['Overview', 'Career & History', 'KYC & Compliance Media'];
 
     return Obx(() {
       final selected = controller.selectedTabIndex.value;
@@ -583,10 +582,11 @@ class ApplicantProfileScreen extends StatelessWidget {
     final fatherNameVal = applicant.fatherName ?? (raw['fatherName']?.toString() ?? 'Not specified');
     final maritalStatusVal = applicant.maritalStatus ?? (raw['maritalStatus']?.toString() ?? (w?.maritalStatus.isNotEmpty == true ? w!.maritalStatus : 'Not specified'));
     final genderVal = applicant.gender ?? (raw['gender']?.toString() ?? (w?.gender.isNotEmpty == true ? w!.gender : 'Not specified'));
-    final altEmailVal = applicant.alternateEmail ?? (raw['alternateEmail']?.toString() ?? 'Not specified');
-    final currentLocationVal = applicant.currentLocation ?? (raw['currentLocation']?.toString() ?? (w?.currentLocation.isNotEmpty == true ? w!.currentLocation : 'Not specified'));
-    final skypeOrLinkedInVal = applicant.skypeOrLinkedIn ?? (raw['skypeAddress']?.toString() ?? (raw['skypeOrLinkedIn']?.toString() ?? 'Not specified'));
+    final currentCityVal = applicant.currentLocation ?? (raw['currentLocation']?.toString() ?? (raw['city']?.toString() ?? (w?.currentLocation.isNotEmpty == true ? w!.currentLocation : 'Not specified')));
+    final skypeOrLinkedInVal = applicant.skypeOrLinkedIn ?? (raw['skypeAddress']?.toString() ?? (raw['skypeOrLinkedIn']?.toString() ?? ''));
     final appliedPositionVal = (w?.appliedPosition.isNotEmpty == true) ? w!.appliedPosition : (raw['appliedPosition']?.toString() ?? (applicant.role.isNotEmpty ? applicant.role : 'General'));
+    final aadhaarNumberVal = applicant.aadhaarNumber ?? (raw['aadhaarNumber']?.toString() ?? (raw['proofOfAddressNumber']?.toString() ?? 'Not specified'));
+    final panNumberVal = applicant.panNumber ?? (raw['panNumber']?.toString() ?? '');
 
     // Emergency fields
     final emName = applicant.emergencyContact?.name ?? (raw['emergencyContact']?['name']?.toString() ?? 'Not recorded');
@@ -614,12 +614,11 @@ class ApplicantProfileScreen extends StatelessWidget {
     final univ = applicant.instituteUniversity ?? (raw['instituteUniversity']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.boardUniversity : '—'));
     final String passYear = applicant.yearOfPassing != null ? '${applicant.yearOfPassing}' : (raw['yearOfPassing']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.passingYear : '—'));
     final pctGrade = applicant.percentageGrade ?? (raw['percentageGrade']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.percentage : '—'));
-    final acadGap = applicant.academicGapDetails ?? (raw['academicGapDetails']?.toString() ?? (applicant.academicGap == true ? 'Yes' : 'None'));
-    final backlogs = applicant.backlogsCount ?? (raw['backlogsCount']?.toString() ?? (w?.backlogsCount.isNotEmpty == true ? w!.backlogsCount : '0'));
 
-    // Professional Certification
-    final profCert = applicant.professionalCertification ?? (raw['professionalCertification']?.toString() ?? 'None');
-    final licenseDetails = applicant.licenseMembershipDetails ?? (raw['licenseMembershipDetails']?.toString() ?? 'None');
+    // Professional Certification (NISM)
+    final profCert = applicant.professionalCertification ?? (raw['professionalCertification']?.toString() ?? (raw['selectedProfessionalCert']?.toString() ?? 'None'));
+    final hasNismCert = raw['hasNismCert'] == true || (profCert != 'None' && profCert != '—' && profCert.isNotEmpty);
+    final certRegNo = raw['certRegistrationNumber']?.toString() ?? (raw['nismCertificateNumber']?.toString() ?? '');
 
     return Column(
       children: [
@@ -637,19 +636,22 @@ class ApplicantProfileScreen extends StatelessWidget {
               _buildRow([
                 _buildDataTile('Gender', genderVal),
                 _buildDataTile('Marital Status', maritalStatusVal),
-                _buildDataTile('Current Location', currentLocationVal),
+                _buildDataTile('Current City', currentCityVal),
               ]),
               const SizedBox(height: 14),
               _buildRow([
                 _buildDataTile('Position Applied For', appliedPositionVal),
                 _buildDataTile('Email Address', applicant.email),
-                _buildDataTile('Alternate Email', altEmailVal),
+                _buildDataTile('Mobile Phone', applicant.mobile),
               ]),
               const SizedBox(height: 14),
               _buildRow([
-                _buildDataTile('Mobile Phone', applicant.mobile),
-                _buildDataTile('LinkedIn / Skype ID', skypeOrLinkedInVal),
-                _buildDataTile('PAN Number', applicant.panNumber ?? (raw['panNumber']?.toString() ?? (applicant.panUrl != null ? 'Uploaded' : 'Not specified'))),
+                _buildDataTile('Aadhaar Number', aadhaarNumberVal),
+                _buildDataTile('PAN Number (Optional)', panNumberVal.isNotEmpty ? panNumberVal : 'Not provided'),
+                if (skypeOrLinkedInVal.isNotEmpty)
+                  _buildDataTile('LinkedIn / Skype ID', skypeOrLinkedInVal)
+                else
+                  const SizedBox(),
               ]),
             ],
           ),
@@ -671,7 +673,7 @@ class ApplicantProfileScreen extends StatelessWidget {
           child: Column(
             children: [
               _buildRow([
-                _buildDataTile('Current / Local Address', applicant.localAddress ?? (currentLocationVal != 'Not specified' ? currentLocationVal : 'Not specified')),
+                _buildDataTile('Current / Local Address', applicant.localAddress ?? (currentCityVal != 'Not specified' ? currentCityVal : 'Not specified')),
                 _buildDataTile('Permanent Address', applicant.permanentAddress ?? (applicant.localAddress ?? 'Same as current / Not specified')),
               ]),
             ],
@@ -680,7 +682,7 @@ class ApplicantProfileScreen extends StatelessWidget {
         const SizedBox(height: 16),
         _buildSectionCard(
           title: 'Educational Background',
-          subtitle: 'Academic degrees, university milestones, grades, and academic gap details.',
+          subtitle: 'Highest qualification degree, major subject, institute/university, and passing milestones.',
           child: Column(
             children: [
               _buildRow([
@@ -692,30 +694,26 @@ class ApplicantProfileScreen extends StatelessWidget {
               _buildRow([
                 _buildDataTile('Year of Passing', passYear),
                 _buildDataTile('Percentage / Grade', pctGrade),
-                _buildDataTile('Academic Gap Details', acadGap),
+                const SizedBox(),
               ]),
-              if (backlogs != '0' && backlogs != '—') ...[
-                const SizedBox(height: 14),
-                _buildRow([
-                  _buildDataTile('Backlogs / ATKTs', backlogs),
-                  const SizedBox(),
-                  const SizedBox(),
-                ]),
-              ],
             ],
           ),
         ),
-        if (profCert != 'None' && profCert != '—') ...[
-          const SizedBox(height: 16),
-          _buildSectionCard(
-            title: 'Professional Qualifications & Certifications',
-            subtitle: 'Professional certifications, regulatory memberships, and licenses.',
-            child: _buildRow([
-              _buildDataTile('Certification', profCert),
-              _buildDataTile('License / Membership Details', licenseDetails),
-            ]),
-          ),
-        ],
+        const SizedBox(height: 16),
+        _buildSectionCard(
+          title: 'Professional Qualifications (NISM)',
+          subtitle: 'Regulatory certifications and professional accreditation details.',
+          child: _buildRow([
+            _buildDataTile('NISM Certified', hasNismCert ? 'Yes' : 'No / None (Optional)'),
+            if (hasNismCert) ...[
+              _buildDataTile('Certification Course', profCert),
+              _buildDataTile('Registration / Cert. No.', certRegNo.isNotEmpty ? certRegNo : 'Not specified'),
+            ] else ...[
+              const SizedBox(),
+              const SizedBox(),
+            ],
+          ]),
+        ),
         const SizedBox(height: 16),
         _buildSectionCard(
           title: 'Occupational & Work Experience',
@@ -762,67 +760,7 @@ class ApplicantProfileScreen extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // Tab 2: Walk-In Form Details
-  // ---------------------------------------------------------------------------
-  Widget _buildWalkInTab(StaffModel applicant) {
-    final w = applicant.walkInForm;
-
-    return Column(
-      children: [
-        _buildSectionCard(
-          title: 'Walk-In Screening & Pre-Employment Declarations',
-          subtitle: 'Regulatory, integrity, and medical declarations submitted during registration.',
-          child: Column(
-            children: [
-              _buildRow([
-                _buildDataTile('Police Record / Inquiries?', (w?.policeRecord == true) ? 'YES (${w?.policeRecordDetails ?? "Unspecified"})' : 'NO'),
-                _buildDataTile('Interviewed with Company Before?', (w?.interviewedBefore == true) ? 'YES (${w?.interviewedBeforeDetails ?? "Unspecified"})' : 'NO'),
-              ]),
-              const SizedBox(height: 14),
-              _buildRow([
-                _buildDataTile('Serious Medical Illness or Ailment?', (w?.majorIllness == true) ? 'YES (${w?.majorIllnessDetails ?? "Unspecified"})' : 'NO'),
-                _buildDataTile('Differently Abled?', (w?.differentlyAbled == true) ? 'YES (${w?.differentlyAbledDetails ?? "Unspecified"})' : 'NO'),
-              ]),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'Educational Qualifications',
-          subtitle: 'Academic background, university degrees, and passing milestones.',
-          child: (w != null && w.educationList.isNotEmpty)
-              ? _buildEducationTable(w.educationList)
-              : const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No structured education qualifications provided.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                ),
-        ),
-        const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'Current Compensation & Reporting Structure',
-          subtitle: 'Remuneration breakdown, team management scope, and joining timeline.',
-          child: Column(
-            children: [
-              _buildRow([
-                _buildDataTile('Fixed Salary (INR)', (w?.fixedSalary.isNotEmpty == true) ? w!.fixedSalary : 'Not stated'),
-                _buildDataTile('Bonus / Incentives (INR)', (w?.bonusIncentive.isNotEmpty == true) ? w!.bonusIncentive : '0'),
-                _buildDataTile('Total Current CTC', applicant.lastCtc ?? (w?.totalSalary.isNotEmpty == true ? w!.totalSalary : 'Not stated')),
-              ]),
-              const SizedBox(height: 14),
-              _buildRow([
-                _buildDataTile('Expected CTC (INR)', (w?.expectedSalary.isNotEmpty == true) ? w!.expectedSalary : 'Negotiable'),
-                _buildDataTile('Direct Reportees', (w?.reporteesCount.isNotEmpty == true) ? w!.reporteesCount : '0 (Individual Contributor)'),
-                _buildDataTile('Notice Period', (w?.noticePeriod.isNotEmpty == true) ? w!.noticePeriod : 'Immediate'),
-              ]),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tab 3: Career & History
+  // Tab 2: Career & History
   // ---------------------------------------------------------------------------
   Widget _buildCareerTab(StaffModel applicant) {
     final w = applicant.walkInForm;
@@ -843,22 +781,32 @@ class ApplicantProfileScreen extends StatelessWidget {
                   child: Text('No previous employment history recorded.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 ),
               const SizedBox(height: 16),
-              _buildDataTile('Career Gap Details', (w?.careerGap.isNotEmpty == true) ? w!.careerGap : 'No career gaps specified'),
+              _buildDataTile('Career Gap Details', (w?.careerGap.isNotEmpty == true) ? w!.careerGap : (applicant.careerGapDetails?.isNotEmpty == true ? applicant.careerGapDetails! : 'No career gaps specified')),
             ],
           ),
         ),
+        if (w != null && w.educationList.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            title: 'Structured Qualifications List',
+            subtitle: 'Detailed academic background and degree history.',
+            child: _buildEducationTable(w.educationList),
+          ),
+        ],
       ],
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Tab 4: KYC & Compliance Media
+  // Tab 3: KYC & Compliance Media
   // ---------------------------------------------------------------------------
   Widget _buildDocumentsTab(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
     final raw = applicant.rawJson ?? {};
+    final photo = applicant.photoUrl ?? raw['photoUrl']?.toString();
     final resume = applicant.resumeUrl ?? raw['resumeUrl']?.toString();
     final pan = applicant.panUrl ?? raw['panUrl']?.toString();
-    final aadhaar = applicant.aadhaarUrl ?? raw['aadhaarUrl']?.toString();
+    final aadhaar = applicant.aadhaarUrl ?? raw['aadhaarUrl']?.toString() ?? raw['proofOfAddressUrl']?.toString();
+    final aadhaarBack = applicant.aadhaarBackUrl ?? raw['aadhaarBackUrl']?.toString();
     final cert = applicant.certDocumentUrl ?? applicant.nismUrl ?? raw['certDocumentUrl']?.toString() ?? raw['nismUrl']?.toString();
     final degree = applicant.highestEducationUrl ?? raw['highestEducationUrl']?.toString();
     final relieving = applicant.relievingLetterUrl ?? raw['relievingLetterUrl']?.toString();
@@ -869,9 +817,15 @@ class ApplicantProfileScreen extends StatelessWidget {
       subtitle: 'Mandatory KYC documentation, identity proofs, education verification files, and recorded video.',
       child: Column(
         children: [
-          _buildDocRow(context, controller, 'Resume / CV', 'resume', resume, Icons.description_outlined),
+          _buildDocRow(context, controller, 'Profile Photo', 'photo', photo, Icons.account_circle_outlined),
           const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'PAN Card', 'pan', pan, Icons.credit_card_outlined),
+          _buildDocRow(context, controller, 'Resume / CV (Mandatory)', 'resume', resume, Icons.description_outlined),
+          const SizedBox(height: 10),
+          _buildDocRow(context, controller, 'Aadhaar Card (Front) *', 'aadhaarFront', aadhaar, Icons.badge_outlined),
+          const SizedBox(height: 10),
+          _buildDocRow(context, controller, 'Aadhaar Card (Back) *', 'aadhaarBack', aadhaarBack, Icons.badge_outlined),
+          const SizedBox(height: 10),
+          _buildDocRow(context, controller, 'PAN Card (Optional)', 'pan', pan, Icons.credit_card_outlined),
           const SizedBox(height: 10),
           _buildDocRow(context, controller, 'Highest Education Degree', 'education', degree, Icons.school_outlined),
           if (relieving != null && relieving.isNotEmpty) ...[
@@ -880,14 +834,10 @@ class ApplicantProfileScreen extends StatelessWidget {
           ],
           if (cert != null && cert.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _buildDocRow(context, controller, 'Professional Certificate', 'certificate', cert, Icons.verified_user_outlined),
-          ],
-          if (aadhaar != null && aadhaar.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _buildDocRow(context, controller, 'Address Proof / Aadhaar', 'aadhaar', aadhaar, Icons.badge_outlined),
+            _buildDocRow(context, controller, 'NISM Certificate Document', 'certificate', cert, Icons.verified_user_outlined),
           ],
           const SizedBox(height: 10),
-          _buildDocRow(context, controller, 'KYC Verification Video', 'video', kycVideo, Icons.videocam_outlined, isVideo: true),
+          _buildDocRow(context, controller, 'Live KYC Verification Video', 'video', kycVideo, Icons.videocam_outlined, isVideo: true),
         ],
       ),
     );

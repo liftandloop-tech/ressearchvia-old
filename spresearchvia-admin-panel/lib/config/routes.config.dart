@@ -15,6 +15,8 @@ class AppRoutes {
   static const String uploadReport = '/upload-report';
   static const String reportDetails = '/reports/details';
   static const String staff = '/staff';
+  static const String staffDetails = '/staff/details/:id';
+  static const String staffEdit = '/staff/edit/:id';
   static const String notifications = '/notifications';
   static const String settings = '/settings';
   static const String rolesPermissions = '/settings/roles-permissions';

@@ -103,6 +103,11 @@ const applicantSchema = new mongoose.Schema({
     trim: true,
     default: null
   },
+  aadhaarNumber: {
+    type: String,
+    trim: true,
+    default: null
+  },
   passportNumber: {
     type: String,
     trim: true,
@@ -356,6 +361,10 @@ const applicantSchema = new mongoose.Schema({
     default: null
   },
   aadhaarUrl: {
+    type: String,
+    default: null
+  },
+  aadhaarBackUrl: {
     type: String,
     default: null
   },

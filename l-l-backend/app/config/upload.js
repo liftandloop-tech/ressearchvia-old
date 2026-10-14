@@ -44,6 +44,10 @@ const ALLOWED_EXTENSIONS_BY_TYPE = {
   'pancard': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'pan': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'aadhaar': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'aadhaarFront': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'aadhaar_front': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'aadhaarBack': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'aadhaar_back': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'poa': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'nism': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'certificate': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
@@ -52,6 +56,9 @@ const ALLOWED_EXTENSIONS_BY_TYPE = {
   'degree': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'photo': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
   'resume': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'relieving': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'relievingLetter': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
+  'relieving_letter': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'serviceAgreement': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'agreement': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
   'signedDocument': ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'pdf'],
@@ -195,7 +202,16 @@ const storage = multer.diskStorage({
     let uploadPath = "app/uploads/";
     if (type === "image") {
       uploadPath = "app/uploads/image";
-    } else if (type === "pancard" || type === "pan" || type === "nism" || type === "certificate" || type === "education" || type === "highestEducation" || type === "degree" || type === "photo" || type === "resume" || type === "serviceAgreement" || type === "agreement" || type === "signedDocument" || type === 'aadhaar' || type === 'poa') {
+    } else if (
+      type === "pancard" || type === "pan" ||
+      type === "aadhaar" || type === "aadhaarFront" || type === "aadhaar_front" ||
+      type === "aadhaarBack" || type === "aadhaar_back" || type === "poa" ||
+      type === "nism" || type === "certificate" ||
+      type === "education" || type === "highestEducation" || type === "degree" ||
+      type === "photo" || type === "resume" ||
+      type === "relieving" || type === "relievingLetter" || type === "relieving_letter" ||
+      type === "serviceAgreement" || type === "agreement" || type === "signedDocument"
+    ) {
       uploadPath = "app/uploads/kycimg";
     } else if (type === 'report') {
       uploadPath = "app/uploads/reports";

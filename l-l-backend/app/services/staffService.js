@@ -150,7 +150,7 @@ export async function transferDepartingStaffLeads(staffId, staffName, reason = '
  */
 export async function resolveRoleAndDepartment({ roleId, roleName, fallbackDept }) {
   let role = null;
-  if (roleId) {
+  if (roleId && mongoose.Types.ObjectId.isValid(roleId)) {
     role = await roleModel.findById(roleId).populate({
       path: 'permissionGroups',
       populate: { path: 'departmentId' }

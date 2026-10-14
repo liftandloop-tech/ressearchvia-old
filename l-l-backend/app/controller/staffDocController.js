@@ -15,6 +15,10 @@ const staffDocController = {
             const fieldMap = {
                 pan: 'panUrl',
                 aadhaar: 'aadhaarUrl',
+                aadhaarFront: 'aadhaarUrl',
+                aadhaar_front: 'aadhaarUrl',
+                aadhaarBack: 'aadhaarBackUrl',
+                aadhaar_back: 'aadhaarBackUrl',
                 nism: 'nismUrl',
                 education: 'highestEducationUrl'
             };

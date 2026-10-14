@@ -10,18 +10,19 @@ import mongoose from "mongoose";
 
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000);
 
-const findApplicantByIdOrCustomId = async (id) => {
+const findApplicantByIdOrCustomId = async (id, selectPassword = false) => {
     if (!id) return null;
     const strId = String(id).trim();
     if (!strId || strId === 'null' || strId === 'undefined') return null;
+    const applySelect = (q) => selectPassword ? q.select('+password') : q;
     if (mongoose.Types.ObjectId.isValid(strId)) {
-        const doc = await applicantModel.findById(strId);
+        const doc = await applySelect(applicantModel.findById(strId));
         if (doc) return doc;
     }
-    const byAppId = await applicantModel.findOne({ applicantId: strId });
+    const byAppId = await applySelect(applicantModel.findOne({ applicantId: strId }));
     if (byAppId) return byAppId;
     if (strId.includes('@')) {
-        return await applicantModel.findOne({ emailAddress: strId.toLowerCase() });
+        return await applySelect(applicantModel.findOne({ emailAddress: strId.toLowerCase() }));
     }
     return null;
 };
@@ -476,6 +477,7 @@ const applicantController = {
             // Identity & Documents
             if (stepData.panNumber !== undefined) applicant.panNumber = stepData.panNumber;
             if (stepData.confirmPanNumber !== undefined) applicant.confirmPanNumber = stepData.confirmPanNumber;
+            if (stepData.aadhaarNumber !== undefined) applicant.aadhaarNumber = stepData.aadhaarNumber;
             if (stepData.passportNumber !== undefined) applicant.passportNumber = stepData.passportNumber;
             if (stepData.proofOfAddressType !== undefined) applicant.proofOfAddressType = stepData.proofOfAddressType;
             if (stepData.proofOfAddressUrl !== undefined) {
@@ -485,6 +487,13 @@ const applicantController = {
             if (stepData.aadhaarUrl !== undefined) {
                 applicant.aadhaarUrl = stepData.aadhaarUrl;
                 if (!applicant.proofOfAddressUrl) applicant.proofOfAddressUrl = stepData.aadhaarUrl;
+            }
+            if (stepData.aadhaarFrontUrl !== undefined) {
+                applicant.aadhaarUrl = stepData.aadhaarFrontUrl;
+                applicant.proofOfAddressUrl = stepData.aadhaarFrontUrl;
+            }
+            if (stepData.aadhaarBackUrl !== undefined) {
+                applicant.aadhaarBackUrl = stepData.aadhaarBackUrl;
             }
             if (stepData.panUrl !== undefined) applicant.panUrl = stepData.panUrl;
             if (stepData.photoUrl !== undefined) applicant.photoUrl = stepData.photoUrl;
@@ -501,10 +510,15 @@ const applicantController = {
                 applicant.targetRole = stepData.targetRole;
             }
 
-            // Step 2: Contact details (PROTECT mobileNumber if already verified!)
-            if (!applicant.isMobileVerified && stepData.mobileNumber) {
+            // Contact details (save mobileNumber directly)
+            if (stepData.mobileNumber) {
                 const p = normalizeIndianMobile(stepData.mobileNumber);
-                if (p.valid) applicant.mobileNumber = p.numeric12;
+                if (p.valid) {
+                    applicant.mobileNumber = p.numeric12;
+                } else {
+                    const clean = String(stepData.mobileNumber).replace(/\D/g, '');
+                    if (clean) applicant.mobileNumber = Number(clean);
+                }
             }
             if (stepData.currentAddress !== undefined) applicant.currentAddress = stepData.currentAddress;
             if (stepData.permanentAddress !== undefined) applicant.permanentAddress = stepData.permanentAddress;
@@ -588,13 +602,9 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Email verification is required before submission", data: {} });
             }
 
-            if (!applicant.isMobileVerified) {
-                return res.status(400).send({ status: 400, message: "Mobile number verification is required before submission", data: {} });
-            }
-
             applicant.isDraft = false;
             applicant.stage = 'APPLIED';
-            applicant.currentStep = 6;
+            applicant.currentStep = 3;
             applicant.isVerified = true;
             applicant.verifiedAt = new Date();
             applicant.stageHistory.push({
@@ -930,6 +940,10 @@ const applicantController = {
                 pan: 'panUrl',
                 pancard: 'panUrl',
                 aadhaar: 'aadhaarUrl',
+                aadhaarFront: 'aadhaarUrl',
+                aadhaar_front: 'aadhaarUrl',
+                aadhaarBack: 'aadhaarBackUrl',
+                aadhaar_back: 'aadhaarBackUrl',
                 poa: 'aadhaarUrl',
                 nism: 'nismUrl',
                 certificate: 'nismUrl',
@@ -954,7 +968,7 @@ const applicantController = {
             if (!applicant.documents) applicant.documents = {};
             applicant.documents[type] = req.file.path;
             applicant.markModified('documents');
-            if (applicant.photoUrl && applicant.resumeUrl && (applicant.aadhaarUrl || applicant.proofOfAddressUrl)) {
+            if (applicant.photoUrl && applicant.resumeUrl && (applicant.aadhaarUrl || applicant.proofOfAddressUrl) && applicant.aadhaarBackUrl) {
                 applicant.onboardingStatus = applicant.kycVideoUrl ? 'VERIFIED' : 'DOCUMENTS_UPLOADED';
             }
             await applicant.save();
@@ -993,7 +1007,7 @@ const applicantController = {
                     emailAddress: cleanEmail,
                     fullName: '',
                     isDraft: true,
-                    currentStep: 6,
+                    currentStep: 3,
                     stage: 'APPLIED',
                 });
             }
@@ -1016,22 +1030,23 @@ const applicantController = {
     listApplicants: async (req, res) => {
         try {
             const { stage, search } = req.query;
-            const filter = {};
+            const stageFilter = {};
 
             if (stage && stage !== 'ALL') {
                 if (stage === 'PROMOTED') {
-                    filter.$or = [{ stage: 'PROMOTED' }, { stage: 'OFFER_ACCEPTED' }, { convertedStaffId: { $ne: null } }];
+                    stageFilter.$or = [{ stage: 'PROMOTED' }, { stage: 'OFFER_ACCEPTED' }, { convertedStaffId: { $ne: null } }];
                 } else if (stage === 'OFFER_ACCEPTED') {
-                    filter.$or = [{ stage: 'OFFER_ACCEPTED' }, { stage: 'PROMOTED' }];
+                    stageFilter.$or = [{ stage: 'OFFER_ACCEPTED' }, { stage: 'PROMOTED' }];
                 } else {
-                    filter.stage = stage;
+                    stageFilter.stage = stage;
                 }
             }
 
+            const searchFilter = {};
             if (search && search.trim().length > 0) {
                 const s = search.trim();
                 const numericSearch = s.replace(/\D/g, '');
-                filter.$or = [
+                searchFilter.$or = [
                     { fullName: { $regex: s, $options: 'i' } },
                     { emailAddress: { $regex: s, $options: 'i' } },
                     { applicantId: { $regex: s, $options: 'i' } },
@@ -1040,15 +1055,24 @@ const applicantController = {
                 if (numericSearch.length >= 4) {
                     const num = parseInt(numericSearch, 10);
                     if (!isNaN(num)) {
-                        filter.$or.push({ mobileNumber: num });
+                        searchFilter.$or.push({ mobileNumber: num });
                     }
                     if (numericSearch.length === 10) {
                         const num12 = parseInt(`91${numericSearch}`, 10);
                         if (!isNaN(num12)) {
-                            filter.$or.push({ mobileNumber: num12 });
+                            searchFilter.$or.push({ mobileNumber: num12 });
                         }
                     }
                 }
+            }
+
+            let filter = {};
+            if (Object.keys(stageFilter).length > 0 && Object.keys(searchFilter).length > 0) {
+                filter = { $and: [stageFilter, searchFilter] };
+            } else if (Object.keys(stageFilter).length > 0) {
+                filter = stageFilter;
+            } else if (Object.keys(searchFilter).length > 0) {
+                filter = searchFilter;
             }
 
             const applicants = await applicantModel.find(filter).sort({ createdAt: -1 }).lean();
@@ -1097,6 +1121,10 @@ const applicantController = {
             const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            if (targetStage === 'PROMOTED') {
+                return applicantController.approveApplicant(req, res);
             }
 
             const prevStage = applicant.stage;
@@ -1176,10 +1204,26 @@ const applicantController = {
                 note
             } = req.body;
 
-            const applicant = await applicantModel.findById(id).select('+password');
+            const applicant = await findApplicantByIdOrCustomId(id, true);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant record not found", data: {} });
             }
+
+            const cleanMobile = applicant.mobileNumber
+                ? parseInt(String(applicant.mobileNumber).replace(/\D/g, '').slice(-10), 10)
+                : (applicant.phone ? parseInt(String(applicant.phone).replace(/\D/g, '').slice(-10), 10) : null);
+
+            if (!cleanMobile) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "Cannot promote applicant: Valid 10-digit Mobile Number is required to create a staff account. Please update the applicant record.",
+                    data: {}
+                });
+            }
+
+            const effectiveFullName = (applicant.fullName && applicant.fullName.trim().length > 0)
+                ? applicant.fullName.trim()
+                : (applicant.firstName ? `${applicant.firstName} ${applicant.lastName || ''}`.trim() : (applicant.emailAddress ? applicant.emailAddress.split('@')[0] : 'Staff Member'));
 
             const effectiveSupervisorId = assignedDirector || supervisorId || reportingTo || null;
             const effectiveSupervisorName = assignedDirectorName || supervisorName || null;
@@ -1202,14 +1246,18 @@ const applicantController = {
                 }
             }
 
-            // Check if already an employee in staffModel
-            let staff = await staffModel.findOne({
-                $or: [
-                    { applicantId: applicant._id },
-                    { emailAddress: applicant.emailAddress.toLowerCase() },
-                    { mobileNumber: applicant.mobileNumber }
-                ]
-            });
+            // Check if already an employee in staffModel (safely without querying null values)
+            const lookupConditions = [{ applicantId: applicant._id }];
+            if (applicant.convertedStaffId && mongoose.Types.ObjectId.isValid(applicant.convertedStaffId)) {
+                lookupConditions.push({ _id: applicant.convertedStaffId });
+            }
+            if (applicant.emailAddress && String(applicant.emailAddress).trim().length > 0) {
+                lookupConditions.push({ emailAddress: applicant.emailAddress.toLowerCase().trim() });
+            }
+            if (cleanMobile) {
+                lookupConditions.push({ mobileNumber: cleanMobile });
+            }
+            let staff = await staffModel.findOne({ $or: lookupConditions });
 
             const isDirectAdmin = effectiveSupervisorId === 'admin' || effectiveSupervisorName === 'Admin';
             let finalSupervisorId = null;
@@ -1218,12 +1266,16 @@ const applicantController = {
             if (isDirectAdmin) {
                 finalSupervisorName = 'Admin';
             } else if (effectiveSupervisorId && effectiveSupervisorId !== 'unassigned') {
-                finalSupervisorId = effectiveSupervisorId;
-                if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
+                if (mongoose.Types.ObjectId.isValid(effectiveSupervisorId)) {
+                    finalSupervisorId = effectiveSupervisorId;
+                    if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
+                        finalSupervisorName = effectiveSupervisorName.trim();
+                    } else {
+                        const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName status');
+                        finalSupervisorName = supervisor ? supervisor.fullName : null;
+                    }
+                } else if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
                     finalSupervisorName = effectiveSupervisorName.trim();
-                } else {
-                    const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName status');
-                    finalSupervisorName = supervisor ? supervisor.fullName : null;
                 }
             }
 
@@ -1237,20 +1289,29 @@ const applicantController = {
                 staff = await staffModel.create({
                     applicantId: applicant._id,
                     staffId,
-                    fullName: applicant.fullName,
-                    emailAddress: applicant.emailAddress.toLowerCase(),
+                    fullName: effectiveFullName,
+                    emailAddress: applicant.emailAddress ? applicant.emailAddress.toLowerCase().trim() : '',
                     password: applicant.password || null,
-                    mobileNumber: applicant.mobileNumber,
+                    mobileNumber: cleanMobile,
                     countryCode: applicant.countryCode || "+91",
                     dob: applicant.dob,
                     gender: applicant.gender,
-                    currentAddress: applicant.currentAddress,
+                    currentAddress: applicant.currentAddress || applicant.localAddress,
                     permanentAddress: applicant.permanentAddress,
                     emergencyContact: applicant.emergencyContact,
                     photoUrl: applicant.photoUrl,
                     resumeUrl: applicant.resumeUrl,
-                    aadhaarUrl: applicant.aadhaarUrl,
+                    aadhaarUrl: applicant.aadhaarUrl || applicant.proofOfAddressUrl,
+                    aadhaarBackUrl: applicant.aadhaarBackUrl,
+                    aadhaarNumber: applicant.aadhaarNumber,
                     panUrl: applicant.panUrl,
+                    panNumber: applicant.panNumber,
+                    nismUrl: applicant.nismUrl || applicant.certDocumentUrl,
+                    highestEducationUrl: applicant.highestEducationUrl,
+                    kycVideoUrl: applicant.kycVideoUrl,
+                    experienceYears: applicant.experienceYears || 0,
+                    previousCompany: applicant.previousCompany,
+                    lastCtc: applicant.lastCtc,
                     joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
                     status: 'Active',
                     stage: 'Employee',
@@ -1262,16 +1323,31 @@ const applicantController = {
                     assignedDirector: finalSupervisorId,
                     assignedDirectorName: finalSupervisorName,
                     isViewOnly: isViewOnly === true || isViewOnly === 'true',
+                    isEmailVerified: applicant.isEmailVerified || false,
+                    isMobileVerified: applicant.isMobileVerified || false,
+                    onboardingStatus: applicant.onboardingStatus || (applicant.kycVideoUrl ? 'VERIFIED' : (applicant.photoUrl && applicant.resumeUrl && applicant.aadhaarUrl ? 'DOCUMENTS_UPLOADED' : 'PENDING')),
                     walkInForm: applicant.walkInForm || {},
                     agreementStatus: 'PENDING_SIGNATURE'
                 });
             } else {
                 // Update existing staff record
                 staff.applicantId = applicant._id;
-                staff.fullName = applicant.fullName;
-                if (applicant.password) {
-                    staff.password = applicant.password;
-                }
+                staff.fullName = effectiveFullName;
+                if (cleanMobile) staff.mobileNumber = cleanMobile;
+                if (applicant.aadhaarUrl || applicant.proofOfAddressUrl) staff.aadhaarUrl = applicant.aadhaarUrl || applicant.proofOfAddressUrl;
+                if (applicant.aadhaarBackUrl) staff.aadhaarBackUrl = applicant.aadhaarBackUrl;
+                if (applicant.aadhaarNumber) staff.aadhaarNumber = applicant.aadhaarNumber;
+                if (applicant.panUrl) staff.panUrl = applicant.panUrl;
+                if (applicant.panNumber) staff.panNumber = applicant.panNumber;
+                if (applicant.photoUrl) staff.photoUrl = applicant.photoUrl;
+                if (applicant.resumeUrl) staff.resumeUrl = applicant.resumeUrl;
+                if (applicant.nismUrl || applicant.certDocumentUrl) staff.nismUrl = applicant.nismUrl || applicant.certDocumentUrl;
+                if (applicant.highestEducationUrl) staff.highestEducationUrl = applicant.highestEducationUrl;
+                if (applicant.kycVideoUrl) staff.kycVideoUrl = applicant.kycVideoUrl;
+                if (applicant.currentAddress) staff.currentAddress = applicant.currentAddress;
+                if (applicant.permanentAddress) staff.permanentAddress = applicant.permanentAddress;
+                if (applicant.emergencyContact) staff.emergencyContact = applicant.emergencyContact;
+                if (applicant.password) staff.password = applicant.password;
                 if (resolved.roleId) staff.roleId = resolved.roleId;
                 if (resolved.roleName) staff.role = resolved.roleName;
                 if (resolved.departmentId) staff.departmentId = resolved.departmentId;
@@ -1280,6 +1356,9 @@ const applicantController = {
                 staff.joiningDate = joiningDate ? new Date(joiningDate) : (staff.joiningDate || new Date());
                 staff.status = 'Active';
                 staff.stage = 'Employee';
+                if (applicant.isEmailVerified !== undefined) staff.isEmailVerified = applicant.isEmailVerified;
+                if (applicant.isMobileVerified !== undefined) staff.isMobileVerified = applicant.isMobileVerified;
+                if (applicant.onboardingStatus) staff.onboardingStatus = applicant.onboardingStatus;
                 if (finalSupervisorId || isDirectAdmin) {
                     staff.assignedDirector = finalSupervisorId;
                     staff.assignedDirectorName = finalSupervisorName;
@@ -1297,10 +1376,11 @@ const applicantController = {
             applicant.stage = 'PROMOTED';
             applicant.convertedStaffId = staff._id;
             applicant.hiredAt = new Date();
+            const changedByUserId = (req.user?._id && mongoose.Types.ObjectId.isValid(req.user._id)) ? req.user._id : null;
             applicant.stageHistory.push({
                 stage: 'PROMOTED',
                 note: note || `Applicant promoted to Staff (Staff ID: ${staff.staffId})`,
-                changedBy: req.user?._id || null,
+                changedBy: changedByUserId,
                 changedAt: new Date()
             });
             await applicant.save();

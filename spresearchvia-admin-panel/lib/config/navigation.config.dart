@@ -108,6 +108,7 @@ final appPages = [
   ),
   GetPage(name: '/staff/create', page: () => const AddStaffScreen()),
   GetPage(name: '/staff/edit/:id', page: () => const AddStaffScreen()),
+  GetPage(name: '/staff/details/:id', page: () => const AddStaffScreen()),
   GetPage(
     name: '/manage-user/:id',
     page: () => DashboardLayout(
