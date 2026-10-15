@@ -1217,7 +1217,7 @@ const segmentsService = {
         const segmentMap = new Map(segments.map(s => [s._id.toString(), s.segmentName]));
         const planMap = new Map(plans.map(p => [p._id.toString(), p]));
 
-        const baseUrl = process.env.BASE_URL || 'https://api.futurepride.in';
+        const baseUrl = process.env.BASE_URL || 'https://api.researchvia.in';
 
         return (intent) => {
           let planObj = intent.planId;
