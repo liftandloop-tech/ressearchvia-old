@@ -899,7 +899,19 @@ export const uploadProof = async (paymentIntentId, files, extraData = {}, userId
         throw new Error("Unauthorized: You can only upload payment proof for your own order.");
     }
 
-    // Amount validation
+    // ── RAZORPAY GUARD ──────────────────────────────────────────────────────────
+    // Online Razorpay payments are auto-verified — they must NEVER accept manual
+    // bank-transfer proof uploads. If a Razorpay payment failed and ended up here
+    // in CREATED status, blocking this prevents it from becoming VERIFICATION_PENDING
+    // and incorrectly appearing in the admin approval queue.
+    if (paymentIntent.paymentMethod === 'RAZORPAY') {
+        throw new Error(
+            "This payment was processed online via Razorpay and cannot accept bank transfer proof. " +
+            "If your Razorpay payment failed, please retry payment from the app. " +
+            "Contact support if the issue persists."
+        );
+    }
+    // ── END RAZORPAY GUARD ──────────────────────────────────────────────────────
     if (extraData.amountPaid !== undefined && extraData.amountPaid !== null) {
         const parsedAmount = Number(extraData.amountPaid);
         if (isNaN(parsedAmount) || parsedAmount <= 0) {

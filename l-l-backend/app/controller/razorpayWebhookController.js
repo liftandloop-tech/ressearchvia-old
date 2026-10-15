@@ -27,7 +27,7 @@ export const handleRazorpayWebhook = async (req, res) => {
 
         console.log(`[Razorpay Webhook] Received event: ${event}`);
 
-        // Handle payment.captured or order.paid
+        // Handle payment.captured or order.paid → auto-verify and grant access
         if (event === 'payment.captured' || event === 'order.paid') {
             const payment = payload?.payment?.entity;
             const orderId = payment?.order_id || payload?.order?.entity?.id;
@@ -55,6 +55,44 @@ export const handleRazorpayWebhook = async (req, res) => {
                 console.log(`[Razorpay Webhook] Successfully auto-verified and granted services for Order ${orderId}`);
             } catch (verifyErr) {
                 console.error(`[Razorpay Webhook] Error during auto-verification of ${orderId}:`, verifyErr.message);
+            }
+        }
+
+        // ── Handle payment.failed → immediately mark intent as FAILED ────────────────
+        // This ensures failed Razorpay payments never linger as CREATED and never
+        // appear in the admin approval queue.
+        if (event === 'payment.failed') {
+            const payment = payload?.payment?.entity;
+            const orderId = payment?.order_id;
+            const paymentId = payment?.id;
+            const failureReason = payment?.error_description || payment?.error_code || 'Unknown reason';
+
+            if (!orderId) {
+                console.warn('[Razorpay Webhook] payment.failed: Missing order_id, skipping.');
+                return res.status(200).json({ status: 200, message: 'Skipped - no order_id' });
+            }
+
+            console.log(`[Razorpay Webhook] Payment ${paymentId} FAILED for Order ${orderId}. Reason: ${failureReason}`);
+
+            try {
+                const intent = await PaymentIntent.findOne({ razorpayOrderId: orderId });
+
+                if (!intent) {
+                    console.warn(`[Razorpay Webhook] No PaymentIntent found for failed order ${orderId}`);
+                } else if (intent.status === 'PAID') {
+                    // Already paid via a retry — do NOT downgrade
+                    console.log(`[Razorpay Webhook] Order ${orderId} already PAID — ignoring failure event.`);
+                } else if (intent.status !== 'FAILED') {
+                    intent.status = 'FAILED';
+                    intent.notes = (intent.notes || '') +
+                        `\n[Webhook] Payment ${paymentId} failed at ${new Date().toISOString()}. Reason: ${failureReason}`;
+                    await intent.save();
+                    console.log(`[Razorpay Webhook] Marked order ${orderId} as FAILED.`);
+                } else {
+                    console.log(`[Razorpay Webhook] Order ${orderId} already FAILED — skipping duplicate event.`);
+                }
+            } catch (failErr) {
+                console.error(`[Razorpay Webhook] Error processing payment.failed for ${orderId}:`, failErr.message);
             }
         }
 

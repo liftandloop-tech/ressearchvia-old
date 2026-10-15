@@ -993,6 +993,12 @@ const segmentsService = {
           queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING', 'PAID', 'APPROVED', 'PARTIAL-PAID', 'REJECTED', 'SUCCESS'] };
         }
       } else {
+        // ── Single-user dossier: still exclude Razorpay online payments ──────────
+        // Razorpay payments are auto-verified — they do not need admin approval.
+        // Without this filter, stale CREATED (failed) Razorpay intents would appear
+        // in the per-user admin view alongside bank transfer payments.
+        queryArgs.paymentMethod = { $ne: 'RAZORPAY' };
+
         if (status && status !== 'All') {
           if (status === 'Approved') {
             queryArgs.status = { $in: ['PAID', 'APPROVED', 'PARTIAL-PAID'] };
@@ -1003,6 +1009,10 @@ const segmentsService = {
           } else if (status === 'Pending') {
             queryArgs.status = { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PENDING'] };
           }
+        } else {
+          // Default: exclude CREATED and FAILED — these are transient Razorpay states
+          // that have no meaning for bank transfer approval flows.
+          queryArgs.status = { $nin: ['CREATED', 'FAILED'] };
         }
       }
 
