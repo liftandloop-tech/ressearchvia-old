@@ -25,31 +25,114 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Preflight & CORS handling
-const allowOrigin = process.env.ALLOW_ACCESS_ORIGIN || '*';
-const corsOptions = {
-    origin: (origin, callback) => {
-        // Allow all origins when configured as '*' or unset, otherwise reflect requesting origin
-        if (!origin || allowOrigin === '*' || allowOrigin.split(',').map(s => s.trim()).includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(null, true); // Fallback permissive for admin panel domain
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Range'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Content-Disposition'],
-    credentials: true,
+const explicitOrigins = [
+    // New frontend URL
+    'https://spios.coolify.researchvia.in',
+    // Old frontend URLs & portals
+    'https://spadmin.researchvia.in',
+    'https://admintest.researchvia.in',
+    'https://researchvia.in',
+    'https://www.researchvia.in',
+    'https://tradetest.researchvia.in',
+    'https://api.researchvia.in',
+    'https://test.researchvia.in',
+    // Local development origins
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'http://localhost:5173',
+    'http://localhost:4000',
+    'http://localhost:8000',
+    'http://localhost:8088',
+    'http://localhost',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:5173',
+];
+
+const envOriginStr = process.env.ALLOW_ACCESS_ORIGIN || '*';
+const configuredOrigins = [
+    ...explicitOrigins,
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.trim().replace(/^['"]|['"]$/g, '').replace(/\/+$/, '')] : []),
+    ...envOriginStr.split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+];
+
+const isOriginAllowed = (origin) => {
+    if (!origin) return true; // Non-browser / curl / mobile apps
+    if (envOriginStr === '*' || configuredOrigins.includes('*')) return true;
+    if (configuredOrigins.includes(origin)) return true;
+    // Allow subdomains of researchvia.in (e.g. *.coolify.researchvia.in, *.researchvia.in)
+    if (/^https?:\/\/([a-z0-9-]+\.)*researchvia\.in(:[0-9]+)?$/i.test(origin)) return true;
+    // Allow localhost / local IP patterns
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?$/i.test(origin)) return true;
+    return true; // Fallback permissive so valid clients connect
 };
 
-app.use(cors(corsOptions));
+const defaultAllowedHeaders = [
+    'Content-Type',
+    'Authorization',
+    'authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Range',
+    'x-platform',
+    'device-id',
+    'X-Platform',
+    'Device-Id',
+    'x-digio-signature',
+    'x-razorpay-signature',
+    'sentry-trace',
+    'baggage',
+    'Cache-Control',
+    'Pragma',
+];
 
-// Explicit preflight handler to prevent Caddy / proxy header dropping
+const corsOptionsDelegate = (req, callback) => {
+    const origin = req.headers.origin;
+    const reqHeaders = req.headers['access-control-request-headers'];
+
+    // Dynamically include whatever headers the client requested in preflight
+    let allowedHeaders = defaultAllowedHeaders;
+    if (reqHeaders) {
+        const requestedList = reqHeaders.split(',').map(h => h.trim());
+        allowedHeaders = Array.from(new Set([...defaultAllowedHeaders, ...requestedList]));
+    }
+
+    callback(null, {
+        origin: isOriginAllowed(origin) ? (origin || true) : false,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+        allowedHeaders,
+        exposedHeaders: ['Content-Range', 'X-Content-Range', 'Content-Disposition'],
+        maxAge: 86400,
+        optionsSuccessStatus: 200,
+    });
+};
+
+app.use(cors(corsOptionsDelegate));
+
+// Explicit preflight handler to prevent Caddy / proxy / gateway header dropping
 app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
-        res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+        const origin = req.headers.origin;
+        if (origin && isOriginAllowed(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+            res.header('Access-Control-Allow-Credentials', 'true');
+        } else {
+            res.header('Access-Control-Allow-Origin', origin || '*');
+            res.header('Access-Control-Allow-Credentials', 'true');
+        }
         res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Range');
-        res.header('Access-Control-Allow-Credentials', 'true');
+
+        const reqHeaders = req.headers['access-control-request-headers'];
+        if (reqHeaders) {
+            res.header('Access-Control-Allow-Headers', reqHeaders);
+        } else {
+            res.header('Access-Control-Allow-Headers', defaultAllowedHeaders.join(', '));
+        }
+
+        res.header('Access-Control-Max-Age', '86400');
+        res.header('Vary', 'Origin, Access-Control-Request-Headers');
         return res.sendStatus(200);
     }
     next();
@@ -71,9 +154,16 @@ app.use(helmet({
 })); 
 
 app.use('/uploads', (req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
+    const origin = req.headers.origin;
+    if (origin && isOriginAllowed(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+        res.header("Access-Control-Allow-Credentials", "true");
+    } else {
+        res.header("Access-Control-Allow-Origin", "*");
+    }
     res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Range");
+    const reqHeaders = req.headers['access-control-request-headers'];
+    res.header("Access-Control-Allow-Headers", reqHeaders || defaultAllowedHeaders.join(', '));
     res.header("Access-Control-Expose-Headers", "Content-Length, Content-Range");
     
     // Explicitly handle OPTIONS preflight for static assets
