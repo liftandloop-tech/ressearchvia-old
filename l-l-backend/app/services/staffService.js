@@ -18,6 +18,7 @@ import { fileURLToPath } from "url";
 import FormData from "form-data";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import emailService from "./emailService.js";
+import { sendOtpSms } from "./smsService.js";
 import userKycService from "./userKycService.js";
 import leadModel from "../models/leadModel.js";
 
@@ -27,14 +28,18 @@ const __dirname = path.dirname(__filename);
 /**
  * Resolves the active Admin custody staff document.
  * Integrates directly with the existing roles -> departments -> staff architecture.
- * Links to the Super Admin (research@researchvia.in) and Admin role.
+ * Links to the Super Admin / Admin role.
  */
 export async function resolveAdminStaff() {
+  const adminEmail = (process.env.ADMIN_EMAIL || 'support@futurepride.in').toLowerCase().trim();
   const adminRole = await roleModel.findOne({ name: { $regex: /^admin$/i } });
   const adminDept = await departmentModel.findOne({ name: { $regex: /^admin$/i } });
 
   const queryOr = [
-    { emailAddress: 'research@researchvia.in' },
+    { emailAddress: adminEmail },
+    { emailAddress: 'support@futurepride.in' },
+    { emailAddress: 'admin@futurepride.in' },
+    { emailAddress: 'info@futurepride.in' },
     { role: { $regex: /^admin$/i } },
     { roleName: { $regex: /^admin$/i } }
   ];
@@ -51,19 +56,22 @@ export async function resolveAdminStaff() {
   if (!adminStaff) {
     const superAdminUser = await userModel.findOne({
       $or: [
-        { email: 'research@researchvia.in' },
+        { email: adminEmail },
+        { email: 'support@futurepride.in' },
+        { email: 'admin@futurepride.in' },
+        { email: 'info@futurepride.in' },
         { userType: 'super_admin' }
       ]
     });
 
     if (superAdminUser) {
       adminStaff = await staffModel.findOneAndUpdate(
-        { emailAddress: superAdminUser.email || 'research@researchvia.in' },
+        { emailAddress: superAdminUser.email || adminEmail },
         {
           $setOnInsert: {
             staffId: 'ADMIN-001',
             fullName: superAdminUser.fullName || 'Super Admin',
-            emailAddress: superAdminUser.email || 'research@researchvia.in',
+            emailAddress: superAdminUser.email || adminEmail,
             mobileNumber: superAdminUser.phone ? (Number(superAdminUser.phone.replace(/\D/g, '')) || 0) : 0,
             role: 'Admin',
             roleId: adminRole?._id || null,
@@ -397,20 +405,32 @@ const staffService = {
         return { status: 200, message: "Login successfully", data: { token, staff } };
       }
 
-      // Branch 2: Mobile Number OTP Dispatch (Fallback)
-      const cleanPhone = phone ? phone.toString().replace(/[^0-9]/g, '') : '';
+      // Branch 2: Mobile / Email OTP Dispatch (Fallback)
+      const lookupPhone = phone || (identifier && !identifier.includes('@') ? identifier : null);
+      const cleanPhone = lookupPhone ? lookupPhone.toString().replace(/[^0-9]/g, '') : '';
       const last10 = cleanPhone.slice(-10);
 
-      const staff = await staffModel.findOne({
-        $or: [
-          { mobileNumber: phone },
-          { mobileNumber: cleanPhone },
-          { mobileNumber: last10 },
-          { mobileNumber: parseInt(last10) },
-          { mobileNumber: `91${last10}` },
-          { mobileNumber: `+91${last10}` }
-        ]
-      });
+      const queryOr = [];
+      if (cleanEmail) {
+        queryOr.push({ emailAddress: cleanEmail });
+      }
+      if (last10 && last10.length >= 10) {
+        queryOr.push({ mobileNumber: lookupPhone });
+        queryOr.push({ mobileNumber: cleanPhone });
+        queryOr.push({ mobileNumber: last10 });
+        queryOr.push({ mobileNumber: parseInt(last10, 10) });
+        queryOr.push({ mobileNumber: `91${last10}` });
+        queryOr.push({ mobileNumber: `+91${last10}` });
+      }
+      if (identifier) {
+        queryOr.push({ staffId: identifier.trim() });
+      }
+
+      if (queryOr.length === 0) {
+        return { status: 400, message: "Mobile number or email is required to send OTP", data: {} };
+      }
+
+      const staff = await staffModel.findOne({ $or: queryOr });
       if (!staff) {
         return { status: 200, message: "staff not found", data: {} };
       }
@@ -420,22 +440,48 @@ const staffService = {
       }
 
       const otp = Math.floor(1000 + Math.random() * 9000).toString();
-      const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
-      const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
-      const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
-      const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
-      const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
+      staff.otp = otp;
+      staff.otpExpires = Date.now() + 5 * 60 * 1000;
+      await staff.save();
 
-      const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
-      const messageText = defaultTemplate.replaceAll('{OTP}', otp);
-      const message = encodeURIComponent(messageText);
-      const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=91${last10}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
-      const response = await axios.get(smsUrl);
-      if (response.status == 200) {
-        staff.otp = otp;
-        staff.otpExpires = Date.now() + 5 * 60 * 1000;
-        await staff.save();
-        return { status: 200, message: "OTP send your phone ", data: {} };
+      let smsSent = false;
+      const staffPhone = staff.mobileNumber ? staff.mobileNumber.toString().replace(/\D/g, '').slice(-10) : (last10.length === 10 ? last10 : null);
+      if (staffPhone && staffPhone.length === 10) {
+        try {
+          console.log(`[Staff SMS Gateway] Sending OTP to ${staffPhone} via Airtel IQ SMS...`);
+          const response = await sendOtpSms(staffPhone, otp, 'Future Pride Wealth Management');
+          if (response && (response.success || response.status == 200)) {
+            smsSent = true;
+          }
+        } catch (smsErr) {
+          console.warn("[Staff SMS Error]:", smsErr.message);
+        }
+      }
+
+      let emailSent = false;
+      const targetEmail = staff.emailAddress || (cleanEmail.includes('@') ? cleanEmail : null);
+      if (targetEmail && targetEmail.includes('@')) {
+        try {
+          console.log(`[Staff Email Gateway] Sending branded OTP to ${targetEmail}...`);
+          const mailResp = await emailService.sendOtpEmail({
+            to: targetEmail,
+            otp,
+            recipientName: staff.fullName || 'Staff Member',
+            purpose: 'Staff Portal Login'
+          });
+          if (mailResp && mailResp.success) {
+            emailSent = true;
+          }
+        } catch (mailErr) {
+          console.warn("[Staff Email OTP Error]:", mailErr.message);
+        }
+      }
+
+      if (smsSent || emailSent) {
+        const dest = smsSent && emailSent ? "phone and email" : (emailSent ? "registered email" : "registered phone");
+        return { status: 200, message: `OTP sent to your ${dest}`, data: {} };
+      } else {
+        return { status: 400, message: "Failed to dispatch OTP. Please verify your contact information.", data: {} };
       }
     } catch (error) {
       return { status: 400, message: error.message, data: {} };
@@ -1177,9 +1223,9 @@ const staffService = {
 
           if (!defaultRm || (!defaultRm.fullName && !defaultRm.staffId)) {
             defaultRm = {
-              fullName: 'Jaya Verma',
+              fullName: 'Relationship Manager',
               mobileNumber: '+91 9755016839',
-              emailAddress: 'info@researchvia.in',
+              emailAddress: 'support@futurepride.in',
               department: 'Relationship Manager',
               staffId: ''
             };
@@ -1210,7 +1256,7 @@ const staffService = {
                 id: defaultRm.id || defaultRm.staffId || 'default_rm',
                 fullName: defaultRm.fullName || 'Relationship Manager',
                 mobileNumber: defaultRm.mobileNumber || '+91 9755016839',
-                emailAddress: defaultRm.emailAddress || 'info@researchvia.in',
+                emailAddress: defaultRm.emailAddress || 'support@futurepride.in',
                 department: defaultRm.department || 'Relationship Manager',
                 staffId: defaultRm.staffId || '',
                 isDefault: true
@@ -1307,7 +1353,7 @@ const staffService = {
           photoUrl: staff.photoUrl,
           joiningDate: staff.joiningDate || staff.createdAt,
           verified: staff.status === 'Active',
-          organization: 'SP ResearchVia Pvt. Ltd.',
+          organization: 'Future Pride Research Pvt. Ltd.',
           sebiReg: 'INH000015808 (SEBI Registered Research Analyst)',
           cin: 'U73200MP2023PTC069041',
           bseEnlistment: '6120',
@@ -1569,43 +1615,71 @@ const staffService = {
    */
   generateStaffAgreementPdf: async (staff) => {
     const templatePath = path.join(__dirname, '../serviceAgreement/staff_disclaimer_terms_agreement.pdf');
-    if (!fs.existsSync(templatePath)) {
-      throw new Error(`Staff agreement template not found at: ${templatePath}`);
+    const altTemplatePath = path.join(__dirname, '../serviceAgreement/Final_appointment_letter1.pdf');
+    const activePath = fs.existsSync(templatePath) ? templatePath : altTemplatePath;
+    if (!fs.existsSync(activePath)) {
+      throw new Error(`Staff agreement template not found at: ${activePath}`);
     }
-    const templateBytes = fs.readFileSync(templatePath);
+    const templateBytes = fs.readFileSync(activePath);
     const pdfDoc = await PDFDocument.load(templateBytes);
 
-    const page1 = pdfDoc.getPage(0);
-    const page11 = pdfDoc.getPage(10);
-
-    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const black = rgb(0, 0, 0);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const black = rgb(0.1, 0.1, 0.1);
     const employeeName = (staff.fullName || 'EMPLOYEE').toUpperCase().trim();
+    const staffId = staff.staffId || '';
+    const issueDate = staff.joiningDate
+      ? new Date(staff.joiningDate).toLocaleDateString('en-GB')
+      : new Date().toLocaleDateString('en-GB');
 
-    // Page 1, Line 1: 'I, ______' blank line (verified alignment)
-    page1.drawText(employeeName, {
-      x: 86,
-      y: 678,
-      size: 11,
-      font,
+    const totalPages = pdfDoc.getPageCount();
+
+    // Page 1: Stamp issue date at top right
+    const page1 = pdfDoc.getPage(0);
+    page1.drawText(`Date: ${issueDate}`, {
+      x: 450,
+      y: 650,
+      size: 10,
+      font: fontRegular,
       color: black
     });
 
-    // Page 1, Last line: 'Employee\'s Name & Signature ______.' (verified alignment)
-    page1.drawText(employeeName, {
-      x: 218,
-      y: 245,
+    // Last Page (Page 10 for 10-page appointment letter): Stamp Acceptance & Employee details
+    const lastPage = pdfDoc.getPage(totalPages - 1);
+
+    // 1. Next to 'Accepted and Agreed Name: - '
+    lastPage.drawText(employeeName, {
+      x: 265,
+      y: 226,
       size: 11,
-      font,
+      font: fontBold,
       color: black
     });
 
-    // Page 11: To the right of 'NAME' label (verified alignment)
-    page11.drawText(employeeName, {
-      x: 120,
-      y: 221.9,
-      size: 11,
-      font,
+    // 2. Below 'NAME (Signature with Date)'
+    lastPage.drawText(`Employee Name: ${employeeName}`, {
+      x: 70,
+      y: 122,
+      size: 10,
+      font: fontBold,
+      color: black
+    });
+
+    if (staffId) {
+      lastPage.drawText(`Staff ID: ${staffId}`, {
+        x: 70,
+        y: 106,
+        size: 9.5,
+        font: fontRegular,
+        color: black
+      });
+    }
+
+    lastPage.drawText(`Date: ${issueDate}`, {
+      x: 380,
+      y: 122,
+      size: 10,
+      font: fontRegular,
       color: black
     });
 
@@ -1616,7 +1690,7 @@ const staffService = {
 
     return {
       outputFilePath,
-      fileName: `SP_Staff_Agreement_${safeName}.pdf`,
+      fileName: `FuturePride_Staff_Agreement_${safeName}.pdf`,
       employeeName
     };
   },
@@ -1644,7 +1718,7 @@ const staffService = {
       // Determine return redirect URL to bring staff back to webapp after signing
       let redirectUrl = customRedirectUrl;
       if (!redirectUrl) {
-        const frontendBase = (process.env.FRONTEND_URL || "https://spadmin.researchvia.in").replace(/\/+$/, "");
+        const frontendBase = (process.env.ADMIN_FRONTEND_URL || process.env.FRONTEND_URL || "https://admin.futurepride.in").replace(/\/+$/, "");
         redirectUrl = `${frontendBase}/job-terms-agreement?signed=true`;
       }
 
@@ -1744,12 +1818,12 @@ const staffService = {
           ? `${gatewayBase}/#/gateway/login/${docId}/${accessToken}/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`
           : `${gatewayBase}/#/gateway/login/${docId}/null/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`;
 
-        // Send branded ResearchVia email with signing link and PDF attachment
+        // Send branded Future Pride email with signing link and PDF attachment
         if (staff.emailAddress && isPublicEmail(staff.emailAddress)) {
           try {
             await emailService.sendEmail({
               to: staff.emailAddress,
-              subject: "Action Required: Sign Your ResearchVia Employment Agreement",
+              subject: "Action Required: Sign Your Future Pride Employment Agreement",
               htmlContent: `
                 <h2>Welcome to the Team, ${staff.fullName}!</h2>
                 <p>Your employment joining agreement is prepared and ready for Aadhaar E-Sign.</p>
@@ -1759,7 +1833,7 @@ const staffService = {
                 <p><strong>Important Note:</strong> You will need your Aadhaar-linked mobile number to complete OTP verification on Digio.</p>
                 <p>After you complete e-signing, the HR and Compliance team will verify your agreement to fully activate your workspace.</p>
                 <br/>
-                <p>Best regards,<br/>HR & Compliance Team<br/>ResearchVia</p>
+                <p>Best regards,<br/>HR & Compliance Team<br/>Future Pride</p>
               `,
               attachments: fs.existsSync(outputFilePath) ? [{
                 filename: fileName,
@@ -1842,7 +1916,7 @@ const staffService = {
 
       let redirectUrl = customRedirectUrl;
       if (!redirectUrl) {
-        const frontendBase = (process.env.FRONTEND_URL || "https://spadmin.researchvia.in").replace(/\/+$/, "");
+        const frontendBase = (process.env.ADMIN_FRONTEND_URL || process.env.FRONTEND_URL || "https://admin.futurepride.in").replace(/\/+$/, "");
         redirectUrl = `${frontendBase}/job-terms-agreement?signed=true`;
       }
 
@@ -1903,13 +1977,13 @@ const staffService = {
         try {
           await emailService.sendEmail({
             to: staff.emailAddress,
-            subject: "ResearchVia: Employment Agreement Verified & Approved",
+            subject: "Future Pride: Employment Agreement Verified & Approved",
             htmlContent: `
               <h2>Congratulations, ${staff.fullName}!</h2>
               <p>Your employment agreement has been reviewed, verified, and approved by the Administration.</p>
               <p>Your employee workspace and dashboard access are now fully activated.</p>
               <br/>
-              <p>Welcome aboard!<br/>ResearchVia Team</p>
+              <p>Welcome aboard!<br/>Future Pride Team</p>
             `
           });
         } catch (mailErr) {
@@ -1970,7 +2044,7 @@ const staffService = {
               </div>
               <p>Please log in to your employee portal, review and correct the required details, and e-sign the updated agreement.</p>
               <br/>
-              <p>Regards,<br/>HR & Compliance Team<br/>ResearchVia</p>
+              <p>Regards,<br/>HR & Compliance Team<br/>Future Pride</p>
             `
           });
         } catch (mailErr) {

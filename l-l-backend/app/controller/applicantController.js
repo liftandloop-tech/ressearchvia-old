@@ -1,6 +1,7 @@
 import applicantModel from "../models/applicantModel.js";
 import staffModel from "../models/staffModel.js";
 import emailService from "../services/emailService.js";
+import { sendOtpSms } from "../services/smsService.js";
 import axios from "axios";
 import staffService, { resolveRoleAndDepartment } from "../services/staffService.js";
 import roleModel from "../models/roleModel.js";
@@ -85,28 +86,13 @@ const normalizeIndianMobile = (phone) => {
 
 const sendMobileOtp = async (phone, otp) => {
     try {
-        const username = process.env.SMS_SHORT_SERVICE_USER || 'ResearchVia';
-        const apikey = process.env.SMS_SHORT_SERVICE_API_KEY || 'DA15E-A0C79';
-        const sender = process.env.SMS_SHORT_SERVICE_SENDER || 'REGISR';
-        const templateID = process.env.SMS_SHORT_SERVICE_TEMPLATEID || '1607100000000327862';
-        const url = process.env.SMS_SHORT_SERVICE_URL || 'http://sms.shortmsgservice.com/sms-panel/api/http/index.php?';
-
-        const { valid, normalized12 } = normalizeIndianMobile(phone);
-        if (!valid || normalized12.length !== 12 || !normalized12.startsWith('91')) {
-            console.error(`[SMS Gateway] Invalid phone number provided for OTP: ${phone}`);
-            return false;
-        }
-
-        const defaultTemplate = "Your OTP for ResearchVia App is {OTP}\n\n\n\nPlease do not share OTP with anyone.\n\nhttps://researchvia.in\n\n";
-        const messageText = defaultTemplate.replaceAll('{OTP}', otp);
-        const message = encodeURIComponent(messageText);
-        const smsUrl = `${url}username=${username}&apikey=${apikey}&apirequest=Text&sender=${sender}&mobile=${normalized12}&message=${message}sms&route=TRANS&TemplateID=${templateID}&format=JSON`;
-
-        console.log(`[SMS Gateway] Sending mobile OTP to ${normalized12}`);
-        const response = await axios.get(smsUrl, { timeout: 10000 });
-        return response.status === 200;
+        const { valid, last10 } = normalizeIndianMobile(phone);
+        const targetPhone = valid ? last10 : phone;
+        console.log(`[SMS Gateway] Sending applicant mobile OTP to ${targetPhone} via Airtel IQ SMS...`);
+        const result = await sendOtpSms(targetPhone, otp, 'Future Pride Wealth Management');
+        return result && (result.success || result.status === 200);
     } catch (e) {
-        console.error('Error sending mobile SMS:', e.message);
+        console.error('[SMS Gateway] Error sending mobile SMS:', e.message);
         return false;
     }
 };
@@ -117,21 +103,15 @@ const sendEmailOtp = async (email, otp) => {
         if (!cleanEmail) return false;
 
         console.log(`[Email Gateway] Sending applicant OTP to ${cleanEmail}`);
-        const result = await emailService.sendEmail({
+        const result = await emailService.sendOtpEmail({
             to: cleanEmail,
-            subject: "ResearchVia Applicant Verification OTP",
-            htmlContent: `
-                <h2>Verification Code</h2>
-                <p>Hello,</p>
-                <p>Thank you for applying at ResearchVia. Your email verification OTP is:</p>
-                <h1 style="color:#4CAF50; letter-spacing: 2px;">${otp}</h1>
-                <p>Please enter this code on the application page. This code is valid for 10 minutes.</p>
-                <p>Regards,<br/>ResearchVia HR Team</p>
-            `
+            otp: otp,
+            recipientName: 'Applicant',
+            purpose: 'Career Application Verification'
         });
-        return result.success;
+        return result && (result.success || result.accepted?.length > 0);
     } catch (e) {
-        console.error('Error sending email OTP:', e.message);
+        console.error('[Email Gateway] Error sending email OTP:', e.message);
         return false;
     }
 };
@@ -241,7 +221,7 @@ const applicantController = {
 
             const token = jwt.sign(
                 { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
-                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
+                process.env.JWT_TOKEN || 'futurepride-jwt-secret',
                 { expiresIn: '24h' }
             );
 
@@ -326,7 +306,7 @@ const applicantController = {
 
             const token = jwt.sign(
                 { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
-                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
+                process.env.JWT_TOKEN || 'futurepride-jwt-secret',
                 { expiresIn: '24h' }
             );
 
