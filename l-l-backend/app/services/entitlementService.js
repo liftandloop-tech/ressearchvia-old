@@ -38,7 +38,7 @@ export const grantEntitlement = async ({
             // fallback
         }
 
-        const revokeConditions = [{ grantReason: 'REGISTRATION_TRIAL' }];
+        const revokeConditions = [{ grantReason: 'REGISTRATION_TRIAL' }, { remarks: /trial/i }];
         if (regIntentIds.length > 0) {
             revokeConditions.push({ sourceRefId: { $in: regIntentIds } });
         }

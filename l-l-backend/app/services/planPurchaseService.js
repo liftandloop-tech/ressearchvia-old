@@ -585,13 +585,28 @@ const planPurchaseService = {
       // Single Active Plan Guard (for non-registration plans)
       const isRegistration = packageName && (packageName.toLowerCase().includes("registration"));
       if (!isRegistration && !body.forceReplace) {
-        const existingActivePlan = await Entitlement.findOne({
+        let regIntentIds = [];
+        try {
+          const regIntents = await PaymentIntent.find({
+            userId,
+            purchaseType: 'REGISTRATION'
+          }).select('_id').lean();
+          regIntentIds = regIntents.map(r => r._id.toString());
+        } catch (e) {}
+
+        const activePlanQuery = {
           userId,
           type: 'PLAN',
           status: { $in: ['ACTIVE', 'SUSPENDED'] },
           grantReason: { $ne: 'REGISTRATION_TRIAL' },
+          remarks: { $not: /trial/i },
           $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
-        }).populate('resourceId');
+        };
+        if (regIntentIds.length > 0) {
+          activePlanQuery.sourceRefId = { $nin: regIntentIds };
+        }
+
+        const existingActivePlan = await Entitlement.findOne(activePlanQuery).populate('resourceId');
 
         if (existingActivePlan) {
           const currentPlanName = existingActivePlan.resourceId?.planName || 'Plan';
@@ -1453,14 +1468,29 @@ const planPurchaseService = {
       endDate.setDate(endDate.getDate() + validity);
 
       // ── DUPLICATE PLAN GUARD (Legacy purchasePlan) ──────────────────────────
-      // 1. Block if user has active/suspended plan
-      const activeEntitlement = await Entitlement.findOne({
+      let regIntentIds = [];
+      try {
+        const regIntents = await PaymentIntent.find({
+          userId: id,
+          purchaseType: 'REGISTRATION'
+        }).select('_id').lean();
+        regIntentIds = regIntents.map(r => r._id.toString());
+      } catch (e) {}
+
+      const legacyActivePlanQuery = {
         userId: id,
         type: 'PLAN',
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        remarks: { $not: /trial/i },
         $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
-      });
+      };
+      if (regIntentIds.length > 0) {
+        legacyActivePlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+
+      // 1. Block if user has active/suspended plan
+      const activeEntitlement = await Entitlement.findOne(legacyActivePlanQuery);
       if (activeEntitlement) {
         throw new Error('You already have an active subscription for this plan.');
       }
@@ -1929,7 +1959,11 @@ const planPurchaseService = {
   getUserActivePlan: async ({ params }) => {
     try {
       let { id } = params;
-      const activePlan = await planPurchaseModel.findOne({ userId: id, status: "active" }).sort({ createdAt: -1 })
+      const activePlan = await planPurchaseModel.findOne({
+        userId: id,
+        status: "active",
+        packageName: { $not: /registration/i }
+      }).sort({ createdAt: -1 });
       if (!activePlan || activePlan == null) {
         return {
           status: 200,

@@ -150,6 +150,12 @@ class SegmentPlanController extends GetxController {
     return type == 'REGISTRATION' && hasBal == true;
   }
 
+  /// Returns true if user has an active PAID segment plan (single plan limit applies)
+  bool get hasActivePaidPlan => hasActiveSegment.value;
+
+  /// Returns true if user has ONLY a registration trial and no paid segment plan
+  bool get isOnlyTrial => activeSegments.isNotEmpty && !hasActiveSegment.value;
+
   Future<void> fetchActiveSegment({bool force = false}) async {
     final now = DateTime.now();
     if (!force && _lastActiveSegmentFetch != null && 
@@ -177,7 +183,14 @@ class SegmentPlanController extends GetxController {
         final data = response.data;
         if (data['data'] != null && data['data'] is List) {
           activeSegments.value = List<Map<String, dynamic>>.from(data['data']);
-          hasActiveSegment.value = activeSegments.isNotEmpty;
+          // An active plan exists ONLY if there is an active PAID plan (not merely a registration trial)
+          final hasPaidPlan = (data['hasActivePlan'] == true || data['hasActivePaidPlan'] == true) ||
+              activeSegments.any((s) =>
+                  s['isTrial'] != true &&
+                  s['grantReason'] != 'REGISTRATION_TRIAL' &&
+                  !(s['planName']?.toString().toLowerCase().contains('trial') ?? false));
+
+          hasActiveSegment.value = hasPaidPlan;
         } else {
           activeSegments.clear();
           hasActiveSegment.value = false;

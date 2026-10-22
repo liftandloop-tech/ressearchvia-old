@@ -24,7 +24,6 @@ class PremiumPlanCard extends StatelessWidget {
       builder: (controller) {
         final isLoading = controller.isLoadingSegment.value;
         final segments = controller.activeSegments;
-        final hasActiveSegment = controller.hasActiveSegment.value;
         
         // Check for account-level suspension
         final authController = Get.find<AuthController>();
@@ -64,7 +63,7 @@ class PremiumPlanCard extends StatelessWidget {
           return _buildRegistrationSkippedCard();
         }
 
-        if (!hasActiveSegment || segments.isEmpty) {
+        if (segments.isEmpty) {
           return _buildNoActivePlanCard();
         }
 
@@ -239,11 +238,19 @@ class PremiumPlanCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: isSuspended ? const Color(0xffDC2626) : (isPartial ? Colors.orange.withOpacity(0.4) : const Color(0xff2C4D6F)),
+                  color: isSuspended
+                      ? const Color(0xffDC2626)
+                      : (isPartial
+                          ? Colors.orange.withOpacity(0.4)
+                          : (segment['isTrial'] == true ? Colors.amber.shade700 : const Color(0xff2C4D6F))),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  isSuspended ? 'Suspended' : (isPartial ? 'Partial' : 'Active'),
+                  isSuspended
+                      ? 'Suspended'
+                      : (isPartial
+                          ? 'Partial'
+                          : (segment['isTrial'] == true ? 'Trial' : 'Active')),
                   style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,

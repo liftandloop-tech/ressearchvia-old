@@ -357,6 +357,53 @@ async function runEdgeCaseSimulation() {
             recordResult('TC-D1', 'Single Plan Rule', 'User with existing active plan cannot purchase another plan', blocked, `Blocked as expected: "${err.message}"`);
         }
 
+        // Test D2: User with ONLY active registration trial CAN purchase a segment plan
+        const userWithTrial = await User.create({
+            fullName: 'EdgeCase Trial User',
+            emailAddress: `trial_user_${Date.now()}@example.com`,
+            phone: `9198${Math.floor(10000000 + Math.random() * 90000000)}`,
+            kycStatus: 'VERIFIED',
+            registrationStatus: 'ACTIVE',
+            registrationFeePaid: true
+        });
+        createdUserIds.push(userWithTrial._id);
+
+        const trialEnt = await Entitlement.create({
+            userId: userWithTrial._id,
+            type: 'PLAN',
+            resourceId: testPlanActive._id,
+            segmentId: testSegmentActive._id,
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+            status: 'ACTIVE',
+            grantedBy: 'SYSTEM',
+            grantReason: 'REGISTRATION_TRIAL'
+        });
+        createdEntitlementIds.push(trialEnt._id);
+
+        // Check getUserActiveSegment returns isTrial: true and hasActivePlan: false
+        const segmentsService = (await import('./app/services/segmentsServices.js')).default;
+        const trialActiveSegRes = await segmentsService.getUserActiveSegment({ query: { userId: userWithTrial._id.toString() } });
+        const trialCorrectlyIdentified = trialActiveSegRes.hasActivePlan === false && trialActiveSegRes.isTrial === true && trialActiveSegRes.data?.length > 0;
+        recordResult('TC-D2a', 'Trial Segment API', 'getUserActiveSegment must return hasActivePlan=false and isTrial=true for trial user', trialCorrectlyIdentified, `hasActivePlan=${trialActiveSegRes.hasActivePlan}, isTrial=${trialActiveSegRes.isTrial}`);
+
+        // Trial user purchases segment plan
+        try {
+            const purchaseResult = await acquisitionService.initiatePlanPurchase(
+                userWithTrial._id,
+                testPlanActive._id,
+                'BANK_TRANSFER',
+                false,
+                testSegmentActive._id
+            );
+            if (purchaseResult && purchaseResult.paymentIntentId) {
+                createdIntentIds.push(purchaseResult.paymentIntentId);
+            }
+            recordResult('TC-D2b', 'Registration Trial Exemption', 'User with only registration trial must be allowed to purchase a segment plan', true, 'Successfully initiated plan purchase during trial');
+        } catch (err) {
+            recordResult('TC-D2b', 'Registration Trial Exemption', 'User with only registration trial must be allowed to purchase a segment plan', false, `Blocked unexpectedly: "${err.message}"`);
+        }
+
         // Test C7: Non-existent Plan ID
         try {
             const fakePlanId = new mongoose.Types.ObjectId();

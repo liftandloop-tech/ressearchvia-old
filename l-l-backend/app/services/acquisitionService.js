@@ -297,14 +297,30 @@ export const initiatePlanPurchase = async (userId, planId, paymentMode, isPartia
 
     // ── SINGLE ACTIVE PLAN GUARD ──────────────────────────────────────────────
     if (!calledBySystem) {
-        // 1. Block if user has ANY active or admin-suspended plan
-        const activeEntitlement = await Entitlement.findOne({
+        // Find registration payment intent IDs to ensure trials linked to them are never blocked as paid plans
+        let regIntentIds = [];
+        try {
+            const regIntents = await PaymentIntent.find({
+                userId,
+                purchaseType: 'REGISTRATION'
+            }).select('_id').lean();
+            regIntentIds = regIntents.map(r => r._id.toString());
+        } catch (e) {}
+
+        const activePlanQuery = {
             userId,
             type: 'PLAN',
             status: { $in: ['ACTIVE', 'SUSPENDED'] },
             grantReason: { $ne: 'REGISTRATION_TRIAL' }, // Ignore trial plans during duplicate check
+            remarks: { $not: /trial/i },
             $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
-        }).populate('resourceId');
+        };
+        if (regIntentIds.length > 0) {
+            activePlanQuery.sourceRefId = { $nin: regIntentIds };
+        }
+
+        // 1. Block if user has ANY active or admin-suspended plan
+        const activeEntitlement = await Entitlement.findOne(activePlanQuery).populate('resourceId');
         if (activeEntitlement) {
             const currentPlanName = activeEntitlement.resourceId?.planName || 'Plan';
             throw new Error(

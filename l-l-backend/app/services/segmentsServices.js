@@ -163,13 +163,28 @@ const segmentsService = {
       }
 
       // Single Active Plan Guard
-      const activePlanEntitlement = await Entitlement.findOne({
+      let regIntentIds = [];
+      try {
+        const regIntents = await PaymentIntent.find({
+          userId,
+          purchaseType: 'REGISTRATION'
+        }).select('_id').lean();
+        regIntentIds = regIntents.map(r => r._id.toString());
+      } catch (e) {}
+
+      const activePlanQuery = {
         userId,
         type: 'PLAN',
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        remarks: { $not: /trial/i },
         $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
-      }).populate('resourceId');
+      };
+      if (regIntentIds.length > 0) {
+        activePlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+
+      const activePlanEntitlement = await Entitlement.findOne(activePlanQuery).populate('resourceId');
       if (activePlanEntitlement) {
         const currentPlanName = activePlanEntitlement.resourceId?.planName || 'Plan';
         return {
@@ -191,14 +206,19 @@ const segmentsService = {
 
       // ── DUPLICATE PLAN GUARD (Legacy Flow) ───────────────────────────────────
       // 1. Active or suspended entitlement
-      const activeEntitlement = await Entitlement.findOne({
+      const duplicatePlanQuery = {
         userId,
         type: 'PLAN',
         resourceId: segmentPlanId,
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        remarks: { $not: /trial/i },
         $or: [{ endDate: null }, { endDate: { $gt: new Date() } }]
-      });
+      };
+      if (regIntentIds.length > 0) {
+        duplicatePlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+      const activeEntitlement = await Entitlement.findOne(duplicatePlanQuery);
       if (activeEntitlement) {
         return { status: 409, success: false, message: 'You already have an active or suspended subscription for this plan.', data: {} };
       }
@@ -1779,12 +1799,23 @@ const segmentsService = {
       // CHUNK 9: Consistency - Read from Entitlements
       const now = new Date();
 
-      // Find active and suspended PLAN entitlements (excluding free trials)
-      const activeEntitlements = await Entitlement.find({
+      // Find registration payment intent IDs to ensure trial entitlements aren't counted as active paid plans
+      let regIntentIds = [];
+      try {
+        const regIntents = await PaymentIntent.find({
+          userId,
+          purchaseType: 'REGISTRATION'
+        }).select('_id').lean();
+        regIntentIds = regIntents.map(r => r._id.toString());
+      } catch (e) {}
+
+      // Find active and suspended PLAN entitlements (excluding free registration trials)
+      const paidPlanQuery = {
         userId: userId,
         type: 'PLAN',
         status: { $in: ['ACTIVE', 'SUSPENDED'] },
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        remarks: { $not: /trial/i },
         $or: [
           { startDate: null },
           { startDate: { $lte: new Date(Date.now() + 60000) } }
@@ -1797,7 +1828,12 @@ const segmentsService = {
             ]
           }
         ]
-      }).populate({
+      };
+      if (regIntentIds.length > 0) {
+        paidPlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+
+      const activeEntitlements = await Entitlement.find(paidPlanQuery).populate({
         path: 'resourceId',
         model: 'segmentsPlan'
       }).populate({
@@ -1826,6 +1862,8 @@ const segmentsService = {
           status: ent.status,
           // Extra metadata
           planName: plan?.planName,
+          isTrial: false,
+          grantReason: ent.grantReason || 'PAID'
         };
       }).filter(item => item !== null);
 
@@ -1835,12 +1873,18 @@ const segmentsService = {
           userId: userId,
           type: 'PLAN',
           status: 'ACTIVE',
-          grantReason: 'REGISTRATION_TRIAL',
           $or: [
-            { startDate: null },
-            { startDate: { $lte: new Date(Date.now() + 60000) } }
+            { grantReason: 'REGISTRATION_TRIAL' },
+            ...(regIntentIds.length > 0 ? [{ sourceRefId: { $in: regIntentIds } }] : []),
+            { remarks: /trial/i }
           ],
           $and: [
+            {
+              $or: [
+                { startDate: null },
+                { startDate: { $lte: new Date(Date.now() + 60000) } }
+              ]
+            },
             {
               $or: [
                 { endDate: null },
@@ -1876,13 +1920,17 @@ const segmentsService = {
               isActive: true,
               status: 'ACTIVE',
               planName: plan?.planName ? `${plan.planName} (Trial)` : 'Registration Trial',
-              isTrial: true
+              isTrial: true,
+              grantReason: 'REGISTRATION_TRIAL'
             };
           });
 
           return {
             status: 200,
             message: "Current Active Segments (Trial)",
+            hasActivePlan: false,
+            hasActivePaidPlan: false,
+            isTrial: true,
             data: trialSegments,
           };
         }
@@ -1890,12 +1938,18 @@ const segmentsService = {
         return {
           status: 200,
           message: "No active segments found",
+          hasActivePlan: false,
+          hasActivePaidPlan: false,
+          isTrial: false,
           data: [],
         };
       }
       return {
         status: 200,
         message: "Current Active Segments",
+        hasActivePlan: true,
+        hasActivePaidPlan: true,
+        isTrial: false,
         data: activeSegments,
       };
     } catch (error) {
@@ -1909,12 +1963,23 @@ const segmentsService = {
         return { status: 400, message: "User ID is required", data: {} };
       }
 
+      // Check registration intents for this user to ensure trial entitlements aren't counted as active paid plans
+      let regIntentIds = [];
+      try {
+        const regIntents = await PaymentIntent.find({
+          userId,
+          purchaseType: 'REGISTRATION'
+        }).select('_id').lean();
+        regIntentIds = regIntents.map(r => r._id.toString());
+      } catch (e) {}
+
       const now = new Date();
-      const activeEntitlements = await Entitlement.find({
+      const paidPlanQuery = {
         userId,
         type: 'PLAN',
         status: 'ACTIVE',
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
+        remarks: { $not: /trial/i },
         $or: [
           { startDate: null },
           { startDate: { $lte: new Date(Date.now() + 60000) } }
@@ -1927,7 +1992,12 @@ const segmentsService = {
             ]
           }
         ]
-      }).populate({
+      };
+      if (regIntentIds.length > 0) {
+        paidPlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+
+      const activeEntitlements = await Entitlement.find(paidPlanQuery).populate({
         path: 'resourceId',
         model: 'segmentsPlan'
       }).populate({

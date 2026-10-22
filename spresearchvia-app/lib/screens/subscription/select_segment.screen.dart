@@ -126,6 +126,34 @@ class _SelectSegmentScreenState extends State<SelectSegmentScreen> {
                       ),
                     );
                   }
+                  if (segmentPlanController.isOnlyTrial) {
+                    final currentTrial = segmentPlanController.activeSegments.firstOrNull?['planName'] ?? 'Registration Trial';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.stars, color: Colors.amber.shade800, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'You currently have an active $currentTrial. You can purchase your desired segment plan anytime below.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
                   return const SizedBox.shrink();
                 }),
 

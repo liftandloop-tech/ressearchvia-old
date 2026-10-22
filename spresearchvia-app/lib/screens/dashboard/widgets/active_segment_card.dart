@@ -18,9 +18,8 @@ class ActiveSegmentCard extends StatelessWidget {
     return GetX<SegmentPlanController>(
       builder: (controller) {
         final segments = controller.activeSegments;
-        final hasActive = controller.hasActiveSegment.value;
 
-        if (!hasActive || segments.isEmpty) {
+        if (segments.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
