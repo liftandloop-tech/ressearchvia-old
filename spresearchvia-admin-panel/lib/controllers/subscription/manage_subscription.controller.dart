@@ -126,8 +126,9 @@ class ManageSubscriptionController extends GetxController {
     availablePlans.value = result.plans;
   }
 
-  Future<void> fetchUserSubscriptions(String userId) async {
-    if (_lastFetchedUserId == userId &&
+  Future<void> fetchUserSubscriptions(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _lastFetchedUserId == userId &&
         (isLoading.value || userSubscriptions.isNotEmpty))
       return;
     _lastFetchedUserId = userId;
@@ -141,7 +142,7 @@ class ManageSubscriptionController extends GetxController {
       final subs = await _subscriptionService.getUserSubscriptions(userId);
       userSubscriptions.value = subs;
 
-      final planSegs = await _subscriptionService.getUserPlanSegments(userId);
+      final planSegs = await _subscriptionService.getUserPlanSegments(userId, forceRefresh: true);
       userPlanSegmentsData.value = planSegs ?? {};
 
       // Initialize controllers for dates
@@ -181,7 +182,7 @@ class ManageSubscriptionController extends GetxController {
 
   Future<void> showManageSegmentsDialog(String userId) async {
     isAllocatingSegments.value = true;
-    final planSegsData = await _subscriptionService.getUserPlanSegments(userId);
+    final planSegsData = await _subscriptionService.getUserPlanSegments(userId, forceRefresh: true);
     userPlanSegmentsData.value = planSegsData ?? {};
     isAllocatingSegments.value = false;
 
@@ -340,7 +341,7 @@ class ManageSubscriptionController extends GetxController {
                       backgroundColor: Colors.green,
                       colorText: Colors.white,
                     );
-                    await fetchUserSubscriptions(userId);
+                    await fetchUserSubscriptions(userId, forceRefresh: true);
                   } else {
                     Get.snackbar(
                       'Error',

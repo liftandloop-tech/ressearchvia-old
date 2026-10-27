@@ -507,9 +507,12 @@ class SubscriptionService extends ApiService {
     }
   }
 
-  Future<Map<String, dynamic>?> getUserPlanSegments(String userId) async {
+  Future<Map<String, dynamic>?> getUserPlanSegments(String userId, {bool forceRefresh = false}) async {
     try {
-      final response = await get('/segments/user-plan-segments?userId=$userId');
+      final response = await get(
+        '/segments/user-plan-segments?userId=$userId',
+        forceRefresh: forceRefresh,
+      );
       if (response.statusCode == 200 && response.body != null) {
         return Map<String, dynamic>.from(response.body['data'] ?? {});
       }

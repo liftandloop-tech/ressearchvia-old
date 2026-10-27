@@ -50,6 +50,12 @@ class ManageSubscriptionScreen extends StatelessWidget {
                       AppStrings.manageSubscription,
                       style: AppTheme.h2Style.copyWith(color: AppTheme.primaryBlue),
                     ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 20, color: AppTheme.primaryBlue),
+                      tooltip: 'Refresh Subscriptions & Segments',
+                      onPressed: () => controller.fetchUserSubscriptions(userId, forceRefresh: true),
+                    ),
                   ],
                 ),
                 if ((currentUser?.isAdmin ?? false) ||

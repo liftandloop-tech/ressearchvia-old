@@ -182,7 +182,46 @@ class SegmentPlanController extends GetxController {
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['data'] != null && data['data'] is List) {
-          activeSegments.value = List<Map<String, dynamic>>.from(data['data']);
+          final rawList = List<Map<String, dynamic>>.from(data['data']);
+
+          // Deduplicate segments defensively on client
+          final hasSpecificSegments = rawList.any((s) {
+            final sId = s['segmentId'];
+            return sId != null && sId != 'null' && sId != '';
+          });
+
+          final Map<String, Map<String, dynamic>> uniqueMap = {};
+          for (final item in rawList) {
+            final sId = item['segmentId'];
+            final isGeneric = sId == null || sId == 'null' || sId == '';
+
+            // If specific segments exist, skip generic placeholder
+            if (hasSpecificSegments && isGeneric) {
+              continue;
+            }
+
+            final String key;
+            if (sId is Map) {
+              key = sId['_id']?.toString() ?? item['segmentName']?.toString() ?? '';
+            } else if (sId != null && sId.toString().isNotEmpty && sId != 'null') {
+              key = sId.toString();
+            } else {
+              key = item['segmentName']?.toString() ?? item['planName']?.toString() ?? 'generic';
+            }
+
+            final normalizedKey = key.trim().toLowerCase();
+            if (!uniqueMap.containsKey(normalizedKey)) {
+              uniqueMap[normalizedKey] = item;
+            } else {
+              final existingEnd = DateTime.tryParse(uniqueMap[normalizedKey]?['endDate']?.toString() ?? uniqueMap[normalizedKey]?['expiryDate']?.toString() ?? '');
+              final currentEnd = DateTime.tryParse(item['endDate']?.toString() ?? item['expiryDate']?.toString() ?? '');
+              if (existingEnd != null && currentEnd != null && currentEnd.isAfter(existingEnd)) {
+                uniqueMap[normalizedKey] = item;
+              }
+            }
+          }
+
+          activeSegments.value = uniqueMap.values.toList();
           // An active plan exists ONLY if there is an active PAID plan (not merely a registration trial)
           final hasPaidPlan = (data['hasActivePlan'] == true || data['hasActivePaidPlan'] == true) ||
               activeSegments.any((s) =>

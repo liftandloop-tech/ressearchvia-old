@@ -720,6 +720,16 @@ export const verifyPayment = async (razorpayOrderId, razorpayPaymentId, razorpay
         });
 
         if (paymentIntent.preferredSegmentId) {
+            // New plan purchase includes only the chosen initial segment.
+            // Deactivate any legacy segments for this user so they start cleanly with only their chosen segment.
+            await userActiveSegmentModel.updateMany(
+                { userId: paymentIntent.userId, segmentId: { $ne: paymentIntent.preferredSegmentId } },
+                { $set: { isActive: false } }
+            );
+            await Entitlement.updateMany(
+                { userId: paymentIntent.userId, type: 'PLAN', segmentId: { $ne: paymentIntent.preferredSegmentId }, status: 'ACTIVE' },
+                { $set: { status: 'REVOKED', revokedReason: 'NEW_PLAN_PURCHASE', revokedAt: new Date() } }
+            );
             await userActiveSegmentModel.findOneAndUpdate(
                 { userId: paymentIntent.userId, segmentId: paymentIntent.preferredSegmentId },
                 {

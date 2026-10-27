@@ -574,14 +574,27 @@ const segmentsService = {
           });
 
 
-          // Create user active segment
-          const userActiveSegment = await userActiveSegmentModel.create({
-            userId: userId,
-            segmentId: segmentId,
-            isActive: true,
-            purchaseDate: intent.serviceStartDate || new Date(),
-            expiryDate: intent.currentExpiryDate || new Date(Date.now() + (days * 24 * 60 * 60 * 1000)),
-          });
+          if (segmentId) {
+            await userActiveSegmentModel.updateMany(
+              { userId, segmentId: { $ne: segmentId } },
+              { $set: { isActive: false } }
+            );
+            await Entitlement.updateMany(
+              { userId, type: 'PLAN', segmentId: { $ne: segmentId }, status: 'ACTIVE' },
+              { $set: { status: 'REVOKED', revokedReason: 'NEW_PLAN_PURCHASE', revokedAt: new Date() } }
+            );
+          }
+
+          // Create or update user active segment
+          const userActiveSegment = await userActiveSegmentModel.findOneAndUpdate(
+            { userId, segmentId },
+            {
+              isActive: true,
+              purchaseDate: intent.serviceStartDate || new Date(),
+              expiryDate: intent.currentExpiryDate || new Date(Date.now() + (days * 24 * 60 * 60 * 1000)),
+            },
+            { upsert: true, new: true }
+          );
 
 
           // Grant entitlement
@@ -1839,10 +1852,83 @@ const segmentsService = {
       }).populate({
         path: 'segmentId',
         model: 'segments'
+      }).sort({ endDate: -1, createdAt: -1 });
+
+      // Fetch user segment status from userActiveSegmentModel to respect user/admin active segments
+      let userActiveSegDocs = [];
+      try {
+        userActiveSegDocs = await userActiveSegmentModel.find({ userId }).sort({ updatedAt: -1, createdAt: -1 }).lean();
+      } catch (uasErr) {
+        console.error("[getUserActiveSegment] Error reading userActiveSegmentModel:", uasErr);
+      }
+
+      const activeSegIdSet = new Set();
+      const inactiveSegIdSet = new Set();
+      for (const doc of userActiveSegDocs) {
+        if (doc.segmentId) {
+          const sId = doc.segmentId.toString();
+          if (doc.isActive) {
+            activeSegIdSet.add(sId);
+          } else {
+            if (!activeSegIdSet.has(sId)) {
+              inactiveSegIdSet.add(sId);
+            }
+          }
+        }
+      }
+
+      // Check if user has specific segment entitlements (non-null segmentId)
+      const hasSpecificSegmentEnts = activeEntitlements.some(ent => {
+        const segId = ent.segmentId?._id ? ent.segmentId._id.toString() : (ent.segmentId ? ent.segmentId.toString() : null);
+        return segId && !inactiveSegIdSet.has(segId);
       });
 
+      // Filter active entitlements
+      const filteredEntitlements = activeEntitlements.filter(ent => {
+        const segId = ent.segmentId?._id ? ent.segmentId._id.toString() : (ent.segmentId ? ent.segmentId.toString() : null);
+
+        // A. Generic placeholder (segmentId is null):
+        // If specific segment entitlements exist, suppress the generic placeholder to avoid duplicate/phantom cards
+        if (!segId) {
+          return !hasSpecificSegmentEnts;
+        }
+
+        // B. If segment is explicitly marked inactive in userActiveSegmentModel, exclude it
+        if (inactiveSegIdSet.has(segId)) {
+          return false;
+        }
+
+        // C. If userActiveSegmentModel has explicit active segments, ensure it is in activeSegIdSet
+        if (activeSegIdSet.size > 0 && !activeSegIdSet.has(segId)) {
+          return false;
+        }
+
+        return true;
+      });
+
+      // Deduplicate by segment: If multiple entitlements exist for the same segment, keep only the one with the furthest expiry
+      const uniqueSegmentsMap = new Map();
+      for (const ent of filteredEntitlements) {
+        const plan = ent.resourceId;
+        const segObj = ent.segmentId;
+        const segIdStr = segObj?._id ? segObj._id.toString() : (ent.segmentId ? ent.segmentId.toString() : null);
+        const segName = segObj?.segmentName || segObj?.name || plan?.segmentsName || 'Segment';
+        const dedupKey = segIdStr || segName.trim().toLowerCase();
+
+        if (!uniqueSegmentsMap.has(dedupKey)) {
+          uniqueSegmentsMap.set(dedupKey, ent);
+        } else {
+          const existing = uniqueSegmentsMap.get(dedupKey);
+          const existingEnd = existing.endDate ? new Date(existing.endDate).getTime() : (existing.endDate === null ? Infinity : 0);
+          const currentEnd = ent.endDate ? new Date(ent.endDate).getTime() : (ent.endDate === null ? Infinity : 0);
+          if (currentEnd > existingEnd) {
+            uniqueSegmentsMap.set(dedupKey, ent);
+          }
+        }
+      }
+
       // Map to format expected by UI
-      const activeSegments = activeEntitlements.map(ent => {
+      const activeSegments = Array.from(uniqueSegmentsMap.values()).map(ent => {
         const plan = ent.resourceId;
         const segObj = ent.segmentId;
         const segName = segObj?.segmentName || segObj?.name || plan?.segmentsName || 'Segment';
@@ -1898,10 +1984,35 @@ const segmentsService = {
         }).populate({
           path: 'segmentId',
           model: 'segments'
-        });
+        }).sort({ endDate: -1, createdAt: -1 });
 
         if (trialEnts && trialEnts.length > 0) {
-          const trialSegments = trialEnts.map(ent => {
+          // Deduplicate trial segments as well
+          const uniqueTrialMap = new Map();
+          const hasSpecificTrialSegs = trialEnts.some(ent => ent.segmentId);
+
+          for (const ent of trialEnts) {
+            const segIdStr = ent.segmentId?._id ? ent.segmentId._id.toString() : (ent.segmentId ? ent.segmentId.toString() : null);
+            if (!segIdStr && hasSpecificTrialSegs) continue;
+
+            const plan = ent.resourceId;
+            const segObj = ent.segmentId;
+            const segName = segObj?.segmentName || segObj?.name || plan?.segmentsName || 'Trial Segment';
+            const dedupKey = segIdStr || segName.trim().toLowerCase();
+
+            if (!uniqueTrialMap.has(dedupKey)) {
+              uniqueTrialMap.set(dedupKey, ent);
+            } else {
+              const existing = uniqueTrialMap.get(dedupKey);
+              const existingEnd = existing.endDate ? new Date(existing.endDate).getTime() : (existing.endDate === null ? Infinity : 0);
+              const currentEnd = ent.endDate ? new Date(ent.endDate).getTime() : (ent.endDate === null ? Infinity : 0);
+              if (currentEnd > existingEnd) {
+                uniqueTrialMap.set(dedupKey, ent);
+              }
+            }
+          }
+
+          const trialSegments = Array.from(uniqueTrialMap.values()).map(ent => {
             const plan = ent.resourceId;
             const segObj = ent.segmentId;
             const segName = segObj?.segmentName || segObj?.name || plan?.segmentsName || 'Trial Segment';
@@ -1958,7 +2069,7 @@ const segmentsService = {
   },
   getUserPlanSegments: async ({ user, query }) => {
     try {
-      const userId = user?._id || query?.userId;
+      const userId = query?.userId || user?._id || user?.userId;
       if (!userId) {
         return { status: 400, message: "User ID is required", data: {} };
       }
@@ -2045,7 +2156,17 @@ const segmentsService = {
         }
       }
 
-      const allSegments = await segmentsModel.find({ segmentStatus: 'active' }).sort({ segmentName: 1 });
+      // Also check userActiveSegmentModel to ensure consistency
+      try {
+        const activeSegDocs = await userActiveSegmentModel.find({ userId, isActive: true });
+        for (const asd of activeSegDocs) {
+          if (asd.segmentId) {
+            activeSegmentIdSet.add(asd.segmentId.toString());
+          }
+        }
+      } catch (e) {}
+
+      const allSegments = await segmentsModel.find({ segmentStatus: { $ne: 'inactive' } }).sort({ segmentName: 1 });
       const mappedSegments = allSegments.map(seg => ({
         _id: seg._id,
         segmentName: seg.segmentName,
@@ -2081,18 +2202,41 @@ const segmentsService = {
         return { status: 400, message: "activate boolean flag is required", data: {} };
       }
 
+      // Check registration intents for this user to ensure trial entitlements aren't counted as active paid plans
+      let regIntentIds = [];
+      try {
+        const regIntents = await PaymentIntent.find({
+          userId,
+          purchaseType: 'REGISTRATION'
+        }).select('_id').lean();
+        regIntentIds = regIntents.map(r => r._id.toString());
+      } catch (e) {}
+
       const now = new Date();
-      const activeEntitlements = await Entitlement.find({
+      const paidPlanQuery = {
         userId,
         type: 'PLAN',
         status: 'ACTIVE',
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
-        startDate: { $lte: now },
+        remarks: { $not: /trial/i },
         $or: [
-          { endDate: null },
-          { endDate: { $gte: now } }
+          { startDate: null },
+          { startDate: { $lte: new Date(Date.now() + 60000) } }
+        ],
+        $and: [
+          {
+            $or: [
+              { endDate: null },
+              { endDate: { $gte: now } }
+            ]
+          }
         ]
-      });
+      };
+      if (regIntentIds.length > 0) {
+        paidPlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+
+      const activeEntitlements = await Entitlement.find(paidPlanQuery);
 
       if (!activeEntitlements || activeEntitlements.length === 0) {
         return { status: 400, message: "No active plan found. Please purchase a plan first.", data: {} };
@@ -2100,8 +2244,8 @@ const segmentsService = {
 
       const templateEnt = activeEntitlements[0];
       const planId = templateEnt.resourceId;
-      const startDate = templateEnt.startDate;
-      const endDate = templateEnt.endDate;
+      const startDate = templateEnt.startDate || new Date();
+      const endDate = templateEnt.endDate || null;
 
       if (!activate) {
         const currentlyActiveSegmentsCount = activeEntitlements.filter(e => e.segmentId).length;
@@ -2164,7 +2308,7 @@ const segmentsService = {
             endDate,
             status: 'ACTIVE',
             grantedBy: 'SYSTEM',
-            grantReason: 'ONLINE_PAYMENT',
+            grantReason: templateEnt.grantReason || 'ONLINE_PAYMENT',
             sourceRefId: templateEnt.sourceRefId,
             remarks: 'Activated by user from Settings'
           });
@@ -2202,18 +2346,41 @@ const segmentsService = {
         return { status: 400, message: "At least one segment must be selected", data: {} };
       }
 
+      // Check registration intents for this user to ensure trial entitlements aren't counted as active paid plans
+      let regIntentIds = [];
+      try {
+        const regIntents = await PaymentIntent.find({
+          userId,
+          purchaseType: 'REGISTRATION'
+        }).select('_id').lean();
+        regIntentIds = regIntents.map(r => r._id.toString());
+      } catch (e) {}
+
       const now = new Date();
-      const activeEntitlements = await Entitlement.find({
+      const paidPlanQuery = {
         userId,
         type: 'PLAN',
         status: 'ACTIVE',
         grantReason: { $ne: 'REGISTRATION_TRIAL' },
-        startDate: { $lte: now },
+        remarks: { $not: /trial/i },
         $or: [
-          { endDate: null },
-          { endDate: { $gte: now } }
+          { startDate: null },
+          { startDate: { $lte: new Date(Date.now() + 60000) } }
+        ],
+        $and: [
+          {
+            $or: [
+              { endDate: null },
+              { endDate: { $gte: now } }
+            ]
+          }
         ]
-      });
+      };
+      if (regIntentIds.length > 0) {
+        paidPlanQuery.sourceRefId = { $nin: regIntentIds };
+      }
+
+      const activeEntitlements = await Entitlement.find(paidPlanQuery);
 
       if (!activeEntitlements || activeEntitlements.length === 0) {
         return { status: 400, message: "User has no active plan to allocate segments to.", data: {} };
@@ -2221,43 +2388,53 @@ const segmentsService = {
 
       const templateEnt = activeEntitlements[0];
       const planId = templateEnt.resourceId;
-      const startDate = templateEnt.startDate;
-      const endDate = templateEnt.endDate;
+      const startDate = templateEnt.startDate || new Date();
+      const endDate = templateEnt.endDate || null;
       const targetSegmentIdStrs = new Set(segmentIds.map(id => id.toString()));
 
       for (const sId of segmentIds) {
-        const existing = await Entitlement.findOne({
+        const sIdStr = sId.toString();
+        const existingList = await Entitlement.find({
           userId,
           type: 'PLAN',
           resourceId: planId,
-          segmentId: sId
-        });
+          segmentId: sIdStr,
+          status: 'ACTIVE'
+        }).sort({ endDate: -1 });
 
-        if (existing) {
-          existing.status = 'ACTIVE';
-          existing.startDate = startDate;
-          existing.endDate = endDate;
-          existing.revokedReason = null;
-          existing.revokedAt = null;
-          await existing.save();
+        if (existingList && existingList.length > 0) {
+          const primary = existingList[0];
+          primary.startDate = startDate;
+          primary.endDate = endDate;
+          primary.revokedReason = null;
+          primary.revokedAt = null;
+          await primary.save();
+
+          // Revoke any duplicates for the same segment
+          for (let i = 1; i < existingList.length; i++) {
+            existingList[i].status = 'REVOKED';
+            existingList[i].revokedReason = 'SUPERSEDED_DUPLICATE';
+            existingList[i].revokedAt = new Date();
+            await existingList[i].save();
+          }
         } else {
           await Entitlement.create({
             userId,
             type: 'PLAN',
             resourceId: planId,
-            segmentId: sId,
+            segmentId: sIdStr,
             startDate,
             endDate,
             status: 'ACTIVE',
-            grantedBy: 'ADMIN',
-            grantReason: 'MANUAL',
+            grantedBy: adminId ? 'ADMIN' : 'SYSTEM',
+            grantReason: templateEnt.grantReason || 'MANUAL',
             sourceRefId: templateEnt.sourceRefId,
             remarks: 'Admin allocated segment'
           });
         }
 
         await userActiveSegmentModel.findOneAndUpdate(
-          { userId, segmentId: sId },
+          { userId, segmentId: sIdStr },
           {
             isActive: true,
             purchaseDate: startDate,
@@ -2268,18 +2445,26 @@ const segmentsService = {
       }
 
       for (const ent of activeEntitlements) {
-        if (ent.segmentId && !targetSegmentIdStrs.has(ent.segmentId.toString())) {
+        if (!ent.segmentId || !targetSegmentIdStrs.has(ent.segmentId.toString())) {
           ent.status = 'REVOKED';
           ent.revokedReason = 'ADMIN_REALLOCATE';
           ent.revokedAt = new Date();
           await ent.save();
 
-          await userActiveSegmentModel.updateMany(
-            { userId, segmentId: ent.segmentId },
-            { $set: { isActive: false } }
-          );
+          if (ent.segmentId) {
+            await userActiveSegmentModel.updateMany(
+              { userId, segmentId: ent.segmentId },
+              { $set: { isActive: false } }
+            );
+          }
         }
       }
+
+      // Ensure any other userActiveSegmentModel entries not in targetSegmentIdStrs are deactivated
+      await userActiveSegmentModel.updateMany(
+        { userId, segmentId: { $nin: Array.from(targetSegmentIdStrs) } },
+        { $set: { isActive: false } }
+      );
 
       await AdminAuditLog.create({
         adminId: adminId || userId,

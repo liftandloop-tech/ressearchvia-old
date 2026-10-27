@@ -218,17 +218,30 @@ class PremiumPlanCard extends StatelessWidget {
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                    ],
-                    Text(
-                      segmentName,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: Colors.white.withValues(alpha: 0.85),
+                      if (segmentName.isNotEmpty &&
+                          segmentName.trim().toLowerCase() != planName.trim().toLowerCase()) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          segmentName,
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ],
+                    ] else ...[
+                      Text(
+                        segmentName,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
