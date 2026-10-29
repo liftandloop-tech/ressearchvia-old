@@ -576,9 +576,8 @@ class _VideoKycRecorderDialogState extends State<VideoKycRecorderDialog> {
   String get _companyName {
     final raw = AppConfig.appName.replaceAll(' Admin Panel', '').trim();
     if (raw.toLowerCase().contains('bizx')) return 'BizX Research';
-    if (raw.toLowerCase().contains('future')) return 'Future Pride Research';
     if (raw.toLowerCase().contains('researchvia') || raw.toLowerCase().contains('spresearch')) return 'ResearchVia';
-    return raw.isNotEmpty ? raw : 'the Company';
+    return raw.isNotEmpty ? raw : 'ResearchVia';
   }
 
   String get _declarationText {

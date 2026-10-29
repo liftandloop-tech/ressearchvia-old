@@ -3655,7 +3655,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Support: support@researchvia.in | SP ResearchVia Pvt. Ltd.',
+                              'Support: info@researchvia.in | SP ResearchVia Pvt. Ltd.',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.grey[400],

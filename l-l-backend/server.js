@@ -14,6 +14,7 @@ import departmentModel from "./app/models/departmentModel.js";
 import roleModel from "./app/models/roleModel.js";
 import permissionGroupModel from "./app/models/permissionGroupModel.js";
 import userModel from "./app/models/userModel.js";
+import expiryAlertSettingsModel from "./app/models/expiryAlertSettingsModel.js";
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -191,9 +192,33 @@ try {
     }
     // Self-heal primary super admin accounts to ensure userType & role are super_admin
     await userModel.updateMany(
-        { email: { $in: ['support@futurepride.in', 'admin@futurepride.in'] } },
+        { email: 'info@researchvia.in' },
         { $set: { userType: 'super_admin', role: 'super_admin', adminAccessGranted: true } }
     );
+
+    // Sanitize any legacy alert templates stored in the database
+    const expirySettings = await expiryAlertSettingsModel.findOne();
+    if (expirySettings && expirySettings.alerts) {
+        let changed = false;
+        expirySettings.alerts = expirySettings.alerts.map(a => {
+            const aObj = a.toObject ? a.toObject() : a;
+            const t = aObj.title || '';
+            const b = aObj.body || '';
+            if (/future\s*pride/i.test(t) || /future\s*pride/i.test(b)) {
+                changed = true;
+                return {
+                    ...aObj,
+                    title: t.replace(/future\s*pride/gi, 'ResearchVia'),
+                    body: b.replace(/future\s*pride/gi, 'ResearchVia')
+                };
+            }
+            return a;
+        });
+        if (changed) {
+            await expirySettings.save();
+            console.log('[BOOTSTRAP] Cleaned legacy Future Pride references in expiryAlertSettings');
+        }
+    }
 } catch (rbacErr) {
     console.warn('[BOOTSTRAP] RBAC auto-seed / admin bootstrap check warning:', rbacErr.message);
 }

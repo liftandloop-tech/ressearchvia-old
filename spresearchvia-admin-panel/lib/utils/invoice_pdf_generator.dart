@@ -721,7 +721,7 @@ class InvoicePdfGenerator {
                     ),
                   ),
                   pw.Text(
-                    'Support: support@researchvia.in | SP ResearchVia Pvt. Ltd.',
+                    'Support: info@researchvia.in | SP ResearchVia Pvt. Ltd.',
                     style: pw.TextStyle(
                       font: font,
                       fontSize: 8,

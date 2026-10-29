@@ -21,7 +21,7 @@ const invoiceGenerator = {
 
         // Company Details (Mock)
         drawText("ResearchVia", 400, height - 40, 14, true, rgb(1, 1, 1));
-        drawText("support@researchvia.in", 400, height - 55, 10, false, rgb(0.9, 0.9, 0.9));
+        drawText("info@researchvia.in", 400, height - 55, 10, false, rgb(0.9, 0.9, 0.9));
         drawText("GSTIN: 23ABMCS3444G1ZC", 400, height - 70, 9, false, rgb(0.9, 0.9, 0.9));
         drawText("SEBI REG: INH000015808", 400, height - 85, 9, false, rgb(0.9, 0.9, 0.9));
 

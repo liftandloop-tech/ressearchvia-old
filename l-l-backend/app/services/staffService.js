@@ -31,15 +31,13 @@ const __dirname = path.dirname(__filename);
  * Links to the Super Admin / Admin role.
  */
 export async function resolveAdminStaff() {
-  const adminEmail = (process.env.ADMIN_EMAIL || 'support@futurepride.in').toLowerCase().trim();
+  const adminEmail = (process.env.ADMIN_EMAIL || 'info@researchvia.in').toLowerCase().trim();
   const adminRole = await roleModel.findOne({ name: { $regex: /^admin$/i } });
   const adminDept = await departmentModel.findOne({ name: { $regex: /^admin$/i } });
 
   const queryOr = [
     { emailAddress: adminEmail },
-    { emailAddress: 'support@futurepride.in' },
-    { emailAddress: 'admin@futurepride.in' },
-    { emailAddress: 'info@futurepride.in' },
+    { emailAddress: 'info@researchvia.in' },
     { role: { $regex: /^admin$/i } },
     { roleName: { $regex: /^admin$/i } }
   ];
@@ -57,9 +55,7 @@ export async function resolveAdminStaff() {
     const superAdminUser = await userModel.findOne({
       $or: [
         { email: adminEmail },
-        { email: 'support@futurepride.in' },
-        { email: 'admin@futurepride.in' },
-        { email: 'info@futurepride.in' },
+        { email: 'info@researchvia.in' },
         { userType: 'super_admin' }
       ]
     });
@@ -449,7 +445,7 @@ const staffService = {
       if (staffPhone && staffPhone.length === 10) {
         try {
           console.log(`[Staff SMS Gateway] Sending OTP to ${staffPhone} via Airtel IQ SMS...`);
-          const response = await sendOtpSms(staffPhone, otp, 'Future Pride Wealth Management');
+          const response = await sendOtpSms(staffPhone, otp, 'ResearchVia');
           if (response && (response.success || response.status == 200)) {
             smsSent = true;
           }
@@ -1225,7 +1221,7 @@ const staffService = {
             defaultRm = {
               fullName: 'Relationship Manager',
               mobileNumber: '+91 9755016839',
-              emailAddress: 'support@futurepride.in',
+              emailAddress: 'info@researchvia.in',
               department: 'Relationship Manager',
               staffId: ''
             };
@@ -1256,7 +1252,7 @@ const staffService = {
                 id: defaultRm.id || defaultRm.staffId || 'default_rm',
                 fullName: defaultRm.fullName || 'Relationship Manager',
                 mobileNumber: defaultRm.mobileNumber || '+91 9755016839',
-                emailAddress: defaultRm.emailAddress || 'support@futurepride.in',
+                emailAddress: defaultRm.emailAddress || 'info@researchvia.in',
                 department: defaultRm.department || 'Relationship Manager',
                 staffId: defaultRm.staffId || '',
                 isDefault: true
@@ -1353,7 +1349,7 @@ const staffService = {
           photoUrl: staff.photoUrl,
           joiningDate: staff.joiningDate || staff.createdAt,
           verified: staff.status === 'Active',
-          organization: 'Future Pride Research Pvt. Ltd.',
+          organization: 'SP ResearchVia Pvt. Ltd.',
           sebiReg: 'INH000015808 (SEBI Registered Research Analyst)',
           cin: 'U73200MP2023PTC069041',
           bseEnlistment: '6120',
@@ -1690,7 +1686,7 @@ const staffService = {
 
     return {
       outputFilePath,
-      fileName: `FuturePride_Staff_Agreement_${safeName}.pdf`,
+      fileName: `ResearchVia_Staff_Agreement_${safeName}.pdf`,
       employeeName
     };
   },
@@ -1718,7 +1714,7 @@ const staffService = {
       // Determine return redirect URL to bring staff back to webapp after signing
       let redirectUrl = customRedirectUrl;
       if (!redirectUrl) {
-        const frontendBase = (process.env.ADMIN_FRONTEND_URL || process.env.FRONTEND_URL || "https://admin.futurepride.in").replace(/\/+$/, "");
+        const frontendBase = (process.env.ADMIN_FRONTEND_URL || process.env.FRONTEND_URL || "https://admin.researchvia.in").replace(/\/+$/, "");
         redirectUrl = `${frontendBase}/job-terms-agreement?signed=true`;
       }
 
@@ -1818,12 +1814,12 @@ const staffService = {
           ? `${gatewayBase}/#/gateway/login/${docId}/${accessToken}/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`
           : `${gatewayBase}/#/gateway/login/${docId}/null/${encodeURIComponent(signerIdentifier)}?redirect_url=${encodeURIComponent(redirectUrl)}`;
 
-        // Send branded Future Pride email with signing link and PDF attachment
+        // Send branded ResearchVia email with signing link and PDF attachment
         if (staff.emailAddress && isPublicEmail(staff.emailAddress)) {
           try {
             await emailService.sendEmail({
               to: staff.emailAddress,
-              subject: "Action Required: Sign Your Future Pride Employment Agreement",
+              subject: "Action Required: Sign Your ResearchVia Employment Agreement",
               htmlContent: `
                 <h2>Welcome to the Team, ${staff.fullName}!</h2>
                 <p>Your employment joining agreement is prepared and ready for Aadhaar E-Sign.</p>
@@ -1833,7 +1829,7 @@ const staffService = {
                 <p><strong>Important Note:</strong> You will need your Aadhaar-linked mobile number to complete OTP verification on Digio.</p>
                 <p>After you complete e-signing, the HR and Compliance team will verify your agreement to fully activate your workspace.</p>
                 <br/>
-                <p>Best regards,<br/>HR & Compliance Team<br/>Future Pride</p>
+                <p>Best regards,<br/>HR & Compliance Team<br/>ResearchVia</p>
               `,
               attachments: fs.existsSync(outputFilePath) ? [{
                 filename: fileName,
@@ -1916,7 +1912,7 @@ const staffService = {
 
       let redirectUrl = customRedirectUrl;
       if (!redirectUrl) {
-        const frontendBase = (process.env.ADMIN_FRONTEND_URL || process.env.FRONTEND_URL || "https://admin.futurepride.in").replace(/\/+$/, "");
+        const frontendBase = (process.env.ADMIN_FRONTEND_URL || process.env.FRONTEND_URL || "https://admin.researchvia.in").replace(/\/+$/, "");
         redirectUrl = `${frontendBase}/job-terms-agreement?signed=true`;
       }
 
@@ -1977,13 +1973,13 @@ const staffService = {
         try {
           await emailService.sendEmail({
             to: staff.emailAddress,
-            subject: "Future Pride: Employment Agreement Verified & Approved",
+            subject: "ResearchVia: Employment Agreement Verified & Approved",
             htmlContent: `
               <h2>Congratulations, ${staff.fullName}!</h2>
               <p>Your employment agreement has been reviewed, verified, and approved by the Administration.</p>
               <p>Your employee workspace and dashboard access are now fully activated.</p>
               <br/>
-              <p>Welcome aboard!<br/>Future Pride Team</p>
+              <p>Welcome aboard!<br/>ResearchVia Team</p>
             `
           });
         } catch (mailErr) {
@@ -2044,7 +2040,7 @@ const staffService = {
               </div>
               <p>Please log in to your employee portal, review and correct the required details, and e-sign the updated agreement.</p>
               <br/>
-              <p>Regards,<br/>HR & Compliance Team<br/>Future Pride</p>
+              <p>Regards,<br/>HR & Compliance Team<br/>ResearchVia</p>
             `
           });
         } catch (mailErr) {

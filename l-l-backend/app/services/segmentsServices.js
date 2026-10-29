@@ -1769,7 +1769,7 @@ const segmentsService = {
           gstAmount: segmentsPayment.gstAmount,
           paymentRefId: utr || razorpay_payment_id,
           userActiveSegmentsId: userActiveSegment._id,
-          generatedBy: "Future Pride Admin",
+          generatedBy: "ResearchVia Admin",
         });
 
         return {

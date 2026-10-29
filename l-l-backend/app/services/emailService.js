@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
-const emailUser = (process.env.EMAIL_USER || 'support@futurepride.in').replace(/^["']|["']$/g, '');
-const emailPass = (process.env.EMAIL_PASS || 'Futurepride@2026').replace(/^["']|["']$/g, '');
+const emailUser = (process.env.EMAIL_USER || 'info@researchvia.in').replace(/^["']|["']$/g, '');
+const emailPass = (process.env.EMAIL_PASS || 'RVIAdewas#1122').replace(/^["']|["']$/g, '');
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.hostinger.com',
@@ -17,9 +17,9 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Standard branded Future Pride HTML email wrapper
+ * Standard branded ResearchVia HTML email wrapper
  */
-const htmlTemplate = (content, title = 'FUTURE PRIDE') => `
+const htmlTemplate = (content, title = 'RESEARCHVIA') => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,8 +51,8 @@ const htmlTemplate = (content, title = 'FUTURE PRIDE') => `
             ${content}
         </div>
         <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} <strong>Future Pride</strong>. All rights reserved.</p>
-            <p>Support: <a href="mailto:support@futurepride.in">support@futurepride.in</a> | Website: <a href="https://futurepride.in">futurepride.in</a></p>
+            <p>&copy; ${new Date().getFullYear()} <strong>ResearchVia</strong>. All rights reserved.</p>
+            <p>Support: <a href="mailto:info@researchvia.in">info@researchvia.in</a> | Website: <a href="https://researchvia.in">researchvia.in</a></p>
         </div>
     </div>
 </body>
@@ -63,11 +63,11 @@ const emailService = {
     /**
      * Send general branded email
      */
-    sendEmail: async ({ to, subject, htmlContent, title = 'FUTURE PRIDE', attachments = [] }) => {
+    sendEmail: async ({ to, subject, htmlContent, title = 'RESEARCHVIA', attachments = [] }) => {
         try {
             const isFullHtml = typeof htmlContent === 'string' && (htmlContent.includes('<!DOCTYPE') || htmlContent.includes('<html'));
             const mailOptions = {
-                from: `"Future Pride" <${emailUser}>`,
+                from: `"ResearchVia" <${emailUser}>`,
                 to: to, // Can be array of strings or comma-separated string
                 subject: subject,
                 html: isFullHtml ? htmlContent : htmlTemplate(htmlContent, title),
@@ -87,7 +87,7 @@ const emailService = {
      */
     sendOtpEmail: async ({ to, otp, recipientName = 'User', purpose = 'Staff Portal Login' }) => {
         try {
-            const subject = `Your Future Pride Verification Code: ${otp}`;
+            const subject = `Your ResearchVia Verification Code: ${otp}`;
             const bodyHtml = `
                 <h2 style="color:#163174;margin-top:0;font-size:20px;">Verification Code (OTP)</h2>
                 <p>Hello <strong>${recipientName}</strong>,</p>
@@ -95,17 +95,17 @@ const emailService = {
                 <div class="otp-box" style="text-align:center;margin:24px 0;padding:20px;background:#f8fafc;border:2px dashed #163174;border-radius:8px;">
                     <span class="otp-code" style="font-family:'Courier New',Courier,monospace;font-size:36px;font-weight:800;letter-spacing:8px;color:#163174;display:inline-block;">${otp}</span>
                 </div>
-                <p style="font-size:13px;color:#475569;">This code is valid for <strong>5 minutes</strong>. For security reasons, please do not share this OTP with anyone, including Future Pride staff.</p>
-                <p style="font-size:12px;color:#94a3b8;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:14px;">If you did not initiate this request, please contact our support team immediately at <a href="mailto:support@futurepride.in" style="color:#163174;text-decoration:none;">support@futurepride.in</a>.</p>
+                <p style="font-size:13px;color:#475569;">This code is valid for <strong>5 minutes</strong>. For security reasons, please do not share this OTP with anyone, including ResearchVia staff.</p>
+                <p style="font-size:12px;color:#94a3b8;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:14px;">If you did not initiate this request, please contact our support team immediately at <a href="mailto:info@researchvia.in" style="color:#163174;text-decoration:none;">info@researchvia.in</a>.</p>
                 <br/>
-                <p style="margin:0;color:#163174;font-weight:700;">Future Pride IT &amp; Security Team</p>
+                <p style="margin:0;color:#163174;font-weight:700;">ResearchVia IT &amp; Security Team</p>
             `;
 
             return await emailService.sendEmail({
                 to,
                 subject,
                 htmlContent: bodyHtml,
-                title: 'FUTURE PRIDE'
+                title: 'RESEARCHVIA'
             });
         } catch (error) {
             console.error("Error in sendOtpEmail:", error);
@@ -114,7 +114,7 @@ const emailService = {
     },
 
     // Helper to just return the template for preview
-    getTemplatePreview: (content, title = 'FUTURE PRIDE') => {
+    getTemplatePreview: (content, title = 'RESEARCHVIA') => {
         return htmlTemplate(content, title);
     }
 };

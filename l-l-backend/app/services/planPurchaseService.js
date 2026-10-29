@@ -1906,6 +1906,10 @@ const planPurchaseService = {
               body = body.split(key).join(replacements[key]);
             });
 
+            // Ensure no legacy company name leaks into expiry alerts
+            title = title.replace(/future\s*pride/gi, 'ResearchVia');
+            body = body.replace(/future\s*pride/gi, 'ResearchVia');
+
             // 1. Send Push Notification (Robust via Repository)
             const tokens = await getUserTokens(user._id);
             if (tokens && tokens.length > 0) {
@@ -1916,14 +1920,8 @@ const planPurchaseService = {
               });
             }
 
-            // 2. Send Email
-            if (user.email) {
-              await emailService.sendEmail({
-                to: user.email,
-                subject: title,
-                htmlContent: `<p>Hello ${user.fullName || 'User'},</p><p>${body}</p><p>Regards,<br>Team ResearchVia</p>`
-              });
-            }
+            // 2. Email expiry alerts disabled - no expiry alerts sent via email
+            // (Push notifications continue via FCM)
 
           }
         }

@@ -89,7 +89,7 @@ const sendMobileOtp = async (phone, otp) => {
         const { valid, last10 } = normalizeIndianMobile(phone);
         const targetPhone = valid ? last10 : phone;
         console.log(`[SMS Gateway] Sending applicant mobile OTP to ${targetPhone} via Airtel IQ SMS...`);
-        const result = await sendOtpSms(targetPhone, otp, 'Future Pride Wealth Management');
+        const result = await sendOtpSms(targetPhone, otp, 'ResearchVia');
         return result && (result.success || result.status === 200);
     } catch (e) {
         console.error('[SMS Gateway] Error sending mobile SMS:', e.message);
@@ -221,7 +221,7 @@ const applicantController = {
 
             const token = jwt.sign(
                 { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
-                process.env.JWT_TOKEN || 'futurepride-jwt-secret',
+                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
                 { expiresIn: '24h' }
             );
 
@@ -306,7 +306,7 @@ const applicantController = {
 
             const token = jwt.sign(
                 { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
-                process.env.JWT_TOKEN || 'futurepride-jwt-secret',
+                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
                 { expiresIn: '24h' }
             );
 

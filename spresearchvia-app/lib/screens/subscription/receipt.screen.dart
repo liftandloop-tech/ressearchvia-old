@@ -1107,7 +1107,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                           ),
                           SizedBox(height: 8),
                           Text(
-                            'Support: For billing queries, contact support@researchvia.in',
+                            'Support: For billing queries, contact info@researchvia.in',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontFamily: 'Poppins',
@@ -1712,7 +1712,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Support: For billing queries, contact support@researchvia.in',
+                    'Support: For billing queries, contact info@researchvia.in',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontFamily: 'Poppins', fontSize: 10,
