@@ -103,7 +103,7 @@ const sendEmailOtp = async (email, otp) => {
         const cleanEmail = email ? email.trim() : '';
         if (!cleanEmail) return false;
 
-        console.log(`[Email Gateway] Sending applicant OTP to ${cleanEmail}`);
+        console.log(`🔑 [Applicant OTP] Generated code for ${cleanEmail}: ${otp}`);
         const result = await emailService.sendOtpEmail({
             to: cleanEmail,
             otp: otp,

@@ -27,9 +27,10 @@ class AppConfig {
     if (kIsWeb) {
       try {
         final origin = Uri.base.origin;
-        if (origin.isNotEmpty &&
-            !origin.contains('localhost') &&
-            !origin.contains('127.0.0.1')) {
+        if (origin.isNotEmpty) {
+          if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
+            return 'http://localhost:8080/api';
+          }
           return '$origin/api';
         }
       } catch (_) {}
