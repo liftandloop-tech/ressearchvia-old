@@ -5,6 +5,15 @@ import '../models/staff.model.dart';
 import '../models/applicant.model.dart';
 
 class ApplicantService extends ApiService {
+  String _extractMsg(dynamic body, [String fallback = 'An error occurred']) {
+    if (body is Map) {
+      return (body['message'] ?? body['error'])?.toString() ?? fallback;
+    }
+    if (body is String && body.trim().isNotEmpty) {
+      return body;
+    }
+    return fallback;
+  }
   Future<({bool success, String? applicantId, String? emailAddress, String? message})> createAccount(String email, String password) async {
     try {
       final response = await post('/staff/applicant/create-account', {
@@ -85,11 +94,11 @@ class ApplicantService extends ApiService {
       final response = await post('/staff/applicant/forgot-password-otp', {
         'emailAddress': email.trim().toLowerCase(),
       });
-      if (response.statusCode == 200 && response.body != null) {
+      if (response.statusCode == 200 && response.body != null && response.body is Map) {
         final hasPass = response.body['data']?['hasExistingPassword'] == true;
         return (success: true, message: response.body['message']?.toString() ?? 'OTP sent to email', hasExistingPassword: hasPass);
       }
-      return (success: false, message: response.body?['message']?.toString() ?? 'Failed to send OTP', hasExistingPassword: false);
+      return (success: false, message: _extractMsg(response.body, response.statusText ?? 'Failed to send OTP'), hasExistingPassword: false);
     } catch (e) {
       debugPrint('Error sending forgot password OTP: $e');
       return (success: false, message: e.toString(), hasExistingPassword: false);
@@ -107,14 +116,14 @@ class ApplicantService extends ApiService {
         'otp': otp.trim(),
         'newPassword': newPassword,
       });
-      if (response.statusCode == 200 && response.body != null) {
+      if (response.statusCode == 200 && response.body != null && response.body is Map) {
         final data = response.body['data'] as Map<String, dynamic>?;
         final appData = data?['applicant'] as Map<String, dynamic>?;
         final token = data?['token']?.toString();
         final step = data?['currentStep'] is int ? data!['currentStep'] as int : int.tryParse(data?['currentStep']?.toString() ?? '1') ?? 1;
         return (success: true, applicant: appData, token: token, currentStep: step, message: response.body['message']?.toString());
       }
-      return (success: false, applicant: null, token: null, currentStep: 1, message: response.body?['message']?.toString() ?? 'Reset failed');
+      return (success: false, applicant: null, token: null, currentStep: 1, message: _extractMsg(response.body, response.statusText ?? 'Reset failed'));
     } catch (e) {
       debugPrint('Error resetting password: $e');
       return (success: false, applicant: null, token: null, currentStep: 1, message: e.toString());
