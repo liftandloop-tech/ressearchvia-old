@@ -80,6 +80,47 @@ class ApplicantService extends ApiService {
     }
   }
 
+  Future<({bool success, String? message, bool hasExistingPassword})> sendForgotPasswordOtp(String email) async {
+    try {
+      final response = await post('/staff/applicant/forgot-password-otp', {
+        'emailAddress': email.trim().toLowerCase(),
+      });
+      if (response.statusCode == 200 && response.body != null) {
+        final hasPass = response.body['data']?['hasExistingPassword'] == true;
+        return (success: true, message: response.body['message']?.toString() ?? 'OTP sent to email', hasExistingPassword: hasPass);
+      }
+      return (success: false, message: response.body?['message']?.toString() ?? 'Failed to send OTP', hasExistingPassword: false);
+    } catch (e) {
+      debugPrint('Error sending forgot password OTP: $e');
+      return (success: false, message: e.toString(), hasExistingPassword: false);
+    }
+  }
+
+  Future<({bool success, Map<String, dynamic>? applicant, String? token, int currentStep, String? message})> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await post('/staff/applicant/reset-password', {
+        'emailAddress': email.trim().toLowerCase(),
+        'otp': otp.trim(),
+        'newPassword': newPassword,
+      });
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body['data'] as Map<String, dynamic>?;
+        final appData = data?['applicant'] as Map<String, dynamic>?;
+        final token = data?['token']?.toString();
+        final step = data?['currentStep'] is int ? data!['currentStep'] as int : int.tryParse(data?['currentStep']?.toString() ?? '1') ?? 1;
+        return (success: true, applicant: appData, token: token, currentStep: step, message: response.body['message']?.toString());
+      }
+      return (success: false, applicant: null, token: null, currentStep: 1, message: response.body?['message']?.toString() ?? 'Reset failed');
+    } catch (e) {
+      debugPrint('Error resetting password: $e');
+      return (success: false, applicant: null, token: null, currentStep: 1, message: e.toString());
+    }
+  }
+
   Future<({bool success, String? message})> sendMobileOtp(String applicantId, String mobileNumber) async {
     try {
       final response = await post('/staff/applicant/send-mobile-otp', {

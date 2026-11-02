@@ -41,6 +41,8 @@ const staffRoutes = () => {
     Router.post("/applicant/verify-account-email", applicantController.verifyAccountEmail)
     Router.post("/applicant/resend-email-otp", applicantController.resendEmailOtp)
     Router.post("/applicant/continue-login", applicantController.continueLogin)
+    Router.post("/applicant/forgot-password-otp", applicantController.forgotPasswordOtp)
+    Router.post("/applicant/reset-password", applicantController.resetPassword)
     Router.post("/applicant/send-mobile-otp", applicantController.sendMobileOtp)
     Router.post("/applicant/verify-mobile-otp", applicantController.verifyMobileOtp)
     Router.put("/applicant/save-step/:id", applicantController.saveStep)

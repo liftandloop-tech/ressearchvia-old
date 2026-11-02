@@ -331,6 +331,142 @@ const applicantController = {
         }
     },
 
+    forgotPasswordOtp: async (req, res) => {
+        try {
+            const { emailAddress } = req.body;
+            if (!emailAddress || !emailAddress.trim()) {
+                return res.status(400).send({ status: 400, message: "Email address is required", data: {} });
+            }
+
+            const cleanEmail = emailAddress.trim().toLowerCase();
+
+            // Check applicantModel first
+            let applicant = await applicantModel.findOne({ emailAddress: cleanEmail });
+
+            // If not found in applicants, check if they exist in staffModel (e.g. walk-in applicant recorded in staff)
+            if (!applicant) {
+                const staffRecord = await staffModel.findOne({ emailAddress: cleanEmail });
+                if (staffRecord) {
+                    const applicantId = await generateNextApplicantId();
+                    applicant = await applicantModel.create({
+                        applicantId,
+                        fullName: staffRecord.fullName || staffRecord.name || '',
+                        emailAddress: cleanEmail,
+                        mobileNumber: staffRecord.mobileNumber || null,
+                        isDraft: false,
+                        currentStep: 1,
+                        stage: 'APPLIED',
+                        walkInForm: staffRecord.walkInForm || null,
+                        stageHistory: [{
+                            stage: 'APPLIED',
+                            note: 'Migrated from staff record for application resume',
+                            changedAt: new Date()
+                        }]
+                    });
+                }
+            }
+
+            if (!applicant) {
+                return res.status(404).send({
+                    status: 404,
+                    message: "No application found with this email. Please click 'Create Application Account' to start.",
+                    data: {}
+                });
+            }
+
+            const otp = generateOtp();
+            applicant.emailOtp = otp;
+            applicant.emailOtpExpires = new Date(Date.now() + 10 * 60000);
+            await applicant.save();
+
+            await sendEmailOtp(cleanEmail, otp);
+
+            return res.status(200).send({
+                status: 200,
+                message: "Verification code sent to your registered email address.",
+                data: {
+                    emailAddress: cleanEmail,
+                    hasExistingPassword: !!applicant.password
+                }
+            });
+        } catch (error) {
+            console.error("[forgotPasswordOtp Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    resetPassword: async (req, res) => {
+        try {
+            const { emailAddress, otp, newPassword } = req.body;
+            if (!emailAddress || !otp || !newPassword) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "Email address, OTP, and new password are required",
+                    data: {}
+                });
+            }
+
+            if (newPassword.length < 6) {
+                return res.status(400).send({
+                    status: 400,
+                    message: "Password must be at least 6 characters long",
+                    data: {}
+                });
+            }
+
+            const cleanEmail = emailAddress.trim().toLowerCase();
+            const applicant = await applicantModel.findOne({ emailAddress: cleanEmail }).select('+password +emailOtp +emailOtpExpires');
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant profile not found", data: {} });
+            }
+
+            const submittedOtp = String(otp).trim();
+            const now = Date.now();
+            const isExpired = !applicant.emailOtpExpires || new Date(applicant.emailOtpExpires).getTime() < now;
+
+            if (String(applicant.emailOtp).trim() !== submittedOtp || isExpired) {
+                return res.status(400).send({ status: 400, message: "Invalid or expired OTP", data: {} });
+            }
+
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
+            applicant.password = hashedPassword;
+            applicant.emailOtp = null;
+            applicant.emailOtpExpires = null;
+            applicant.isEmailVerified = true;
+            await applicant.save();
+
+            // Also sync password to staff record if one exists with the same email
+            await staffModel.updateOne(
+                { emailAddress: cleanEmail },
+                { $set: { password: hashedPassword, updatedAt: new Date() } }
+            );
+
+            const token = jwt.sign(
+                { _id: applicant._id.toString(), email: applicant.emailAddress, type: 'applicant' },
+                process.env.JWT_TOKEN || 'researchvia-jwt-secret',
+                { expiresIn: '24h' }
+            );
+
+            const data = applicant.toObject();
+            delete data.password;
+            delete data.emailOtp;
+            delete data.mobileOtp;
+
+            return res.status(200).send({
+                status: 200,
+                message: "Password set successfully. Continuing to your application...",
+                data: {
+                    applicant: data,
+                    token,
+                    currentStep: applicant.currentStep || 1
+                }
+            });
+        } catch (error) {
+            console.error("[resetPassword Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
     sendMobileOtp: async (req, res) => {
         try {
             const { applicantId, mobileNumber } = req.body;
