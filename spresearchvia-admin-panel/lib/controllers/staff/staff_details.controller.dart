@@ -1,7 +1,9 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../models/staff.model.dart';
 import '../../services/staff.service.dart';
+import '../../ui/widgets/video_kyc_recorder_dialog.widget.dart';
 
 class StaffDetailsController extends GetxController {
   final StaffService _staffService = Get.isRegistered<StaffService>() ? Get.find<StaffService>() : Get.put(StaffService());
@@ -10,9 +12,12 @@ class StaffDetailsController extends GetxController {
   var isVerifying = false.obs;
   var isRejecting = false.obs;
   var isInitiatingAgreement = false.obs;
+  var uploadingDocType = ''.obs;
   var staffId = ''.obs;
   var staff = Rxn<StaffModel>();
   var selectedTabIndex = 0.obs;
+
+  void setTab(int index) => selectedTabIndex.value = index;
 
   @override
   void onInit() {
@@ -36,6 +41,108 @@ class StaffDetailsController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> uploadDoc(String type) async {
+    final currentStaff = staff.value;
+    if (currentStaff == null) return;
+
+    try {
+      FilePickerResult? result;
+      if (type == 'video') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.video,
+          withData: true,
+        );
+      } else if (type == 'photo') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          withData: true,
+        );
+      } else if (type == 'resume') {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+          withData: true,
+        );
+      } else {
+        result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+          withData: true,
+        );
+      }
+
+      if (result != null && result.files.isNotEmpty) {
+        final pickedFile = result.files.single;
+        final bytes = pickedFile.bytes;
+
+        if (bytes == null || bytes.isEmpty) {
+          Get.snackbar('Upload Failed', 'Could not read file data. Please try again.',
+              backgroundColor: Colors.red.withValues(alpha: 0.1));
+          return;
+        }
+
+        String fileName = pickedFile.name.trim();
+        final isVideo = type == 'video';
+        final hasExt = fileName.contains('.') && fileName.split('.').last.trim().isNotEmpty;
+        if (!hasExt || fileName.toLowerCase() == 'blob' || fileName.toLowerCase() == 'image') {
+          final defaultExt = isVideo ? 'mp4' : 'jpg';
+          fileName = '${type}_${DateTime.now().millisecondsSinceEpoch}.$defaultExt';
+        }
+
+        uploadingDocType.value = type;
+        final res = isVideo
+            ? await _staffService.uploadStaffVideo(currentStaff.id, bytes, fileName)
+            : await _staffService.uploadStaffDocument(currentStaff.id, type, bytes, fileName);
+
+        uploadingDocType.value = '';
+        if (res.success) {
+          if (res.staff != null) {
+            staff.value = res.staff;
+          }
+          staff.refresh();
+          await fetchStaffDetails();
+          Get.snackbar('Upload Success', '${type.toUpperCase()} file uploaded',
+              backgroundColor: Colors.green.withValues(alpha: 0.1));
+        } else {
+          Get.snackbar('Upload Failed', res.message ?? 'An error occurred during upload',
+              backgroundColor: Colors.red.withValues(alpha: 0.1));
+        }
+      }
+    } catch (e) {
+      uploadingDocType.value = '';
+      Get.snackbar('Error', 'Failed to upload document: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
+    }
+  }
+
+  Future<void> handleVideoKyc(BuildContext context) async {
+    final currentStaff = staff.value;
+    if (currentStaff == null) return;
+    await VideoKycRecorderDialog.showChoice(
+      context: context,
+      applicantName: currentStaff.name,
+      onVideoRecorded: (bytes, filename) async {
+        uploadingDocType.value = 'video';
+        final res = await _staffService.uploadStaffVideo(currentStaff.id, bytes, filename);
+        uploadingDocType.value = '';
+        if (res.success) {
+          if (res.staff != null) {
+            staff.value = res.staff;
+          }
+          staff.refresh();
+          await fetchStaffDetails();
+          Get.snackbar('Upload Success', 'KYC Video uploaded successfully',
+              backgroundColor: Colors.green.withValues(alpha: 0.1));
+          return true;
+        } else {
+          Get.snackbar('Upload Failed', res.message ?? 'An error occurred during upload',
+              backgroundColor: Colors.red.withValues(alpha: 0.1));
+          return false;
+        }
+      },
+      onFallbackUpload: () => uploadDoc('video'),
+    );
   }
 
   Future<bool> verifyAgreement() async {

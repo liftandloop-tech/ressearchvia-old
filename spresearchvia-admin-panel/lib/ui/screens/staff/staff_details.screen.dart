@@ -81,15 +81,13 @@ class StaffDetailsScreen extends StatelessWidget {
                     Obx(() {
                       switch (controller.selectedTabIndex.value) {
                         case 0:
-                          return _buildOverviewTab(staff);
+                          return _buildPersonalAndContactTab(context, controller, staff);
                         case 1:
-                          return _buildWalkInTab(staff);
+                          return _buildEducationAndProfessionalTab(context, controller, staff);
                         case 2:
-                          return _buildCareerTab(staff);
-                        case 3:
-                          return _buildDocumentsTab(context, staff, controller);
+                          return _buildOccupationalAndKycTab(context, controller, staff);
                         default:
-                          return _buildOverviewTab(staff);
+                          return _buildPersonalAndContactTab(context, controller, staff);
                       }
                     }),
                     const SizedBox(height: 40),
@@ -343,57 +341,74 @@ class StaffDetailsScreen extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // Sleek Segmented Tab Selector
+  // Step-Flow Segmented Tab Selector (Matching Applicant View)
   // ---------------------------------------------------------------------------
   Widget _buildTabBar(StaffDetailsController controller) {
     final tabs = [
-      {'title': 'Overview & Profile', 'icon': Icons.badge_outlined},
-      {'title': 'Walk-In Application', 'icon': Icons.description_outlined},
-      {'title': 'Education & Career', 'icon': Icons.school_outlined},
-      {'title': 'KYC & Documents', 'icon': Icons.folder_shared_outlined},
+      {'step': 1, 'title': 'Personal & Contact Details'},
+      {'step': 2, 'title': 'Education & Professional Details'},
+      {'step': 3, 'title': 'Occupational & KYC Details'},
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Obx(
-        () => Row(
-          children: tabs.asMap().entries.map((entry) {
-            final index = entry.key;
-            final tab = entry.value;
-            final isSelected = controller.selectedTabIndex.value == index;
-
+    return Obx(() {
+      final selected = controller.selectedTabIndex.value;
+      return Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: List.generate(tabs.length, (idx) {
+            final isSelected = selected == idx;
+            final item = tabs[idx];
             return Expanded(
               child: InkWell(
-                onTap: () => controller.selectedTabIndex.value = index,
+                onTap: () => controller.setTab(idx),
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: isSelected ? Colors.white : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: isSelected
-                        ? const [BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))]
+                        ? const [BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 1))]
                         : null,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        tab['icon'] as IconData,
-                        size: 15,
-                        color: isSelected ? AppTheme.primaryBlue : const Color(0xFF64748B),
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF163174) : const Color(0xFFE2E8F0),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${item['step']}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? Colors.white : const Color(0xFF64748B),
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 7),
-                      Text(
-                        tab['title'] as String,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          color: isSelected ? AppTheme.primaryBlue : const Color(0xFF475569),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          item['title'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? const Color(0xFF163174) : const Color(0xFF64748B),
+                          ),
                         ),
                       ),
                     ],
@@ -401,323 +416,663 @@ class StaffDetailsScreen extends StatelessWidget {
                 ),
               ),
             );
-          }).toList(),
+          }),
+        ),
+      );
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // STEP 1: Personal & Contact Details Tab
+  // ---------------------------------------------------------------------------
+  Widget _buildPersonalAndContactTab(
+    BuildContext context,
+    StaffDetailsController controller,
+    StaffModel staff,
+  ) {
+    final w = staff.walkInForm;
+    final raw = staff.rawJson ?? {};
+
+    String cleanDob(String? rawDob) {
+      if (rawDob == null || rawDob.isEmpty) return 'Not specified';
+      if (rawDob.contains('T')) return rawDob.split('T').first;
+      if (rawDob.contains(' ')) return rawDob.split(' ').first;
+      return rawDob;
+    }
+
+    final dobVal = cleanDob(staff.dob ?? (raw['dob']?.toString() ?? (w?.dob.isNotEmpty == true ? w!.dob : null)));
+    final fatherNameVal = staff.fatherName ?? (raw['fatherName']?.toString() ?? 'Not specified');
+    final maritalStatusVal = staff.maritalStatus ?? (raw['maritalStatus']?.toString() ?? (w?.maritalStatus.isNotEmpty == true ? w!.maritalStatus : 'Not specified'));
+    final genderVal = staff.gender ?? (raw['gender']?.toString() ?? (w?.gender.isNotEmpty == true ? w!.gender : 'Not specified'));
+    final currentCityVal = staff.currentLocation ?? (raw['currentLocation']?.toString() ?? (raw['city']?.toString() ?? (w?.currentLocation.isNotEmpty == true ? w!.currentLocation : 'Not specified')));
+    final skypeOrLinkedInVal = staff.skypeOrLinkedIn ?? (raw['skypeAddress']?.toString() ?? (raw['skypeOrLinkedIn']?.toString() ?? (w?.skypeAddress.isNotEmpty == true ? w!.skypeAddress : '')));
+    final appliedPositionVal = (w?.appliedPosition.isNotEmpty == true) ? w!.appliedPosition : (raw['appliedPosition']?.toString() ?? (staff.role.isNotEmpty ? staff.role : 'General'));
+    final aadhaarNumberVal = staff.aadhaarNumber ?? (raw['aadhaarNumber']?.toString() ?? (raw['proofOfAddressNumber']?.toString() ?? 'Not specified'));
+    final panNumberVal = staff.panNumber ?? (raw['panNumber']?.toString() ?? '');
+    final altEmailVal = staff.alternateEmail ?? (raw['alternateEmail']?.toString() ?? '—');
+    final resPhoneVal = raw['telephoneResidence']?.toString() ?? (raw['telephoneResidenceNumber']?.toString() ?? '—');
+
+    // Address Parsing
+    final currentAddr = raw['currentAddress'] is Map ? (raw['currentAddress'] as Map) : null;
+    final permAddr = raw['permanentAddress'] is Map ? (raw['permanentAddress'] as Map) : null;
+
+    final currLine1 = currentAddr?['line1']?.toString() ?? currentAddr?['street']?.toString() ?? (staff.localAddress ?? (currentCityVal != 'Not specified' ? currentCityVal : 'Not specified'));
+    final currLine2 = currentAddr?['line2']?.toString() ?? '';
+    final currLine3 = currentAddr?['line3']?.toString() ?? '';
+    final currCity = currentAddr?['city']?.toString() ?? currentCityVal;
+    final currState = currentAddr?['state']?.toString() ?? (raw['state']?.toString() ?? 'Madhya Pradesh');
+    final currCountry = currentAddr?['country']?.toString() ?? (raw['country']?.toString() ?? 'India');
+    final currPincode = currentAddr?['pincode']?.toString() ?? (currentAddr?['zip']?.toString() ?? (raw['pincode']?.toString() ?? '—'));
+
+    final sameAsCurrent = raw['sameAsCurrentAddress'] == true || raw['sameAsCurrent'] == true;
+    final permLine1 = permAddr?['line1']?.toString() ?? permAddr?['street']?.toString() ?? (staff.permanentAddress ?? (sameAsCurrent ? 'Same as Current Address' : (currLine1 != 'Not specified' ? currLine1 : 'Not specified')));
+    final permCity = permAddr?['city']?.toString() ?? (sameAsCurrent ? currCity : '—');
+    final permState = permAddr?['state']?.toString() ?? (sameAsCurrent ? currState : '—');
+    final permPincode = permAddr?['pincode']?.toString() ?? (sameAsCurrent ? currPincode : '—');
+
+    // Documents
+    final photo = staff.photoUrl ?? raw['photoUrl']?.toString();
+    final resume = staff.resumeUrl ?? raw['resumeUrl']?.toString();
+    final aadhaar = staff.aadhaarUrl ?? raw['aadhaarUrl']?.toString() ?? raw['proofOfAddressUrl']?.toString();
+    final aadhaarBack = staff.aadhaarBackUrl ?? raw['aadhaarBackUrl']?.toString();
+    final pan = staff.panUrl ?? raw['panUrl']?.toString();
+
+    return Column(
+      children: [
+        // Uploaded Compliance & Identity Proofs (Step 1)
+        _buildSectionCard(
+          title: 'Identity & Application Documents',
+          subtitle: 'Profile photo, resume, and government identity verification documents.',
+          child: Column(
+            children: [
+              _buildDocRow(context, controller, 'Profile Photo *', 'photo', photo, Icons.account_circle_outlined),
+              const SizedBox(height: 10),
+              _buildDocRow(context, controller, 'Resume / CV *', 'resume', resume, Icons.description_outlined),
+              const SizedBox(height: 10),
+              _buildDocRow(context, controller, 'Aadhaar Card (Front) *', 'aadhaarFront', aadhaar, Icons.badge_outlined),
+              const SizedBox(height: 10),
+              _buildDocRow(context, controller, 'Aadhaar Card (Back) *', 'aadhaarBack', aadhaarBack, Icons.badge_outlined),
+              const SizedBox(height: 10),
+              _buildDocRow(context, controller, 'PAN Card (Optional)', 'pan', pan, Icons.credit_card_outlined),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Personal & Contact Information
+        _buildSectionCard(
+          title: 'Personal & Identity Information',
+          subtitle: 'Candidate identity, family background, and primary communication coordinates.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Full Legal Name', staff.name),
+                _buildDataTile("Father's Name", fatherNameVal),
+                _buildDataTile('Date of Birth', dobVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Gender', genderVal),
+                _buildDataTile('Marital Status', maritalStatusVal),
+                _buildDataTile('Current City', currentCityVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Position Applied For', appliedPositionVal),
+                _buildDataTile('Email Address', staff.email),
+                _buildDataTile('Alternate Email ID', altEmailVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Mobile Phone', staff.mobile),
+                _buildDataTile('Telephone Residence', resPhoneVal),
+                _buildDataTile('Aadhaar Number', aadhaarNumberVal),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('PAN Number (Optional)', panNumberVal.isNotEmpty ? panNumberVal : 'Not provided'),
+                if (skypeOrLinkedInVal.isNotEmpty)
+                  _buildDataTile('LinkedIn / Skype ID', skypeOrLinkedInVal)
+                else
+                  const SizedBox(),
+                const SizedBox(),
+              ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Current Address
+        _buildSectionCard(
+          title: 'Current Residential Address',
+          subtitle: 'Local residence and current physical living coordinates.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Address Line 1', currLine1),
+                _buildDataTile('Address Line 2', currLine2.isNotEmpty ? currLine2 : '—'),
+                _buildDataTile('Address Line 3 / Landmark', currLine3.isNotEmpty ? currLine3 : '—'),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('City', currCity),
+                _buildDataTile('State', currState),
+                _buildDataTile('Country / Pincode', '$currCountry - $currPincode'),
+              ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Permanent Address
+        _buildSectionCard(
+          title: 'Permanent Address',
+          subtitle: 'Permanent hometown domicile recorded on application.',
+          child: _buildRow([
+            _buildDataTile('Street / Address', permLine1),
+            _buildDataTile('City & State', '$permCity, $permState'),
+            _buildDataTile('Pincode', permPincode),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // STEP 2: Education & Professional Details Tab
+  // ---------------------------------------------------------------------------
+  Widget _buildEducationAndProfessionalTab(
+    BuildContext context,
+    StaffDetailsController controller,
+    StaffModel staff,
+  ) {
+    final w = staff.walkInForm;
+    final raw = staff.rawJson ?? {};
+
+    // Education
+    final highestQual = staff.highestQualification ?? (raw['highestQualification']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.degree : '—'));
+    final majorSub = staff.majorSubject ?? (raw['majorSubject']?.toString() ?? '—');
+    final univ = staff.instituteUniversity ?? (raw['instituteUniversity']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.boardUniversity : '—'));
+    final String passYear = staff.yearOfPassing != null ? '${staff.yearOfPassing}' : (raw['yearOfPassing']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.passingYear : '—'));
+    final pctGrade = staff.percentageGrade ?? (raw['percentageGrade']?.toString() ?? (w?.educationList.isNotEmpty == true ? w!.educationList.last.percentage : '—'));
+
+    // Professional Certification (NISM)
+    final profCert = staff.professionalCertification ?? (raw['professionalCertification']?.toString() ?? (raw['selectedProfessionalCert']?.toString() ?? 'None'));
+    final hasNismCert = raw['hasNismCert'] == true || (profCert != 'None' && profCert != '—' && profCert.isNotEmpty);
+    final certRegNo = raw['certRegistrationNumber']?.toString() ?? (raw['nismCertificateNumber']?.toString() ?? (raw['licenseMembershipDetails']?.toString() ?? ''));
+
+    // Documents
+    final degreeDoc = staff.highestEducationUrl ?? raw['highestEducationUrl']?.toString();
+    final certDoc = staff.certDocumentUrl ?? staff.nismUrl ?? raw['certDocumentUrl']?.toString() ?? raw['nismUrl']?.toString();
+
+    return Column(
+      children: [
+        // Educational Background
+        _buildSectionCard(
+          title: 'Educational Details',
+          subtitle: 'Highest qualification degree, major subject, institute/university, and passing milestones.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Highest Qualification', highestQual),
+                _buildDataTile('Major Subject / Stream', majorSub),
+                _buildDataTile('Institute / University', univ),
+              ]),
+              const SizedBox(height: 14),
+              _buildRow([
+                _buildDataTile('Year of Passing', passYear),
+                _buildDataTile('Percentage / Grade', pctGrade),
+                const SizedBox(),
+              ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Degree Document
+        _buildSectionCard(
+          title: 'Highest Qualification Degree / Marksheet',
+          subtitle: 'Scanned copy or PDF of final graduation degree or highest marksheet.',
+          child: _buildDocRow(context, controller, 'Degree Certificate / Marksheet', 'education', degreeDoc, Icons.school_outlined),
+        ),
+        const SizedBox(height: 16),
+
+        // Professional Qualifications & NISM
+        _buildSectionCard(
+          title: 'Professional Qualifications & NISM Certifications',
+          subtitle: 'Regulatory certifications and professional accreditation details.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Certification Status', hasNismCert ? 'Yes (Certified)' : 'No / None'),
+                if (hasNismCert) ...[
+                  _buildDataTile('Selected Certification', profCert),
+                  _buildDataTile('Certificate / Registration No.', certRegNo.isNotEmpty ? certRegNo : 'Not specified'),
+                ] else ...[
+                  const SizedBox(),
+                  const SizedBox(),
+                ],
+              ]),
+              if (hasNismCert || (certDoc != null && certDoc.isNotEmpty)) ...[
+                const SizedBox(height: 14),
+                _buildDocRow(context, controller, 'Certificate Copy', 'certificate', certDoc, Icons.verified_user_outlined),
+              ],
+            ],
+          ),
+        ),
+        if (w != null && w.educationList.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            title: 'Structured Qualifications History',
+            subtitle: 'Detailed academic background and degree history recorded chronologically.',
+            child: _buildEducationTable(w.educationList),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // STEP 3: Occupational & KYC Details Tab
+  // ---------------------------------------------------------------------------
+  Widget _buildOccupationalAndKycTab(
+    BuildContext context,
+    StaffDetailsController controller,
+    StaffModel staff,
+  ) {
+    final w = staff.walkInForm;
+    final raw = staff.rawJson ?? {};
+
+    // Experience / Fresher
+    final isFresher = staff.isFresher ?? (raw['isFresher'] == true || raw['isFresher'] == 'true');
+    final currentCompany = staff.previousCompany ?? (raw['previousCompany']?.toString() ?? (raw['currentCompany']?.toString() ?? (w?.employmentList.isNotEmpty == true ? w!.employmentList.first.organisation : (w?.currentOrganisation.isNotEmpty == true ? w!.currentOrganisation : '—'))));
+    final currentDesignation = staff.currentDesignation ?? (raw['currentDesignation']?.toString() ?? (w?.employmentList.isNotEmpty == true ? w!.employmentList.first.designation : (w?.currentDesignation.isNotEmpty == true ? w!.currentDesignation : '—')));
+    final reportingManager = staff.reportingManagerName ?? (raw['reportingManagerName']?.toString() ?? (raw['reportingManager']?.toString() ?? (w?.reportingManagerName.isNotEmpty == true ? w!.reportingManagerName : '—')));
+    final reportingManagerDesig = staff.reportingManagerDesignation ?? (raw['reportingManagerDesignation']?.toString() ?? (w?.reportingManagerDesignation.isNotEmpty == true ? w!.reportingManagerDesignation : '—'));
+    final String expYears = staff.experienceYears != null ? '${staff.experienceYears} Years' : (raw['totalExperience']?.toString() ?? (w?.totalExperience.isNotEmpty == true ? w!.totalExperience : '—'));
+    final String directReportees = staff.reporteesCount != null ? '${staff.reporteesCount}' : (raw['reporteesCount']?.toString() ?? (w?.reporteesCount.isNotEmpty == true ? w!.reporteesCount : '0'));
+    final fixedSal = staff.fixedSalary ?? (raw['fixedSalary']?.toString() ?? (w?.fixedSalary.isNotEmpty == true ? w!.fixedSalary : '—'));
+    final bonusInc = staff.bonusIncentive ?? (raw['bonusIncentive']?.toString() ?? (w?.bonusIncentive.isNotEmpty == true ? w!.bonusIncentive : '0'));
+    final currentCtc = staff.lastCtc ?? (raw['annualCtc']?.toString() ?? (w?.totalSalary.isNotEmpty == true ? w!.totalSalary : '—'));
+    final expectedCtc = staff.expectedSalary ?? (raw['expectedSalary']?.toString() ?? (w?.expectedSalary.isNotEmpty == true ? w!.expectedSalary : 'Negotiable'));
+    final noticePer = staff.noticePeriod ?? (raw['noticePeriod']?.toString() ?? (w?.noticePeriod.isNotEmpty == true ? w!.noticePeriod : 'Immediate'));
+    final careerGapVal = staff.careerGapDetails ?? (raw['careerGap']?.toString() ?? (w?.careerGap.isNotEmpty == true ? w!.careerGap : 'None'));
+
+    // Emergency fields
+    final emName = staff.emergencyContact?.name ?? (raw['emergencyContact']?['name']?.toString() ?? 'Not recorded');
+    final emRel = staff.emergencyContact?.relation ?? (raw['emergencyContact']?['relation']?.toString() ?? 'Not recorded');
+    final emPhone = staff.emergencyContact?.phone ?? (raw['emergencyContact']?['phone']?.toString() ?? 'Not recorded');
+
+    // Documents
+    final relieving = staff.relievingLetterUrl ?? raw['relievingLetterUrl']?.toString();
+    final kycVideo = staff.kycVideoUrl ?? raw['kycVideoUrl']?.toString();
+    final hasVideo = kycVideo != null && kycVideo.isNotEmpty;
+
+    return Column(
+      children: [
+        // Occupational & Work Experience
+        _buildSectionCard(
+          title: 'Occupational & Work Experience',
+          subtitle: 'Employment status, compensation breakdown, management scope, and notice period.',
+          child: Column(
+            children: [
+              _buildRow([
+                _buildDataTile('Employment Status', isFresher ? 'Fresher' : 'Experienced ($expYears)'),
+                _buildDataTile('Current / Previous Company', isFresher ? 'N/A (Fresher)' : currentCompany),
+                _buildDataTile('Current Designation', isFresher ? 'N/A (Fresher)' : currentDesignation),
+              ]),
+              if (!isFresher) ...[
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Reporting Manager', reportingManager != '—' ? '$reportingManager ($reportingManagerDesig)' : '—'),
+                  _buildDataTile('Direct Reportees', directReportees),
+                  _buildDataTile('Total Experience', expYears),
+                ]),
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Fixed Salary (Monthly)', fixedSal),
+                  _buildDataTile('Bonus / Incentive', bonusInc),
+                  _buildDataTile('Current Total CTC', currentCtc),
+                ]),
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Expected CTC', expectedCtc),
+                  _buildDataTile('Notice Period', noticePer),
+                  _buildDataTile('Career Gap Details', careerGapVal),
+                ]),
+              ] else ...[
+                const SizedBox(height: 14),
+                _buildRow([
+                  _buildDataTile('Expected CTC', expectedCtc),
+                  _buildDataTile('Notice Period', noticePer),
+                  _buildDataTile('Direct Reportees', directReportees),
+                ]),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Relieving Letter / Experience Proof
+        if (!isFresher || (relieving != null && relieving.isNotEmpty)) ...[
+          _buildSectionCard(
+            title: 'Experience / Relieving Documentation',
+            subtitle: 'Relieving letter or experience certificate from last employer.',
+            child: _buildDocRow(context, controller, 'Relieving Letter *', 'relieving', relieving, Icons.work_history_outlined),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Previous Employment Table (if available)
+        if (w != null && w.employmentList.isNotEmpty) ...[
+          _buildSectionCard(
+            title: 'Previous Employment History',
+            subtitle: 'Chronological timeline of past corporate positions, responsibilities, and departures.',
+            child: _buildEmploymentTable(w.employmentList),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Emergency & Safety Contact
+        _buildSectionCard(
+          title: 'Emergency Contact Information',
+          subtitle: 'Primary contact person to notify in case of personal or workplace emergencies.',
+          child: _buildRow([
+            _buildDataTile('Contact Name', emName),
+            _buildDataTile('Relationship', emRel),
+            _buildDataTile('Contact Mobile', emPhone),
+          ]),
+        ),
+        const SizedBox(height: 16),
+
+        // Live Video KYC Verification
+        _buildSectionCard(
+          title: 'Live Video KYC Verification',
+          subtitle: 'Mandatory recorded device video KYC for identity and compliance audit.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: hasVideo ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: hasVideo ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasVideo ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                      size: 18,
+                      color: hasVideo ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        hasVideo
+                            ? 'Video KYC Recording Verified and Stored on Cloud'
+                            : 'Video KYC Pending • Candidate must record video verification before approval.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: hasVideo ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _buildDocRow(context, controller, 'Live KYC Verification Video', 'video', kycVideo, Icons.videocam_outlined, isVideo: true),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Digio Employment Agreement
+        _buildAgreementSection(context, staff, controller),
+
+        // Declarations if available
+        if (w != null && (w.policeRecord || w.interviewedBefore || w.differentlyAbled || w.majorIllness)) ...[
+          const SizedBox(height: 16),
+          _buildSectionCard(
+            title: 'Compliance & Legal Declarations',
+            subtitle: 'Mandatory statutory and organizational declarations.',
+            child: Column(
+              children: [
+                if (w.interviewedBefore)
+                  _buildDeclarationTile('Interviewed by company in last six months', w.interviewedBefore, w.interviewedBeforeDetails),
+                if (w.policeRecord) ...[
+                  const SizedBox(height: 10),
+                  _buildDeclarationTile('Past police records or legal proceedings', w.policeRecord, w.policeRecordDetails),
+                ],
+                if (w.differentlyAbled) ...[
+                  const SizedBox(height: 10),
+                  _buildDeclarationTile('Differently abled candidate', w.differentlyAbled, w.differentlyAbledDetails),
+                ],
+                if (w.majorIllness) ...[
+                  const SizedBox(height: 10),
+                  _buildDeclarationTile('History of major illness or medical treatment', w.majorIllness, w.majorIllnessDetails),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDocRow(
+    BuildContext context,
+    StaffDetailsController controller,
+    String label,
+    String type,
+    String? fileUrl,
+    IconData icon, {
+    bool isVideo = false,
+  }) {
+    final hasFile = fileUrl != null && fileUrl.isNotEmpty;
+
+    return Obx(() {
+      final isUploading = controller.uploadingDocType.value == type;
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: hasFile ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(icon, size: 16, color: hasFile ? const Color(0xFF2563EB) : const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    hasFile ? 'Uploaded and verified' : 'Not uploaded yet',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: hasFile ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasFile) ...[
+              OutlinedButton.icon(
+                onPressed: () {
+                  final fullUrl = AppConfig.buildImageUrl(fileUrl);
+                  final ext = isVideo ? '.mp4' : (fileUrl.toLowerCase().endsWith('.pdf') ? '.pdf' : '.png');
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => FilePreviewDialog(
+                      fileName: '$label$ext',
+                      fileUrl: fullUrl,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.visibility_outlined, size: 13),
+                label: const Text('View', style: TextStyle(fontSize: 11.5)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF334155),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            ElevatedButton.icon(
+              onPressed: isUploading ? null : () => (isVideo ? controller.handleVideoKyc(context) : controller.uploadDoc(type)),
+              icon: isUploading
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+                    )
+                  : Icon(isVideo ? (hasFile ? Icons.videocam : Icons.videocam_outlined) : (hasFile ? Icons.swap_horiz : Icons.file_upload_outlined), size: 13),
+              label: Text(
+                isUploading ? 'Uploading...' : (isVideo ? (hasFile ? 'Re-record' : 'Record / Upload') : (hasFile ? 'Replace' : 'Upload')),
+                style: const TextStyle(fontSize: 11.5),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: hasFile ? const Color(0xFFF1F5F9) : AppTheme.primaryBlue,
+                foregroundColor: hasFile ? const Color(0xFF334155) : Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildEducationTable(List<EducationEntryModel> list) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Table(
+          border: TableBorder.symmetric(inside: const BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+          columnWidths: const {
+            0: FlexColumnWidth(1.2),
+            1: FlexColumnWidth(2.0),
+            2: FlexColumnWidth(1.5),
+            3: FlexColumnWidth(1.0),
+            4: FlexColumnWidth(0.8),
+            5: FlexColumnWidth(0.8),
+          },
+          children: [
+            TableRow(
+              decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
+              children: [
+                _buildTableHeaderCell('Standard/Degree'),
+                _buildTableHeaderCell('Institute/College'),
+                _buildTableHeaderCell('Board/University'),
+                _buildTableHeaderCell('Course Type'),
+                _buildTableHeaderCell('Passing Year'),
+                _buildTableHeaderCell('% / CGPA'),
+              ],
+            ),
+            ...list.map((item) {
+              return TableRow(
+                children: [
+                  _buildTableCell(item.degree.isNotEmpty ? item.degree : item.standard),
+                  _buildTableCell(item.schoolCollege),
+                  _buildTableCell(item.boardUniversity),
+                  _buildTableCell(item.courseType),
+                  _buildTableCell(item.passingYear),
+                  _buildTableCell(item.percentage.isNotEmpty ? '${item.percentage}%' : '—'),
+                ],
+              );
+            }),
+          ],
         ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab 1: Overview & Profile
-  // ---------------------------------------------------------------------------
-  Widget _buildOverviewTab(StaffModel staff) {
-    final w = staff.walkInForm;
-
-    return Column(
-      children: [
-        _buildSectionCard(
-          title: 'Personal Details & Identity',
-          subtitle: 'Core demographic, contact, and identification information.',
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 16,
-            children: [
-              _buildDataTile('Full Name', staff.name),
-              _buildDataTile('Position Applied', (w?.appliedPosition.isNotEmpty == true) ? w!.appliedPosition : staff.role),
-              _buildDataTile('Date of Birth', staff.dob ?? (w?.dob.isNotEmpty == true ? w!.dob : 'N/A')),
-              _buildDataTile('Gender', staff.gender ?? (w?.gender.isNotEmpty == true ? w!.gender : 'N/A')),
-              _buildDataTile('Native Place (Hometown)', (w?.nativePlace.isNotEmpty == true) ? w!.nativePlace : 'N/A'),
-              _buildDataTile('Marital Status', (w?.maritalStatus.isNotEmpty == true) ? w!.maritalStatus : 'N/A'),
-              _buildDataTile('Current Location', (w?.currentLocation.isNotEmpty == true) ? w!.currentLocation : 'N/A'),
-              _buildDataTile('Skype / LinkedIn Handle', (w?.skypeAddress.isNotEmpty == true) ? w!.skypeAddress : 'N/A'),
-              _buildDataTile('Mobile Number', staff.mobile),
-              _buildDataTile('Email Address', staff.email),
-            ],
-          ),
+  Widget _buildEmploymentTable(List<EmploymentEntryModel> list) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-        const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'Residential Addresses',
-          subtitle: 'Current local address and permanent domicile address.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildAddressItem('Current / Residential Address', staff.localAddress ?? 'Not specified'),
-              const SizedBox(height: 12),
-              _buildAddressItem('Permanent Address', staff.permanentAddress ?? 'Same as current address'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (staff.emergencyContact != null)
-          _buildSectionCard(
-            title: 'Emergency Contact Information',
-            subtitle: 'Immediate contact for workplace health, safety, and urgent family alerts.',
-            child: Wrap(
-              spacing: 24,
-              runSpacing: 16,
+        child: Table(
+          border: TableBorder.symmetric(inside: const BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+          columnWidths: const {
+            0: FlexColumnWidth(1.3),
+            1: FlexColumnWidth(2.0),
+            2: FlexColumnWidth(1.5),
+            3: FlexColumnWidth(2.0),
+          },
+          children: [
+            TableRow(
+              decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
               children: [
-                _buildDataTile('Emergency Contact Person', staff.emergencyContact!.name.isNotEmpty ? staff.emergencyContact!.name : 'N/A'),
-                _buildDataTile('Relationship', staff.emergencyContact!.relation.isNotEmpty ? staff.emergencyContact!.relation : 'N/A'),
-                _buildDataTile('Emergency Contact Phone', staff.emergencyContact!.phone.isNotEmpty ? staff.emergencyContact!.phone : 'N/A'),
+                _buildTableHeaderCell('Duration'),
+                _buildTableHeaderCell('Organisation'),
+                _buildTableHeaderCell('Designation'),
+                _buildTableHeaderCell('Reason for Leaving'),
               ],
             ),
-          ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tab 2: Walk-In Application (Declarations & Screening)
-  // ---------------------------------------------------------------------------
-  Widget _buildWalkInTab(StaffModel staff) {
-    final w = staff.walkInForm;
-
-    if (w == null) {
-      return _buildEmptyTabMessage(
-        icon: Icons.assignment_outlined,
-        title: 'Walk-In Interview Form Not Attached',
-        subtitle: 'No walk-in application form data was recorded for this staff member.',
-      );
-    }
-
-    return Column(
-      children: [
-        _buildSectionCard(
-          title: 'Walk-In Screening & Lifestyle Declarations',
-          subtitle: 'Declarations signed during the walk-in recruitment and screening process.',
-          child: Column(
-            children: [
-              _buildDeclarationTile(
-                'Interviewed by company in last six months',
-                w.interviewedBefore,
-                w.interviewedBeforeDetails,
-              ),
-              const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildDeclarationTile(
-                'Tobacco / Smoking consumption',
-                w.smoke,
-                null,
-              ),
-              const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildDeclarationTile(
-                'Alcohol consumption',
-                w.alcohol,
-                null,
-              ),
-              const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildDeclarationTile(
-                'Differently abled candidate',
-                w.differentlyAbled,
-                w.differentlyAbledDetails,
-              ),
-              const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildDeclarationTile(
-                'Past police records or legal proceedings',
-                w.policeRecord,
-                w.policeRecordDetails,
-              ),
-              const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildDeclarationTile(
-                'History of major illness or medical treatment',
-                w.majorIllness,
-                w.majorIllnessDetails,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'Candidate Sourcing & Referral Details',
-          subtitle: 'Information about how the candidate discovered the job vacancy.',
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 16,
-            children: [
-              _buildDataTile('Application Date', w.applicationDate.isNotEmpty ? w.applicationDate : 'N/A'),
-              _buildDataTile('Vacancy Source Channel', w.source.isNotEmpty ? w.source : 'Not declared'),
-              _buildDataTile('Referrer / Source Details', w.sourceDetails.isNotEmpty ? w.sourceDetails : 'N/A'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Tab 3: Education & Career
-  // ---------------------------------------------------------------------------
-  Widget _buildCareerTab(StaffModel staff) {
-    final w = staff.walkInForm;
-
-    return Column(
-      children: [
-        // Education Table Card
-        _buildSectionCard(
-          title: 'Educational Qualifications',
-          subtitle: 'Academic background recorded in the walk-in application form.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (w?.educationList.isNotEmpty == true)
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                      headingTextStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                      dataTextStyle: const TextStyle(fontSize: 11.5, color: Color(0xFF1E293B)),
-                      columnSpacing: 16,
-                      horizontalMargin: 12,
-                      columns: const [
-                        DataColumn(label: Text('Class / Level')),
-                        DataColumn(label: Text('Degree / Stream')),
-                        DataColumn(label: Text('School / College')),
-                        DataColumn(label: Text('Board / Univ')),
-                        DataColumn(label: Text('Type')),
-                        DataColumn(label: Text('Year')),
-                        DataColumn(label: Text('Attempts')),
-                        DataColumn(label: Text('% / CGPA')),
-                      ],
-                      rows: w!.educationList.map((e) => DataRow(
-                        cells: [
-                          DataCell(Text(e.standard.isNotEmpty ? e.standard : '-')),
-                          DataCell(Text(e.degree.isNotEmpty ? e.degree : '-')),
-                          DataCell(Text(e.schoolCollege.isNotEmpty ? e.schoolCollege : '-')),
-                          DataCell(Text(e.boardUniversity.isNotEmpty ? e.boardUniversity : '-')),
-                          DataCell(Text(e.courseType.isNotEmpty ? e.courseType : '-')),
-                          DataCell(Text(e.passingYear.isNotEmpty ? e.passingYear : '-')),
-                          DataCell(Text(e.attempts.isNotEmpty ? e.attempts : '1')),
-                          DataCell(Text(e.percentage.isNotEmpty ? '${e.percentage}%' : '-')),
-                        ],
-                      )).toList(),
-                    ),
-                  ),
-                )
-              else
-                Text('No educational records logged.', style: TextStyle(fontSize: 12, color: AppTheme.gray500)),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 24,
-                runSpacing: 8,
+            ...list.map((item) {
+              return TableRow(
                 children: [
-                  _buildDataTile('Academic Gap', (w?.academicGap == true) ? 'Yes (${w?.academicGapDetails})' : 'No gap reported'),
-                  _buildDataTile('Backlogs / ATKTs', (w?.backlogsCount.isNotEmpty == true) ? w!.backlogsCount : 'Nil'),
+                  _buildTableCell('${item.fromPeriod} - ${item.toPeriod}'),
+                  _buildTableCell(item.organisation),
+                  _buildTableCell(item.designation),
+                  _buildTableCell(item.reasonForLeaving),
                 ],
-              ),
-            ],
-          ),
+              );
+            }),
+          ],
         ),
-        const SizedBox(height: 16),
-
-        // Compensation & Reporting Structure
-        _buildSectionCard(
-          title: 'Current / Last Employment & Compensation',
-          subtitle: 'Prior organization, designation, reporting hierarchy, and remuneration breakdown.',
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 16,
-            children: [
-              _buildDataTile('Current / Last Employer', (w?.currentOrganisation.isNotEmpty == true) ? w!.currentOrganisation : (staff.previousCompany ?? 'N/A')),
-              _buildDataTile('Current Designation', (w?.currentDesignation.isNotEmpty == true) ? w!.currentDesignation : 'N/A'),
-              _buildDataTile('Reporting Manager Name', (w?.reportingManagerName.isNotEmpty == true) ? w!.reportingManagerName : 'N/A'),
-              _buildDataTile('Reporting Manager Designation', (w?.reportingManagerDesignation.isNotEmpty == true) ? w!.reportingManagerDesignation : 'N/A'),
-              _buildDataTile('Direct Reportees', (w?.reporteesCount.isNotEmpty == true) ? w!.reporteesCount : '0'),
-              _buildDataTile('Total Experience', (w?.totalExperience.isNotEmpty == true) ? w!.totalExperience : (staff.experienceYears != null ? '${staff.experienceYears} Years' : 'N/A')),
-              _buildDataTile('Fixed Salary (CTC)', (w?.fixedSalary.isNotEmpty == true) ? '₹${w!.fixedSalary}' : 'N/A'),
-              _buildDataTile('Bonus / Incentive', (w?.bonusIncentive.isNotEmpty == true) ? '₹${w!.bonusIncentive}' : 'N/A'),
-              _buildDataTile('Total Salary (CTC)', (w?.totalSalary.isNotEmpty == true) ? '₹${w!.totalSalary}' : (staff.lastCtc != null ? '₹${staff.lastCtc}' : 'N/A')),
-              _buildDataTile('Expected CTC', (w?.expectedSalary.isNotEmpty == true) ? '₹${w!.expectedSalary}' : 'N/A'),
-              _buildDataTile('Notice Period', (w?.noticePeriod.isNotEmpty == true) ? w!.noticePeriod : 'N/A'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Employment History Table
-        _buildSectionCard(
-          title: 'Previous Employment History',
-          subtitle: 'Chronological timeline of past employers and reasons for transitions.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (w?.employmentList.isNotEmpty == true)
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                      headingTextStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                      dataTextStyle: const TextStyle(fontSize: 11.5, color: Color(0xFF1E293B)),
-                      columnSpacing: 16,
-                      horizontalMargin: 12,
-                      columns: const [
-                        DataColumn(label: Text('From')),
-                        DataColumn(label: Text('To')),
-                        DataColumn(label: Text('Organisation')),
-                        DataColumn(label: Text('Designation')),
-                        DataColumn(label: Text('Reason for Leaving')),
-                      ],
-                      rows: w!.employmentList.map((emp) => DataRow(
-                        cells: [
-                          DataCell(Text(emp.fromPeriod.isNotEmpty ? emp.fromPeriod : '-')),
-                          DataCell(Text(emp.toPeriod.isNotEmpty ? emp.toPeriod : '-')),
-                          DataCell(Text(emp.organisation.isNotEmpty ? emp.organisation : '-')),
-                          DataCell(Text(emp.designation.isNotEmpty ? emp.designation : '-')),
-                          DataCell(Text(emp.reasonForLeaving.isNotEmpty ? emp.reasonForLeaving : '-')),
-                        ],
-                      )).toList(),
-                    ),
-                  ),
-                )
-              else
-                Text('No previous employment history recorded.', style: TextStyle(fontSize: 12, color: AppTheme.gray500)),
-              const SizedBox(height: 12),
-              _buildDataTile('Career Gap Details', (w?.careerGap.isNotEmpty == true) ? w!.careerGap : 'No career gaps specified'),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab 4: KYC & Documents
-  // ---------------------------------------------------------------------------
-  Widget _buildDocumentsTab(BuildContext context, StaffModel staff, StaffDetailsController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildAgreementSection(context, staff, controller),
-        const SizedBox(height: 16),
-        _buildSectionCard(
-          title: 'Uploaded Compliance & Verification Media',
-          subtitle: 'Mandatory KYC documentation, identity proofs, and education verification files.',
-          child: Column(
-            children: [
-              _buildCompactDocTile(context, 'Resume / CV', staff.resumeUrl, Icons.description_outlined),
-              const SizedBox(height: 8),
-              _buildCompactDocTile(context, 'PAN Card', staff.panUrl, Icons.credit_card_outlined),
-              const SizedBox(height: 8),
-              _buildCompactDocTile(context, 'Aadhaar Card', staff.aadhaarUrl, Icons.badge_outlined),
-              const SizedBox(height: 8),
-              _buildCompactDocTile(context, 'NISM Certification', staff.nismUrl, Icons.verified_user_outlined),
-              const SizedBox(height: 8),
-              _buildCompactDocTile(context, 'Highest Education Degree', staff.highestEducationUrl, Icons.school_outlined),
-              const SizedBox(height: 8),
-              _buildCompactDocTile(context, 'KYC Verification Video', staff.kycVideoUrl, Icons.videocam_outlined, isVideo: true),
-            ],
-          ),
+  Widget _buildTableHeaderCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF475569),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildTableCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      child: Text(
+        text.isNotEmpty ? text : '—',
+        style: const TextStyle(fontSize: 11.5, color: Color(0xFF1E293B)),
+      ),
     );
   }
 
@@ -1259,49 +1614,36 @@ class StaffDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDataTile(String label, String value) {
-    return SizedBox(
-      width: 220,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value.isNotEmpty ? value : 'N/A',
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-          ),
-        ],
-      ),
+  Widget _buildRow(List<Widget> children) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children.map((c) => Expanded(child: c)).toList(),
     );
   }
 
-  Widget _buildAddressItem(String title, String address) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+  Widget _buildDataTile(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+            color: Color(0xFF94A3B8),
           ),
-          const SizedBox(height: 2),
-          Text(
-            address,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value.isNotEmpty ? value : '—',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF1E293B),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1344,101 +1686,6 @@ class StaffDetailsScreen extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildCompactDocTile(BuildContext context, String title, String? fileUrl, IconData icon, {bool isVideo = false}) {
-    final bool hasFile = fileUrl != null && fileUrl.trim().isNotEmpty;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: hasFile ? Colors.white : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: hasFile ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: hasFile ? AppTheme.primaryBlue : const Color(0xFF94A3B8)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: hasFile ? const Color(0xFF1E293B) : const Color(0xFF64748B),
-                  ),
-                ),
-                Text(
-                  hasFile ? (isVideo ? 'Video Uploaded & Available' : 'Document Uploaded') : 'Not uploaded yet',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: hasFile ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (hasFile)
-            OutlinedButton.icon(
-              onPressed: () {
-                final fullUrl = AppConfig.buildImageUrl(fileUrl);
-                final ext = isVideo ? '.mp4' : (fileUrl.toLowerCase().endsWith('.pdf') ? '.pdf' : '.png');
-                showDialog(
-                  context: context,
-                  builder: (ctx) => FilePreviewDialog(
-                    fileName: '$title$ext',
-                    fileUrl: fullUrl,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.visibility_outlined, size: 13),
-              label: const Text('View', style: TextStyle(fontSize: 11.5)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF334155),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyTabMessage({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(36),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(icon, size: 36, color: const Color(0xFFCBD5E1)),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
