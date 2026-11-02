@@ -87,7 +87,8 @@ export const rejectPartialPayment = async (req, res) => {
 export const getActivePartialInfo = async (req, res) => {
     try {
         const userId = req.user._id;
-        const result = await acquisitionService.getActivePartialInfo(userId);
+        const intentId = req.query.intentId || req.query.paymentId;
+        const result = await acquisitionService.getActivePartialInfo(userId, intentId);
         res.status(200).json({ status: 200, data: result });
     } catch (error) {
         res.status(400).json({ status: 400, message: error.message });

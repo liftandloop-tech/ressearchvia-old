@@ -93,6 +93,8 @@ class ApiService extends GetConnect {
             urlStr.contains('/staff/applicant/promote') ||
             urlStr.contains('/staff/applicant/stage') ||
             urlStr.contains('/staff/applicant/reject') ||
+            urlStr.contains('/staff/applicant/assign') ||
+            urlStr.contains('/staff/applicant/delete') ||
             urlStr.contains('/staff/applicant/evaluation-remarks') ||
             urlStr.contains('/staff/applicants');
 

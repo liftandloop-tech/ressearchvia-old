@@ -212,6 +212,15 @@ const applicantSchema = new mongoose.Schema({
     ref: "staff",
     default: null
   },
+  assignedStaffId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "staff",
+    default: null
+  },
+  assignedStaffName: {
+    type: String,
+    default: null
+  },
   rejectionReason: {
     type: String,
     default: null

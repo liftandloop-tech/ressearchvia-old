@@ -23,6 +23,7 @@ class RolePermissionController extends GetxController {
     'KYC',
     'Reports',
     'Staff',
+    'Recruitment',
     'Notifications',
     'Settings',
     'AutomatedTrading',
@@ -102,6 +103,16 @@ class RolePermissionController extends GetxController {
           'staff.delete',
           'staff.view_applicants',
           'staff.approve_applicant',
+          'staff.delete_applicant',
+        ];
+      case 'Recruitment':
+        return [
+          'recruitment.view',
+          'recruitment.assign',
+          'recruitment.stage',
+          'recruitment.promote',
+          'recruitment.reject',
+          'recruitment.delete',
         ];
       case 'Notifications':
         return [
@@ -195,6 +206,15 @@ class RolePermissionController extends GetxController {
       'staff.delete': 'Delete Staff',
       'staff.view_applicants': 'View Applicants',
       'staff.approve_applicant': 'Approve Applicant',
+      'staff.delete_applicant': 'Delete Job Applicant',
+
+      // Recruitment
+      'recruitment.view': 'View Applicants',
+      'recruitment.assign': 'Assign to Staff',
+      'recruitment.stage': 'Update Stage',
+      'recruitment.promote': 'Promote to Staff',
+      'recruitment.reject': 'Reject Application',
+      'recruitment.delete': 'Delete Job Applicant',
 
       // Notifications
       'notifications.view': 'View Notifications',
@@ -288,6 +308,15 @@ class RolePermissionController extends GetxController {
       'staff.delete': 'Allows staff to deactivate or remove employee accounts.',
       'staff.view_applicants': 'Allows staff to view onboarding recruitment applicant queues.',
       'staff.approve_applicant': 'Allows staff to approve and transition applicants into employees.',
+      'staff.delete_applicant': 'Allows staff to permanently remove job applicant records.',
+
+      // Recruitment
+      'recruitment.view': 'Allows staff to view the recruitment pipeline and applicant profiles.',
+      'recruitment.assign': 'Allows staff to assign applicants to team members for review.',
+      'recruitment.stage': 'Allows staff to advance or change applicant pipeline stages.',
+      'recruitment.promote': 'Allows staff to approve and promote applicants to active staff.',
+      'recruitment.reject': 'Allows staff to mark applicant applications as rejected.',
+      'recruitment.delete': 'Allows staff to permanently delete job applicant records and uploaded documents.',
 
       // Notifications
       'notifications.view': 'Allows staff to view sent notification history and delivery logs.',
@@ -364,12 +393,53 @@ class RolePermissionController extends GetxController {
 
   Future<void> fetchDepartmentPages() async {
     final response = await _service.getDepartmentPages();
+    List<Map<String, dynamic>> list = [];
     if (!response.status.hasError && response.body != null) {
-      final list = (response.body['data'] as List? ?? [])
+      list = (response.body['data'] as List? ?? [])
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
-      availableDepartmentPages.assignAll(list);
     }
+
+    // Ensure 'Staff' and 'Recruitment' are separated into two distinct pages
+    final hasRecruitment = list.any((p) => p['key']?.toString().toLowerCase() == 'recruitment');
+    if (!hasRecruitment && list.isNotEmpty) {
+      final staffIdx = list.indexWhere((p) => p['key']?.toString().toLowerCase() == 'staff');
+      if (staffIdx != -1) {
+        list[staffIdx] = {
+          'key': 'Staff',
+          'label': 'Staff Management',
+          'description': 'Manage staff members, onboarding, and assignments',
+          'features': ['Staff'],
+          'defaultPages': ['/staff', '/staff/create', '/staff/roles', '/staff/permissions'],
+        };
+      }
+      final insertIdx = staffIdx != -1 ? staffIdx + 1 : list.length;
+      list.insert(insertIdx, {
+        'key': 'Recruitment',
+        'label': 'Recruitment & Job Applicants',
+        'description': 'Manage candidate applications, screening pipeline, and recruitment',
+        'features': ['Recruitment', 'Staff'],
+        'defaultPages': ['/applicants'],
+      });
+    }
+
+    if (list.isEmpty) {
+      list = [
+        {'key': 'Dashboard', 'label': 'Dashboard & Analytics', 'description': 'Executive overview, KPI metrics, revenue charts, and operational summary'},
+        {'key': 'Users', 'label': 'Clients & Users Management', 'description': 'Client records, onboarding, profile updates, and active portfolio views'},
+        {'key': 'KYC', 'label': 'KYC Verification & Compliance', 'description': 'Identity verification, Aadhaar/PAN compliance, and risk profiling'},
+        {'key': 'Payments', 'label': 'Payments & Approvals', 'description': 'Review bank transfers and verify payment operations'},
+        {'key': 'Subscriptions', 'label': 'Plans & Subscriptions', 'description': 'Package management, plan creation, subscription assignments, and pricing'},
+        {'key': 'Leads', 'label': 'Leads Pipeline & CRM', 'description': 'Incoming prospect tracking, lead assignment, and conversion pipelines'},
+        {'key': 'Reports', 'label': 'Reports & Export Center', 'description': 'Financial, compliance, trading call reports, and business intelligence'},
+        {'key': 'Notifications', 'label': 'Notifications & Alerts', 'description': 'Broadcast push notifications, send bulk marketing emails, and schedule alerts'},
+        {'key': 'Staff', 'label': 'Staff Management', 'description': 'Manage staff members, onboarding, and assignments'},
+        {'key': 'Recruitment', 'label': 'Recruitment & Job Applicants', 'description': 'Manage candidate applications, screening pipeline, and recruitment'},
+        {'key': 'AutomatedTrading', 'label': 'Automated Trading & Algo Gateways', 'description': 'Multi-tenant automated order distribution, strategy execution, risk controls, and broker gateways'},
+        {'key': 'Settings', 'label': 'System Settings & RBAC', 'description': 'System configurations, roles, permission groups, and department controls'},
+      ];
+    }
+    availableDepartmentPages.assignAll(list);
   }
 
   Future<void> fetchRoles() async {

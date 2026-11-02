@@ -565,7 +565,8 @@ class ApplicantRegistrationController extends GetxController {
         return;
       }
 
-      await _saveStepDraft(1, {
+      await _saveStepDraft(2, {
+        'currentStep': 2,
         'title': selectedTitle.value,
         'firstName': firstNameController.text.trim(),
         'middleName': middleNameController.text.trim(),

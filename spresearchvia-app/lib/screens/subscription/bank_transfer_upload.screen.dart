@@ -82,7 +82,11 @@ class _BankTransferUploadScreenState extends State<BankTransferUploadScreen> {
   }
 
   Future<void> _fetchPartialInfo() async {
-    await _segmentController.fetchActivePartialInfo();
+    final paymentId = args['paymentId']?.toString();
+    await _segmentController.fetchActivePartialInfo(
+      intentId: paymentId,
+      force: true,
+    );
   }
 
   void _validateAmount() {
@@ -101,12 +105,17 @@ class _BankTransferUploadScreenState extends State<BankTransferUploadScreen> {
     final partialInfo = _segmentController.activePartialInfo.value;
     if (partialInfo == null) return;
 
-    final totalAmount = (partialInfo['actual_total_amount'] as num?)?.toDouble() ?? 0.0;
+    final targetFromArgs = (args['totalToPay'] as num?)?.toDouble() ?? (args['amount'] as num?)?.toDouble();
+    final targetFromPartial = (partialInfo['actual_total_amount'] as num?)?.toDouble();
+    final totalAmount = (targetFromArgs != null && targetFromArgs > 0)
+        ? targetFromArgs
+        : (targetFromPartial ?? 0.0);
+
     final totalPaid = (partialInfo['total_amount_paid'] as num?)?.toDouble() ?? 0.0;
     final pendingAmount = (partialInfo['pending_amount'] as num?)?.toDouble() ?? 0.0;
 
     final totalCommitted = totalPaid + pendingAmount;
-    final remaining = totalAmount - totalCommitted;
+    final remaining = (totalAmount - totalCommitted < 0) ? 0.0 : (totalAmount - totalCommitted);
 
     // Reject amount will not be calculated in amount paid (handled by backend API already)
     // total_amount_paid only includes APPROVED
@@ -724,10 +733,15 @@ class _BankTransferUploadScreenState extends State<BankTransferUploadScreen> {
                 final partialInfo = _segmentController.activePartialInfo.value;
                 if (partialInfo == null) return const SizedBox.shrink();
 
-                final totalAmount = (partialInfo['actual_total_amount'] as num?)?.toDouble() ?? 0.0;
+                final targetFromArgs = (args['totalToPay'] as num?)?.toDouble() ?? (args['amount'] as num?)?.toDouble();
+                final targetFromPartial = (partialInfo['actual_total_amount'] as num?)?.toDouble();
+                final totalAmount = (targetFromArgs != null && targetFromArgs > 0)
+                    ? targetFromArgs
+                    : (targetFromPartial ?? 0.0);
+
                 final totalPaid = (partialInfo['total_amount_paid'] as num?)?.toDouble() ?? 0.0;
                 final pendingAmount = (partialInfo['pending_amount'] as num?)?.toDouble() ?? 0.0;
-                final remaining = totalAmount - totalPaid - pendingAmount;
+                final remaining = (totalAmount - totalPaid - pendingAmount < 0) ? 0.0 : (totalAmount - totalPaid - pendingAmount);
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),

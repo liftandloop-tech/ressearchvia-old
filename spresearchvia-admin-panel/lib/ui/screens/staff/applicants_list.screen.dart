@@ -7,6 +7,7 @@ import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
+import '../../../controllers/auth/auth.controller.dart';
 
 class ApplicantsListScreen extends StatelessWidget {
   const ApplicantsListScreen({super.key});
@@ -21,6 +22,17 @@ class ApplicantsListScreen extends StatelessWidget {
       controller.fetchApplicants();
     });
 
+    final authUser = Get.isRegistered<AuthController>() ? Get.find<AuthController>().user.value : null;
+    final canDelete = authUser?.isAdmin == true || (authUser?.canDeleteApplicant ?? false);
+    final canAssign = authUser?.isAdmin == true ||
+        (authUser?.has('recruitment.assign') ?? false) ||
+        (authUser?.has('staff.assignment') ?? false);
+    final canPromote = authUser?.isAdmin == true ||
+        (authUser?.has('recruitment.promote') ?? false) ||
+        (authUser?.has('staff.approve_applicant') ?? false);
+    final canReject = authUser?.isAdmin == true ||
+        (authUser?.has('recruitment.reject') ?? false);
+
     return DashboardLayout(
       child: Container(
         color: const Color(0xFFF8FAFC),
@@ -32,29 +44,31 @@ class ApplicantsListScreen extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Recruitment & Job Applicants',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                        letterSpacing: -0.5,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Recruitment & Job Applicants',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Candidate talent pipeline, screening stages, and walk-in application tracking.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
+                      const SizedBox(height: 4),
+                      Text(
+                        'Candidate talent pipeline, screening stages, and walk-in application tracking.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 16),
                 OutlinedButton.icon(
                   onPressed: () => controller.fetchApplicants(),
                   icon: const Icon(Icons.refresh, size: 16),
@@ -113,6 +127,47 @@ class ApplicantsListScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
 
+                  // Staff Filter Dropdown
+                  Obx(() {
+                    final supervisors = controller.availableSupervisors;
+                    return Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: controller.selectedStaffFilter.value ?? 'ALL',
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+                          onChanged: (val) {
+                            controller.selectedStaffFilter.value = val;
+                          },
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'ALL',
+                              child: Text('All Assigned Staff'),
+                            ),
+                            const DropdownMenuItem(
+                              value: 'UNASSIGNED',
+                              child: Text('Unassigned Only'),
+                            ),
+                            ...supervisors.map((s) {
+                              return DropdownMenuItem(
+                                value: s.id,
+                                child: Text(s.name.isNotEmpty ? s.name : s.email),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 12),
+
                   // Search Box
                   SizedBox(
                     width: 240,
@@ -146,10 +201,10 @@ class ApplicantsListScreen extends StatelessWidget {
             // Table Card
             Expanded(
               child: Obx(() {
-                if (controller.isLoading.value && controller.applicants.isEmpty) {
+                if (controller.isLoading.value && controller.filteredApplicants.isEmpty) {
                   return const TableSkeleton(rowCount: 8, columnCount: 7);
                 }
-                if (controller.applicants.isEmpty) {
+                if (controller.filteredApplicants.isEmpty) {
                   return Center(
                     child: Container(
                       width: double.infinity,
@@ -165,12 +220,12 @@ class ApplicantsListScreen extends StatelessWidget {
                           Icon(Icons.person_search_outlined, size: 54, color: AppTheme.gray400),
                           const SizedBox(height: 12),
                           const Text(
-                            'No applicants found in this stage.',
+                            'No applicants found.',
                             style: TextStyle(color: Color(0xFF334155), fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Try selecting another stage or clearing your search filter.',
+                            'Try selecting another stage, staff filter, or clearing your search.',
                             style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                           ),
                         ],
@@ -191,17 +246,18 @@ class ApplicantsListScreen extends StatelessWidget {
                     child: DataTable2(
                       columnSpacing: 16,
                       horizontalMargin: 12,
-                      minWidth: 920,
+                      minWidth: 1080,
                       columns: const [
                         DataColumn2(label: Text('Candidate'), size: ColumnSize.L),
                         DataColumn2(label: Text('Applied Role')),
                         DataColumn2(label: Text('Contact Details')),
-                        DataColumn2(label: Text('Verification')),
+                        DataColumn2(label: Text('Status')),
                         DataColumn2(label: Text('Pipeline Stage')),
-                        DataColumn2(label: Text('Actions'), size: ColumnSize.S),
+                        DataColumn2(label: Text('Assigned Staff'), size: ColumnSize.M),
+                        DataColumn2(label: Text('Actions'), fixedWidth: 155),
                       ],
-                      rows: controller.applicants.map((applicant) {
-                        final contactsVerified = applicant.isEmailVerified && applicant.isMobileVerified;
+                      rows: controller.filteredApplicants.map((applicant) {
+                        final raw = applicant.rawJson ?? {};
                         final stage = applicant.stage.toUpperCase();
                         final isPromoted = stage == 'PROMOTED' ||
                             stage == 'OFFER_ACCEPTED' ||
@@ -209,6 +265,55 @@ class ApplicantsListScreen extends StatelessWidget {
                             applicant.rawJson?['convertedToStaffId'] != null ||
                             applicant.rawJson?['convertedStaffId'] != null;
                         final isRejected = stage == 'REJECTED';
+
+                        // Calculate Application Form Status: Not Started, Pending, Submitted
+                        final isDraft = raw['isDraft'] == true;
+                        final currentStep = raw['currentStep'] is int
+                            ? raw['currentStep'] as int
+                            : (int.tryParse(raw['currentStep']?.toString() ?? '1') ?? 1);
+
+                        final hasFilledStep1 = currentStep >= 2 ||
+                            (raw['firstName'] != null && raw['firstName'].toString().trim().isNotEmpty) ||
+                            (raw['fatherName'] != null && raw['fatherName'].toString().trim().isNotEmpty) ||
+                            (raw['currentLocation'] != null && raw['currentLocation'].toString().trim().isNotEmpty) ||
+                            (applicant.name.trim().isNotEmpty &&
+                                applicant.name.trim().toLowerCase() != 'candidate' &&
+                                applicant.name.trim() != '—');
+
+                        final isFormSubmitted = !isDraft ||
+                            raw['isVerified'] == true ||
+                            applicant.onboardingStatus == 'COMPLETED' ||
+                            applicant.onboardingStatus == 'VERIFIED' ||
+                            applicant.onboardingStatus == 'DOCUMENTS_UPLOADED' ||
+                            applicant.onboardingStatus == 'SUBMITTED' ||
+                            isPromoted ||
+                            (stage != 'APPLIED' && stage != 'SCREENING');
+
+                        String formStatusText;
+                        Color formStatusBg;
+                        Color formStatusBorder;
+                        Color formStatusColor;
+                        IconData formStatusIcon;
+
+                        if (isFormSubmitted && hasFilledStep1) {
+                          formStatusText = 'Submitted';
+                          formStatusBg = const Color(0xFFF0FDF4);
+                          formStatusBorder = const Color(0xFFBBF7D0);
+                          formStatusColor = const Color(0xFF16A34A);
+                          formStatusIcon = Icons.check_circle_outline_rounded;
+                        } else if (hasFilledStep1) {
+                          formStatusText = 'Pending';
+                          formStatusBg = const Color(0xFFFFFBEB);
+                          formStatusBorder = const Color(0xFFFDE68A);
+                          formStatusColor = const Color(0xFFD97706);
+                          formStatusIcon = Icons.hourglass_top_rounded;
+                        } else {
+                          formStatusText = 'Not Started';
+                          formStatusBg = const Color(0xFFF1F5F9);
+                          formStatusBorder = const Color(0xFFCBD5E1);
+                          formStatusColor = const Color(0xFF64748B);
+                          formStatusIcon = Icons.radio_button_unchecked_rounded;
+                        }
 
                         Color stageBg = const Color(0xFFEFF6FF);
                         Color stageColor = const Color(0xFF2563EB);
@@ -329,31 +434,30 @@ class ApplicantsListScreen extends StatelessWidget {
                               ),
                             ),
 
-                            // Verification status
+                            // Application Form Status badge
                             DataCell(
-                              Row(
-                                children: [
-                                  Icon(
-                                    applicant.isEmailVerified ? Icons.email : Icons.mail_outline,
-                                    size: 16,
-                                    color: applicant.isEmailVerified ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Icon(
-                                    applicant.isMobileVerified ? Icons.phone_android : Icons.phone_android_outlined,
-                                    size: 16,
-                                    color: applicant.isMobileVerified ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    contactsVerified ? 'Verified' : 'Pending',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: contactsVerified ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: formStatusBg,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: formStatusBorder),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(formStatusIcon, size: 13, color: formStatusColor),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      formStatusText,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: formStatusColor,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
 
@@ -377,6 +481,68 @@ class ApplicantsListScreen extends StatelessWidget {
                               ),
                             ),
 
+                            // Assigned Staff
+                            DataCell(
+                              InkWell(
+                                onTap: canAssign ? () => _showAssignStaffDialog(context, controller, applicant) : null,
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                                  decoration: BoxDecoration(
+                                    color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                        ? const Color(0xFFEEF2FF)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                          ? const Color(0xFFC7D2FE)
+                                          : const Color(0xFFCBD5E1),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                            ? Icons.person_rounded
+                                            : Icons.person_add_alt_1_outlined,
+                                        size: 13,
+                                        color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                            ? const Color(0xFF4338CA)
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Flexible(
+                                        child: Text(
+                                          (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                              ? applicant.assignedStaffName!
+                                              : 'Assign Staff',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                                ? FontWeight.w600
+                                                : FontWeight.w500,
+                                            color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                                ? const Color(0xFF4338CA)
+                                                : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 14,
+                                        color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
+                                            ? const Color(0xFF4338CA)
+                                            : const Color(0xFF94A3B8),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
                             // Actions
                             DataCell(
                               Row(
@@ -386,17 +552,43 @@ class ApplicantsListScreen extends StatelessWidget {
                                     tooltip: 'View Profile',
                                     icon: const Icon(Icons.remove_red_eye_outlined, size: 19, color: Color(0xFF2563EB)),
                                     onPressed: () => Get.toNamed('/applicant/${applicant.id}'),
+                                    splashRadius: 18,
+                                    padding: const EdgeInsets.all(5),
+                                    constraints: const BoxConstraints(),
                                   ),
                                   if (!isPromoted && !isRejected) ...[
+                                    if (canPromote) ...[
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        tooltip: 'Promote to Staff',
+                                        icon: const Icon(Icons.how_to_reg_rounded, size: 19, color: Color(0xFF16A34A)),
+                                        onPressed: () => _showQuickPromoteDialog(context, controller, applicant),
+                                        splashRadius: 18,
+                                        padding: const EdgeInsets.all(5),
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                    if (canReject) ...[
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        tooltip: 'Reject Application',
+                                        icon: const Icon(Icons.cancel_outlined, size: 19, color: Color(0xFFEA580C)),
+                                        onPressed: () => _showQuickRejectDialog(context, controller, applicant),
+                                        splashRadius: 18,
+                                        padding: const EdgeInsets.all(5),
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ],
+                                  if (canDelete) ...[
+                                    const SizedBox(width: 4),
                                     IconButton(
-                                      tooltip: 'Promote to Staff',
-                                      icon: const Icon(Icons.how_to_reg_rounded, size: 19, color: Color(0xFF16A34A)),
-                                      onPressed: () => _showQuickPromoteDialog(context, controller, applicant),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Reject Application',
-                                      icon: const Icon(Icons.cancel_outlined, size: 19, color: Color(0xFFDC2626)),
-                                      onPressed: () => _showQuickRejectDialog(context, controller, applicant),
+                                      tooltip: 'Delete Applicant',
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 19, color: Color(0xFFDC2626)),
+                                      onPressed: () => _showDeleteConfirmDialog(context, controller, applicant),
+                                      splashRadius: 18,
+                                      padding: const EdgeInsets.all(5),
+                                      constraints: const BoxConstraints(),
                                     ),
                                   ],
                                 ],
@@ -503,6 +695,281 @@ class ApplicantsListScreen extends StatelessWidget {
             child: const Text('Confirm Rejection'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAssignStaffDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
+    String? selectedStaffId = applicant.assignedStaffId ?? applicant.assignedRecruiterId;
+    final initialStaff = controller.availableSupervisors.firstWhereOrNull((s) => s.id == selectedStaffId);
+    if (initialStaff == null) {
+      selectedStaffId = null;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final supervisors = controller.availableSupervisors;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF2563EB), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Assign Applicant to Staff',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          applicant.name.isNotEmpty && applicant.name != '—' ? applicant.name : applicant.email,
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w400, color: Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 440,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select a team member to assign this candidate for review, interviewing, or onboarding.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF475569), height: 1.4),
+                    ),
+                    const SizedBox(height: 18),
+                    DropdownButtonFormField<String?>(
+                      value: selectedStaffId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Assigned Staff Member',
+                        prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      hint: const Text('Select staff member'),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('— Unassigned —', style: TextStyle(color: Color(0xFF94A3B8))),
+                        ),
+                        ...supervisors.map((s) {
+                          final roleText = s.role.isNotEmpty ? ' (${s.role})' : '';
+                          return DropdownMenuItem<String?>(
+                            value: s.id,
+                            child: Text(
+                              '${s.name.isNotEmpty ? s.name : s.email}$roleText',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 13.5),
+                            ),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedStaffId = val;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(dialogCtx).pop();
+                    String? staffName;
+                    if (selectedStaffId != null) {
+                      final chosen = supervisors.firstWhereOrNull((s) => s.id == selectedStaffId);
+                      staffName = chosen?.name.isNotEmpty == true ? chosen!.name : chosen?.email;
+                    }
+                    await controller.assignApplicant(
+                      applicant.id,
+                      staffId: selectedStaffId,
+                      staffName: staffName,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('Save Assignment'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
+    final confirmController = TextEditingController();
+    bool isConfirmed = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isMatch = confirmController.text.trim().toUpperCase() == 'DELETE' || isConfirmed;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Text('Confirm Deletion', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Are you sure you want to permanently delete this applicant record?',
+                    style: TextStyle(fontSize: 13.5, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          applicant.name.isNotEmpty && applicant.name != '—' ? applicant.name : 'Candidate',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                        ),
+                        if (applicant.email.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              applicant.email,
+                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'To confirm, please type "DELETE" below:',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: confirmController,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                    decoration: InputDecoration(
+                      hintText: 'Type DELETE to confirm',
+                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      prefixIcon: const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFDC2626)),
+                    ),
+                    onChanged: (_) {
+                      setDialogState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () {
+                      setDialogState(() {
+                        isConfirmed = !isConfirmed;
+                        if (isConfirmed && confirmController.text.trim().toUpperCase() != 'DELETE') {
+                          confirmController.text = 'DELETE';
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: isConfirmed || confirmController.text.trim().toUpperCase() == 'DELETE',
+                          activeColor: const Color(0xFFDC2626),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (val) {
+                            setDialogState(() {
+                              isConfirmed = val == true;
+                              if (isConfirmed && confirmController.text.trim().toUpperCase() != 'DELETE') {
+                                confirmController.text = 'DELETE';
+                              }
+                            });
+                          },
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'I confirm permanent deletion of this applicant and all submitted data.',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFFDC2626), fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isMatch
+                    ? () async {
+                        Navigator.of(dialogCtx).pop();
+                        await controller.deleteApplicant(applicant.id);
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                child: const Text('Delete Permanently'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

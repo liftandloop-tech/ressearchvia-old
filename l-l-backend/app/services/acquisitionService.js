@@ -1919,12 +1919,65 @@ export const handleExpiredPartials = async () => {
     }
 };
 
-export const getActivePartialInfo = async (userId) => {
-    const activePartial = await PaymentIntent.findOne({
-        userId,
-        isPartial: true,
-        status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID'] }
-    }).populate('planId').sort({ createdAt: -1 });
+export const getActivePartialInfo = async (userId, intentId = null) => {
+    let activePartial = null;
+
+    if (intentId) {
+        activePartial = await PaymentIntent.findOne({
+            _id: intentId,
+            userId,
+            isPartial: true
+        }).populate('planId');
+    }
+
+    if (!activePartial) {
+        // 1. First priority: Ongoing partial PLAN that has pending bank transfer or pending verification
+        activePartial = await PaymentIntent.findOne({
+            userId,
+            isPartial: true,
+            purchaseType: 'PLAN',
+            status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING'] }
+        }).populate('planId').sort({ createdAt: -1 });
+
+        // 2. Second priority: Any partial PLAN that still has remaining capacity to pay
+        if (!activePartial) {
+            const planIntents = await PaymentIntent.find({
+                userId,
+                isPartial: true,
+                purchaseType: 'PLAN',
+                status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID'] }
+            }).populate('planId').sort({ createdAt: -1 });
+
+            for (const pi of planIntents) {
+                const approvedPayments = (pi.partialPaymentsHistory || [])
+                    .filter(h => h.status === 'APPROVED')
+                    .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
+                const totalApproved = Math.max(pi.amountPaid || 0, approvedPayments);
+                const pendingPayments = (pi.partialPaymentsHistory || [])
+                    .filter(h => h.status === 'PENDING')
+                    .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
+                const target = pi.partialTotalTarget || pi.totalAmount || 0;
+                if (target - (totalApproved + pendingPayments) > 0) {
+                    activePartial = pi;
+                    break;
+                }
+            }
+
+            // Fallback to latest plan intent if all are at capacity
+            if (!activePartial && planIntents.length > 0) {
+                activePartial = planIntents[0];
+            }
+        }
+
+        // 3. Fallback to REGISTRATION only if no partial PLAN exists at all
+        if (!activePartial) {
+            activePartial = await PaymentIntent.findOne({
+                userId,
+                isPartial: true,
+                status: { $in: ['PENDING_BANK_TRANSFER', 'VERIFICATION_PENDING', 'PAID'] }
+            }).populate('planId').sort({ createdAt: -1 });
+        }
+    }
 
     if (!activePartial) return null;
 
@@ -1944,11 +1997,13 @@ export const getActivePartialInfo = async (userId) => {
     }
 
     // Calculate payment breakdown
-    const totalApprovedPayments = activePartial.partialPaymentsHistory
+    const approvedPaymentsSum = (activePartial.partialPaymentsHistory || [])
         .filter(h => h.status === 'APPROVED')
         .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
+    // If partialPaymentsHistory is missing historical entries but amountPaid is recorded on intent, respect amountPaid
+    const totalApprovedPayments = Math.max(activePartial.amountPaid || 0, approvedPaymentsSum);
 
-    const totalPendingPayments = activePartial.partialPaymentsHistory
+    const totalPendingPayments = (activePartial.partialPaymentsHistory || [])
         .filter(h => h.status === 'PENDING')
         .reduce((sum, h) => sum + (h.amountPaid || 0), 0);
 

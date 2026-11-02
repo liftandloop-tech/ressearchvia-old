@@ -554,11 +554,20 @@ export const checkPermission = (targetPermission, actionParam = null) => {
                     if ((requiredKey === 'users.manage' || requiredKey === 'users:manage') &&
                         (perm.actions.includes('users.manage') || perm.actions.includes('users.update') || perm.actions.includes('subscriptions.manage') || perm.actions.includes('subscriptions.activate'))) return true;
 
-                    if ((requiredKey === 'staff.view_applicants') &&
-                        (perm.actions.includes('staff.view_applicants') || perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
+                    if ((requiredKey === 'staff.view_applicants' || requiredKey === 'recruitment.view') &&
+                        (perm.actions.includes('recruitment.view') || perm.actions.includes('staff.view_applicants') || perm.actions.includes('staff.view') || perm.actions.includes('read'))) return true;
 
-                    if ((requiredKey === 'staff.approve_applicant') &&
-                        (perm.actions.includes('staff.approve_applicant') || perm.actions.includes('staff.create') || perm.actions.includes('staff.update'))) return true;
+                    if ((requiredKey === 'staff.approve_applicant' || requiredKey === 'recruitment.promote') &&
+                        (perm.actions.includes('recruitment.promote') || perm.actions.includes('staff.approve_applicant') || perm.actions.includes('staff.create') || perm.actions.includes('staff.update'))) return true;
+
+                    if ((requiredKey === 'staff.delete_applicant' || requiredKey === 'recruitment.delete') &&
+                        (perm.actions.includes('recruitment.delete') || perm.actions.includes('staff.delete_applicant') || perm.actions.includes('staff.delete') || perm.actions.includes('delete'))) return true;
+
+                    if ((requiredKey === 'recruitment.assign') &&
+                        (perm.actions.includes('recruitment.assign') || perm.actions.includes('staff.assignment') || perm.actions.includes('staff.update') || perm.actions.includes('update'))) return true;
+
+                    if ((requiredKey === 'recruitment.stage') &&
+                        (perm.actions.includes('recruitment.stage') || perm.actions.includes('staff.update') || perm.actions.includes('update'))) return true;
 
                     if (requiredKey === 'staff.reset' &&
                         (perm.actions.includes('staff.reset_mpin') || perm.actions.includes('staff.update') || perm.actions.includes('staff.reset'))) return true;

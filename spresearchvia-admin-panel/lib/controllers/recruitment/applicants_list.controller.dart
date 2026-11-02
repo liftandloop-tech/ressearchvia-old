@@ -17,6 +17,21 @@ class ApplicantsListController extends GetxController {
   var applicants = <StaffModel>[].obs;
   var selectedStage = 'ALL'.obs;
   var searchQuery = ''.obs;
+  var selectedStaffFilter = RxnString();
+
+  List<StaffModel> get filteredApplicants {
+    final filter = selectedStaffFilter.value;
+    if (filter == null || filter == 'ALL') {
+      return applicants;
+    }
+    if (filter == 'UNASSIGNED') {
+      return applicants.where((a) => a.assignedStaffName == null || a.assignedStaffName!.trim().isEmpty).toList();
+    }
+    return applicants.where((a) =>
+      a.assignedStaffId == filter ||
+      a.assignedRecruiterId == filter
+    ).toList();
+  }
 
   var rolesList = <RoleModel>[].obs;
   var supervisorsList = <StaffModel>[].obs;
@@ -223,5 +238,51 @@ class ApplicantsListController extends GetxController {
 
   Future<void> approveApplicant(String applicantId) async {
     await promoteApplicant(applicantId);
+  }
+
+  Future<void> assignApplicant(String applicantId, {String? staffId, String? staffName}) async {
+    isLoading.value = true;
+    try {
+      final result = await _applicantService.assignApplicant(applicantId, staffId: staffId, staffName: staffName);
+      if (result.success) {
+        fetchApplicants();
+        Get.snackbar(
+          'Staff Assigned',
+          result.message ?? 'Applicant assigned successfully',
+          backgroundColor: Colors.green.withValues(alpha: 0.15),
+        );
+      } else {
+        Get.snackbar(
+          'Assignment Failed',
+          result.message ?? 'Failed to assign staff',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+        );
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> deleteApplicant(String applicantId) async {
+    isLoading.value = true;
+    try {
+      final result = await _applicantService.deleteApplicant(applicantId);
+      if (result.success) {
+        fetchApplicants();
+        Get.snackbar(
+          'Applicant Deleted',
+          result.message ?? 'Applicant deleted successfully',
+          backgroundColor: Colors.green.withValues(alpha: 0.15),
+        );
+      } else {
+        Get.snackbar(
+          'Delete Failed',
+          result.message ?? 'Failed to delete applicant',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+        );
+      }
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

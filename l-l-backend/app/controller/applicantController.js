@@ -5,6 +5,7 @@ import { sendOtpSms } from "../services/smsService.js";
 import axios from "axios";
 import staffService, { resolveRoleAndDepartment } from "../services/staffService.js";
 import roleModel from "../models/roleModel.js";
+import { getSupervisedStaffIds } from "../utils/staffHierarchy.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -585,6 +586,7 @@ const applicantController = {
             applicant.isDraft = false;
             applicant.stage = 'APPLIED';
             applicant.currentStep = 3;
+            applicant.onboardingStatus = 'SUBMITTED';
             applicant.isVerified = true;
             applicant.verifiedAt = new Date();
             applicant.stageHistory.push({
@@ -1046,13 +1048,40 @@ const applicantController = {
                 }
             }
 
+            // Staff Scoping: If caller is staff (and not super admin), only show applicants assigned to them
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            let staffScopeFilter = null;
+
+            if (callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                // System admin sees all applicants; regular staff/supervisors only see applicants assigned to them
+                if (!hierarchy.isSystemAdmin) {
+                    const allowedStaffIds = hierarchy.staffIds || [callerId];
+                    const objIds = allowedStaffIds
+                        .filter(id => id && mongoose.isValidObjectId(id))
+                        .map(id => new mongoose.Types.ObjectId(id.toString()));
+                    const strIds = allowedStaffIds.filter(Boolean).map(id => id.toString());
+                    const allTargetStaffIds = [...new Set([...objIds, ...strIds])];
+
+                    staffScopeFilter = {
+                        $or: [
+                            { assignedStaffId: { $in: allTargetStaffIds } },
+                            { assignedRecruiterId: { $in: allTargetStaffIds } }
+                        ]
+                    };
+                }
+            }
+
+            const andConditions = [];
+            if (Object.keys(stageFilter).length > 0) andConditions.push(stageFilter);
+            if (Object.keys(searchFilter).length > 0) andConditions.push(searchFilter);
+            if (staffScopeFilter) andConditions.push(staffScopeFilter);
+
             let filter = {};
-            if (Object.keys(stageFilter).length > 0 && Object.keys(searchFilter).length > 0) {
-                filter = { $and: [stageFilter, searchFilter] };
-            } else if (Object.keys(stageFilter).length > 0) {
-                filter = stageFilter;
-            } else if (Object.keys(searchFilter).length > 0) {
-                filter = searchFilter;
+            if (andConditions.length === 1) {
+                filter = andConditions[0];
+            } else if (andConditions.length > 1) {
+                filter = { $and: andConditions };
             }
 
             const applicants = await applicantModel.find(filter).sort({ createdAt: -1 }).lean();
@@ -1162,6 +1191,97 @@ const applicantController = {
             });
         } catch (error) {
             console.error("[rejectApplicant Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    assignApplicant: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { staffId, staffName } = req.body;
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            let resolvedStaffName = staffName || null;
+            if (staffId && !resolvedStaffName) {
+                const s = await staffModel.findById(staffId).select('name fullName');
+                if (s) resolvedStaffName = s.fullName || s.name;
+            }
+
+            applicant.assignedRecruiterId = staffId || null;
+            applicant.assignedStaffId = staffId || null;
+            applicant.assignedStaffName = resolvedStaffName;
+            await applicant.save();
+
+            return res.status(200).send({
+                status: 200,
+                message: "Applicant assigned successfully",
+                data: { applicant }
+            });
+        } catch (error) {
+            console.error("[assignApplicant Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    deleteApplicant: async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            // Check permission: Admin or recruitment.delete / staff.delete_applicant / staff.delete
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            const callerRole = (req.user?.role || req.user?.userType || '').toLowerCase();
+            const isAdmin = callerRole === 'admin' || callerRole === 'super_admin';
+
+            if (!isAdmin && callerId) {
+                const staffMember = await staffModel.findById(callerId)
+                    .populate({
+                        path: 'roleId',
+                        populate: { path: 'permissionGroups' }
+                    }).lean();
+
+                if (staffMember) {
+                    let hasDeletePerm = false;
+                    const groups = staffMember.roleId?.permissionGroups || [];
+                    for (const group of groups) {
+                        for (const perm of (group.permissions || [])) {
+                            const actions = (perm.actions || []).map(a => a.toLowerCase());
+                            if (actions.includes('*') || actions.includes('all') ||
+                                actions.includes('recruitment.delete') ||
+                                actions.includes('staff.delete_applicant') ||
+                                actions.includes('staff.delete')) {
+                                hasDeletePerm = true;
+                                break;
+                            }
+                        }
+                        if (hasDeletePerm) break;
+                    }
+
+                    if (!hasDeletePerm) {
+                        return res.status(403).send({
+                            status: 403,
+                            message: "Access denied. You do not have permission to delete job applicants.",
+                            data: {}
+                        });
+                    }
+                }
+            }
+
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            await applicantModel.findByIdAndDelete(applicant._id);
+
+            return res.status(200).send({
+                status: 200,
+                message: "Applicant deleted successfully"
+            });
+        } catch (error) {
+            console.error("[deleteApplicant Error]:", error);
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
     },
@@ -1399,6 +1519,29 @@ const applicantController = {
             const applicant = await findApplicantByIdOrCustomId(id);
             if (!applicant) {
                 return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            // Staff Scoping: If caller is staff (and not super admin), verify assignment
+            const callerId = req.user?._id || req.user?.userId || req.user?.id;
+            if (callerId) {
+                const callerStaff = await staffModel.findById(callerId).lean();
+                if (callerStaff) {
+                    const hierarchy = await getSupervisedStaffIds(callerId);
+                    if (!hierarchy.isSystemAdmin) {
+                        const allowedStaffIds = (hierarchy.staffIds || [callerId]).map(i => i.toString());
+                        const assignedStaff = applicant.assignedStaffId ? applicant.assignedStaffId.toString() : null;
+                        const assignedRecruiter = applicant.assignedRecruiterId ? applicant.assignedRecruiterId.toString() : null;
+                        const hasAccess = (assignedStaff && allowedStaffIds.includes(assignedStaff)) ||
+                                          (assignedRecruiter && allowedStaffIds.includes(assignedRecruiter));
+                        if (!hasAccess) {
+                            return res.status(403).send({
+                                status: 403,
+                                message: "Access denied. This applicant is not assigned to you.",
+                                data: {}
+                            });
+                        }
+                    }
+                }
             }
 
             const data = applicant.toObject();

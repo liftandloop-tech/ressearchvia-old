@@ -174,6 +174,14 @@ class UserModel {
     return d.contains('research') || r.contains('analyst');
   }
 
+  bool get canDeleteApplicant =>
+      isAdmin ||
+      has('recruitment.delete') ||
+      has('staff.delete_applicant') ||
+      has('staff.delete') ||
+      hasPermission('Recruitment', 'delete') ||
+      hasPermission('Staff', 'delete');
+
   static String _parseMongoId(dynamic id) {
     if (id is Map && id.containsKey('\$oid')) {
       return id['\$oid']?.toString() ?? '';
@@ -340,7 +348,11 @@ class UserModel {
         if ((key == 'notifications' || key == 'notification') && assigned.contains('notifications')) {
           return true;
         }
-        if ((key == 'staff' || key == 'applicants') && assigned.contains('staff')) {
+        if (key == 'staff' && assigned.contains('staff')) {
+          return true;
+        }
+        if ((key == 'recruitment' || key == 'applicants' || key == 'job applicants') &&
+            (assigned.contains('recruitment') || assigned.contains('applicants'))) {
           return true;
         }
         if ((key == 'settings') && assigned.contains('settings')) {
@@ -381,7 +393,8 @@ class UserModel {
     if (f == 'reports' || f == 'report') return 'Reports';
     if (f == 'automatedtrading' || f == 'automated_trading' || f == 'automated trading') return 'AutomatedTrading';
     if (f == 'notifications' || f == 'notification') return 'Notifications';
-    if (f == 'staff' || f == 'applicant' || f == 'applicants') return 'Staff';
+    if (f == 'staff') return 'Staff';
+    if (f == 'recruitment' || f == 'applicant' || f == 'applicants') return 'Recruitment';
     if (f == 'settings' || f == 'roles' || f == 'permissiongroups') return 'Settings';
     if (f == 'attendance') return 'Attendance';
     return null;
@@ -615,6 +628,33 @@ class UserModel {
               if (requiredKey == 'staff.reset' &&
                   (actList.contains('staff.reset_mpin') || actList.contains('staff.update') || actList.contains('staff.reset'))) {
                 return true;
+              }
+            }
+
+            // Recruitment
+            if (targetFeature == 'recruitment') {
+              if (isReadIntent) {
+                if (actList.contains('recruitment.view') ||
+                    actList.contains('staff.view_applicants') ||
+                    actList.contains('read') ||
+                    actList.contains('view')) {
+                  return true;
+                }
+              }
+              if (requiredKey == 'recruitment.delete' || requiredKey == 'staff.delete_applicant') {
+                if (actList.contains('recruitment.delete') ||
+                    actList.contains('staff.delete_applicant') ||
+                    actList.contains('staff.delete') ||
+                    actList.contains('delete')) {
+                  return true;
+                }
+              }
+              if (requiredKey == 'recruitment.assign') {
+                if (actList.contains('recruitment.assign') ||
+                    actList.contains('staff.assignment') ||
+                    actList.contains('assign')) {
+                  return true;
+                }
               }
             }
 

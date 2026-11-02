@@ -61,6 +61,10 @@ const staffRoutes = () => {
     Router.post("/applicant/stage/:id", auth.tokenVerified, adminOnly, applicantController.updateApplicantStage)
     Router.put("/applicant/stage/:id", auth.tokenVerified, adminOnly, applicantController.updateApplicantStage)
     Router.post("/applicant/reject/:id", auth.tokenVerified, adminOnly, applicantController.rejectApplicant)
+    Router.post("/applicant/assign/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicant)
+    Router.put("/applicant/assign/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicant)
+    Router.delete("/applicant/:id", auth.tokenVerified, adminOnly, applicantController.deleteApplicant)
+    Router.post("/applicant/delete/:id", auth.tokenVerified, adminOnly, applicantController.deleteApplicant)
     Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, applicantController.saveEvaluationRemarks)
 
     // Document uploads for staff onboarding

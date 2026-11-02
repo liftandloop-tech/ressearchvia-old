@@ -64,6 +64,15 @@ export const PERMISSION_REGISTRY = {
     'staff.delete': { feature: 'Staff', action: 'delete', label: 'Delete / Deactivate Staff', description: 'Deactivate or remove staff account' },
     'staff.view_applicants': { feature: 'Staff', action: 'view_applicants', label: 'View Job Applicants', description: 'View onboarding applicant queue' },
     'staff.approve_applicant': { feature: 'Staff', action: 'approve_applicant', label: 'Approve Applicant', description: 'Approve applicant to full employee' },
+    'staff.delete_applicant': { feature: 'Staff', action: 'delete_applicant', label: 'Delete Job Applicant', description: 'Permanently remove job applicant record' },
+
+    // Module 7.5: Recruitment & Job Applicants
+    'recruitment.view': { feature: 'Recruitment', action: 'view', label: 'View Job Applicants', description: 'View onboarding applicant queue and profiles' },
+    'recruitment.assign': { feature: 'Recruitment', action: 'assign', label: 'Assign Applicant to Staff', description: 'Assign applicants to staff members' },
+    'recruitment.stage': { feature: 'Recruitment', action: 'stage', label: 'Update Pipeline Stage', description: 'Advance or change candidate pipeline stage' },
+    'recruitment.promote': { feature: 'Recruitment', action: 'promote', label: 'Promote Applicant to Staff', description: 'Approve and promote applicant to staff' },
+    'recruitment.reject': { feature: 'Recruitment', action: 'reject', label: 'Reject Application', description: 'Mark applicant as rejected with reason' },
+    'recruitment.delete': { feature: 'Recruitment', action: 'delete', label: 'Delete Job Applicant', description: 'Permanently delete candidate application and documents' },
 
     // Module 8: Notifications
     'notifications.view': { feature: 'Notifications', action: 'view', label: 'View Notifications History', description: 'View sent notifications log' },

@@ -55,9 +55,15 @@ export const AVAILABLE_DEPARTMENT_PAGES = [
     },
     {
         key: 'Staff',
-        label: 'Staff Management & Recruitment',
-        description: 'Manage staff members, job applicants, onboarding, and assignments',
+        label: 'Staff Management',
+        description: 'Manage staff directory, employee profiles, MPIN, and client assignments',
         features: ['Staff']
+    },
+    {
+        key: 'Recruitment',
+        label: 'Recruitment & Job Applicants',
+        description: 'Manage candidate pipeline, screening, staff assignment, and walk-in applicants',
+        features: ['Recruitment', 'Staff']
     },
     {
         key: 'Settings',

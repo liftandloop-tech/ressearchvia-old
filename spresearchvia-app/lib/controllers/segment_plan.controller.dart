@@ -127,9 +127,16 @@ class SegmentPlanController extends GetxController {
     fetchActivePartialInfo();
   }
 
-  Future<void> fetchActivePartialInfo() async {
+  Future<void> fetchActivePartialInfo({String? intentId, bool force = false}) async {
     try {
-      final response = await _apiClient.get('/acquisition/active-partial-info');
+      final queryParams = (intentId != null && intentId.isNotEmpty)
+          ? {'intentId': intentId}
+          : null;
+      final response = await _apiClient.get(
+        '/acquisition/active-partial-info',
+        queryParameters: queryParams,
+        forceRefresh: force,
+      );
       if (response.statusCode == 200) {
         activePartialInfo.value = response.data['data'];
       } else {

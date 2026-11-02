@@ -408,6 +408,9 @@ class StaffModel {
   final EmergencyContactModel? emergencyContact;
   final WalkInFormModel? walkInForm;
   final String? telephonyExtension;
+  final String? assignedStaffId;
+  final String? assignedStaffName;
+  final String? assignedRecruiterId;
   final Map<String, dynamic>? rawJson;
 
   StaffModel({
@@ -490,6 +493,9 @@ class StaffModel {
     this.emergencyContact,
     this.walkInForm,
     this.telephonyExtension,
+    this.assignedStaffId,
+    this.assignedStaffName,
+    this.assignedRecruiterId,
     this.rawJson,
   });
 
@@ -634,6 +640,9 @@ class StaffModel {
       emergencyContact: contact,
       walkInForm: walkIn,
       telephonyExtension: _safeString(json['telephonyExtension']),
+      assignedStaffId: _safeString(json['assignedStaffId'] is Map ? (json['assignedStaffId']['_id'] ?? json['assignedStaffId']['id']) : (json['assignedStaffId'] ?? json['assignedRecruiterId'])),
+      assignedStaffName: _safeString(json['assignedStaffName'] ?? (json['assignedStaffId'] is Map ? (json['assignedStaffId']['fullName'] ?? json['assignedStaffId']['name']) : (json['assignedRecruiterId'] is Map ? (json['assignedRecruiterId']['fullName'] ?? json['assignedRecruiterId']['name']) : null))),
+      assignedRecruiterId: _safeString(json['assignedRecruiterId'] is Map ? (json['assignedRecruiterId']['_id'] ?? json['assignedRecruiterId']['id']) : json['assignedRecruiterId']),
       rawJson: json,
     );
   }

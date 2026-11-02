@@ -31,7 +31,6 @@ const htmlTemplate = (content, title = 'RESEARCHVIA') => `
         .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0; }
         .header { background: linear-gradient(135deg, #163174 0%, #0d1e48 100%); padding: 28px 24px; text-align: center; color: #ffffff; }
         .brand-title { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #ffffff; }
-        .brand-subtitle { margin: 6px 0 0 0; font-size: 12px; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px; }
         .content { padding: 32px 28px; color: #334155; line-height: 1.65; font-size: 15px; }
         .footer { background-color: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }
         .footer p { margin: 4px 0; }
@@ -45,7 +44,6 @@ const htmlTemplate = (content, title = 'RESEARCHVIA') => `
     <div class="container">
         <div class="header">
             <h1 class="brand-title">${title}</h1>
-            <p class="brand-subtitle">Wealth Management &amp; Research</p>
         </div>
         <div class="content">
             ${content}

@@ -340,10 +340,10 @@ class ApplicantService extends ApiService {
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
       });
       if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
+        final successMsg = response.body is Map ? response.body['message']?.toString() : null;
+        return (success: true, message: successMsg);
       }
-      final errorMsg = response.body?['message']?.toString() ??
-          response.body?['error']?.toString() ??
+      final errorMsg = (response.body is Map ? (response.body['message'] ?? response.body['error'])?.toString() : null) ??
           'Failed to update stage (HTTP ${response.statusCode})';
       debugPrint('updateApplicantStage failed: $errorMsg');
       return (success: false, message: errorMsg);
@@ -360,15 +360,52 @@ class ApplicantService extends ApiService {
         if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       });
       if (response.statusCode == 200) {
-        return (success: true, message: response.body?['message']?.toString());
+        final successMsg = response.body is Map ? response.body['message']?.toString() : null;
+        return (success: true, message: successMsg);
       }
-      final errorMsg = response.body?['message']?.toString() ??
-          response.body?['error']?.toString() ??
+      final errorMsg = (response.body is Map ? (response.body['message'] ?? response.body['error'])?.toString() : null) ??
           'Failed to reject applicant (HTTP ${response.statusCode})';
       debugPrint('rejectApplicant failed: $errorMsg');
       return (success: false, message: errorMsg);
     } catch (e) {
       debugPrint('Error rejecting applicant: $e');
+      return (success: false, message: e.toString());
+    }
+  }
+
+  Future<({bool success, String? message})> assignApplicant(String id, {String? staffId, String? staffName}) async {
+    try {
+      final response = await post('/staff/applicant/assign/$id', {
+        'staffId': staffId,
+        'staffName': staffName,
+      });
+      if (response.statusCode == 200) {
+        final successMsg = response.body is Map ? response.body['message']?.toString() : null;
+        return (success: true, message: successMsg ?? 'Applicant assigned successfully');
+      }
+      final errorMsg = (response.body is Map ? (response.body['message'] ?? response.body['error'])?.toString() : null) ??
+          'Failed to assign applicant (HTTP ${response.statusCode})';
+      debugPrint('assignApplicant failed: $errorMsg');
+      return (success: false, message: errorMsg);
+    } catch (e) {
+      debugPrint('Error assigning applicant: $e');
+      return (success: false, message: e.toString());
+    }
+  }
+
+  Future<({bool success, String? message})> deleteApplicant(String id) async {
+    try {
+      final response = await post('/staff/applicant/delete/$id', {});
+      if (response.statusCode == 200) {
+        final successMsg = response.body is Map ? response.body['message']?.toString() : null;
+        return (success: true, message: successMsg ?? 'Applicant deleted successfully');
+      }
+      final errorMsg = (response.body is Map ? (response.body['message'] ?? response.body['error'])?.toString() : null) ??
+          'Failed to delete applicant (HTTP ${response.statusCode})';
+      debugPrint('deleteApplicant failed: $errorMsg');
+      return (success: false, message: errorMsg);
+    } catch (e) {
+      debugPrint('Error deleting applicant: $e');
       return (success: false, message: e.toString());
     }
   }
