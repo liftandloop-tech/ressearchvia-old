@@ -30,9 +30,10 @@ class PremiumPlanCard extends StatelessWidget {
         final isUserSuspended = authController.currentUser.value?.userStatus == 'SUSPENDED';
 
         final user = authController.currentUser.value;
-        final isRegistrationPending = user?.registrationSource == 'APP' &&
-                                      (user?.registrationStatus == 'PENDING');
-        final isRegistrationRejected = user?.registrationStatus == 'REJECTED';
+        final regStatus = (user?.registrationStatus ?? '').toUpperCase().trim();
+        final isRegistrationPending = regStatus == 'PENDING';
+        final isRegistrationRejected = regStatus == 'REJECTED';
+        final isRegistrationActive = regStatus == 'ACTIVE' || regStatus == 'COMPLETE';
         
         // Check for partial registration balance - user is ACTIVE but owes registration balance
         final hasRegistrationBalance = controller.hasRegistrationPendingBalance;
@@ -41,8 +42,6 @@ class PremiumPlanCard extends StatelessWidget {
         final isRegistrationSkipped = Get.isRegistered<TabsController>()
             ? Get.find<TabsController>().isRegistrationSkipped.value
             : false;
-        final isRegistrationActive = user?.registrationStatus == 'ACTIVE' ||
-            user?.registrationStatus == 'COMPLETE';
 
         if (isLoading) {
           return _buildLoadingCard();
@@ -61,6 +60,11 @@ class PremiumPlanCard extends StatelessWidget {
         // User has skipped registration and has no active registration
         if (isRegistrationSkipped && !isRegistrationActive) {
           return _buildRegistrationSkippedCard();
+        }
+
+        // If registration is not active/approved, block plan selection and show pending card
+        if (!isRegistrationActive && user?.adminAccessGranted != true) {
+          return _buildRegistrationPendingCard(context, authController);
         }
 
         if (segments.isEmpty) {

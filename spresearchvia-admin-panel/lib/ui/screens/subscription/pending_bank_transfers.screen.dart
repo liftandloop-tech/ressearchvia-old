@@ -1761,6 +1761,7 @@ class PendingBankTransfersScreen extends StatelessWidget {
                       ),
                       const Spacer(),
                       if (canApprove &&
+                          history.isNotEmpty &&
                           status != 'PAID' &&
                           status != 'APPROVED' &&
                           status != 'REJECTED') ...[
