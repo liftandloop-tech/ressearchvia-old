@@ -722,7 +722,7 @@ const applicantController = {
             applicant.isDraft = false;
             applicant.stage = 'APPLIED';
             applicant.currentStep = 3;
-            applicant.onboardingStatus = 'SUBMITTED';
+            applicant.onboardingStatus = applicant.kycVideoUrl ? 'VERIFIED' : ((applicant.photoUrl && applicant.resumeUrl) ? 'DOCUMENTS_UPLOADED' : 'SUBMITTED');
             applicant.isVerified = true;
             applicant.verifiedAt = new Date();
             applicant.stageHistory.push({

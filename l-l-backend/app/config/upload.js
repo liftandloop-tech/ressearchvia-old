@@ -373,11 +373,18 @@ async function scanAndValidateFile(file, req) {
       throw new Error('Security violation: Invalid PDF file signature.');
     }
   } else if (ext === '.jpg' || ext === '.jpeg') {
-    if (bytesRead < 3 || chunk[0] !== 0xFF || chunk[1] !== 0xD8 || chunk[2] !== 0xFF) {
+    const isJpeg = (bytesRead >= 3 && chunk[0] === 0xFF && chunk[1] === 0xD8 && chunk[2] === 0xFF);
+    const isPng = (bytesRead >= 4 && chunk[0] === 0x89 && chunk[1] === 0x50 && chunk[2] === 0x4E && chunk[3] === 0x47);
+    const isWebp = (bytesRead >= 12 && chunk.toString('ascii', 0, 4) === 'RIFF' && chunk.toString('ascii', 8, 12) === 'WEBP');
+    const isGif = (bytesRead >= 6 && (chunk.toString('ascii', 0, 6) === 'GIF87a' || chunk.toString('ascii', 0, 6) === 'GIF89a'));
+    if (!isJpeg && !isPng && !isWebp && !isGif) {
       throw new Error('Security violation: Invalid JPEG file signature.');
     }
   } else if (ext === '.png') {
-    if (bytesRead < 8 || chunk[0] !== 0x89 || chunk[1] !== 0x50 || chunk[2] !== 0x4E || chunk[3] !== 0x47) {
+    const isPng = (bytesRead >= 4 && chunk[0] === 0x89 && chunk[1] === 0x50 && chunk[2] === 0x4E && chunk[3] === 0x47);
+    const isJpeg = (bytesRead >= 3 && chunk[0] === 0xFF && chunk[1] === 0xD8 && chunk[2] === 0xFF);
+    const isWebp = (bytesRead >= 12 && chunk.toString('ascii', 0, 4) === 'RIFF' && chunk.toString('ascii', 8, 12) === 'WEBP');
+    if (!isPng && !isJpeg && !isWebp) {
       throw new Error('Security violation: Invalid PNG file signature.');
     }
   } else if (ext === '.gif') {

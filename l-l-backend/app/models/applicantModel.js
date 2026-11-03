@@ -261,7 +261,7 @@ const applicantSchema = new mongoose.Schema({
   },
   onboardingStatus: {
     type: String,
-    enum: ["PENDING", "DOCUMENTS_UPLOADED", "VERIFIED"],
+    enum: ["PENDING", "DOCUMENTS_UPLOADED", "VERIFIED", "SUBMITTED"],
     default: "PENDING"
   },
 
