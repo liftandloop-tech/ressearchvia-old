@@ -247,15 +247,17 @@ class ApplicantsListScreen extends StatelessWidget {
                     child: DataTable2(
                       columnSpacing: 16,
                       horizontalMargin: 12,
-                      minWidth: 1080,
+                      minWidth: 1220,
+                      dataRowHeight: 68,
+                      headingRowHeight: 46,
                       columns: const [
-                        DataColumn2(label: Text('Candidate'), size: ColumnSize.L),
-                        DataColumn2(label: Text('Applied Role')),
-                        DataColumn2(label: Text('Contact Details')),
-                        DataColumn2(label: Text('Status')),
-                        DataColumn2(label: Text('Pipeline Stage')),
-                        DataColumn2(label: Text('Assigned Staff'), size: ColumnSize.M),
-                        DataColumn2(label: Text('Actions'), fixedWidth: 185),
+                        DataColumn2(label: Text('Candidate'), size: ColumnSize.L, fixedWidth: 210),
+                        DataColumn2(label: Text('Applied Role'), size: ColumnSize.L, fixedWidth: 230),
+                        DataColumn2(label: Text('Contact Details'), size: ColumnSize.M, fixedWidth: 200),
+                        DataColumn2(label: Text('Status'), fixedWidth: 125),
+                        DataColumn2(label: Text('Pipeline Stage'), fixedWidth: 120),
+                        DataColumn2(label: Text('Assigned Staff'), size: ColumnSize.M, fixedWidth: 180),
+                        DataColumn2(label: Text('Actions'), fixedWidth: 175),
                       ],
                       rows: controller.filteredApplicants.map((applicant) {
                         final raw = applicant.rawJson ?? {};
@@ -399,32 +401,59 @@ class ApplicantsListScreen extends StatelessWidget {
 
                             // Role
                             DataCell(
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    (() {
-                                      if (applicant.role.isNotEmpty && applicant.role.toLowerCase() != 'staff') {
-                                        return applicant.role;
-                                      }
-                                      final rawTarget = raw['targetRole']?.toString() ??
-                                          raw['walkInForm']?['appliedPosition']?.toString() ??
-                                          raw['walkInForm']?['positionApplied']?.toString() ??
-                                          raw['appliedPosition']?.toString();
-                                      if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff') {
-                                        return rawTarget.trim();
-                                      }
-                                      return '—';
-                                    })(),
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
-                                  ),
-                                  if (applicant.department.isNotEmpty || (raw['targetDepartment'] != null && raw['targetDepartment'].toString().isNotEmpty))
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
                                     Text(
-                                      applicant.department.isNotEmpty ? applicant.department : raw['targetDepartment'].toString(),
-                                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                      (() {
+                                        if (applicant.role.isNotEmpty && applicant.role.toLowerCase() != 'staff') {
+                                          return applicant.role;
+                                        }
+                                        final rawTarget = raw['targetRole']?.toString() ??
+                                            raw['walkInForm']?['appliedPosition']?.toString() ??
+                                            raw['walkInForm']?['positionApplied']?.toString() ??
+                                            raw['appliedPosition']?.toString();
+                                        if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff') {
+                                          return rawTarget.trim();
+                                        }
+                                        return '—';
+                                      })(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1E293B),
+                                        height: 1.25,
+                                      ),
                                     ),
-                                ],
+                                    if (applicant.department.isNotEmpty || (raw['targetDepartment'] != null && raw['targetDepartment'].toString().trim().isNotEmpty)) ...[
+                                      const SizedBox(height: 3),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+                                        ),
+                                        child: Text(
+                                          applicant.department.isNotEmpty
+                                              ? applicant.department
+                                              : raw['targetDepartment'].toString().trim(),
+                                          style: const TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w500,
+                                            color: Color(0xFF64748B),
+                                            height: 1.1,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             ),
 

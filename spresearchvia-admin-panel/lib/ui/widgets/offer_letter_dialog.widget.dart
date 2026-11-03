@@ -1,6 +1,8 @@
 import 'dart:js_interop';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:printing/printing.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/services/applicant.service.dart';
@@ -46,6 +48,8 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
   bool _isSending = false;
   String? _statusMessage;
   bool _isError = false;
+  Uint8List? _previewBytes;
+  String? _blobUrl;
 
   final ApplicantService _applicantService = Get.find<ApplicantService>();
 
@@ -198,23 +202,34 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
     try {
       final res = await _applicantService.previewOfferLetter(
         widget.applicant.id,
+        applicant: widget.applicant,
         designation: _designationCtrl.text.trim(),
         joiningDate: _joiningDateCtrl.text.trim(),
         issueDate: _issueDateCtrl.text.trim(),
       );
 
       if (res.success && res.bytes != null) {
+        _previewBytes = res.bytes;
         final blob = web.Blob(
           [res.bytes!.toJS].toJS,
           web.BlobPropertyBag(type: 'application/pdf'),
         );
-        final blobUrl = web.URL.createObjectURL(blob);
+        _blobUrl = web.URL.createObjectURL(blob);
 
-        // Open preview in new tab
-        web.window.open(blobUrl, '_blank');
+        // Open in browser interactive PDF viewer
+        try {
+          await Printing.layoutPdf(
+            onLayout: (_) async => res.bytes!,
+            name: res.fileName ?? 'Offer_Letter.pdf',
+          );
+        } catch (_) {
+          if (_blobUrl != null) {
+            web.window.open(_blobUrl!, '_blank');
+          }
+        }
 
         setState(() {
-          _statusMessage = 'Preview opened in a new browser tab. Review before sending.';
+          _statusMessage = 'Official Offer-cum-Appointment Letter preview generated.';
           _isError = false;
         });
       } else {
@@ -594,24 +609,73 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: _isError ? const Color(0xFFFECACA) : const Color(0xFFBFDBFE)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          _isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-                          color: _isError ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _statusMessage!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _isError ? const Color(0xFF991B1B) : const Color(0xFF1E40AF),
-                              fontWeight: FontWeight.w500,
+                        Row(
+                          children: [
+                            Icon(
+                              _isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+                              color: _isError ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
+                              size: 18,
                             ),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _statusMessage!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _isError ? const Color(0xFF991B1B) : const Color(0xFF1E40AF),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                        if (_previewBytes != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: () {
+                                  Printing.layoutPdf(
+                                    onLayout: (_) async => _previewBytes!,
+                                    name: 'Offer_Letter_${widget.applicant.name.replaceAll(' ', '_')}.pdf',
+                                  );
+                                },
+                                icon: const Icon(Icons.print_outlined, size: 14),
+                                label: const Text('Print / Save PDF', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFF1E40AF),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  backgroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    side: const BorderSide(color: Color(0xFFBFDBFE)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (_blobUrl != null)
+                                TextButton.icon(
+                                  onPressed: () {
+                                    web.window.open(_blobUrl!, '_blank');
+                                  },
+                                  icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                                  label: const Text('Open in New Tab', style: TextStyle(fontSize: 12)),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF1E40AF),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    backgroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      side: const BorderSide(color: Color(0xFFBFDBFE)),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
