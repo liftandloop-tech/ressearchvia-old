@@ -730,11 +730,19 @@ class ApplicantProfileScreen extends StatelessWidget {
               const SizedBox(height: 14),
               _buildRow([
                 _buildDataTile('PAN Number (Optional)', panNumberVal.isNotEmpty ? panNumberVal : 'Not provided'),
+                _buildDataTile(
+                  'Portal Login Password',
+                  (() {
+                    final pass = raw['plainPassword']?.toString() ?? raw['password']?.toString() ?? '';
+                    if (pass.isEmpty) return 'Not set';
+                    if (pass.startsWith(r'$2a$') || pass.startsWith(r'$2b$')) return '[Encrypted Hash]';
+                    return pass;
+                  })(),
+                ),
                 if (skypeOrLinkedInVal.isNotEmpty)
                   _buildDataTile('LinkedIn / Skype ID', skypeOrLinkedInVal)
                 else
                   const SizedBox(),
-                const SizedBox(),
               ]),
             ],
           ),

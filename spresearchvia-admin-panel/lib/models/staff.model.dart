@@ -344,6 +344,7 @@ class StaffModel {
   final String? assignedDirector;
   final String? assignedDirectorName;
   final String? mpin;
+  final String? plainPassword;
   final bool isViewOnly;
   final String? panUrl;
   final String? aadhaarUrl;
@@ -429,6 +430,7 @@ class StaffModel {
     this.assignedDirector,
     this.assignedDirectorName,
     this.mpin,
+    this.plainPassword,
     this.isViewOnly = false,
     this.panUrl,
     this.aadhaarUrl,
@@ -574,6 +576,7 @@ class StaffModel {
       assignedDirector: _safeString(json['assignedDirector']),
       assignedDirectorName: json['assignedDirectorName'] ?? (json['assignedDirector'] is Map ? _safeString(json['assignedDirector']['fullName'] ?? json['assignedDirector']['name']) : null),
       mpin: _safeString(json['mpin']),
+      plainPassword: _safeString(json['plainPassword'] ?? json['password']),
       isViewOnly: json['isViewOnly'] ?? false,
       panUrl: _safeString(json['panUrl']),
       aadhaarUrl: _safeString(json['aadhaarUrl']),
@@ -664,6 +667,7 @@ class StaffModel {
       'assignedDirector': assignedDirector,
       'assignedDirectorName': assignedDirectorName,
       'mpin': mpin,
+      if (plainPassword != null) 'plainPassword': plainPassword,
       'isViewOnly': isViewOnly,
       'hasSignedAgreement': hasSignedAgreement,
       'agreementStatus': agreementStatus,

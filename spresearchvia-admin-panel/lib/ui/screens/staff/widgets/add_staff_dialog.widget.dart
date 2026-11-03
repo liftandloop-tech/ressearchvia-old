@@ -138,6 +138,14 @@ class AddStaffDialog extends StatelessWidget {
                       ],
                     );
                   }),
+                  // Login Password
+                  _buildLabel('Login Password (Optional)'),
+                  const SizedBox(height: 6),
+                  _buildTextField(
+                    controller: controller.passwordController,
+                    hint: 'Enter or view login password',
+                  ),
+                  const SizedBox(height: 14),
                   // Role
                   _buildLabel('Role', required: true),
                   const SizedBox(height: 6),

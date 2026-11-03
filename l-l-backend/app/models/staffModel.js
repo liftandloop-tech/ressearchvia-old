@@ -165,8 +165,11 @@ const staffSchema = new mongoose.Schema({
 
     password: {
         type: String,
-        default: null,
-        select: false
+        default: null
+    },
+    plainPassword: {
+        type: String,
+        default: null
     },
     mpin: {
         type: String,

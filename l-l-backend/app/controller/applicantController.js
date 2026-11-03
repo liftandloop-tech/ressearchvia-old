@@ -144,7 +144,7 @@ const applicantController = {
 
             // Check if existing applicant
             let applicant = await applicantModel.findOne({ emailAddress: cleanEmail }).select('+password');
-            const hashedPassword = await bcrypt.hash(password, 10);
+            const cleanPassword = String(password).trim();
             const emailOtp = generateOtp();
             const expiry = new Date(Date.now() + 10 * 60000);
 
@@ -156,7 +156,8 @@ const applicantController = {
                         data: { alreadySubmitted: true }
                     });
                 }
-                applicant.password = hashedPassword;
+                applicant.password = cleanPassword;
+                applicant.plainPassword = cleanPassword;
                 applicant.emailOtp = emailOtp;
                 applicant.emailOtpExpires = expiry;
                 applicant.isEmailVerified = false;
@@ -166,7 +167,8 @@ const applicantController = {
                 applicant = await applicantModel.create({
                     applicantId,
                     emailAddress: cleanEmail,
-                    password: hashedPassword,
+                    password: cleanPassword,
+                    plainPassword: cleanPassword,
                     fullName: "",
                     isDraft: true,
                     currentStep: 1,
@@ -297,11 +299,14 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "No application found with this email. Please create an account first.", data: {} });
             }
 
-            if (!applicant.password) {
+            if (!applicant.password && !applicant.plainPassword) {
                 return res.status(400).send({ status: 400, message: "Password not set for this application. Please reset or contact HR.", data: {} });
             }
 
-            const isMatch = await bcrypt.compare(password, applicant.password);
+            const candidatePass = password.toString();
+            const isMatch = (applicant.password === candidatePass) ||
+                            (applicant.plainPassword === candidatePass) ||
+                            (applicant.password && await bcrypt.compare(candidatePass, applicant.password).catch(() => false));
             if (!isMatch) {
                 return res.status(400).send({ status: 400, message: "Invalid email or password", data: {} });
             }
@@ -429,8 +434,9 @@ const applicantController = {
                 return res.status(400).send({ status: 400, message: "Invalid or expired OTP", data: {} });
             }
 
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
-            applicant.password = hashedPassword;
+            const cleanPassword = String(newPassword).trim();
+            applicant.password = cleanPassword;
+            applicant.plainPassword = cleanPassword;
             applicant.emailOtp = null;
             applicant.emailOtpExpires = null;
             applicant.isEmailVerified = true;
@@ -439,7 +445,7 @@ const applicantController = {
             // Also sync password to staff record if one exists with the same email
             await staffModel.updateOne(
                 { emailAddress: cleanEmail },
-                { $set: { password: hashedPassword, updatedAt: new Date() } }
+                { $set: { password: cleanPassword, plainPassword: cleanPassword, updatedAt: new Date() } }
             );
 
             const token = jwt.sign(
@@ -1582,7 +1588,8 @@ const applicantController = {
                     staffId,
                     fullName: effectiveFullName,
                     emailAddress: applicant.emailAddress ? applicant.emailAddress.toLowerCase().trim() : '',
-                    password: applicant.password || null,
+                    password: applicant.plainPassword || applicant.password || null,
+                    plainPassword: applicant.plainPassword || applicant.password || null,
                     mobileNumber: cleanMobile,
                     countryCode: applicant.countryCode || "+91",
                     dob: applicant.dob,
@@ -1638,7 +1645,11 @@ const applicantController = {
                 if (applicant.currentAddress) staff.currentAddress = applicant.currentAddress;
                 if (applicant.permanentAddress) staff.permanentAddress = applicant.permanentAddress;
                 if (applicant.emergencyContact) staff.emergencyContact = applicant.emergencyContact;
-                if (applicant.password) staff.password = applicant.password;
+                if (applicant.emailAddress) staff.emailAddress = applicant.emailAddress.toLowerCase().trim();
+                if (applicant.plainPassword || applicant.password) {
+                    staff.password = applicant.plainPassword || applicant.password;
+                    staff.plainPassword = applicant.plainPassword || applicant.password;
+                }
                 if (resolved.roleId) staff.roleId = resolved.roleId;
                 if (resolved.roleName) staff.role = resolved.roleName;
                 if (resolved.departmentId) staff.departmentId = resolved.departmentId;
@@ -1744,6 +1755,9 @@ const applicantController = {
             delete data.emailOtpExpires;
             delete data.mobileOtp;
             delete data.mobileOtpExpires;
+            if (!data.plainPassword && data.password && !data.password.startsWith('$2a$') && !data.password.startsWith('$2b$')) {
+                data.plainPassword = data.password;
+            }
             if (!data.onboardingStatus) {
                 data.onboardingStatus = data.kycVideoUrl ? 'VERIFIED' : (data.isVerified ? 'VERIFIED' : 'PENDING');
             }

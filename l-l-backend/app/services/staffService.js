@@ -361,11 +361,14 @@ const staffService = {
           return { status: 403, message: "Access denied. Account is inactive. Please contact Admin.", data: {} };
         }
 
-        if (!staff.password) {
+        if (!staff.password && !staff.plainPassword) {
           return { status: 400, message: "Password not set for this account. Please log in with MPIN or Mobile OTP.", data: {} };
         }
 
-        const isMatch = await bcrypt.compare(password.toString(), staff.password);
+        const candidatePass = password.toString();
+        const isMatch = (staff.password === candidatePass) ||
+                        (staff.plainPassword === candidatePass) ||
+                        (staff.password && await bcrypt.compare(candidatePass, staff.password).catch(() => false));
         if (!isMatch) {
           return { status: 400, message: "Invalid email or password", data: {} };
         }
@@ -728,7 +731,16 @@ const staffService = {
       }
       if (fullName) staff.fullName = fullName;
       if (mobileNumber) staff.mobileNumber = mobileNumber;
-      if (emailAddress) staff.emailAddress = emailAddress;
+      if (emailAddress) {
+        const cleanEmail = emailAddress.toLowerCase().trim();
+        staff.emailAddress = cleanEmail;
+        if (staff.applicantId) {
+          await applicantModel.updateOne(
+            { _id: staff.applicantId },
+            { $set: { emailAddress: cleanEmail } }
+          );
+        }
+      }
 
       const targetRoleId = roleId !== undefined ? roleId : body.roleId;
       const targetRoleName = role || body.role;
@@ -795,6 +807,23 @@ const staffService = {
 
       if (body.mpin) {
         staff.mpin = body.mpin.toString();
+      }
+
+      if (body.password !== undefined && body.password !== null && String(body.password).trim().length > 0) {
+        const cleanPassword = String(body.password).trim();
+        staff.password = cleanPassword;
+        staff.plainPassword = cleanPassword;
+        if (staff.applicantId) {
+          await applicantModel.updateOne(
+            { _id: staff.applicantId },
+            { $set: { password: cleanPassword, plainPassword: cleanPassword } }
+          );
+        } else if (staff.emailAddress) {
+          await applicantModel.updateOne(
+            { emailAddress: staff.emailAddress.toLowerCase().trim() },
+            { $set: { password: cleanPassword, plainPassword: cleanPassword } }
+          );
+        }
       }
 
       const previousStatus = (staff.status || '').toString().trim().toLowerCase();
@@ -994,6 +1023,23 @@ const staffService = {
         })
         .populate('departmentId')
         .lean();
+
+      // Ensure plainPassword and emailAddress are populated for all staff
+      for (let s of staffList) {
+        if (!s.emailAddress || !s.password || !s.plainPassword) {
+          if (s.applicantId) {
+            const app = await applicantModel.findById(s.applicantId).select('emailAddress password plainPassword').lean();
+            if (app) {
+              if (!s.emailAddress && app.emailAddress) s.emailAddress = app.emailAddress;
+              if (!s.password && app.password) s.password = app.password;
+              if (!s.plainPassword && (app.plainPassword || app.password)) s.plainPassword = app.plainPassword || app.password;
+            }
+          }
+        }
+        if (s.password && !s.plainPassword && !s.password.startsWith('$2a$') && !s.password.startsWith('$2b$')) {
+          s.plainPassword = s.password;
+        }
+      }
       console.log(`Found ${staffList.length} staff members (statusFilter=${statusParam || 'Active(default)'})`);
       console.log('Staff departments:', staffList.map(s => ({ name: s.fullName, dept: s.deparment, status: s.status })));
 

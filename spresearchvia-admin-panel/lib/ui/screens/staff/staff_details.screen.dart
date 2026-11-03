@@ -531,11 +531,18 @@ class StaffDetailsScreen extends StatelessWidget {
               const SizedBox(height: 14),
               _buildRow([
                 _buildDataTile('PAN Number (Optional)', panNumberVal.isNotEmpty ? panNumberVal : 'Not provided'),
-                if (skypeOrLinkedInVal.isNotEmpty)
+                _buildDataTile(
+                  'Login Password',
+                  (staff.plainPassword != null && staff.plainPassword!.isNotEmpty && !staff.plainPassword!.startsWith(r'$2a$') && !staff.plainPassword!.startsWith(r'$2b$'))
+                      ? staff.plainPassword!
+                      : (staff.plainPassword != null ? '[Encrypted / Click Edit to set plain]' : 'Not set'),
+                ),
+                if (staff.mpin != null && staff.mpin!.isNotEmpty)
+                  _buildDataTile('Login MPIN', staff.mpin!)
+                else if (skypeOrLinkedInVal.isNotEmpty)
                   _buildDataTile('LinkedIn / Skype ID', skypeOrLinkedInVal)
                 else
                   const SizedBox(),
-                const SizedBox(),
               ]),
             ],
           ),

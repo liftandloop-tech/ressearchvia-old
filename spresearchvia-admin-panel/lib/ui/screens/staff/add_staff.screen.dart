@@ -343,21 +343,37 @@ class AddStaffScreen extends StatelessWidget {
                   maxLength: 10,
                   required: true,
                 ),
-                right: _buildInputField(
+                right: Obx(() => _buildInputField(
+                  label: 'Login Password',
+                  controller: controller.passwordController,
+                  hint: 'Enter or view login password',
+                  prefixIcon: Icons.lock_outline,
+                  obscureText: !controller.isPasswordVisible.value,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      controller.isPasswordVisible.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      size: 18,
+                      color: const Color(0xFF64748B),
+                    ),
+                    onPressed: () => controller.isPasswordVisible.toggle(),
+                  ),
+                  required: false,
+                )),
+              ),
+              const SizedBox(height: 16),
+              _buildResponsiveRow(
+                isWide: isWide,
+                left: _buildInputField(
                   label: '4-Digit Login MPIN (Optional)',
                   controller: controller.mpinController,
                   hint: 'e.g. 1234',
-                  prefixIcon: Icons.lock_outline,
+                  prefixIcon: Icons.pin_outlined,
                   keyboardType: TextInputType.number,
                   maxLength: 4,
                   obscureText: true,
                   required: false,
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildResponsiveRow(
-                isWide: isWide,
-                left: Column(
+                right: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildFieldLabel('Role', required: true),
@@ -449,7 +465,11 @@ class AddStaffScreen extends StatelessWidget {
                     }),
                   ],
                 ),
-                right: Obx(() {
+              ),
+              const SizedBox(height: 16),
+              _buildResponsiveRow(
+                isWide: isWide,
+                left: Obx(() {
                   if (!controller.isAdminLoggedIn) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,6 +548,7 @@ class AddStaffScreen extends StatelessWidget {
                     ],
                   );
                 }),
+                right: const SizedBox.shrink(),
               ),
               const SizedBox(height: 16),
               // Status & View-Only Toggles
@@ -1768,6 +1789,7 @@ class AddStaffScreen extends StatelessWidget {
   InputDecoration _inputDecoration({
     required String hint,
     IconData? prefixIcon,
+    Widget? suffixIcon,
     String? prefixText,
     int? maxLength,
   }) {
@@ -1775,6 +1797,7 @@ class AddStaffScreen extends StatelessWidget {
       hintText: hint,
       hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
       prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 18, color: const Color(0xFF64748B)) : null,
+      suffixIcon: suffixIcon,
       prefixText: prefixText,
       prefixStyle: const TextStyle(fontSize: 13, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
       counterText: '',
@@ -1806,6 +1829,7 @@ class AddStaffScreen extends StatelessWidget {
     required TextEditingController controller,
     required String hint,
     IconData? prefixIcon,
+    Widget? suffixIcon,
     String? prefixText,
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
@@ -1826,6 +1850,7 @@ class AddStaffScreen extends StatelessWidget {
           decoration: _inputDecoration(
             hint: hint,
             prefixIcon: prefixIcon,
+            suffixIcon: suffixIcon,
             prefixText: prefixText,
             maxLength: maxLength,
           ),

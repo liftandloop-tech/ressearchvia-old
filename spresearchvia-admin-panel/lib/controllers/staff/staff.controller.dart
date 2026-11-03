@@ -23,6 +23,8 @@ class StaffController extends GetxController {
   final nameController = TextEditingController();
   final mobileController = TextEditingController();
   final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final isPasswordVisible = false.obs;
   final mpinController = TextEditingController();
   final departmentController =
       TextEditingController(); // For now using text field, or dropdown if UI requires
@@ -340,6 +342,7 @@ class StaffController extends GetxController {
     nameController.dispose();
     mobileController.dispose();
     emailController.dispose();
+    passwordController.dispose();
     mpinController.dispose();
     departmentController.dispose();
     joiningDateController.dispose();
@@ -426,7 +429,16 @@ class StaffController extends GetxController {
       mobile = mobile.substring(2);
     }
     mobileController.text = mobile;
-    emailController.text = staff.email;
+    emailController.text = staff.email.isNotEmpty
+        ? staff.email
+        : (staff.rawJson?['emailAddress']?.toString() ?? staff.rawJson?['email']?.toString() ?? '');
+    final rawPass = staff.plainPassword ??
+        (staff.rawJson?['plainPassword']?.toString() ?? staff.rawJson?['password']?.toString() ?? '');
+    if (rawPass.startsWith(r'$2a$') || rawPass.startsWith(r'$2b$')) {
+      passwordController.text = ''; // Irreversible bcrypt hash; admin can enter a new readable password
+    } else {
+      passwordController.text = rawPass;
+    }
     mpinController.text = staff.mpin ?? '';
 
     // Handle role and auto-assigned department
@@ -794,6 +806,11 @@ class StaffController extends GetxController {
         data["mpin"] = mpinController.text.trim();
       }
 
+      if (passwordController.text.trim().isNotEmpty) {
+        data["password"] = passwordController.text.trim();
+        data["plainPassword"] = passwordController.text.trim();
+      }
+
       // Handle assigned supervisor / director
       if (!_authController.user.value!.isAdmin) {
         data["assignedDirector"] = _authController.user.value!.id;
@@ -922,6 +939,8 @@ class StaffController extends GetxController {
     nameController.clear();
     mobileController.clear();
     emailController.clear();
+    passwordController.clear();
+    isPasswordVisible.value = false;
     mpinController.clear();
     departmentController.clear();
     joiningDateController.clear();

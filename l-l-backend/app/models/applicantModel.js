@@ -46,7 +46,10 @@ const applicantSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    select: false,
+    default: null
+  },
+  plainPassword: {
+    type: String,
     default: null
   },
   mobileNumber: {
