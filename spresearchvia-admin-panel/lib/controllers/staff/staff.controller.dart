@@ -1411,99 +1411,141 @@ class StaffController extends GetxController {
   }
 
   Future<void> deleteStaff(String staffId, String staffName) async {
-    // Show confirmation dialog
+    final confirmController = TextEditingController();
+    bool isConfirmed = false;
+
+    // Show strict confirmation dialog requiring typing DELETE or checking confirmation
     final confirmed = await Get.dialog<bool>(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.orange[700],
-                    size: 28,
+      StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          final isMatch = confirmController.text.trim().toUpperCase() == "DELETE" || isConfirmed;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(width: 12),
+                  child: const Icon(Icons.delete_forever_rounded, color: Color(0xFFDC2626), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Text("Confirm Staff Deletion", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Confirm Deletion',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[800],
+                    "Are you sure you want to permanently delete staff member \"" + staffName + "\"?",
+                    style: const TextStyle(fontSize: 13.5, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          staffName.isNotEmpty ? staffName : "Staff Member",
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          "• All assigned leads will be automatically transferred to Admin.\n• Staff login & portal permissions will be permanently revoked.\n• This action cannot be undone.",
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B), height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    "To confirm, please type \"DELETE\" below:",
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: confirmController,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                    decoration: InputDecoration(
+                      hintText: "Type DELETE to confirm",
+                      hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      prefixIcon: const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFDC2626)),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    onTap: () {
+                      setDialogState(() {
+                        isConfirmed = !isConfirmed;
+                        if (isConfirmed && confirmController.text.trim().toUpperCase() != "DELETE") {
+                          confirmController.text = "DELETE";
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: isConfirmed || confirmController.text.trim().toUpperCase() == "DELETE",
+                          activeColor: const Color(0xFFDC2626),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (val) {
+                            setDialogState(() {
+                              isConfirmed = val == true;
+                              if (isConfirmed && confirmController.text.trim().toUpperCase() != "DELETE") {
+                                confirmController.text = "DELETE";
+                              }
+                            });
+                          },
+                        ),
+                        const Expanded(
+                          child: Text(
+                            "I confirm permanent deletion of this staff member.",
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFFDC2626), fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Are you sure you want to delete $staffName?',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                  height: 1.5,
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text("Cancel"),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'This action cannot be undone. All data associated with this staff member will be permanently removed.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                  height: 1.5,
+              ElevatedButton(
+                onPressed: isMatch ? () => Get.back(result: true) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  disabledBackgroundColor: const Color(0xFFE2E8F0),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Get.back(result: false),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                    ),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => Get.back(result: true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red[600],
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    child: const Text(
-                      'Delete',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+                child: const Text("Delete Permanently"),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
 
