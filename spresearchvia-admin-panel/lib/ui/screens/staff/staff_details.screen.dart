@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/controllers/staff/staff_details.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
@@ -108,6 +109,7 @@ class StaffDetailsScreen extends StatelessWidget {
     final authController = Get.find<AuthController>();
     final currentUser = authController.user.value;
     final canUpdate = currentUser?.isAdmin == true || (currentUser?.has('staff.update') ?? false);
+    final canDelete = currentUser?.isAdmin == true || (currentUser?.has('staff.delete') ?? false);
 
     return Row(
       children: [
@@ -168,6 +170,26 @@ class StaffDetailsScreen extends StatelessWidget {
             label: const Text('Edit Staff', style: TextStyle(fontSize: 12.5)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            ),
+          ),
+        ],
+        if (canDelete) ...[
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final staffCtrl = Get.isRegistered<StaffController>()
+                  ? Get.find<StaffController>()
+                  : Get.put(StaffController());
+              await staffCtrl.deleteStaff(staff.id, staff.name);
+            },
+            icon: const Icon(Icons.delete_outline_rounded, size: 15),
+            label: const Text('Delete Staff', style: TextStyle(fontSize: 12.5)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

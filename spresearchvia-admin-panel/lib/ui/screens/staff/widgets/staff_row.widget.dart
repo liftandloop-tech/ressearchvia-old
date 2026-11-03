@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
+import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'table_reporting_to_dropdown.widget.dart';
 import 'staff_digital_id_dialog.widget.dart';
@@ -200,6 +201,22 @@ class StaffRow extends TableRow {
                     color: AppTheme.primaryBlue,
                   ),
                   tooltip: 'Edit Staff Member',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+              if (canDelete) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () {
+                    Get.find<StaffController>().deleteStaff(staff.id, staff.name);
+                  },
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: AppTheme.errorRed,
+                  ),
+                  tooltip: 'Delete Staff Member',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),

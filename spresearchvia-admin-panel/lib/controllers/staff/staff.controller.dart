@@ -1520,6 +1520,9 @@ class StaffController extends GetxController {
             colorText: Colors.green[900],
           );
           await fetchStaffList();
+          if (Get.currentRoute != '/staff' && Get.currentRoute.startsWith('/staff/')) {
+            Get.offNamed('/staff');
+          }
         } else {
           Get.snackbar(
             'Error',

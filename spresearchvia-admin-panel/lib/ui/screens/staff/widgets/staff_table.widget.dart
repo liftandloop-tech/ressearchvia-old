@@ -29,9 +29,9 @@ class StaffTable extends StatelessWidget {
         1: FlexColumnWidth(1.1), // Mobile No.
         2: FlexColumnWidth(1.4), // Email
         3: FlexColumnWidth(1.0), // Role
-        4: FlexColumnWidth(1.6), // Reporting To dropdown
-        5: FlexColumnWidth(1.1), // Status switch + text
-        6: FlexColumnWidth(1.4), // Actions (Badge, Login As, View, Edit)
+        4: FlexColumnWidth(1.5), // Reporting To dropdown
+        5: FlexColumnWidth(1.0), // Status switch + text
+        6: FlexColumnWidth(1.6), // Actions (Badge, Login As, View, Edit, Delete)
       },
       children: [
         TableRow(
