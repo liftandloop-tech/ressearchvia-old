@@ -1233,8 +1233,8 @@ const userService = {
     try {
       let { email, password } = body;
 
-      email = email.trim().toLowerCase();
-      password = password.trim();
+      email = (email || '').trim().toLowerCase();
+      password = (password || '').trim();
 
       if (!email || !password) {
         return {
@@ -1243,12 +1243,35 @@ const userService = {
           data: {},
         };
       }
+
+      const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const emailRegex = new RegExp(`^${escapedEmail}$`, 'i');
+
       let admin = await userModel.findOne({
-        "userObject.emailAddress": email,
-        "userObject.password": password,
+        $or: [
+          { "userObject.emailAddress": emailRegex },
+          { email: emailRegex },
+          { phone: email }
+        ]
       });
+
       if (!admin) {
-        return { status: 200, message: "admin not found", data: { admin } };
+        return { status: 200, message: "admin not found", data: {} };
+      }
+
+      // Check password: plain text match or bcrypt match
+      const storedPassword = admin.userObject?.password || admin.password;
+      let isMatch = false;
+      if (storedPassword === password) {
+        isMatch = true;
+      } else if (storedPassword) {
+        try {
+          isMatch = await bcrypt.compare(password, storedPassword);
+        } catch (_) {}
+      }
+
+      if (!isMatch) {
+        return { status: 200, message: "Invalid email or password", data: {} };
       }
 
       // Self-heal userType and adminAccessGranted for admin accounts
