@@ -5,6 +5,7 @@ import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/controllers/recruitment/applicant_profile.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
+import '../../widgets/offer_letter_dialog.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
 
@@ -234,6 +235,27 @@ class ApplicantProfileScreen extends StatelessWidget {
               foregroundColor: const Color(0xFFDC2626),
               side: const BorderSide(color: Color(0xFFFCA5A5)),
               backgroundColor: isRejected ? const Color(0xFFFEF2F2) : Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Operation: Offer Letter (Preview & Send)
+          OutlinedButton.icon(
+            onPressed: () => OfferLetterDialog.show(
+              context,
+              applicant: applicant,
+              onSuccess: () => controller.fetchDetails(showLoading: false),
+            ),
+            icon: const Icon(Icons.mark_email_read_rounded, size: 15),
+            label: Text(
+              applicant.stage == 'OFFER_SENT' ? 'Resend Offer Letter' : 'Send Offer Letter',
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4F46E5),
+              side: const BorderSide(color: Color(0xFFA5B4FC)),
+              backgroundColor: applicant.stage == 'OFFER_SENT' ? const Color(0xFFEEF2FF) : Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
             ),
@@ -667,6 +689,10 @@ class ApplicantProfileScreen extends StatelessWidget {
               _buildDocRow(context, controller, 'Aadhaar Card (Back) *', 'aadhaarBack', aadhaarBack, Icons.badge_outlined),
               const SizedBox(height: 10),
               _buildDocRow(context, controller, 'PAN Card (Optional)', 'pan', pan, Icons.credit_card_outlined),
+              if (raw['offerLetterUrl'] != null && raw['offerLetterUrl'].toString().trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildDocRow(context, controller, 'Offer-cum-Appointment Letter (Sent)', 'offerLetter', raw['offerLetterUrl'].toString().trim(), Icons.mark_email_read_outlined),
+              ],
             ],
           ),
         ),

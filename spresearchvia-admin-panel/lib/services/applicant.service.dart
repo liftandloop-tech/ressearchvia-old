@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'api.service.dart';
@@ -532,6 +533,80 @@ class ApplicantService extends ApiService {
     } catch (e) {
       debugPrint('Error getting public roles: $e');
       return [];
+    }
+  }
+
+  Future<({bool success, Uint8List? bytes, String? pdfBase64, String? fileName, String? message})> previewOfferLetter(
+    String id, {
+    String? designation,
+    String? joiningDate,
+    String? issueDate,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'format': 'json',
+        if (designation != null && designation.trim().isNotEmpty) 'designation': designation.trim(),
+        if (joiningDate != null && joiningDate.trim().isNotEmpty) 'joiningDate': joiningDate.trim(),
+        if (issueDate != null && issueDate.trim().isNotEmpty) 'issueDate': issueDate.trim(),
+      };
+      final uri = Uri(path: '/staff/applicant/offer-letter/preview/$id', queryParameters: queryParams);
+      final response = await get(uri.toString(), forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body['data'] as Map<String, dynamic>?;
+        final base64Str = data?['pdfBase64']?.toString();
+        Uint8List? bytes;
+        if (base64Str != null && base64Str.isNotEmpty) {
+          bytes = Uint8List.fromList(base64Decode(base64Str));
+        }
+        return (
+          success: true,
+          bytes: bytes,
+          pdfBase64: base64Str,
+          fileName: data?['fileName']?.toString(),
+          message: null,
+        );
+      }
+      return (
+        success: false,
+        bytes: null,
+        pdfBase64: null,
+        fileName: null,
+        message: _extractMsg(response.body, 'Failed to preview offer letter'),
+      );
+    } catch (e) {
+      debugPrint('Error previewing offer letter: $e');
+      return (success: false, bytes: null, pdfBase64: null, fileName: null, message: e.toString());
+    }
+  }
+
+  Future<({bool success, String? offerLetterUrl, String? message})> sendOfferLetter(
+    String id, {
+    required String designation,
+    required String joiningDate,
+    String? issueDate,
+    String? customNote,
+  }) async {
+    try {
+      final response = await post('/staff/applicant/offer-letter/send/$id', {
+        'designation': designation.trim(),
+        'joiningDate': joiningDate.trim(),
+        if (issueDate != null && issueDate.trim().isNotEmpty) 'issueDate': issueDate.trim(),
+        if (customNote != null && customNote.trim().isNotEmpty) 'customNote': customNote.trim(),
+      });
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body['data'] as Map<String, dynamic>?;
+        final url = data?['offerLetterUrl']?.toString();
+        final msg = response.body['message']?.toString() ?? 'Offer letter sent successfully';
+        return (success: true, offerLetterUrl: url, message: msg);
+      }
+      return (
+        success: false,
+        offerLetterUrl: null,
+        message: _extractMsg(response.body, 'Failed to send offer letter'),
+      );
+    } catch (e) {
+      debugPrint('Error sending offer letter: $e');
+      return (success: false, offerLetterUrl: null, message: e.toString());
     }
   }
 }

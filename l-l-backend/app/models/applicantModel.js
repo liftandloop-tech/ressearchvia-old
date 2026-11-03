@@ -418,6 +418,29 @@ const applicantSchema = new mongoose.Schema({
   hiredAt: {
     type: Date,
     default: null
+  },
+
+  // Offer Letter Generation & Dispatch
+  offerLetterUrl: {
+    type: String,
+    default: null
+  },
+  offerLetterSentAt: {
+    type: Date,
+    default: null
+  },
+  offerLetterSentBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "staff",
+    default: null
+  },
+  offerLetterDesignation: {
+    type: String,
+    default: null
+  },
+  offerLetterJoiningDate: {
+    type: String,
+    default: null
   }
 }, { timestamps: true, versionKey: false });
 

@@ -1,6 +1,7 @@
 import applicantModel from "../models/applicantModel.js";
 import staffModel from "../models/staffModel.js";
 import emailService from "../services/emailService.js";
+import offerLetterService from "../services/offerLetterService.js";
 import { sendOtpSms } from "../services/smsService.js";
 import axios from "axios";
 import staffService, { resolveRoleAndDepartment } from "../services/staffService.js";
@@ -1899,6 +1900,165 @@ const applicantController = {
                 data: { walkInForm: applicant.walkInForm }
             });
         } catch (error) {
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    previewOfferLetter: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            const options = {
+                designation: req.query.designation || req.body?.designation,
+                joiningDate: req.query.joiningDate || req.body?.joiningDate,
+                issueDate: req.query.issueDate || req.body?.issueDate
+            };
+
+            const result = await offerLetterService.generateOfferLetterPdf(applicant, options);
+
+            if (req.query.format === 'json') {
+                return res.status(200).send({
+                    status: 200,
+                    success: true,
+                    data: {
+                        fileName: result.fileName,
+                        candidateName: result.candidateName,
+                        email: result.email,
+                        designation: result.designation,
+                        joiningDate: result.joiningDate,
+                        issueDate: result.issueDate,
+                        pdfBase64: result.pdfBytes.toString('base64')
+                    }
+                });
+            }
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="${result.fileName}"`);
+            res.setHeader('Content-Length', result.pdfBytes.length);
+            return res.status(200).send(result.pdfBytes);
+        } catch (error) {
+            console.error("[previewOfferLetter Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    sendOfferLetter: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            if (!applicant.emailAddress) {
+                return res.status(400).send({ status: 400, message: "Applicant does not have a registered email address to receive the offer letter", data: {} });
+            }
+
+            const { designation, joiningDate, issueDate, customNote } = req.body;
+            const options = { designation, joiningDate, issueDate };
+
+            // 1. Generate filled PDF
+            const result = await offerLetterService.generateOfferLetterPdf(applicant, options);
+
+            // 2. Save PDF to uploads folder
+            const saveResult = await offerLetterService.saveOfferLetterPdf(applicant._id, result.pdfBytes, result.fileName);
+
+            // 3. Send email to candidate
+            const emailResult = await offerLetterService.sendOfferLetterEmail({
+                applicant,
+                pdfBuffer: result.pdfBytes,
+                designation: result.designation,
+                joiningDate: result.joiningDate,
+                fileName: result.fileName
+            });
+
+            // 4. Update applicant stage and history
+            const previousStage = applicant.stage;
+            applicant.stage = 'OFFER_SENT';
+            applicant.offerLetterUrl = saveResult.relativeUrl;
+            applicant.offerLetterSentAt = new Date();
+            applicant.offerLetterSentBy = req.user?._id || req.staff?._id || null;
+            applicant.offerLetterDesignation = result.designation;
+            applicant.offerLetterJoiningDate = result.joiningDate;
+
+            if (!applicant.stageHistory) {
+                applicant.stageHistory = [];
+            }
+            applicant.stageHistory.push({
+                stage: 'OFFER_SENT',
+                note: customNote || `Offer letter issued for position "${result.designation}" (Joining: ${result.joiningDate}). Email ${emailResult.success ? 'dispatched successfully' : 'dispatch failed: ' + (emailResult.error || '')}`,
+                changedBy: req.user?._id || null,
+                changedAt: new Date()
+            });
+
+            await applicant.save();
+
+            res.status(200).send({
+                status: 200,
+                success: true,
+                message: `Offer letter successfully generated and sent to ${applicant.emailAddress}!`,
+                data: {
+                    offerLetterUrl: saveResult.relativeUrl,
+                    fileName: result.fileName,
+                    emailSent: emailResult.success,
+                    emailError: emailResult.error || null,
+                    applicant: {
+                        _id: applicant._id,
+                        applicantId: applicant.applicantId,
+                        fullName: applicant.fullName,
+                        emailAddress: applicant.emailAddress,
+                        stage: applicant.stage,
+                        offerLetterUrl: applicant.offerLetterUrl,
+                        offerLetterSentAt: applicant.offerLetterSentAt,
+                        offerLetterDesignation: applicant.offerLetterDesignation,
+                        offerLetterJoiningDate: applicant.offerLetterJoiningDate
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("[sendOfferLetter Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    downloadOfferLetter: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            let pdfBytes = null;
+            let fileName = `Offer_Letter_${(applicant.fullName || 'Candidate').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+
+            if (applicant.offerLetterUrl) {
+                const localPath = path.join(__dirname, '..', applicant.offerLetterUrl);
+                if (fs.existsSync(localPath)) {
+                    pdfBytes = fs.readFileSync(localPath);
+                }
+            }
+
+            if (!pdfBytes) {
+                const options = {
+                    designation: applicant.offerLetterDesignation || applicant.targetRole,
+                    joiningDate: applicant.offerLetterJoiningDate
+                };
+                const generated = await offerLetterService.generateOfferLetterPdf(applicant, options);
+                pdfBytes = generated.pdfBytes;
+                fileName = generated.fileName;
+            }
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.setHeader('Content-Length', pdfBytes.length);
+            return res.status(200).send(pdfBytes);
+        } catch (error) {
+            console.error("[downloadOfferLetter Error]:", error);
             res.status(500).send({ status: 500, message: error.message, data: {} });
         }
     }

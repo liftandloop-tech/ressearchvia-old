@@ -5,6 +5,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/recruitment/applicants_list.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
+import '../../widgets/offer_letter_dialog.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
 import '../../../controllers/auth/auth.controller.dart';
@@ -254,7 +255,7 @@ class ApplicantsListScreen extends StatelessWidget {
                         DataColumn2(label: Text('Status')),
                         DataColumn2(label: Text('Pipeline Stage')),
                         DataColumn2(label: Text('Assigned Staff'), size: ColumnSize.M),
-                        DataColumn2(label: Text('Actions'), fixedWidth: 155),
+                        DataColumn2(label: Text('Actions'), fixedWidth: 185),
                       ],
                       rows: controller.filteredApplicants.map((applicant) {
                         final raw = applicant.rawJson ?? {};
@@ -557,6 +558,19 @@ class ApplicantsListScreen extends StatelessWidget {
                                     constraints: const BoxConstraints(),
                                   ),
                                   if (!isPromoted && !isRejected) ...[
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      tooltip: 'Offer Letter (Preview & Send)',
+                                      icon: const Icon(Icons.mark_email_read_outlined, size: 19, color: Color(0xFF4F46E5)),
+                                      onPressed: () => OfferLetterDialog.show(
+                                        context,
+                                        applicant: applicant,
+                                        onSuccess: () => controller.fetchApplicants(),
+                                      ),
+                                      splashRadius: 18,
+                                      padding: const EdgeInsets.all(5),
+                                      constraints: const BoxConstraints(),
+                                    ),
                                     if (canPromote) ...[
                                       const SizedBox(width: 4),
                                       IconButton(
@@ -755,7 +769,7 @@ class ApplicantsListScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     DropdownButtonFormField<String?>(
-                      value: selectedStaffId,
+                      initialValue: selectedStaffId,
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Assigned Staff Member',

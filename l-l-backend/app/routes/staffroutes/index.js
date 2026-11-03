@@ -68,6 +68,10 @@ const staffRoutes = () => {
     Router.delete("/applicant/:id", auth.tokenVerified, adminOnly, applicantController.deleteApplicant)
     Router.post("/applicant/delete/:id", auth.tokenVerified, adminOnly, applicantController.deleteApplicant)
     Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, applicantController.saveEvaluationRemarks)
+    Router.get("/applicant/offer-letter/preview/:id", auth.tokenVerified, adminOnly, applicantController.previewOfferLetter)
+    Router.post("/applicant/offer-letter/preview/:id", auth.tokenVerified, adminOnly, applicantController.previewOfferLetter)
+    Router.post("/applicant/offer-letter/send/:id", auth.tokenVerified, adminOnly, applicantController.sendOfferLetter)
+    Router.get("/applicant/offer-letter/download/:id", auth.tokenVerified, adminOnly, applicantController.downloadOfferLetter)
 
     // Document uploads for staff onboarding
     Router.post("/upload-doc/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), staffDocController.uploadDocument)
