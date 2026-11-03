@@ -27,17 +27,14 @@ class AppConfig {
     if (kIsWeb) {
       try {
         final origin = Uri.base.origin;
-        if (origin.isNotEmpty) {
-          if (origin.contains('localhost') || origin.contains('127.0.0.1')) {
-            return 'http://localhost:8080/api';
-          }
+        if (origin.isNotEmpty &&
+            !origin.contains('localhost') &&
+            !origin.contains('127.0.0.1')) {
           return '$origin/api';
         }
       } catch (_) {}
     }
-    return kReleaseMode
-        ? 'https://api.researchvia.in/api'
-        : 'http://localhost:8080/api';
+    return 'https://api.researchvia.in/api';
   }
 
   static String buildApiUrl(String path) {
