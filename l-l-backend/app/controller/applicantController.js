@@ -1351,9 +1351,45 @@ const applicantController = {
             applicant.assignedStaffName = resolvedStaffName;
             await applicant.save();
 
+            // CRITICAL SYNC: If this applicant has already been converted or promoted to staff,
+            // automatically sync their assigned supervisor (assignedDirector) on the staff page too!
+            try {
+                const staffLookup = [];
+                if (applicant.convertedStaffId && mongoose.Types.ObjectId.isValid(applicant.convertedStaffId)) {
+                    staffLookup.push({ _id: applicant.convertedStaffId });
+                }
+                if (applicant._id) {
+                    staffLookup.push({ applicantId: applicant._id });
+                }
+                if (applicant.emailAddress && applicant.emailAddress.trim().length > 0) {
+                    staffLookup.push({ emailAddress: applicant.emailAddress.toLowerCase().trim() });
+                }
+                if (applicant.mobileNumber) {
+                    const cleanM = parseInt(String(applicant.mobileNumber).replace(/\D/g, '').slice(-10), 10);
+                    if (cleanM) staffLookup.push({ mobileNumber: cleanM });
+                }
+
+                if (staffLookup.length > 0) {
+                    const supervisorObjId = (staffId && mongoose.Types.ObjectId.isValid(staffId))
+                        ? new mongoose.Types.ObjectId(staffId)
+                        : null;
+                    await staffModel.updateMany(
+                        { $or: staffLookup },
+                        {
+                            $set: {
+                                assignedDirector: supervisorObjId,
+                                assignedDirectorName: resolvedStaffName || null
+                            }
+                        }
+                    );
+                }
+            } catch (syncErr) {
+                console.warn('[assignApplicant] Staff supervisor sync warning:', syncErr.message);
+            }
+
             return res.status(200).send({
                 status: 200,
-                message: "Applicant assigned successfully",
+                message: "Applicant assigned successfully and synced to staff record",
                 data: { applicant }
             });
         } catch (error) {
@@ -1461,8 +1497,46 @@ const applicantController = {
                 ? applicant.fullName.trim()
                 : (applicant.firstName ? `${applicant.firstName} ${applicant.lastName || ''}`.trim() : (applicant.emailAddress ? applicant.emailAddress.split('@')[0] : 'Staff Member'));
 
-            const effectiveSupervisorId = assignedDirector || supervisorId || reportingTo || null;
-            const effectiveSupervisorName = assignedDirectorName || supervisorName || null;
+            // Priority for supervisor / reporting authority:
+            // 1. Explicitly passed in req.body (assignedDirector || supervisorId || reportingTo)
+            // 2. Previously assigned on the job applicant page (applicant.assignedStaffId || applicant.assignedRecruiterId)
+            // 3. The staff member currently performing the promotion (req.user), if they are not system admin
+            let candidateSupervisorId = assignedDirector || supervisorId || reportingTo || null;
+            let candidateSupervisorName = assignedDirectorName || supervisorName || null;
+
+            if (!candidateSupervisorId || candidateSupervisorId === 'unassigned') {
+                if (applicant.assignedStaffId || applicant.assignedRecruiterId) {
+                    candidateSupervisorId = (applicant.assignedStaffId || applicant.assignedRecruiterId).toString();
+                    candidateSupervisorName = applicant.assignedStaffName || null;
+                } else if (req.user?._id && req.user?.role !== 'Admin' && req.user?.role !== 'admin' && req.user?.userType !== 'admin') {
+                    candidateSupervisorId = req.user._id.toString();
+                    candidateSupervisorName = req.user.fullName || req.user.name || null;
+                }
+            }
+
+            if (candidateSupervisorId && !candidateSupervisorName && mongoose.Types.ObjectId.isValid(candidateSupervisorId)) {
+                try {
+                    const supervisor = await staffModel.findById(candidateSupervisorId).select('fullName name');
+                    if (supervisor) {
+                        candidateSupervisorName = supervisor.fullName || supervisor.name;
+                    }
+                } catch (_) {}
+            }
+
+            const isDirectAdmin = candidateSupervisorId === 'admin' || candidateSupervisorName === 'Admin';
+            let finalSupervisorId = null;
+            let finalSupervisorName = null;
+
+            if (isDirectAdmin) {
+                finalSupervisorName = 'Admin';
+            } else if (candidateSupervisorId && candidateSupervisorId !== 'unassigned') {
+                if (mongoose.Types.ObjectId.isValid(candidateSupervisorId)) {
+                    finalSupervisorId = new mongoose.Types.ObjectId(candidateSupervisorId);
+                    finalSupervisorName = candidateSupervisorName;
+                } else if (candidateSupervisorName && candidateSupervisorName.trim().length > 0) {
+                    finalSupervisorName = candidateSupervisorName.trim();
+                }
+            }
 
             // Resolve role and department gracefully (defaults to applicant info or unassigned)
             const targetRoleId = roleId || applicant.targetRoleId || null;
@@ -1494,26 +1568,6 @@ const applicantController = {
                 lookupConditions.push({ mobileNumber: cleanMobile });
             }
             let staff = await staffModel.findOne({ $or: lookupConditions });
-
-            const isDirectAdmin = effectiveSupervisorId === 'admin' || effectiveSupervisorName === 'Admin';
-            let finalSupervisorId = null;
-            let finalSupervisorName = null;
-
-            if (isDirectAdmin) {
-                finalSupervisorName = 'Admin';
-            } else if (effectiveSupervisorId && effectiveSupervisorId !== 'unassigned') {
-                if (mongoose.Types.ObjectId.isValid(effectiveSupervisorId)) {
-                    finalSupervisorId = effectiveSupervisorId;
-                    if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
-                        finalSupervisorName = effectiveSupervisorName.trim();
-                    } else {
-                        const supervisor = await staffModel.findById(effectiveSupervisorId).select('fullName status');
-                        finalSupervisorName = supervisor ? supervisor.fullName : null;
-                    }
-                } else if (effectiveSupervisorName && effectiveSupervisorName.trim().length > 0) {
-                    finalSupervisorName = effectiveSupervisorName.trim();
-                }
-            }
 
             const effectiveMpin = mpin ? mpin.toString().trim() : '0000';
 
@@ -1619,6 +1673,10 @@ const applicantController = {
                 changedBy: changedByUserId,
                 changedAt: new Date()
             });
+            if (finalSupervisorId && !applicant.assignedStaffId) {
+                applicant.assignedStaffId = finalSupervisorId;
+                applicant.assignedStaffName = finalSupervisorName;
+            }
             await applicant.save();
 
             // Automatically initialize personalized Digio Aadhaar agreement & dispatch branded email

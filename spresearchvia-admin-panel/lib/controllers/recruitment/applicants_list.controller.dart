@@ -168,7 +168,13 @@ class ApplicantsListController extends GetxController {
   Future<void> promoteApplicant(String applicantId, {String? note}) async {
     isLoading.value = true;
     try {
-      final result = await _applicantService.promoteApplicant(applicantId, note: note);
+      final applicant = applicants.firstWhereOrNull((a) => a.id == applicantId);
+      final result = await _applicantService.promoteApplicant(
+        applicantId,
+        note: note,
+        assignedDirector: applicant?.assignedStaffId,
+        assignedDirectorName: applicant?.assignedStaffName,
+      );
       if (result.success) {
         fetchApplicants();
         if (Get.isRegistered<StaffController>()) {

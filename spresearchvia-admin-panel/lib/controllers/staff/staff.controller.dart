@@ -1003,7 +1003,10 @@ class StaffController extends GetxController {
     return staffList.where((s) {
       if (isDirector) {
         final isSelf = s.id == authUser.id || (s.email.isNotEmpty && s.email.toLowerCase() == authUser.email.toLowerCase());
-        final isAssigned = s.assignedDirector != null && s.assignedDirector == authUser.id;
+        final isAssigned = (s.assignedDirector != null && s.assignedDirector == authUser.id) ||
+            (s.assignedDirectorName != null &&
+                s.assignedDirectorName!.isNotEmpty &&
+                s.assignedDirectorName!.toLowerCase().trim() == authUser.fullName.toLowerCase().trim());
         if (!isSelf && !isAssigned) {
           return false;
         }

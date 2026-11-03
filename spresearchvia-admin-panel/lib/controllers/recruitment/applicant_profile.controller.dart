@@ -305,6 +305,8 @@ class ApplicantProfileController extends GetxController {
       final result = await _applicantService.promoteApplicant(
         applicantId.value,
         note: note,
+        assignedDirector: applicant.value?.assignedStaffId,
+        assignedDirectorName: applicant.value?.assignedStaffName,
       );
       if (result.success) {
         await fetchDetails(showLoading: false);

@@ -377,9 +377,16 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<({bool success, String? message})> promoteApplicant(String id, {String? note}) async {
+  Future<({bool success, String? message})> promoteApplicant(
+    String id, {
+    String? note,
+    String? assignedDirector,
+    String? assignedDirectorName,
+  }) async {
     return approveApplicant(id, {
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      if (assignedDirector != null && assignedDirector.trim().isNotEmpty) 'assignedDirector': assignedDirector.trim(),
+      if (assignedDirectorName != null && assignedDirectorName.trim().isNotEmpty) 'assignedDirectorName': assignedDirectorName.trim(),
     });
   }
 

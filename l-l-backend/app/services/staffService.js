@@ -1,4 +1,5 @@
 import staffModel from "../models/staffModel.js";
+import applicantModel from "../models/applicantModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
 import userModel from "../models/userModel.js"
 import axios from "axios"
@@ -890,6 +891,46 @@ const staffService = {
         },
         { $set: { stage: 'Employee' } }
       );
+
+      // Auto-heal: If any staff member created from an applicant has no assigned supervisor,
+      // sync it from the applicant record so they are visible on their assigned supervisor's staff page
+      try {
+        const unassignedPromotedStaff = await staffModel.find({
+          applicantId: { $ne: null },
+          $or: [
+            { assignedDirector: null },
+            { assignedDirector: { $exists: false } }
+          ]
+        }).select('_id applicantId');
+
+        if (unassignedPromotedStaff.length > 0) {
+          const applicantIds = unassignedPromotedStaff.map(s => s.applicantId).filter(Boolean);
+          const applicants = await applicantModel.find({
+            _id: { $in: applicantIds },
+            $or: [
+              { assignedStaffId: { $ne: null } },
+              { assignedRecruiterId: { $ne: null } }
+            ]
+          }).select('_id assignedStaffId assignedRecruiterId assignedStaffName');
+
+          for (const app of applicants) {
+            const supId = app.assignedStaffId || app.assignedRecruiterId;
+            if (supId) {
+              await staffModel.updateOne(
+                { applicantId: app._id },
+                {
+                  $set: {
+                    assignedDirector: supId,
+                    assignedDirectorName: app.assignedStaffName || null
+                  }
+                }
+              );
+            }
+          }
+        }
+      } catch (autoSyncErr) {
+        console.warn('[staffList] Auto-sync supervisor warning:', autoSyncErr.message);
+      }
 
       let mongoQuery = {
         $or: [
