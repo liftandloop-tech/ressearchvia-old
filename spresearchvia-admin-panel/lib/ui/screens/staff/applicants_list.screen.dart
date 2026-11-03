@@ -404,12 +404,24 @@ class ApplicantsListScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    applicant.role.isNotEmpty ? applicant.role : 'General Applicant',
+                                    (() {
+                                      if (applicant.role.isNotEmpty && applicant.role.toLowerCase() != 'staff') {
+                                        return applicant.role;
+                                      }
+                                      final rawTarget = raw['targetRole']?.toString() ??
+                                          raw['walkInForm']?['appliedPosition']?.toString() ??
+                                          raw['walkInForm']?['positionApplied']?.toString() ??
+                                          raw['appliedPosition']?.toString();
+                                      if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff') {
+                                        return rawTarget.trim();
+                                      }
+                                      return '—';
+                                    })(),
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF1E293B)),
                                   ),
-                                  if (applicant.department.isNotEmpty)
+                                  if (applicant.department.isNotEmpty || (raw['targetDepartment'] != null && raw['targetDepartment'].toString().isNotEmpty))
                                     Text(
-                                      applicant.department,
+                                      applicant.department.isNotEmpty ? applicant.department : raw['targetDepartment'].toString(),
                                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                                     ),
                                 ],

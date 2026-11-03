@@ -1228,6 +1228,44 @@ const applicantController = {
             }
 
             const applicants = await applicantModel.find(filter).sort({ createdAt: -1 }).lean();
+
+            // Populate accurate applied role & department for applicants
+            for (let a of applicants) {
+                if (!a.targetRole && (a.convertedStaffId || a.stage === 'PROMOTED')) {
+                    const s = await staffModel.findOne({
+                        $or: [
+                            ...(a.convertedStaffId ? [{ _id: a.convertedStaffId }] : []),
+                            { applicantId: a._id },
+                            ...(a.emailAddress ? [{ emailAddress: a.emailAddress }] : [])
+                        ]
+                    }).select('role deparment departmentId').populate('roleId departmentId').lean();
+
+                    if (s) {
+                        a.targetRole = s.role || s.roleId?.name || a.targetRole;
+                        a.targetDepartment = s.deparment || s.departmentId?.name || a.targetDepartment;
+                    }
+                }
+
+                const resolvedRole = a.targetRole ||
+                    a.walkInForm?.appliedPosition ||
+                    a.walkInForm?.positionApplied ||
+                    a.walkInForm?.position ||
+                    a.appliedPosition ||
+                    a.appliedRole ||
+                    a.role ||
+                    null;
+
+                const resolvedDept = a.targetDepartment ||
+                    a.deparment ||
+                    a.walkInForm?.department ||
+                    null;
+
+                a.role = resolvedRole;
+                a.targetRole = resolvedRole;
+                a.deparment = resolvedDept;
+                a.targetDepartment = resolvedDept;
+            }
+
             res.status(200).send({
                 status: 200,
                 message: "Applicants retrieved successfully",
@@ -1677,6 +1715,9 @@ const applicantController = {
             // Update applicant stage and link
             applicant.stage = 'PROMOTED';
             applicant.convertedStaffId = staff._id;
+            applicant.targetRole = resolved.roleName || staff.role;
+            applicant.targetDepartment = resolved.departmentName || staff.deparment;
+            applicant.targetRoleId = resolved.roleId || staff.roleId;
             applicant.hiredAt = new Date();
             const changedByUserId = (req.user?._id && mongoose.Types.ObjectId.isValid(req.user._id)) ? req.user._id : null;
             applicant.stageHistory.push({

@@ -641,7 +641,9 @@ class ApplicantProfileScreen extends StatelessWidget {
     final genderVal = applicant.gender ?? (raw['gender']?.toString() ?? (w?.gender.isNotEmpty == true ? w!.gender : 'Not specified'));
     final currentCityVal = applicant.currentLocation ?? (raw['currentLocation']?.toString() ?? (raw['city']?.toString() ?? (w?.currentLocation.isNotEmpty == true ? w!.currentLocation : 'Not specified')));
     final skypeOrLinkedInVal = applicant.skypeOrLinkedIn ?? (raw['skypeAddress']?.toString() ?? (raw['skypeOrLinkedIn']?.toString() ?? ''));
-    final appliedPositionVal = (w?.appliedPosition.isNotEmpty == true) ? w!.appliedPosition : (raw['appliedPosition']?.toString() ?? (applicant.role.isNotEmpty ? applicant.role : 'General'));
+    final appliedPositionVal = (w?.appliedPosition.isNotEmpty == true)
+        ? w!.appliedPosition
+        : (raw['targetRole']?.toString() ?? raw['appliedPosition']?.toString() ?? (applicant.role.isNotEmpty && applicant.role != 'Staff' ? applicant.role : 'Not Specified'));
     final aadhaarNumberVal = applicant.aadhaarNumber ?? (raw['aadhaarNumber']?.toString() ?? (raw['proofOfAddressNumber']?.toString() ?? 'Not specified'));
     final panNumberVal = applicant.panNumber ?? (raw['panNumber']?.toString() ?? '');
     final altEmailVal = applicant.alternateEmail ?? (raw['alternateEmail']?.toString() ?? '—');

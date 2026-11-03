@@ -554,7 +554,21 @@ class StaffModel {
       deptName = _safeString(json['departmentId']['name']);
     }
 
-    final resolvedRole = roleName ?? _safeString(json['role'] ?? json['designation'] ?? json['position'] ?? json['deparment'] ?? json['department']) ?? 'Staff';
+    final isApplicantRecord = json['applicantId'] != null || json['isDraft'] != null || json['currentStep'] != null;
+
+    final walkInApplied = _safeString(walkIn?.appliedPosition.isNotEmpty == true ? walkIn!.appliedPosition : null) ??
+        _safeString(json['walkInForm'] is Map ? (json['walkInForm']['appliedPosition'] ?? json['walkInForm']['positionApplied'] ?? json['walkInForm']['position']) : null);
+
+    final resolvedRole = roleName ??
+        _safeString(json['targetRole']) ??
+        walkInApplied ??
+        _safeString(json['appliedPosition'] ?? json['appliedRole'] ?? json['role'] ?? json['designation'] ?? json['position']) ??
+        (isApplicantRecord ? '' : (deptName ?? _safeString(json['deparment'] ?? json['department']) ?? 'Staff'));
+
+    final resolvedDept = deptName ??
+        _safeString(json['targetDepartment']) ??
+        _safeString(json['deparment'] ?? json['department'] ?? json['team']) ??
+        '';
 
     return StaffModel(
       id: _safeString(json['_id'] ?? json['id']) ?? '',
@@ -565,7 +579,7 @@ class StaffModel {
       role: resolvedRole,
       roleId: roleId,
       status: _safeString(json['status']) ?? 'Active',
-      department: deptName ?? _safeString(json['deparment'] ?? json['department'] ?? json['team']) ?? '',
+      department: resolvedDept,
       departmentId: json['departmentId'] is Map
           ? _safeString(json['departmentId']['_id'])
           : _safeString(json['departmentId']),
