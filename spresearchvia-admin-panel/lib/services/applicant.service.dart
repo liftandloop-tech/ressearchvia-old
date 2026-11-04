@@ -388,12 +388,37 @@ class ApplicantService extends ApiService {
     String? note,
     String? assignedDirector,
     String? assignedDirectorName,
+    bool autoSendOfferLetter = false,
+    String? offerDesignation,
+    String? offerJoiningDate,
   }) async {
-    return approveApplicant(id, {
+    final res = await approveApplicant(id, {
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
       if (assignedDirector != null && assignedDirector.trim().isNotEmpty) 'assignedDirector': assignedDirector.trim(),
       if (assignedDirectorName != null && assignedDirectorName.trim().isNotEmpty) 'assignedDirectorName': assignedDirectorName.trim(),
+      'autoSendOfferLetter': autoSendOfferLetter,
+      if (offerDesignation != null && offerDesignation.trim().isNotEmpty) 'offerDesignation': offerDesignation.trim(),
+      if (offerJoiningDate != null && offerJoiningDate.trim().isNotEmpty) 'offerJoiningDate': offerJoiningDate.trim(),
     });
+
+    if (res.success && autoSendOfferLetter) {
+      try {
+        await sendOfferLetter(
+          id,
+          designation: offerDesignation?.trim().isNotEmpty == true
+              ? offerDesignation!.trim()
+              : 'Business Development Executive',
+          joiningDate: offerJoiningDate?.trim().isNotEmpty == true
+              ? offerJoiningDate!.trim()
+              : '10/11/2026',
+          customNote: note,
+        );
+      } catch (e) {
+        debugPrint('Auto send offer letter post-promotion notice: $e');
+      }
+    }
+
+    return res;
   }
 
   Future<({bool success, String? message})> updateApplicantStage(String id, String stage, {String? note}) async {

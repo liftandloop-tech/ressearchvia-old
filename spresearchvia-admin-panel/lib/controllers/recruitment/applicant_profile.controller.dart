@@ -299,7 +299,12 @@ class ApplicantProfileController extends GetxController {
   final isRejecting = false.obs;
   final isUpdatingStage = false.obs;
 
-  Future<bool> promoteToStaff({String? note}) async {
+  Future<bool> promoteToStaff({
+    String? note,
+    bool autoSendOfferLetter = false,
+    String? offerDesignation,
+    String? offerJoiningDate,
+  }) async {
     isPromoting.value = true;
     try {
       final result = await _applicantService.promoteApplicant(
@@ -307,6 +312,9 @@ class ApplicantProfileController extends GetxController {
         note: note,
         assignedDirector: applicant.value?.assignedStaffId,
         assignedDirectorName: applicant.value?.assignedStaffName,
+        autoSendOfferLetter: autoSendOfferLetter,
+        offerDesignation: offerDesignation,
+        offerJoiningDate: offerJoiningDate,
       );
       if (result.success) {
         await fetchDetails(showLoading: false);
@@ -322,7 +330,9 @@ class ApplicantProfileController extends GetxController {
         }
         Get.snackbar(
           'Candidate Promoted',
-          '${applicant.value?.name ?? "Applicant"} has been promoted to Staff. You can configure their Role, Reporting Authority, and MPIN from the Staff page.',
+          autoSendOfferLetter
+              ? '${applicant.value?.name ?? "Applicant"} promoted to Staff & official Offer Letter emailed to candidate.'
+              : '${applicant.value?.name ?? "Applicant"} has been promoted to Staff. You can configure their Role, Reporting Authority, and MPIN from the Staff page.',
           backgroundColor: Colors.green.withValues(alpha: 0.15),
           duration: const Duration(seconds: 4),
         );

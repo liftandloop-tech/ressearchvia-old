@@ -414,6 +414,8 @@ class StaffModel {
   final String? assignedRecruiterId;
   final Map<String, dynamic>? rawJson;
 
+  String? get targetRole => rawJson?['targetRole']?.toString() ?? rawJson?['jobRole']?.toString() ?? currentDesignation;
+
   StaffModel({
     required this.id,
     required this.staffId,

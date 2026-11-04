@@ -8,6 +8,7 @@ import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 import '../../../config/app.config.dart';
 import 'widgets/staff_digital_id_dialog.widget.dart';
+import 'package:spresearch_web/ui/widgets/offer_letter_dialog.widget.dart';
 import '../../../models/staff.model.dart';
 
 class StaffDetailsScreen extends StatelessWidget {
@@ -158,6 +159,26 @@ class StaffDetailsScreen extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF1E293B),
             side: const BorderSide(color: Color(0xFFCBD5E1)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton.icon(
+          onPressed: () => OfferLetterDialog.show(
+            context,
+            applicant: staff,
+            onSuccess: () {
+              try {
+                Get.find<StaffDetailsController>().fetchStaffDetails();
+              } catch (_) {}
+            },
+          ),
+          icon: const Icon(Icons.mark_email_read_rounded, size: 15, color: Color(0xFF4F46E5)),
+          label: const Text('Offer Letter', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF4F46E5),
+            side: const BorderSide(color: Color(0xFFA5B4FC)),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
           ),

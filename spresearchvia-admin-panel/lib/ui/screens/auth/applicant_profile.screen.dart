@@ -225,6 +225,23 @@ class ApplicantProfileScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
             ),
           ),
+          const SizedBox(width: 10),
+          OutlinedButton.icon(
+            onPressed: () => OfferLetterDialog.show(
+              context,
+              applicant: applicant,
+              onSuccess: () => controller.fetchDetails(showLoading: false),
+            ),
+            icon: const Icon(Icons.mark_email_read_rounded, size: 15),
+            label: const Text('Offer Letter (Promoted Staff)', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4F46E5),
+              side: const BorderSide(color: Color(0xFFA5B4FC)),
+              backgroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+            ),
+          ),
         ] else if (canApproveApplicant) ...[
           // Operation 1: Reject
           OutlinedButton.icon(
@@ -1344,118 +1361,225 @@ class ApplicantProfileScreen extends StatelessWidget {
     }
 
     final noteController = TextEditingController();
+    bool autoSendOfferLetter = true;
+
+    final defaultRole = applicant.role.isNotEmpty && applicant.role != 'Applicant'
+        ? applicant.role
+        : (applicant.targetRole?.isNotEmpty == true
+            ? applicant.targetRole!
+            : (applicant.currentDesignation?.isNotEmpty == true
+                ? applicant.currentDesignation!
+                : 'Business Development Executive'));
+
+    final defaultJoinDt = applicant.joiningDate ?? DateTime.now().add(const Duration(days: 7));
+    final defaultJoinStr = '${defaultJoinDt.day.toString().padLeft(2, '0')}/${defaultJoinDt.month.toString().padLeft(2, '0')}/${defaultJoinDt.year}';
+
+    final roleCtrl = TextEditingController(text: defaultRole);
+    final joinDateCtrl = TextEditingController(text: defaultJoinStr);
 
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          child: Container(
-            width: 460,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setDialogState) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: Container(
+              width: 480,
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0FDF4),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFBBF7D0)),
-                          ),
-                          child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF16A34A), size: 22),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDF4),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFBBF7D0)),
+                              ),
+                              child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF16A34A), size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Promote to Staff',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Promote to Staff',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.of(dialogContext).pop(),
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Promote ${applicant.name} to an active Staff member account.',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Are you sure you want to promote ${applicant.name} to an active Staff member?',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF2563EB)),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Role, Reporting Authority (Supervisor), and Employee MPIN can be configured anytime from the Staff Management page.',
-                          style: TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.4),
+                    const SizedBox(height: 12),
+
+                    // Offer Letter Option (Automatic vs Manual)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: autoSendOfferLetter ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: autoSendOfferLetter ? const Color(0xFFA5B4FC) : const Color(0xFFE2E8F0),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: noteController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Promotion Note (Optional)',
-                    hintText: 'e.g. Selected in final interview round',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 12),
-                    Obx(() => ElevatedButton.icon(
-                          onPressed: controller.isPromoting.value
-                              ? null
-                              : () async {
-                                  final note = noteController.text.trim();
-                                  final success = await controller.promoteToStaff(note: note.isNotEmpty ? note : null);
-                                  if (success && dialogContext.mounted) {
-                                    Navigator.of(dialogContext).pop();
-                                  }
-                                },
-                          icon: controller.isPromoting.value
-                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.check_circle_outline, size: 16),
-                          label: Text(controller.isPromoting.value ? 'Promoting...' : 'Confirm & Promote'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF16A34A),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                autoSendOfferLetter = !autoSendOfferLetter;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(6),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: autoSendOfferLetter,
+                                  activeColor: const Color(0xFF4F46E5),
+                                  onChanged: (v) {
+                                    setDialogState(() {
+                                      autoSendOfferLetter = v ?? false;
+                                    });
+                                  },
+                                ),
+                                const Expanded(
+                                  child: Text(
+                                    'Automatic: Email Official Offer Letter on Promotion',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        )),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 40, right: 8, bottom: 4),
+                            child: Text(
+                              autoSendOfferLetter
+                                  ? 'Automatically generates the official SP Researchvia letterhead PDF and emails it to candidate upon promotion.'
+                                  : 'Manual Option: Staff will be promoted without sending an email. You can preview and send the offer letter manually anytime from the Applicant or Staff page.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: autoSendOfferLetter ? const Color(0xFF4338CA) : const Color(0xFF64748B),
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          if (autoSendOfferLetter) ...[
+                            const SizedBox(height: 10),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Offer Designation *',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    controller: roleCtrl,
+                                    style: const TextStyle(fontSize: 12.5),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Joining Date (DD/MM/YYYY) *',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    controller: joinDateCtrl,
+                                    style: const TextStyle(fontSize: 12.5),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextField(
+                      controller: noteController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Promotion Note (Optional)',
+                        hintText: 'e.g. Selected in final interview round',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 12),
+                        Obx(() => ElevatedButton.icon(
+                              onPressed: controller.isPromoting.value
+                                  ? null
+                                  : () async {
+                                      final note = noteController.text.trim();
+                                      final success = await controller.promoteToStaff(
+                                        note: note.isNotEmpty ? note : null,
+                                        autoSendOfferLetter: autoSendOfferLetter,
+                                        offerDesignation: roleCtrl.text.trim(),
+                                        offerJoiningDate: joinDateCtrl.text.trim(),
+                                      );
+                                      if (success && dialogContext.mounted) {
+                                        Navigator.of(dialogContext).pop();
+                                      }
+                                    },
+                              icon: controller.isPromoting.value
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.check_circle_outline, size: 16),
+                              label: Text(controller.isPromoting.value
+                                  ? 'Promoting...'
+                                  : (autoSendOfferLetter ? 'Promote & Send Letter' : 'Confirm & Promote')),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            )),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
         );

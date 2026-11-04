@@ -165,7 +165,13 @@ class ApplicantsListController extends GetxController {
     }
   }
 
-  Future<void> promoteApplicant(String applicantId, {String? note}) async {
+  Future<void> promoteApplicant(
+    String applicantId, {
+    String? note,
+    bool autoSendOfferLetter = false,
+    String? offerDesignation,
+    String? offerJoiningDate,
+  }) async {
     isLoading.value = true;
     try {
       final applicant = applicants.firstWhereOrNull((a) => a.id == applicantId);
@@ -174,6 +180,9 @@ class ApplicantsListController extends GetxController {
         note: note,
         assignedDirector: applicant?.assignedStaffId,
         assignedDirectorName: applicant?.assignedStaffName,
+        autoSendOfferLetter: autoSendOfferLetter,
+        offerDesignation: offerDesignation,
+        offerJoiningDate: offerJoiningDate,
       );
       if (result.success) {
         fetchApplicants();
@@ -185,7 +194,9 @@ class ApplicantsListController extends GetxController {
         }
         Get.snackbar(
           'Candidate Promoted',
-          'Applicant has been promoted to Staff. Configure Role, Supervisor, and MPIN from the Staff page.',
+          autoSendOfferLetter
+              ? 'Applicant has been promoted to Staff & official Offer Letter emailed to candidate.'
+              : 'Applicant has been promoted to Staff. You can send the offer letter manually anytime.',
           backgroundColor: Colors.green.withValues(alpha: 0.15),
           duration: const Duration(seconds: 4),
         );

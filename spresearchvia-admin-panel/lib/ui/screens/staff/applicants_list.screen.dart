@@ -598,11 +598,16 @@ class ApplicantsListScreen extends StatelessWidget {
                                     padding: const EdgeInsets.all(5),
                                     constraints: const BoxConstraints(),
                                   ),
-                                  if (!isPromoted && !isRejected) ...[
+                                  // Offer Letter (Manual preview & send anytime, before OR after promotion)
+                                  if (!isRejected) ...[
                                     const SizedBox(width: 4),
                                     IconButton(
-                                      tooltip: 'Offer Letter (Preview & Send)',
-                                      icon: const Icon(Icons.mark_email_read_outlined, size: 19, color: Color(0xFF4F46E5)),
+                                      tooltip: isPromoted ? 'Offer Letter (Promoted Staff)' : 'Offer Letter (Preview & Send)',
+                                      icon: Icon(
+                                        Icons.mark_email_read_outlined,
+                                        size: 19,
+                                        color: isPromoted ? const Color(0xFF10B981) : const Color(0xFF4F46E5),
+                                      ),
                                       onPressed: () => OfferLetterDialog.show(
                                         context,
                                         applicant: applicant,
@@ -612,6 +617,8 @@ class ApplicantsListScreen extends StatelessWidget {
                                       padding: const EdgeInsets.all(5),
                                       constraints: const BoxConstraints(),
                                     ),
+                                  ],
+                                  if (!isPromoted && !isRejected) ...[
                                     if (canPromote) ...[
                                       const SizedBox(width: 4),
                                       IconButton(
@@ -664,41 +671,188 @@ class ApplicantsListScreen extends StatelessWidget {
   }
 
   void _showQuickPromoteDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
+    bool autoSendOfferLetter = true;
+    final defaultRole = applicant.role.isNotEmpty && applicant.role != 'Applicant'
+        ? applicant.role
+        : (applicant.targetRole?.isNotEmpty == true
+            ? applicant.targetRole!
+            : (applicant.currentDesignation?.isNotEmpty == true
+                ? applicant.currentDesignation!
+                : 'Business Development Executive'));
+
+    final defaultJoinDt = applicant.joiningDate ?? DateTime.now().add(const Duration(days: 7));
+    final defaultJoinStr = '${defaultJoinDt.day.toString().padLeft(2, '0')}/${defaultJoinDt.month.toString().padLeft(2, '0')}/${defaultJoinDt.year}';
+
+    final roleCtrl = TextEditingController(text: defaultRole);
+    final joinDateCtrl = TextEditingController(text: defaultJoinStr);
+
     showDialog(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Promote ${applicant.name} to Staff'),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
             children: [
-              Text(
-                'Are you sure you want to promote this candidate to active Staff member?\n\nRole, Reporting Authority (Supervisor), and Employee MPIN can be configured anytime from the Staff page.',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF16A34A), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Promote ${applicant.name} to Staff',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(dialogCtx).pop();
-              await controller.promoteApplicant(applicant.id);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF16A34A),
-              foregroundColor: Colors.white,
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Promote this candidate to an active employee account. Role hierarchy, reporting supervisor, and MPIN can also be updated from the Staff page.',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Offer Letter Delivery Card (Automatic vs Manual)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: autoSendOfferLetter ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: autoSendOfferLetter ? const Color(0xFFA5B4FC) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              autoSendOfferLetter = !autoSendOfferLetter;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: autoSendOfferLetter,
+                                activeColor: const Color(0xFF4F46E5),
+                                onChanged: (v) {
+                                  setDialogState(() {
+                                    autoSendOfferLetter = v ?? false;
+                                  });
+                                },
+                              ),
+                              const Expanded(
+                                child: Text(
+                                  'Automatic: Email Official Offer Letter on Promotion',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 40, right: 8, bottom: 4),
+                          child: Text(
+                            autoSendOfferLetter
+                                ? 'Generates the official SP Researchvia letterhead PDF and emails it to ${applicant.email.isNotEmpty ? applicant.email : "candidate"} upon promotion.'
+                                : 'Manual Option: Staff will be promoted without an email. You can preview and send the offer letter manually anytime from the Staff or Applicant page.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: autoSendOfferLetter ? const Color(0xFF4338CA) : const Color(0xFF64748B),
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                        if (autoSendOfferLetter) ...[
+                          const SizedBox(height: 10),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Offer Designation *',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: roleCtrl,
+                                  style: const TextStyle(fontSize: 12.5),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Joining Date (DD/MM/YYYY) *',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 4),
+                                TextField(
+                                  controller: joinDateCtrl,
+                                  style: const TextStyle(fontSize: 12.5),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Text('Confirm & Promote'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                await controller.promoteApplicant(
+                  applicant.id,
+                  autoSendOfferLetter: autoSendOfferLetter,
+                  offerDesignation: roleCtrl.text.trim(),
+                  offerJoiningDate: joinDateCtrl.text.trim(),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(autoSendOfferLetter ? 'Promote & Send Letter' : 'Promote Staff Only'),
+            ),
+          ],
+        ),
       ),
     );
   }

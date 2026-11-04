@@ -73,6 +73,12 @@ const staffRoutes = () => {
     Router.post("/applicant/offer-letter/send/:id", auth.tokenVerified, adminOnly, applicantController.sendOfferLetter)
     Router.get("/applicant/offer-letter/download/:id", auth.tokenVerified, adminOnly, applicantController.downloadOfferLetter)
 
+    // Staff Offer Letter alias routes (accessible from Staff Directory / Details page too)
+    Router.get("/offer-letter/preview/:id", auth.tokenVerified, adminOnly, applicantController.previewOfferLetter)
+    Router.post("/offer-letter/preview/:id", auth.tokenVerified, adminOnly, applicantController.previewOfferLetter)
+    Router.post("/offer-letter/send/:id", auth.tokenVerified, adminOnly, applicantController.sendOfferLetter)
+    Router.get("/offer-letter/download/:id", auth.tokenVerified, adminOnly, applicantController.downloadOfferLetter)
+
     // Document uploads for staff onboarding
     Router.post("/upload-doc/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = req.query.type; next(); }, upload.single("file"), staffDocController.uploadDocument)
     Router.post("/upload-video/:id", auth.tokenVerified, (req, res, next) => { req.uploadType = 'staff-video'; next(); }, upload.single("file"), staffDocController.uploadVideo)

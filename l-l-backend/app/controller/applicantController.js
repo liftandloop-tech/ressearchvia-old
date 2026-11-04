@@ -18,15 +18,77 @@ const findApplicantByIdOrCustomId = async (id, selectPassword = false) => {
     const strId = String(id).trim();
     if (!strId || strId === 'null' || strId === 'undefined') return null;
     const applySelect = (q) => selectPassword ? q.select('+password') : q;
+
+    // 1. Direct applicant ObjectId
     if (mongoose.Types.ObjectId.isValid(strId)) {
         const doc = await applySelect(applicantModel.findById(strId));
         if (doc) return doc;
+
+        // Check if this ObjectId belongs to a converted staff record
+        const byConverted = await applySelect(applicantModel.findOne({ convertedStaffId: strId }));
+        if (byConverted) return byConverted;
     }
+
+    // 2. By applicantId (e.g. APP-2026-0001)
     const byAppId = await applySelect(applicantModel.findOne({ applicantId: strId }));
     if (byAppId) return byAppId;
+
+    // 3. By staffId in applicant model
+    const byStaffIdInApp = await applySelect(applicantModel.findOne({ staffId: strId }));
+    if (byStaffIdInApp) return byStaffIdInApp;
+
+    // 4. By email
     if (strId.includes('@')) {
-        return await applySelect(applicantModel.findOne({ emailAddress: strId.toLowerCase() }));
+        const byEmail = await applySelect(applicantModel.findOne({ emailAddress: strId.toLowerCase() }));
+        if (byEmail) return byEmail;
     }
+
+    // 5. If not found in applicantModel, check staffModel directly (for promoted/existing staff)
+    try {
+        let staffDoc = null;
+        if (mongoose.Types.ObjectId.isValid(strId)) {
+            staffDoc = await staffModel.findById(strId);
+        }
+        if (!staffDoc) {
+            staffDoc = await staffModel.findOne({ staffId: strId });
+        }
+        if (!staffDoc && strId.includes('@')) {
+            staffDoc = await staffModel.findOne({ emailAddress: strId.toLowerCase() });
+        }
+        if (staffDoc) {
+            // Check if there is an applicant record linked to this staff
+            const linkedApp = await applySelect(applicantModel.findOne({
+                $or: [
+                    { convertedStaffId: staffDoc._id },
+                    { emailAddress: staffDoc.emailAddress?.toLowerCase() },
+                    { mobileNumber: staffDoc.mobileNumber }
+                ]
+            }));
+            if (linkedApp) return linkedApp;
+
+            // Otherwise, construct a synthetic applicant-compatible object from the staff member
+            return {
+                _id: staffDoc._id,
+                id: staffDoc._id.toString(),
+                fullName: staffDoc.fullName || staffDoc.name || 'Staff Member',
+                firstName: staffDoc.firstName || (staffDoc.fullName ? staffDoc.fullName.split(' ')[0] : 'Staff'),
+                lastName: staffDoc.lastName || (staffDoc.fullName ? staffDoc.fullName.split(' ').slice(1).join(' ') : ''),
+                emailAddress: staffDoc.emailAddress || staffDoc.email,
+                mobileNumber: staffDoc.mobileNumber || staffDoc.phone,
+                countryCode: staffDoc.countryCode || '+91',
+                currentAddress: staffDoc.currentAddress || staffDoc.localAddress,
+                permanentAddress: staffDoc.permanentAddress,
+                targetRole: staffDoc.role || staffDoc.currentDesignation || 'Business Development Executive',
+                currentDesignation: staffDoc.role || staffDoc.currentDesignation,
+                joiningDate: staffDoc.joiningDate,
+                staffId: staffDoc.staffId,
+                stage: 'PROMOTED',
+                isSyntheticStaff: true,
+                save: async () => staffDoc.save()
+            };
+        }
+    } catch (_) {}
+
     return null;
 };
 
@@ -1518,7 +1580,13 @@ const applicantController = {
                 supervisorId,
                 supervisorName,
                 reportingTo,
-                note
+                note,
+                autoSendOfferLetter,
+                sendOfferLetter,
+                offerDesignation,
+                offerJoiningDate,
+                offerIssueDate,
+                offerCustomNote
             } = req.body;
 
             const applicant = await findApplicantByIdOrCustomId(id, true);
@@ -1737,6 +1805,34 @@ const applicantController = {
                 await staffService.initiateStaffDigioAgreement(staff._id);
             } catch (digioErr) {
                 console.warn("[Applicant Approval] Auto Digio agreement error:", digioErr.message);
+            }
+
+            // Automatically generate and dispatch official Offer-cum-Appointment Letter if opted-in
+            let offerLetterResult = null;
+            if (autoSendOfferLetter === true || sendOfferLetter === true || autoSendOfferLetter === 'true' || sendOfferLetter === 'true') {
+                try {
+                    const offerOptions = {
+                        designation: offerDesignation || resolved.roleName || staff.role || applicant.targetRole || 'Business Development Executive',
+                        joiningDate: offerJoiningDate || (joiningDate ? new Date(joiningDate).toLocaleDateString('en-GB') : null) || new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-GB'),
+                        issueDate: offerIssueDate || new Date().toLocaleDateString('en-GB'),
+                        customNote: offerCustomNote || `Offer-cum-Appointment letter issued automatically upon promotion to ${staff.staffId}`
+                    };
+                    const offerPdf = await offerLetterService.generateOfferLetterPdf(applicant, offerOptions);
+                    const savedUrl = await offerLetterService.saveOfferLetterPdf(applicant._id, offerPdf.pdfBytes, offerPdf.fileName);
+
+                    staff.offerLetterUrl = savedUrl;
+                    await staff.save();
+
+                    await offerLetterService.sendOfferLetterEmail(applicant, offerPdf.pdfBytes, offerPdf.fileName, offerOptions);
+
+                    applicant.offerLetterUrl = savedUrl;
+                    applicant.offerLetterSentAt = new Date();
+                    applicant.offerLetterIssuedBy = changedByUserId;
+                    await applicant.save();
+                    offerLetterResult = { success: true, url: savedUrl };
+                } catch (offerErr) {
+                    console.warn("[approveApplicant] Auto offer letter send warning:", offerErr.message);
+                }
             }
 
             const updatedStaff = await staffModel.findById(staff._id)
@@ -2031,26 +2127,39 @@ const applicantController = {
                 fileName: result.fileName
             });
 
-            // 4. Update applicant stage and history
-            const previousStage = applicant.stage;
-            applicant.stage = 'OFFER_SENT';
-            applicant.offerLetterUrl = saveResult.relativeUrl;
-            applicant.offerLetterSentAt = new Date();
-            applicant.offerLetterSentBy = req.user?._id || req.staff?._id || null;
-            applicant.offerLetterDesignation = result.designation;
-            applicant.offerLetterJoiningDate = result.joiningDate;
+            // 4. Update applicant/staff stage and history
+            if (applicant.isSyntheticStaff) {
+                try {
+                    await staffModel.findByIdAndUpdate(applicant._id, {
+                        offerLetterUrl: saveResult.relativeUrl,
+                        offerLetterSentAt: new Date(),
+                        offerLetterSentBy: req.user?._id || req.staff?._id || null,
+                        offerLetterDesignation: result.designation,
+                        offerLetterJoiningDate: result.joiningDate,
+                    });
+                } catch (e) {
+                    console.error("[sendOfferLetter synthetic staff update error]:", e);
+                }
+            } else {
+                applicant.stage = 'OFFER_SENT';
+                applicant.offerLetterUrl = saveResult.relativeUrl;
+                applicant.offerLetterSentAt = new Date();
+                applicant.offerLetterSentBy = req.user?._id || req.staff?._id || null;
+                applicant.offerLetterDesignation = result.designation;
+                applicant.offerLetterJoiningDate = result.joiningDate;
 
-            if (!applicant.stageHistory) {
-                applicant.stageHistory = [];
+                if (!applicant.stageHistory) {
+                    applicant.stageHistory = [];
+                }
+                applicant.stageHistory.push({
+                    stage: 'OFFER_SENT',
+                    note: customNote || `Offer letter issued for position "${result.designation}" (Joining: ${result.joiningDate}). Email ${emailResult.success ? 'dispatched successfully' : 'dispatch failed: ' + (emailResult.error || '')}`,
+                    changedBy: req.user?._id || null,
+                    changedAt: new Date()
+                });
+
+                await applicant.save();
             }
-            applicant.stageHistory.push({
-                stage: 'OFFER_SENT',
-                note: customNote || `Offer letter issued for position "${result.designation}" (Joining: ${result.joiningDate}). Email ${emailResult.success ? 'dispatched successfully' : 'dispatch failed: ' + (emailResult.error || '')}`,
-                changedBy: req.user?._id || null,
-                changedAt: new Date()
-            });
-
-            await applicant.save();
 
             res.status(200).send({
                 status: 200,

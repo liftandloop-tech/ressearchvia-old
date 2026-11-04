@@ -6,6 +6,7 @@ import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'table_reporting_to_dropdown.widget.dart';
 import 'staff_digital_id_dialog.widget.dart';
+import 'package:spresearch_web/ui/widgets/offer_letter_dialog.widget.dart';
 
 class StaffRow extends TableRow {
   final StaffModel staff;
@@ -103,7 +104,7 @@ class StaffRow extends TableRow {
                   child: Switch(
                     value: staff.status == 'Active',
                     onChanged: onStatusToggle,
-                    activeColor: AppTheme.successGreen,
+                    activeThumbColor: AppTheme.successGreen,
                     activeTrackColor: AppTheme.successGreen.withValues(
                       alpha: 0.2,
                     ),
@@ -160,6 +161,28 @@ class StaffRow extends TableRow {
                   color: Color(0xFF0F172A),
                 ),
                 tooltip: 'Digital ID Card',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
+                  OfferLetterDialog.show(
+                    Get.context!,
+                    applicant: staff,
+                    onSuccess: () {
+                      try {
+                        Get.find<StaffController>().fetchStaffList();
+                      } catch (_) {}
+                    },
+                  );
+                },
+                icon: const Icon(
+                  Icons.mark_email_read_outlined,
+                  size: 19,
+                  color: Color(0xFF4F46E5),
+                ),
+                tooltip: 'Offer Letter (Preview & Send)',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),

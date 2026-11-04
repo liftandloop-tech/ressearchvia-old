@@ -273,6 +273,27 @@ const staffSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    offerLetterUrl: {
+        type: String,
+        default: null
+    },
+    offerLetterSentAt: {
+        type: Date,
+        default: null
+    },
+    offerLetterSentBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'staff',
+        default: null
+    },
+    offerLetterDesignation: {
+        type: String,
+        default: null
+    },
+    offerLetterJoiningDate: {
+        type: String,
+        default: null
+    },
     isDeleted: {
         type: Boolean,
         default: false
