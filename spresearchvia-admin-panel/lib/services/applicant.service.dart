@@ -548,6 +548,28 @@ class ApplicantService extends ApiService {
     String? issueDate,
     StaffModel? applicant,
   }) async {
+    // 1. Primary: Generate using the official template background directly in-client
+    if (applicant != null) {
+      try {
+        final bytes = await OfferLetterPdfGenerator.generate(
+          applicant: applicant,
+          designation: designation?.trim().isNotEmpty == true ? designation!.trim() : 'Business Development Executive',
+          joiningDate: joiningDate?.trim().isNotEmpty == true ? joiningDate!.trim() : '10/11/2026',
+          issueDate: issueDate?.trim().isNotEmpty == true ? issueDate!.trim() : '04/11/2026',
+        );
+        final safeName = (applicant.name.isNotEmpty && applicant.name != '—' ? applicant.name : 'Candidate').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
+        return (
+          success: true,
+          bytes: bytes,
+          pdfBase64: base64Encode(bytes),
+          fileName: 'Offer_Letter_$safeName.pdf',
+          message: null,
+        );
+      } catch (genErr) {
+        debugPrint('Client official template PDF generation error: $genErr');
+      }
+    }
+
     final queryParams = <String, String>{
       'format': 'json',
       if (designation != null && designation.trim().isNotEmpty) 'designation': designation.trim(),
@@ -556,7 +578,7 @@ class ApplicantService extends ApiService {
     };
     final uri = Uri(path: '/staff/applicant/offer-letter/preview/$id', queryParameters: queryParams);
 
-    // 1. Try remote API endpoint
+    // 2. Try remote API endpoint
     try {
       final response = await get(uri.toString(), forceRefresh: true);
       if (response.statusCode == 200 && response.body != null && response.body is Map) {
@@ -576,9 +598,9 @@ class ApplicantService extends ApiService {
       }
     } catch (_) {}
 
-    // 2. Try local backend if running on port 8080
+    // 3. Try local backend fallback
     try {
-      final localUri = Uri.parse('http://localhost:8080/api/staff/applicant/offer-letter/preview/$id').replace(queryParameters: queryParams);
+      final localUri = Uri.parse('http://localhost:8088/api/staff/applicant/offer-letter/preview/$id').replace(queryParameters: queryParams);
       final token = Get.isRegistered<SharedPreferences>()
           ? Get.find<SharedPreferences>().getString('token')
           : null;
@@ -602,28 +624,6 @@ class ApplicantService extends ApiService {
         );
       }
     } catch (_) {}
-
-    // 3. Resilient Client-Side Generation fallback using official appointment letter format
-    if (applicant != null) {
-      try {
-        final bytes = await OfferLetterPdfGenerator.generate(
-          applicant: applicant,
-          designation: designation?.trim().isNotEmpty == true ? designation!.trim() : 'Business Development Executive',
-          joiningDate: joiningDate?.trim().isNotEmpty == true ? joiningDate!.trim() : '10/11/2026',
-          issueDate: issueDate?.trim().isNotEmpty == true ? issueDate!.trim() : '03/11/2026',
-        );
-        final safeName = (applicant.name.isNotEmpty && applicant.name != '—' ? applicant.name : 'Candidate').replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-        return (
-          success: true,
-          bytes: bytes,
-          pdfBase64: base64Encode(bytes),
-          fileName: 'Offer_Letter_$safeName.pdf',
-          message: null,
-        );
-      } catch (genErr) {
-        debugPrint('Client PDF generation error: $genErr');
-      }
-    }
 
     return (
       success: false,
@@ -671,16 +671,20 @@ class ApplicantService extends ApiService {
       final token = Get.isRegistered<SharedPreferences>()
           ? Get.find<SharedPreferences>().getString('token')
           : null;
-      final localResp = await httpClient.post(
-        'http://localhost:8080/api/staff/applicant/offer-letter/send/$id',
-        body: payload,
-        headers: {if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token'},
-      );
-      if (localResp.statusCode == 200 && localResp.body != null && localResp.body is Map) {
-        final data = localResp.body['data'] as Map<String, dynamic>?;
-        final url = data?['offerLetterUrl']?.toString();
-        final msg = localResp.body['message']?.toString() ?? 'Offer letter sent successfully';
-        return (success: true, offerLetterUrl: url, message: msg);
+      for (final port in [8088, 8080]) {
+        try {
+          final localResp = await httpClient.post(
+            'http://localhost:$port/api/staff/applicant/offer-letter/send/$id',
+            body: payload,
+            headers: {if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token'},
+          );
+          if (localResp.statusCode == 200 && localResp.body != null && localResp.body is Map) {
+            final data = localResp.body['data'] as Map<String, dynamic>?;
+            final url = data?['offerLetterUrl']?.toString();
+            final msg = localResp.body['message']?.toString() ?? 'Offer letter sent successfully';
+            return (success: true, offerLetterUrl: url, message: msg);
+          }
+        } catch (_) {}
       }
     } catch (_) {}
 

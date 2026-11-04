@@ -97,35 +97,35 @@ const offerLetterService = {
 
         const page = pdfDoc.getPage(0);
 
-        // 1. DATE: at y = 643.54
+        // 1. DATE: placed after "DATE: "
         page.drawText(issueDate, {
-            x: 460,
+            x: 500,
             y: 643.54,
             size: 10,
             font: fontRegular,
             color: black
         });
 
-        // 2. Name: at y = 630.1
+        // 2. Name: placed after "Name"
         page.drawText(candidateName, {
-            x: 120,
+            x: 135,
             y: 630.1,
             size: 10,
             font: fontBold,
             color: black
         });
 
-        // 3. Address: at y = 603.22
+        // 3. Address: placed after "Address"
         if (addrLine2) {
             page.drawText(addrLine1, {
-                x: 120,
+                x: 135,
                 y: 603.22,
                 size: 8.5,
                 font: fontRegular,
                 color: black
             });
             page.drawText(addrLine2, {
-                x: 120,
+                x: 135,
                 y: 591.22,
                 size: 8.5,
                 font: fontRegular,
@@ -133,7 +133,7 @@ const offerLetterService = {
             });
         } else if (addrLine1) {
             page.drawText(addrLine1, {
-                x: 120,
+                x: 135,
                 y: 603.22,
                 size: 9,
                 font: fontRegular,
@@ -141,10 +141,10 @@ const offerLetterService = {
             });
         }
 
-        // 4. Contact: at y = 576.31
+        // 4. Contact: placed after "Contact"
         if (contactStr) {
             page.drawText(contactStr, {
-                x: 120,
+                x: 135,
                 y: 576.31,
                 size: 9.5,
                 font: fontRegular,
@@ -152,31 +152,31 @@ const offerLetterService = {
             });
         }
 
-        // 5. Dear: at y = 528.07
+        // 5. Dear: placed after "Dear "
         page.drawText(`${candidateName},`, {
-            x: 102,
+            x: 98,
             y: 528.07,
             size: 10,
             font: fontBold,
             color: black
         });
 
-        // 6. Congratulations and welcome to: at y = 505.51
+        // 6. Congratulations and welcome to: placed after "welcome to "
         page.drawText("SP RESEARCHVIA PVT. LTD.", {
-            x: 224,
+            x: 232,
             y: 505.51,
             size: 9.5,
             font: fontBold,
             color: black
         });
 
-        // 7. We are pleased to offer you a position as ... commencing on ...: at y = 483.07
-        const defaultSize = 9.5;
-        const maxRoleW = 86;
+        // 7. We are pleased to offer you a position as ... commencing on ...:
+        const defaultSize = 8.5;
+        const maxRoleW = 80;
         const actualW = fontBold.widthOfTextAtSize(designation, defaultSize);
-        const roleSize = actualW > maxRoleW ? Math.max(6.5, (maxRoleW / actualW) * defaultSize) : defaultSize;
+        const roleSize = actualW > maxRoleW ? Math.max(4.8, (maxRoleW / actualW) * defaultSize) : defaultSize;
         page.drawText(designation, {
-            x: 258,
+            x: 256,
             y: 483.07,
             size: roleSize,
             font: fontBold,
@@ -184,34 +184,34 @@ const offerLetterService = {
         });
 
         page.drawText(joiningDate, {
-            x: 422,
+            x: 426,
             y: 483.07,
-            size: 9,
+            size: 8.5,
             font: fontRegular,
             color: black
         });
 
-        // 8. Designation : at y = 343.25
+        // 8. Designation : placed after "Designation :"
         page.drawText(designation, {
-            x: 150,
+            x: 165,
             y: 343.25,
             size: 10,
             font: fontBold,
             color: black
         });
 
-        // 9. Date of joining : at y = 320.69
+        // 9. Date of joining : placed after "Date of joining :"
         page.drawText(joiningDate, {
-            x: 150,
+            x: 165,
             y: 320.69,
             size: 10,
             font: fontRegular,
             color: black
         });
 
-        // 10. For: at y = 275.69
+        // 10. For: placed after "For "
         page.drawText("SP RESEARCHVIA PVT. LTD.", {
-            x: 95,
+            x: 98,
             y: 275.69,
             size: 10,
             font: fontBold,
@@ -221,10 +221,17 @@ const offerLetterService = {
         // Signatory placeholder
         page.drawText("Authorized Signatory", {
             x: 72,
-            y: 220,
+            y: 190,
             size: 9.5,
-            font: fontRegular,
+            font: fontBold,
             color: black
+        });
+        page.drawText("SP RESEARCHVIA PVT. LTD.", {
+            x: 72,
+            y: 178,
+            size: 8.5,
+            font: fontRegular,
+            color: rgb(0.3, 0.35, 0.4)
         });
 
         const pdfBytes = await pdfDoc.save();
