@@ -96,6 +96,8 @@ class ApiService extends GetConnect {
             urlStr.contains('/staff/applicant/assign') ||
             urlStr.contains('/staff/applicant/delete') ||
             urlStr.contains('/staff/applicant/evaluation-remarks') ||
+            urlStr.contains('/staff/applicant/offer-letter') ||
+            urlStr.contains('/staff/offer-letter') ||
             urlStr.contains('/staff/applicants');
 
         // Public applicant routes do not use staff auth tokens

@@ -5,10 +5,10 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/recruitment/applicants_list.controller.dart';
 import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
-import '../../widgets/offer_letter_dialog.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
 import '../../../controllers/auth/auth.controller.dart';
+import 'widgets/applicant_column_filter.widget.dart';
 
 class ApplicantsListScreen extends StatelessWidget {
   const ApplicantsListScreen({super.key});
@@ -22,17 +22,6 @@ class ApplicantsListScreen extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.fetchApplicants();
     });
-
-    final authUser = Get.isRegistered<AuthController>() ? Get.find<AuthController>().user.value : null;
-    final canDelete = authUser?.isAdmin == true || (authUser?.canDeleteApplicant ?? false);
-    final canAssign = authUser?.isAdmin == true ||
-        (authUser?.has('recruitment.assign') ?? false) ||
-        (authUser?.has('staff.assignment') ?? false);
-    final canPromote = authUser?.isAdmin == true ||
-        (authUser?.has('recruitment.promote') ?? false) ||
-        (authUser?.has('staff.approve_applicant') ?? false);
-    final canReject = authUser?.isAdmin == true ||
-        (authUser?.has('recruitment.reject') ?? false);
 
     return DashboardLayout(
       child: Container(
@@ -202,6 +191,17 @@ class ApplicantsListScreen extends StatelessWidget {
             // Table Card
             Expanded(
               child: Obx(() {
+                final authUser = Get.isRegistered<AuthController>() ? Get.find<AuthController>().user.value : null;
+                final canDelete = authUser?.isAdmin == true || (authUser?.canDeleteApplicant ?? false);
+                final canAssign = authUser?.isAdmin == true ||
+                    (authUser?.has('recruitment.assign') ?? false) ||
+                    (authUser?.has('staff.assignment') ?? false);
+                final canPromote = authUser?.isAdmin == true ||
+                    (authUser?.has('recruitment.promote') ?? false) ||
+                    (authUser?.has('staff.approve_applicant') ?? false);
+                final canReject = authUser?.isAdmin == true ||
+                    (authUser?.has('recruitment.reject') ?? false);
+
                 if (controller.isLoading.value && controller.filteredApplicants.isEmpty) {
                   return const TableSkeleton(rowCount: 8, columnCount: 7);
                 }
@@ -235,30 +235,74 @@ class ApplicantsListScreen extends StatelessWidget {
                   );
                 }
 
-                return Card(
-                  elevation: 0,
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: DataTable2(
-                      columnSpacing: 16,
-                      horizontalMargin: 12,
-                      minWidth: 1220,
-                      dataRowHeight: 68,
-                      headingRowHeight: 46,
-                      columns: const [
-                        DataColumn2(label: Text('Candidate'), size: ColumnSize.L, fixedWidth: 210),
-                        DataColumn2(label: Text('Applied Role'), size: ColumnSize.L, fixedWidth: 230),
-                        DataColumn2(label: Text('Contact Details'), size: ColumnSize.M, fixedWidth: 200),
-                        DataColumn2(label: Text('Status'), fixedWidth: 125),
-                        DataColumn2(label: Text('Pipeline Stage'), fixedWidth: 120),
-                        DataColumn2(label: Text('Assigned Staff'), size: ColumnSize.M, fixedWidth: 180),
-                        DataColumn2(label: Text('Actions'), fixedWidth: 175),
-                      ],
+                  clipBehavior: Clip.antiAlias,
+                  child: DataTable2(
+                    columnSpacing: 12,
+                    horizontalMargin: 8,
+                    minWidth: 1050,
+                    dataRowHeight: 54,
+                    headingRowHeight: 44,
+                    columns: [
+                      DataColumn2(
+                        size: ColumnSize.L,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Candidate',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'candidate', columnName: 'Candidate'),
+                        ),
+                      ),
+                      DataColumn2(
+                        size: ColumnSize.L,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Applied Role',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'role', columnName: 'Applied Role'),
+                        ),
+                      ),
+                      DataColumn2(
+                        size: ColumnSize.L,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Contact Details',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'contact', columnName: 'Contact Details'),
+                        ),
+                      ),
+                      DataColumn2(
+                        fixedWidth: 125,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Status',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'status', columnName: 'Status'),
+                        ),
+                      ),
+                      DataColumn2(
+                        fixedWidth: 140,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Pipeline Stage',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'stage', columnName: 'Pipeline Stage'),
+                        ),
+                      ),
+                      DataColumn2(
+                        fixedWidth: 175,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Assigned Staff',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'staff', columnName: 'Assigned Staff'),
+                        ),
+                      ),
+                      const DataColumn2(
+                        fixedWidth: 125,
+                        label: Text(
+                          'Actions',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                    ],
                       rows: controller.filteredApplicants.map((applicant) {
                         final raw = applicant.rawJson ?? {};
                         final stage = applicant.stage.toUpperCase();
@@ -365,35 +409,46 @@ class ApplicantsListScreen extends StatelessWidget {
                                   if (applicant.photoUrl != null && applicant.photoUrl!.isNotEmpty)
                                     CircleAvatar(
                                       backgroundImage: NetworkImage(AppConfig.buildImageUrl(applicant.photoUrl)),
-                                      radius: 18,
+                                      radius: 16,
                                     )
                                   else
                                     CircleAvatar(
                                       backgroundColor: const Color(0xFFE2E8F0),
-                                      radius: 18,
+                                      radius: 16,
                                       child: Text(
-                                        applicant.name.isNotEmpty ? applicant.name[0].toUpperCase() : '?',
-                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFF334155)),
+                                        (applicant.name.isNotEmpty && applicant.name != '—' && applicant.name.toLowerCase() != 'candidate')
+                                            ? applicant.name[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF475569)),
                                       ),
                                     ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 10),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          applicant.name,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, color: Color(0xFF0F172A)),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          applicant.staffId.isNotEmpty ? applicant.staffId : 'Candidate',
-                                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
+                                    child: (applicant.name.isNotEmpty &&
+                                            applicant.name != '—' &&
+                                            applicant.name.toLowerCase() != 'candidate')
+                                        ? Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                applicant.name,
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Color(0xFF0F172A)),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 1),
+                                              const Text(
+                                                'Candidate',
+                                                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10.5),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          )
+                                        : const Text(
+                                            'Candidate',
+                                            style: TextStyle(fontWeight: FontWeight.w500, fontSize: 12, color: Color(0xFF64748B)),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                   ),
                                 ],
                               ),
@@ -401,59 +456,56 @@ class ApplicantsListScreen extends StatelessWidget {
 
                             // Role
                             DataCell(
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      (() {
-                                        if (applicant.role.isNotEmpty && applicant.role.toLowerCase() != 'staff') {
-                                          return applicant.role;
-                                        }
-                                        final rawTarget = raw['targetRole']?.toString() ??
-                                            raw['walkInForm']?['appliedPosition']?.toString() ??
-                                            raw['walkInForm']?['positionApplied']?.toString() ??
-                                            raw['appliedPosition']?.toString();
-                                        if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff') {
-                                          return rawTarget.trim();
-                                        }
-                                        return '—';
-                                      })(),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF1E293B),
-                                        height: 1.25,
-                                      ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    (() {
+                                      if (applicant.role.isNotEmpty && applicant.role.toLowerCase() != 'staff' && applicant.role.toLowerCase() != 'applicant') {
+                                        return applicant.role;
+                                      }
+                                      final rawTarget = raw['targetRole']?.toString() ??
+                                          raw['walkInForm']?['appliedPosition']?.toString() ??
+                                          raw['walkInForm']?['positionApplied']?.toString() ??
+                                          raw['appliedPosition']?.toString();
+                                      if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff' && rawTarget.toLowerCase() != 'applicant') {
+                                        return rawTarget.trim();
+                                      }
+                                      if (applicant.currentDesignation?.isNotEmpty == true && applicant.currentDesignation!.toLowerCase() != 'staff') {
+                                        return applicant.currentDesignation!;
+                                      }
+                                      return 'Business Development executive';
+                                    })(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF0F172A),
                                     ),
-                                    if (applicant.department.isNotEmpty || (raw['targetDepartment'] != null && raw['targetDepartment'].toString().trim().isNotEmpty)) ...[
-                                      const SizedBox(height: 3),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(4),
-                                          border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
-                                        ),
-                                        child: Text(
-                                          applicant.department.isNotEmpty
-                                              ? applicant.department
-                                              : raw['targetDepartment'].toString().trim(),
-                                          style: const TextStyle(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF64748B),
-                                            height: 1.1,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    (() {
+                                      if (applicant.department.isNotEmpty && applicant.department.toLowerCase() != 'staff') {
+                                        return applicant.department;
+                                      }
+                                      final rawDept = raw['targetDepartment']?.toString() ??
+                                          raw['department']?.toString() ??
+                                          raw['walkInForm']?['department']?.toString();
+                                      if (rawDept != null && rawDept.trim().isNotEmpty && rawDept.toLowerCase() != 'staff') {
+                                        return rawDept.trim();
+                                      }
+                                      return 'Sales';
+                                    })(),
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w400,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
 
@@ -463,14 +515,33 @@ class ApplicantsListScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    applicant.email,
-                                    style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
-                                    overflow: TextOverflow.ellipsis,
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.mail_outline_rounded, size: 12, color: Color(0xFF10B981)),
+                                      const SizedBox(width: 5),
+                                      Flexible(
+                                        child: Text(
+                                          applicant.email.isNotEmpty ? applicant.email : '',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    applicant.mobile,
-                                    style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.smartphone_rounded, size: 12, color: Color(0xFF94A3B8)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        (applicant.mobile.isNotEmpty && applicant.mobile != '—')
+                                            ? applicant.mobile
+                                            : '',
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -479,21 +550,21 @@ class ApplicantsListScreen extends StatelessWidget {
                             // Application Form Status badge
                             DataCell(
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                                 decoration: BoxDecoration(
                                   color: formStatusBg,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: formStatusBorder),
+                                  border: Border.all(color: formStatusBorder, width: 0.8),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(formStatusIcon, size: 13, color: formStatusColor),
-                                    const SizedBox(width: 5),
+                                    Icon(formStatusIcon, size: 12, color: formStatusColor),
+                                    const SizedBox(width: 4),
                                     Text(
                                       formStatusText,
                                       style: TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.w600,
                                         color: formStatusColor,
                                       ),
@@ -506,18 +577,17 @@ class ApplicantsListScreen extends StatelessWidget {
                             // Pipeline Stage badge
                             DataCell(
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
                                 decoration: BoxDecoration(
                                   color: stageBg,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: stageColor.withValues(alpha: 0.2)),
                                 ),
                                 child: Text(
                                   stageDisplay,
                                   style: TextStyle(
                                     color: stageColor,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ),
@@ -529,16 +599,16 @@ class ApplicantsListScreen extends StatelessWidget {
                                 onTap: canAssign ? () => _showAssignStaffDialog(context, controller, applicant) : null,
                                 borderRadius: BorderRadius.circular(16),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
                                         ? const Color(0xFFEEF2FF)
-                                        : const Color(0xFFF8FAFC),
+                                        : const Color(0xFFFAFAFA),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
                                       color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
                                           ? const Color(0xFFC7D2FE)
-                                          : const Color(0xFFCBD5E1),
+                                          : const Color(0xFFE2E8F0),
                                     ),
                                   ),
                                   child: Row(
@@ -546,14 +616,14 @@ class ApplicantsListScreen extends StatelessWidget {
                                     children: [
                                       Icon(
                                         (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
-                                            ? Icons.person_rounded
+                                            ? Icons.person
                                             : Icons.person_add_alt_1_outlined,
-                                        size: 13,
+                                        size: 12,
                                         color: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
                                             ? const Color(0xFF4338CA)
                                             : const Color(0xFF64748B),
                                       ),
-                                      const SizedBox(width: 5),
+                                      const SizedBox(width: 4),
                                       Flexible(
                                         child: Text(
                                           (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
@@ -561,7 +631,7 @@ class ApplicantsListScreen extends StatelessWidget {
                                               : 'Assign Staff',
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            fontSize: 11.5,
+                                            fontSize: 11,
                                             fontWeight: (applicant.assignedStaffName != null && applicant.assignedStaffName!.isNotEmpty)
                                                 ? FontWeight.w600
                                                 : FontWeight.w500,
@@ -571,7 +641,7 @@ class ApplicantsListScreen extends StatelessWidget {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 3),
+                                      const SizedBox(width: 2),
                                       Icon(
                                         Icons.arrow_drop_down,
                                         size: 14,
@@ -592,64 +662,44 @@ class ApplicantsListScreen extends StatelessWidget {
                                 children: [
                                   IconButton(
                                     tooltip: 'View Profile',
-                                    icon: const Icon(Icons.remove_red_eye_outlined, size: 19, color: Color(0xFF2563EB)),
+                                    icon: const Icon(Icons.remove_red_eye_outlined, size: 18, color: Color(0xFF2563EB)),
                                     onPressed: () => Get.toNamed('/applicant/${applicant.id}'),
-                                    splashRadius: 18,
-                                    padding: const EdgeInsets.all(5),
+                                    splashRadius: 16,
+                                    padding: const EdgeInsets.all(4),
                                     constraints: const BoxConstraints(),
                                   ),
-                                  // Offer Letter (Manual preview & send anytime, before OR after promotion)
-                                  if (!isRejected) ...[
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      tooltip: isPromoted ? 'Offer Letter (Promoted Staff)' : 'Offer Letter (Preview & Send)',
-                                      icon: Icon(
-                                        Icons.mark_email_read_outlined,
-                                        size: 19,
-                                        color: isPromoted ? const Color(0xFF10B981) : const Color(0xFF4F46E5),
-                                      ),
-                                      onPressed: () => OfferLetterDialog.show(
-                                        context,
-                                        applicant: applicant,
-                                        onSuccess: () => controller.fetchApplicants(),
-                                      ),
-                                      splashRadius: 18,
-                                      padding: const EdgeInsets.all(5),
-                                      constraints: const BoxConstraints(),
-                                    ),
-                                  ],
                                   if (!isPromoted && !isRejected) ...[
                                     if (canPromote) ...[
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 6),
                                       IconButton(
                                         tooltip: 'Promote to Staff',
-                                        icon: const Icon(Icons.how_to_reg_rounded, size: 19, color: Color(0xFF16A34A)),
+                                        icon: const Icon(Icons.person_add_alt_1_outlined, size: 18, color: Color(0xFF16A34A)),
                                         onPressed: () => _showQuickPromoteDialog(context, controller, applicant),
-                                        splashRadius: 18,
-                                        padding: const EdgeInsets.all(5),
+                                        splashRadius: 16,
+                                        padding: const EdgeInsets.all(4),
                                         constraints: const BoxConstraints(),
                                       ),
                                     ],
                                     if (canReject) ...[
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 6),
                                       IconButton(
                                         tooltip: 'Reject Application',
-                                        icon: const Icon(Icons.cancel_outlined, size: 19, color: Color(0xFFEA580C)),
+                                        icon: const Icon(Icons.cancel_outlined, size: 18, color: Color(0xFFDC2626)),
                                         onPressed: () => _showQuickRejectDialog(context, controller, applicant),
-                                        splashRadius: 18,
-                                        padding: const EdgeInsets.all(5),
+                                        splashRadius: 16,
+                                        padding: const EdgeInsets.all(4),
                                         constraints: const BoxConstraints(),
                                       ),
                                     ],
                                   ],
                                   if (canDelete) ...[
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: 6),
                                     IconButton(
                                       tooltip: 'Delete Applicant',
-                                      icon: const Icon(Icons.delete_outline_rounded, size: 19, color: Color(0xFFDC2626)),
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
                                       onPressed: () => _showDeleteConfirmDialog(context, controller, applicant),
-                                      splashRadius: 18,
-                                      padding: const EdgeInsets.all(5),
+                                      splashRadius: 16,
+                                      padding: const EdgeInsets.all(4),
                                       constraints: const BoxConstraints(),
                                     ),
                                   ],
@@ -660,10 +710,9 @@ class ApplicantsListScreen extends StatelessWidget {
                         );
                       }).toList(),
                     ),
-                  ),
-                );
-              }),
-            ),
+                  );
+                }),
+              ),
           ],
         ),
       ),
@@ -811,10 +860,32 @@ class ApplicantsListScreen extends StatelessWidget {
                                 TextField(
                                   controller: joinDateCtrl,
                                   style: const TextStyle(fontSize: 12.5),
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    border: OutlineInputBorder(),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    border: const OutlineInputBorder(),
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () async {
+                                        final parts = joinDateCtrl.text.split('/');
+                                        DateTime initial = DateTime.now();
+                                        if (parts.length == 3) {
+                                          try {
+                                            initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                                          } catch (_) {}
+                                        }
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
+                                          firstDate: DateTime(2000),
+                                          lastDate: DateTime(2100),
+                                        );
+                                        if (picked != null) {
+                                          joinDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                        }
+                                      },
+                                    ),
                                   ),
                                 ),
                               ],

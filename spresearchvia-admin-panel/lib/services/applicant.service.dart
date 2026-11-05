@@ -673,7 +673,33 @@ class ApplicantService extends ApiService {
       if (customNote != null && customNote.trim().isNotEmpty) 'customNote': customNote.trim(),
     };
 
-    // 1. Try primary API
+    // 1. Try local backend first if in development / localhost
+    try {
+      final prefs = Get.isRegistered<SharedPreferences>() ? Get.find<SharedPreferences>() : null;
+      final token = prefs?.getString('auth_token') ?? prefs?.getString('token');
+      for (final port in [8088, 8080]) {
+        for (final authHeader in [
+          if (token != null && token.isNotEmpty) token,
+          if (token != null && token.isNotEmpty) 'Bearer $token',
+        ]) {
+          try {
+            final localResp = await httpClient.post(
+              'http://localhost:$port/api/staff/applicant/offer-letter/send/$id',
+              body: payload,
+              headers: {'Authorization': authHeader},
+            );
+            if (localResp.statusCode == 200 && localResp.body != null && localResp.body is Map) {
+              final data = localResp.body['data'] as Map<String, dynamic>?;
+              final url = data?['offerLetterUrl']?.toString();
+              final msg = localResp.body['message']?.toString() ?? 'Offer letter sent successfully';
+              return (success: true, offerLetterUrl: url, message: msg);
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // 2. Try primary API
     try {
       final response = await post('/staff/applicant/offer-letter/send/$id', payload);
       if (response.statusCode == 200 && response.body != null && response.body is Map) {
@@ -688,28 +714,6 @@ class ApplicantService extends ApiService {
           offerLetterUrl: null,
           message: _extractMsg(response.body, 'Failed to send offer letter'),
         );
-      }
-    } catch (_) {}
-
-    // 2. Try local backend
-    try {
-      final token = Get.isRegistered<SharedPreferences>()
-          ? Get.find<SharedPreferences>().getString('token')
-          : null;
-      for (final port in [8088, 8080]) {
-        try {
-          final localResp = await httpClient.post(
-            'http://localhost:$port/api/staff/applicant/offer-letter/send/$id',
-            body: payload,
-            headers: {if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token'},
-          );
-          if (localResp.statusCode == 200 && localResp.body != null && localResp.body is Map) {
-            final data = localResp.body['data'] as Map<String, dynamic>?;
-            final url = data?['offerLetterUrl']?.toString();
-            final msg = localResp.body['message']?.toString() ?? 'Offer letter sent successfully';
-            return (success: true, offerLetterUrl: url, message: msg);
-          }
-        } catch (_) {}
       }
     } catch (_) {}
 

@@ -26,6 +26,7 @@ import 'package:spresearch_web/services/lead.service.dart';
 import 'package:spresearch_web/services/telephony.service.dart';
 import 'package:spresearch_web/services/permission_service.dart';
 import 'package:spresearch_web/services/refund.service.dart';
+import 'package:spresearch_web/services/applicant.service.dart';
 
 import 'package:spresearch_web/services/api.service.dart';
 import 'package:spresearch_web/controllers/notifications/research_notification.controller.dart';
@@ -58,6 +59,7 @@ class InitialBinding extends Bindings {
     Get.put(LeadService(), permanent: true);
     Get.put(TelephonyService(), permanent: true);
     Get.put(PermissionService(), permanent: true);
+    Get.put(ApplicantService(), permanent: true);
 
     // Controllers (Essential root singletons - permanently active to prevent disposed controller crashes)
     Get.put(AuthController(), permanent: true);

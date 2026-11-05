@@ -15,6 +15,9 @@ class DashboardLayout extends StatelessWidget {
     final controller = Get.find<MainDashboardController>();
     final authController = Get.find<AuthController>();
 
+    // Keep active sidebar tab synchronized with current route
+    controller.syncTabWithRoute();
+
     return SelectionArea(
       child: Scaffold(
         backgroundColor: AppTheme.gray50,

@@ -19,13 +19,14 @@ class StaffScreen extends StatelessWidget {
         ? Get.find<StaffController>()
         : Get.put(StaffController(), permanent: true);
     final authController = Get.find<AuthController>();
-    final currentUser = authController.user.value;
-    final canCreateStaff = currentUser?.isAdmin == true || (currentUser?.has('staff.create') ?? false);
 
     return DashboardLayout(
       child: Container(
         color: AppTheme.gray50,
         child: Obx(() {
+          final currentUser = authController.user.value;
+          final canCreateStaff = currentUser?.isAdmin == true || (currentUser?.has('staff.create') ?? false);
+
           if (controller.isLoading.value && controller.staffList.isEmpty) {
             return const ScreenSkeleton(hasFilterBar: true, rowCount: 8);
           }

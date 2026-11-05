@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/config/routes.config.dart';
@@ -13,19 +14,32 @@ class MainDashboardController extends GetxController {
 
     final authController = Get.find<AuthController>();
 
+    // Synchronize tab immediately
+    syncTabWithRoute();
+
     // Perform initial check
     _checkRedirect();
 
     // Also listen for auth initialization or user changes
     everAll([authController.isInitialized, authController.user], (_) {
       _checkRedirect();
+      syncTabWithRoute();
     });
-
-    _updateTab();
   }
 
   void _checkRedirect() {
-    final currentRoute = Get.currentRoute;
+    String currentRoute = Get.currentRoute;
+    if (kIsWeb) {
+      try {
+        final webPath = Uri.base.path;
+        if (webPath.isNotEmpty && webPath != '/' && webPath != '/login') {
+          currentRoute = webPath;
+        }
+      } catch (_) {}
+    }
+    if (currentRoute.contains('?')) {
+      currentRoute = currentRoute.split('?').first;
+    }
 
     // Public routes (/apply, /continue-application, /verify, etc.) are always allowed
     if (AppRoutes.isPublicRoute(currentRoute)) {
@@ -141,41 +155,69 @@ class MainDashboardController extends GetxController {
     }
   }
 
-  void _updateTab() {
-    final currentRoute = Get.currentRoute;
+  void syncTabWithRoute([String? route]) {
+    String currentRoute = route ?? Get.currentRoute;
+    if (kIsWeb) {
+      try {
+        final webPath = Uri.base.path;
+        if (webPath.isNotEmpty && webPath != '/' && webPath != '/login') {
+          currentRoute = webPath;
+        }
+      } catch (_) {}
+    }
+    if (currentRoute.contains('?')) {
+      currentRoute = currentRoute.split('?').first;
+    }
+    if (currentRoute.endsWith('/') && currentRoute.length > 1) {
+      currentRoute = currentRoute.substring(0, currentRoute.length - 1);
+    }
+
     if (currentRoute == AppRoutes.registeredClients ||
         currentRoute == AppRoutes.userKyc ||
         currentRoute.startsWith('/registered-clients') ||
-        currentRoute.startsWith('/approvals/kyc'))
+        currentRoute.startsWith('/approvals/kyc') ||
+        currentRoute.startsWith('/kyc')) {
       selectedTab.value = 7;
-    else if (currentRoute == AppRoutes.pendingPayments)
+      expandedItem.value = 'Clients';
+    } else if (currentRoute == AppRoutes.pendingPayments ||
+        currentRoute.startsWith('/approvals/payments') ||
+        currentRoute.startsWith('/users/pending-transfers')) {
       selectedTab.value = 8;
-    else if (currentRoute.startsWith('/users') ||
-        currentRoute.startsWith('/manage-user') ||
-        currentRoute.startsWith('/edit-user'))
-      selectedTab.value = 1;
-    else if (currentRoute.startsWith('/staff'))
-      selectedTab.value = 2;
-    else if (currentRoute.startsWith('/subscriptions'))
-      selectedTab.value = 3;
-    else if (currentRoute.startsWith('/reports'))
-      selectedTab.value = 4;
-    else if (currentRoute.startsWith('/notifications'))
-      selectedTab.value = 5;
-    else if (currentRoute.startsWith('/settings'))
-      selectedTab.value = 6;
-    else if (currentRoute.startsWith('/automated-trading'))
-      selectedTab.value = 9;
-    else if (currentRoute.startsWith('/leads'))
-      selectedTab.value = 10;
-    else if (currentRoute.startsWith('/applicants') ||
-        currentRoute.startsWith('/applicant/'))
+      expandedItem.value = 'Clients';
+    } else if (currentRoute.startsWith('/applicants') ||
+        currentRoute.startsWith('/applicant/')) {
       selectedTab.value = 11;
-    else if (currentRoute.startsWith('/attendance'))
+    } else if (currentRoute.startsWith('/staff')) {
+      selectedTab.value = 2;
+    } else if (currentRoute.startsWith('/users') ||
+        currentRoute.startsWith('/manage-user') ||
+        currentRoute.startsWith('/edit-user')) {
+      selectedTab.value = 1;
+      expandedItem.value = 'Clients';
+    } else if (currentRoute.startsWith('/subscriptions') ||
+        currentRoute.startsWith('/manage-subscription')) {
+      selectedTab.value = 3;
+    } else if (currentRoute.startsWith('/reports') ||
+        currentRoute.startsWith('/upload-report')) {
+      selectedTab.value = 4;
+    } else if (currentRoute.startsWith('/notifications')) {
+      selectedTab.value = 5;
+    } else if (currentRoute.startsWith('/settings')) {
+      selectedTab.value = 6;
+    } else if (currentRoute.startsWith('/automated-trading')) {
+      selectedTab.value = 9;
+    } else if (currentRoute.startsWith('/leads')) {
+      selectedTab.value = 10;
+    } else if (currentRoute.startsWith('/attendance')) {
       selectedTab.value = 12;
-    else
+    } else if (currentRoute.startsWith('/dashboard')) {
       selectedTab.value = 0;
+    } else {
+      selectedTab.value = 0;
+    }
   }
+
+  void updateTab() => syncTabWithRoute();
 
   void changeTab(int index) {
     selectedTab.value = index;

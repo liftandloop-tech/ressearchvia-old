@@ -51,7 +51,9 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
   Uint8List? _previewBytes;
   String? _blobUrl;
 
-  final ApplicantService _applicantService = Get.find<ApplicantService>();
+  late final ApplicantService _applicantService = Get.isRegistered<ApplicantService>()
+      ? Get.find<ApplicantService>()
+      : Get.put(ApplicantService());
 
   @override
   void initState() {
@@ -108,12 +110,15 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
   }
 
   Future<void> _selectJoiningDate() async {
-    final initial = _parseDate(_joiningDateCtrl.text) ?? DateTime.now().add(const Duration(days: 7));
+    final parsed = _parseDate(_joiningDateCtrl.text);
+    final initial = (parsed != null && parsed.isAfter(DateTime(1999, 12, 31)) && parsed.isBefore(DateTime(2101, 1, 1)))
+        ? parsed
+        : DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 180)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -135,12 +140,15 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
   }
 
   Future<void> _selectIssueDate() async {
-    final initial = _parseDate(_issueDateCtrl.text) ?? DateTime.now();
+    final parsed = _parseDate(_issueDateCtrl.text);
+    final initial = (parsed != null && parsed.isAfter(DateTime(1999, 12, 31)) && parsed.isBefore(DateTime(2101, 1, 1)))
+        ? parsed
+        : DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 60)),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/services/auth.service.dart';
@@ -136,7 +137,19 @@ class AuthController extends GetxController {
         }
 
         // Auto-redirect authenticated user away from login screen if restoring session, or gate if agreement pending
-        final currentRoute = Get.currentRoute;
+        String currentRoute = Get.currentRoute;
+        if (kIsWeb) {
+          try {
+            final webPath = Uri.base.path;
+            if (webPath.isNotEmpty && webPath != '/' && webPath != '/login') {
+              currentRoute = webPath;
+            }
+          } catch (_) {}
+        }
+        if (currentRoute.contains('?')) {
+          currentRoute = currentRoute.split('?').first;
+        }
+
         final isPublic = AppRoutes.isPublicRoute(currentRoute);
         if (storedUser.needsJobAgreement && currentRoute != AppRoutes.jobTermsAgreement) {
           debugPrint('[AuthController] Staff has not signed job terms agreement. Redirecting to agreement screen.');

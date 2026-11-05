@@ -7,6 +7,7 @@ import '../../models/staff.model.dart';
 import '../../models/role.model.dart';
 import '../staff/staff.controller.dart';
 import '../staff/staff_management.controller.dart';
+import '../auth/auth.controller.dart';
 
 class ApplicantsListController extends GetxController {
   final ApplicantService _applicantService = Get.put(ApplicantService());
@@ -19,18 +20,204 @@ class ApplicantsListController extends GetxController {
   var searchQuery = ''.obs;
   var selectedStaffFilter = RxnString();
 
+  // Column-level filters
+  var filterCandidate = ''.obs;
+  var filterRole = <String>[].obs;
+  var filterContact = ''.obs;
+  var filterStatus = <String>[].obs;
+  var filterStage = <String>[].obs;
+  var filterStaff = <String>[].obs;
+
+  List<String> get availableRoleFilterOptions {
+    final set = <String>{};
+    for (var r in availableRoles) {
+      if (r.name.trim().isNotEmpty) set.add(r.name.trim());
+    }
+    for (var a in applicants) {
+      if (a.role.isNotEmpty && a.role.toLowerCase() != 'applicant' && a.role.toLowerCase() != 'staff') {
+        set.add(a.role.trim());
+      }
+      final rawTarget = a.rawJson?['targetRole']?.toString() ??
+          a.rawJson?['walkInForm']?['appliedPosition']?.toString() ??
+          a.rawJson?['appliedPosition']?.toString();
+      if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff' && rawTarget.toLowerCase() != 'applicant') {
+        set.add(rawTarget.trim());
+      }
+    }
+    if (set.isEmpty) {
+      set.addAll([
+        'Business Development executive',
+        'Floor Manager',
+        'Team Leader',
+        'Director',
+      ]);
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  List<String> get availableStaffFilterOptions {
+    final list = <String>['Unassigned'];
+    final seen = <String>{};
+    for (var s in availableSupervisors) {
+      final name = s.name.trim().isNotEmpty ? s.name.trim() : s.email.trim();
+      if (name.isNotEmpty && seen.add(name)) {
+        list.add(name);
+      }
+    }
+    for (var a in applicants) {
+      final staffName = a.assignedStaffName?.trim();
+      if (staffName != null && staffName.isNotEmpty && seen.add(staffName)) {
+        list.add(staffName);
+      }
+    }
+    return list;
+  }
+
+  List<String> get availableStatusFilterOptions {
+    return const ['Submitted', 'Pending', 'Not Started'];
+  }
+
+  List<String> get availableStageFilterOptions {
+    return const [
+      'Applied',
+      'Screening',
+      'Shortlisted',
+      'Interview',
+      'Selected',
+      'Offer Sent',
+      'Promoted',
+      'Rejected',
+    ];
+  }
+
   List<StaffModel> get filteredApplicants {
-    final filter = selectedStaffFilter.value;
-    if (filter == null || filter == 'ALL') {
-      return applicants;
+    var list = applicants.toList();
+
+    // 1. Stage filter pills at the top
+    final stage = selectedStage.value.toUpperCase();
+    if (stage.isNotEmpty && stage != 'ALL') {
+      list = list.where((a) => a.stage.toUpperCase() == stage).toList();
     }
-    if (filter == 'UNASSIGNED') {
-      return applicants.where((a) => a.assignedStaffName == null || a.assignedStaffName!.trim().isEmpty).toList();
+
+    // 2. Staff filter dropdown at the top
+    final staff = selectedStaffFilter.value;
+    if (staff != null && staff != 'ALL') {
+      if (staff == 'UNASSIGNED') {
+        list = list.where((a) => a.assignedStaffName == null || a.assignedStaffName!.trim().isEmpty).toList();
+      } else {
+        list = list.where((a) => a.assignedStaffId == staff || a.assignedRecruiterId == staff).toList();
+      }
     }
-    return applicants.where((a) =>
-      a.assignedStaffId == filter ||
-      a.assignedRecruiterId == filter
-    ).toList();
+
+    // 3. Search query at the top
+    final q = searchQuery.value.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((a) {
+        return a.name.toLowerCase().contains(q) ||
+            a.email.toLowerCase().contains(q) ||
+            a.mobile.toLowerCase().contains(q) ||
+            a.role.toLowerCase().contains(q) ||
+            (a.targetRole?.toLowerCase().contains(q) ?? false);
+      }).toList();
+    }
+
+    // 4. Candidate Column Filter (name search)
+    if (filterCandidate.value.trim().isNotEmpty) {
+      final cQuery = filterCandidate.value.trim().toLowerCase();
+      list = list.where((a) => a.name.toLowerCase().contains(cQuery)).toList();
+    }
+
+    // 5. Applied Role Column Filter (multi-select)
+    if (filterRole.isNotEmpty) {
+      final selectedRolesLower = filterRole.map((r) => r.toLowerCase()).toSet();
+      list = list.where((a) {
+        final r1 = a.role.toLowerCase();
+        final r2 = a.targetRole?.toLowerCase() ?? '';
+        final r3 = a.rawJson?['targetRole']?.toString().toLowerCase() ?? '';
+        final r4 = a.rawJson?['walkInForm']?['appliedPosition']?.toString().toLowerCase() ?? '';
+        final r5 = a.rawJson?['appliedPosition']?.toString().toLowerCase() ?? '';
+        return selectedRolesLower.contains(r1) ||
+            selectedRolesLower.contains(r2) ||
+            selectedRolesLower.contains(r3) ||
+            selectedRolesLower.contains(r4) ||
+            selectedRolesLower.contains(r5);
+      }).toList();
+    }
+
+    // 6. Contact Details Column Filter (email or mobile)
+    if (filterContact.value.trim().isNotEmpty) {
+      final contactQuery = filterContact.value.trim().toLowerCase();
+      list = list.where((a) =>
+        a.email.toLowerCase().contains(contactQuery) ||
+        a.mobile.toLowerCase().contains(contactQuery)
+      ).toList();
+    }
+
+    // 7. Status Column Filter (Submitted, Pending, Not Started)
+    if (filterStatus.isNotEmpty) {
+      final selectedStatusesUpper = filterStatus.map((s) => s.toUpperCase()).toSet();
+      list = list.where((applicant) {
+        final raw = applicant.rawJson ?? {};
+        final aStage = applicant.stage.toUpperCase();
+        final isPromoted = aStage == 'PROMOTED' ||
+            aStage == 'OFFER_ACCEPTED' ||
+            aStage == 'EMPLOYEE' ||
+            applicant.rawJson?['convertedToStaffId'] != null ||
+            applicant.rawJson?['convertedStaffId'] != null;
+        final isDraft = raw['isDraft'] == true;
+        final currentStep = raw['currentStep'] is int
+            ? raw['currentStep'] as int
+            : (int.tryParse(raw['currentStep']?.toString() ?? '1') ?? 1);
+        final hasFilledStep1 = currentStep >= 2 ||
+            (raw['firstName'] != null && raw['firstName'].toString().trim().isNotEmpty) ||
+            (raw['fatherName'] != null && raw['fatherName'].toString().trim().isNotEmpty) ||
+            (raw['currentLocation'] != null && raw['currentLocation'].toString().trim().isNotEmpty) ||
+            (applicant.name.trim().isNotEmpty &&
+                applicant.name.trim().toLowerCase() != 'candidate' &&
+                applicant.name.trim() != '—');
+        final isFormSubmitted = !isDraft ||
+            raw['isVerified'] == true ||
+            applicant.onboardingStatus == 'COMPLETED' ||
+            applicant.onboardingStatus == 'VERIFIED' ||
+            applicant.onboardingStatus == 'DOCUMENTS_UPLOADED' ||
+            applicant.onboardingStatus == 'SUBMITTED' ||
+            isPromoted ||
+            (aStage != 'APPLIED' && aStage != 'SCREENING');
+
+        String st = 'NOT STARTED';
+        if (isFormSubmitted && hasFilledStep1) {
+          st = 'SUBMITTED';
+        } else if (hasFilledStep1) {
+          st = 'PENDING';
+        }
+        return selectedStatusesUpper.contains(st);
+      }).toList();
+    }
+
+    // 8. Pipeline Stage Column Filter
+    if (filterStage.isNotEmpty) {
+      final selectedStagesUpper = filterStage.map((s) => s.toUpperCase().replaceAll(' ', '_')).toSet();
+      list = list.where((a) {
+        final aStage = a.stage.toUpperCase();
+        return selectedStagesUpper.contains(aStage);
+      }).toList();
+    }
+
+    // 9. Assigned Staff Column Filter
+    if (filterStaff.isNotEmpty) {
+      final selectedStaffNamesLower = filterStaff.map((s) => s.toLowerCase()).toSet();
+      final includesUnassigned = selectedStaffNamesLower.contains('unassigned');
+      list = list.where((a) {
+        final staffName = a.assignedStaffName?.trim().toLowerCase();
+        if (staffName == null || staffName.isEmpty) {
+          return includesUnassigned;
+        }
+        return selectedStaffNamesLower.contains(staffName);
+      }).toList();
+    }
+
+    return list;
   }
 
   var rolesList = <RoleModel>[].obs;
@@ -118,6 +305,15 @@ class ApplicantsListController extends GetxController {
       (_) => fetchApplicants(),
       time: const Duration(milliseconds: 350),
     );
+
+    if (Get.isRegistered<AuthController>()) {
+      ever(Get.find<AuthController>().user, (user) {
+        if (user != null && applicants.isEmpty && !isLoading.value) {
+          fetchApplicants();
+          fetchRolesAndSupervisors();
+        }
+      });
+    }
   }
 
   Future<void> fetchRolesAndSupervisors() async {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
@@ -24,9 +25,18 @@ class UsersScreen extends StatelessWidget {
         ? Get.find<UsersNavigationController>()
         : Get.put(UsersNavigationController(), permanent: true);
 
+    String currentRoute = Get.currentRoute;
+    if (kIsWeb) {
+      try {
+        final webPath = Uri.base.path;
+        if (webPath.isNotEmpty && webPath != '/' && webPath != '/login') {
+          currentRoute = webPath;
+        }
+      } catch (_) {}
+    }
     final isRegistered = isRegisteredClients ||
-        Get.currentRoute.startsWith('/registered-clients') ||
-        Get.currentRoute.startsWith('/approvals/kyc');
+        currentRoute.startsWith('/registered-clients') ||
+        currentRoute.startsWith('/approvals/kyc');
 
     // Synchronize filter state for Registered Clients vs All Users safely after build frame
     WidgetsBinding.instance.addPostFrameCallback((_) {

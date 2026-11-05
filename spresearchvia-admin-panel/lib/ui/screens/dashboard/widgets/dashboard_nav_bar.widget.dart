@@ -14,6 +14,7 @@ class DashboardNavBar extends StatelessWidget {
     final authController = Get.find<AuthController>();
 
     return Obx(() {
+      controller.syncTabWithRoute();
       final user = authController.user.value;
 
       final allItems = [

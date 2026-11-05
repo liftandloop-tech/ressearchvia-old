@@ -1513,12 +1513,34 @@ class ApplicantProfileScreen extends StatelessWidget {
                                   TextField(
                                     controller: joinDateCtrl,
                                     style: const TextStyle(fontSize: 12.5),
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: const OutlineInputBorder(),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                                        padding: EdgeInsets.zero,
+                                        onPressed: () async {
+                                          final parts = joinDateCtrl.text.split('/');
+                                          DateTime initial = DateTime.now();
+                                          if (parts.length == 3) {
+                                            try {
+                                              initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                                            } catch (_) {}
+                                         }
+                                         final picked = await showDatePicker(
+                                           context: context,
+                                           initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
+                                           firstDate: DateTime(2000),
+                                           lastDate: DateTime(2100),
+                                         );
+                                         if (picked != null) {
+                                           joinDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                         }
+                                       },
+                                     ),
+                                   ),
+                                 ),
                                 ],
                               ),
                             ),
