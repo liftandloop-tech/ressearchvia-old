@@ -4,7 +4,7 @@ import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 
 class StaffColumnFilter extends StatefulWidget {
-  final String columnKey; // 'name', 'mobile', 'email', 'role', 'status'
+  final String columnKey; // 'name', 'mobile', 'email', 'role', 'branch', 'hr', 'reportingTo', 'status'
   final String columnName;
 
   const StaffColumnFilter({
@@ -31,6 +31,7 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
   }
 
   void _initValues() {
+    _optionsSearchQuery = '';
     if (widget.columnKey == 'name') {
       _searchController.text = controller.filterName.value;
     } else if (widget.columnKey == 'mobile') {
@@ -40,6 +41,15 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
     } else if (widget.columnKey == 'role') {
       _selectedOptions.clear();
       _selectedOptions.addAll(controller.filterSelectedRoles);
+    } else if (widget.columnKey == 'branch') {
+      _selectedOptions.clear();
+      _selectedOptions.addAll(controller.filterSelectedBranches);
+    } else if (widget.columnKey == 'hr') {
+      _selectedOptions.clear();
+      _selectedOptions.addAll(controller.filterSelectedHRs);
+    } else if (widget.columnKey == 'reportingTo') {
+      _selectedOptions.clear();
+      _selectedOptions.addAll(controller.filterSelectedReportingTo);
     } else if (widget.columnKey == 'status') {
       _selectedOptions.clear();
       _selectedOptions.addAll(controller.filterSelectedStatuses);
@@ -57,28 +67,44 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
     if (widget.columnKey == 'mobile') return controller.filterMobile.value.isNotEmpty;
     if (widget.columnKey == 'email') return controller.filterEmail.value.isNotEmpty;
     if (widget.columnKey == 'role') return controller.filterSelectedRoles.isNotEmpty;
+    if (widget.columnKey == 'branch') return controller.filterSelectedBranches.isNotEmpty;
+    if (widget.columnKey == 'hr') return controller.filterSelectedHRs.isNotEmpty;
+    if (widget.columnKey == 'reportingTo') return controller.filterSelectedReportingTo.isNotEmpty;
     if (widget.columnKey == 'status') return controller.filterSelectedStatuses.isNotEmpty;
     return false;
   }
 
   List<String> _getOptions() {
+    List<String> raw = [];
     if (widget.columnKey == 'role') {
-      // Exclude 'All' from options inside selection list
-      final allRoles = controller.availableRolesFilterOptions.where((r) => r != 'All').toList();
-      if (_optionsSearchQuery.isEmpty) return allRoles;
-      return allRoles.where((r) => r.toLowerCase().contains(_optionsSearchQuery.toLowerCase())).toList();
+      raw = controller.availableRolesFilterOptions.where((r) => r != 'All').toList();
+    } else if (widget.columnKey == 'branch') {
+      raw = controller.availableBranchesFilterOptions;
+    } else if (widget.columnKey == 'hr') {
+      raw = controller.availableHRFilterOptions;
+    } else if (widget.columnKey == 'reportingTo') {
+      raw = controller.availableReportingToFilterOptions;
+    } else if (widget.columnKey == 'status') {
+      raw = const ['Active', 'Inactive'];
     }
-    if (widget.columnKey == 'status') {
-      final allStatuses = ['Active', 'Inactive'];
-      if (_optionsSearchQuery.isEmpty) return allStatuses;
-      return allStatuses.where((s) => s.toLowerCase().contains(_optionsSearchQuery.toLowerCase())).toList();
-    }
-    return [];
+
+    if (_optionsSearchQuery.trim().isEmpty) return raw;
+    final q = _optionsSearchQuery.trim().toLowerCase();
+    return raw.where((opt) => opt.toLowerCase().contains(q)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    const knownKeys = {'name', 'mobile', 'email', 'role', 'status'};
+    const knownKeys = {
+      'name',
+      'mobile',
+      'email',
+      'role',
+      'branch',
+      'hr',
+      'reportingTo',
+      'status',
+    };
 
     if (!knownKeys.contains(widget.columnKey)) {
       return _buildPopupMenu(false);
@@ -104,144 +130,203 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
       constraints: const BoxConstraints(),
       offset: const Offset(0, 24),
       itemBuilder: (context) {
-          // Re-initialize active values whenever the popup opens
-          _initValues();
-          return [
-            PopupMenuItem<void>(
-              enabled: false,
-              child: StatefulBuilder(
-                builder: (context, setStatePopup) {
-                  return GestureDetector(
-                    onTap: () {}, // Prevent taps from closing menu
-                    child: Container(
-                      width: 250,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Filter by ${widget.columnName}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (isTextFilter) ...[
-                            // Text Input Search
-                            TextField(
-                              controller: _searchController,
-                              decoration: InputDecoration(
-                                hintText: 'Search ${widget.columnName}...',
-                                prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.gray400),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                isDense: true,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: BorderSide(color: AppTheme.gray300),
-                                ),
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ] else ...[
-                            // Options List with Search Bar
-                            TextField(
-                              onChanged: (val) {
-                                setStatePopup(() {
-                                  _optionsSearchQuery = val;
-                                });
-                              },
-                              decoration: InputDecoration(
-                                hintText: 'Search options...',
-                                prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.gray400),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                isDense: true,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: BorderSide(color: AppTheme.gray300),
-                                ),
-                              ),
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 150),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: _getOptions().map((opt) {
-                                    final isChecked = _selectedOptions.contains(opt);
-                                    return CheckboxListTile(
-                                      title: Text(opt, style: const TextStyle(fontSize: 13)),
-                                      value: isChecked,
-                                      controlAffinity: ListTileControlAffinity.leading,
-                                      dense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      onChanged: (val) {
-                                        setStatePopup(() {
-                                          if (val == true) {
-                                            _selectedOptions.add(opt);
-                                          } else {
-                                            _selectedOptions.remove(opt);
-                                          }
-                                        });
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
+        _initValues();
+        final scrollController = ScrollController();
+
+        return [
+          PopupMenuItem<void>(
+            enabled: false,
+            child: StatefulBuilder(
+              builder: (context, setStatePopup) {
+                final options = _getOptions();
+
+                return GestureDetector(
+                  onTap: () {}, // Prevent taps from closing menu
+                  child: Container(
+                    width: 270,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Filter by ${widget.columnName}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
                               ),
                             ),
-                          ],
-                          const SizedBox(height: 16),
-                          // Action Buttons
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () {
-                                  // Clear filter
+                            if (!isTextFilter && options.isNotEmpty)
+                              InkWell(
+                                onTap: () {
                                   setStatePopup(() {
-                                    if (isTextFilter) {
-                                      _searchController.clear();
+                                    if (_selectedOptions.length == options.length) {
+                                      _selectedOptions.clear();
                                     } else {
                                       _selectedOptions.clear();
+                                      _selectedOptions.addAll(options);
                                     }
                                   });
-                                  _applyFilter();
-                                  Navigator.pop(context);
                                 },
-                                child: const Text('Clear', style: TextStyle(fontSize: 12, color: AppTheme.errorRed)),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _applyFilter();
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryBlue,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
+                                child: Text(
+                                  _selectedOptions.length == options.length ? 'Deselect All' : 'Select All',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.primaryBlue,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                child: const Text('Apply', style: TextStyle(fontSize: 12)),
                               ),
-                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (isTextFilter) ...[
+                          // Text Input Search
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search ${widget.columnName}...',
+                              prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.gray400),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(color: AppTheme.gray300),
+                              ),
+                            ),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ] else ...[
+                          // Options Search Bar
+                          TextField(
+                            onChanged: (val) {
+                              setStatePopup(() {
+                                _optionsSearchQuery = val;
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search ${widget.columnName.toLowerCase()}...',
+                              prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.gray400),
+                              suffixIcon: _optionsSearchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 14, color: AppTheme.gray400),
+                                      onPressed: () {
+                                        setStatePopup(() {
+                                          _optionsSearchQuery = '';
+                                        });
+                                      },
+                                    )
+                                  : null,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(color: AppTheme.gray300),
+                              ),
+                            ),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          const SizedBox(height: 8),
+                          // Scroller with Visible Scrollbar
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            child: Scrollbar(
+                              controller: scrollController,
+                              thumbVisibility: true,
+                              child: options.isEmpty
+                                  ? Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 20),
+                                      child: Center(
+                                        child: Text(
+                                          'No matching ${widget.columnName.toLowerCase()} found',
+                                          style: const TextStyle(fontSize: 12, color: AppTheme.gray400),
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      controller: scrollController,
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      itemBuilder: (context, idx) {
+                                        final opt = options[idx];
+                                        final isChecked = _selectedOptions.contains(opt);
+                                        return CheckboxListTile(
+                                          title: Text(
+                                            opt,
+                                            style: const TextStyle(fontSize: 12.5),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          value: isChecked,
+                                          controlAffinity: ListTileControlAffinity.leading,
+                                          dense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                          onChanged: (val) {
+                                            setStatePopup(() {
+                                              if (val == true) {
+                                                _selectedOptions.add(opt);
+                                              } else {
+                                                _selectedOptions.remove(opt);
+                                              }
+                                            });
+                                          },
+                                        );
+                                      },
+                                    ),
+                            ),
                           ),
                         ],
-                      ),
+                        const SizedBox(height: 14),
+                        // Action Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                setStatePopup(() {
+                                  if (isTextFilter) {
+                                    _searchController.clear();
+                                  } else {
+                                    _selectedOptions.clear();
+                                  }
+                                });
+                                _applyFilter();
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Clear', style: TextStyle(fontSize: 12, color: AppTheme.errorRed)),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                _applyFilter();
+                                Navigator.pop(context);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryBlue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              child: const Text('Apply', style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ];
-        },
-      );
+          ),
+        ];
+      },
+    );
   }
 
   void _applyFilter() {
@@ -253,6 +338,12 @@ class _StaffColumnFilterState extends State<StaffColumnFilter> {
       controller.filterEmail.value = _searchController.text.trim();
     } else if (widget.columnKey == 'role') {
       controller.filterSelectedRoles.assignAll(_selectedOptions);
+    } else if (widget.columnKey == 'branch') {
+      controller.filterSelectedBranches.assignAll(_selectedOptions);
+    } else if (widget.columnKey == 'hr') {
+      controller.filterSelectedHRs.assignAll(_selectedOptions);
+    } else if (widget.columnKey == 'reportingTo') {
+      controller.filterSelectedReportingTo.assignAll(_selectedOptions);
     } else if (widget.columnKey == 'status') {
       controller.filterSelectedStatuses.assignAll(_selectedOptions);
     }

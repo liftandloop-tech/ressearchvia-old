@@ -57,12 +57,15 @@ class StaffTable extends StatelessWidget {
             ),
             const StaffTableHeaderCell(
               text: 'Branch',
+              filterIcon: StaffColumnFilter(columnKey: 'branch', columnName: 'Branch'),
             ),
             const StaffTableHeaderCell(
               text: 'Assigned HR',
+              filterIcon: StaffColumnFilter(columnKey: 'hr', columnName: 'Assigned HR'),
             ),
             const StaffTableHeaderCell(
               text: 'Reporting To',
+              filterIcon: StaffColumnFilter(columnKey: 'reportingTo', columnName: 'Reporting To'),
             ),
             const StaffTableHeaderCell(
               text: 'Status',

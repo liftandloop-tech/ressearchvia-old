@@ -178,6 +178,7 @@ class StaffScreen extends StatelessWidget {
                                     controller.filterSelectedRoles.isNotEmpty ||
                                     controller.filterSelectedBranches.isNotEmpty ||
                                     controller.filterSelectedHRs.isNotEmpty ||
+                                    controller.filterSelectedReportingTo.isNotEmpty ||
                                     !isDefaultActive;
                                 if (!hasActiveFilters) return const SizedBox.shrink();
                                 return TextButton.icon(
@@ -300,6 +301,30 @@ class StaffScreen extends StatelessWidget {
                           chips.add(Chip(
                             label: Text('Role: $role', style: const TextStyle(fontSize: 12)),
                             onDeleted: () => controller.filterSelectedRoles.remove(role),
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        for (final branch in controller.filterSelectedBranches) {
+                          chips.add(Chip(
+                            label: Text('Branch: $branch', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterSelectedBranches.remove(branch),
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        for (final hr in controller.filterSelectedHRs) {
+                          chips.add(Chip(
+                            label: Text('HR: $hr', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterSelectedHRs.remove(hr),
+                            backgroundColor: AppTheme.gray100,
+                            deleteIconColor: AppTheme.errorRed,
+                          ));
+                        }
+                        for (final rep in controller.filterSelectedReportingTo) {
+                          chips.add(Chip(
+                            label: Text('Reporting To: $rep', style: const TextStyle(fontSize: 12)),
+                            onDeleted: () => controller.filterSelectedReportingTo.remove(rep),
                             backgroundColor: AppTheme.gray100,
                             deleteIconColor: AppTheme.errorRed,
                           ));

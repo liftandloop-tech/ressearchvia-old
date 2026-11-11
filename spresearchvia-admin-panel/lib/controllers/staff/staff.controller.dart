@@ -33,6 +33,7 @@ class StaffController extends GetxController {
   var selectedHRName = RxnString();
   var filterSelectedBranches = <String>[].obs;
   var filterSelectedHRs = <String>[].obs;
+  var filterSelectedReportingTo = <String>[].obs;
 
   final nameController = TextEditingController();
   final mobileController = TextEditingController();
@@ -1224,15 +1225,33 @@ class StaffController extends GetxController {
       }
 
       if (filterSelectedBranches.isNotEmpty) {
-        final bName = s.branchName?.trim() ?? 'Unassigned';
+        final bName = (s.branchName != null && s.branchName!.trim().isNotEmpty)
+            ? s.branchName!.trim()
+            : 'Unassigned';
         if (!filterSelectedBranches.contains(bName)) {
           return false;
         }
       }
 
       if (filterSelectedHRs.isNotEmpty) {
-        final hrName = s.assignedHRName?.trim() ?? 'Unassigned';
+        final hrName = (s.assignedHRName != null && s.assignedHRName!.trim().isNotEmpty)
+            ? s.assignedHRName!.trim()
+            : 'Unassigned';
         if (!filterSelectedHRs.contains(hrName)) {
+          return false;
+        }
+      }
+
+      if (filterSelectedReportingTo.isNotEmpty) {
+        String supervisorName;
+        if (s.assignedDirectorName?.trim().isNotEmpty == true) {
+          supervisorName = s.assignedDirectorName!.trim();
+        } else if (s.assignedDirector == 'admin') {
+          supervisorName = 'Admin';
+        } else {
+          supervisorName = 'None';
+        }
+        if (!filterSelectedReportingTo.contains(supervisorName)) {
           return false;
         }
       }
@@ -1248,6 +1267,7 @@ class StaffController extends GetxController {
     filterSelectedRoles.clear();
     filterSelectedBranches.clear();
     filterSelectedHRs.clear();
+    filterSelectedReportingTo.clear();
     filterSelectedStatuses.assignAll(['Active']);
     currentPage.value = 1;
   }
@@ -1303,6 +1323,56 @@ class StaffController extends GetxController {
       roles.add(r.name.trim());
     }
     return roles.toList()..sort((a, b) => a == 'All' ? -1 : b == 'All' ? 1 : a.compareTo(b));
+  }
+
+  List<String> get availableBranchesFilterOptions {
+    final set = <String>{};
+    for (var b in branchList) {
+      if (b.name.trim().isNotEmpty) set.add(b.name.trim());
+    }
+    for (var s in staffList) {
+      if (s.branchName != null && s.branchName!.trim().isNotEmpty) {
+        set.add(s.branchName!.trim());
+      }
+    }
+    final sorted = set.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    sorted.add('Unassigned');
+    return sorted;
+  }
+
+  List<String> get availableHRFilterOptions {
+    final set = <String>{};
+    for (var h in hrStaffList) {
+      if (h.name.trim().isNotEmpty) set.add(h.name.trim());
+    }
+    for (var s in staffList) {
+      if (s.assignedHRName != null && s.assignedHRName!.trim().isNotEmpty) {
+        set.add(s.assignedHRName!.trim());
+      }
+    }
+    final sorted = set.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    sorted.add('Unassigned');
+    return sorted;
+  }
+
+  List<String> get availableReportingToFilterOptions {
+    final set = <String>{'Admin'};
+    for (var s in staffList) {
+      if (s.assignedDirectorName != null && s.assignedDirectorName!.trim().isNotEmpty) {
+        set.add(s.assignedDirectorName!.trim());
+      }
+      final r = s.role.toLowerCase();
+      if (r.contains('director') || r.contains('manager') || r.contains('leader') || r.contains('lead')) {
+        if (s.name.trim().isNotEmpty) set.add(s.name.trim());
+      }
+    }
+    final sorted = set.toList()..sort((a, b) {
+      if (a == 'Admin') return -1;
+      if (b == 'Admin') return 1;
+      return a.toLowerCase().compareTo(b.toLowerCase());
+    });
+    sorted.add('None');
+    return sorted;
   }
 
   List<StaffModel> get availableDirectors {
