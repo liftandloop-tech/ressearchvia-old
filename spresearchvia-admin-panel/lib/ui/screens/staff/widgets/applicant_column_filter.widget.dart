@@ -40,7 +40,7 @@ class ApplicantTableHeaderCell extends StatelessWidget {
 }
 
 class ApplicantColumnFilter extends StatefulWidget {
-  final String columnKey; // 'candidate', 'role', 'contact', 'status', 'stage', 'staff'
+  final String columnKey; // 'candidate', 'role', 'contact', 'status', 'stage', 'staff', 'branch', 'hr'
   final String columnName;
 
   const ApplicantColumnFilter({
@@ -67,6 +67,7 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
   }
 
   void _initValues() {
+    _optionsSearchQuery = '';
     if (widget.columnKey == 'candidate') {
       _textController.text = controller.filterCandidate.value;
     } else if (widget.columnKey == 'contact') {
@@ -83,6 +84,12 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
     } else if (widget.columnKey == 'staff') {
       _selectedOptions.clear();
       _selectedOptions.addAll(controller.filterStaff);
+    } else if (widget.columnKey == 'branch') {
+      _selectedOptions.clear();
+      _selectedOptions.addAll(controller.filterBranch);
+    } else if (widget.columnKey == 'hr') {
+      _selectedOptions.clear();
+      _selectedOptions.addAll(controller.filterHR);
     }
   }
 
@@ -99,6 +106,8 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
     if (widget.columnKey == 'status') return controller.filterStatus.isNotEmpty;
     if (widget.columnKey == 'stage') return controller.filterStage.isNotEmpty;
     if (widget.columnKey == 'staff') return controller.filterStaff.isNotEmpty;
+    if (widget.columnKey == 'branch') return controller.filterBranch.isNotEmpty;
+    if (widget.columnKey == 'hr') return controller.filterHR.isNotEmpty;
     return false;
   }
 
@@ -112,12 +121,16 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
       raw = controller.availableStageFilterOptions;
     } else if (widget.columnKey == 'staff') {
       raw = controller.availableStaffFilterOptions;
+    } else if (widget.columnKey == 'branch') {
+      raw = controller.availableBranchFilterOptions;
+    } else if (widget.columnKey == 'hr') {
+      raw = controller.availableHRFilterOptions;
     } else {
       raw = [];
     }
 
-    if (_optionsSearchQuery.isEmpty) return raw;
-    final query = _optionsSearchQuery.toLowerCase();
+    if (_optionsSearchQuery.trim().isEmpty) return raw;
+    final query = _optionsSearchQuery.trim().toLowerCase();
     return raw.where((opt) => opt.toLowerCase().contains(query)).toList();
   }
 
@@ -139,34 +152,62 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
         offset: const Offset(0, 24),
         itemBuilder: (context) {
           _initValues();
+          final scrollController = ScrollController();
+
           return [
             PopupMenuItem<void>(
               enabled: false,
               child: StatefulBuilder(
                 builder: (context, setStatePopup) {
+                  final options = _getOptions();
+
                   return GestureDetector(
-                    onTap: () {}, // Prevent taps inside dialog from closing popup
+                    onTap: () {}, // Prevent taps inside menu from closing popup
                     child: Container(
-                      width: 260,
+                      width: 270,
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(Icons.filter_list_rounded, size: 16, color: AppTheme.primaryBlue),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Filter by ${widget.columnName}',
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0F172A),
+                              Row(
+                                children: [
+                                  Icon(Icons.filter_list_rounded, size: 16, color: AppTheme.primaryBlue),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Filter by ${widget.columnName}',
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (!isText && options.isNotEmpty)
+                                InkWell(
+                                  onTap: () {
+                                    setStatePopup(() {
+                                      if (_selectedOptions.length == options.length) {
+                                        _selectedOptions.clear();
+                                      } else {
+                                        _selectedOptions.clear();
+                                        _selectedOptions.addAll(options);
+                                      }
+                                    });
+                                  },
+                                  child: Text(
+                                    _selectedOptions.length == options.length ? 'Deselect All' : 'Select All',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.primaryBlue,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
@@ -202,9 +243,19 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
                                 });
                               },
                               decoration: InputDecoration(
-                                hintText: 'Search options...',
+                                hintText: 'Search ${widget.columnName.toLowerCase()}...',
                                 hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                                 prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+                                suffixIcon: _optionsSearchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear, size: 14, color: Color(0xFF94A3B8)),
+                                        onPressed: () {
+                                          setStatePopup(() {
+                                            _optionsSearchQuery = '';
+                                          });
+                                        },
+                                      )
+                                    : null,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 isDense: true,
                                 border: OutlineInputBorder(
@@ -216,36 +267,53 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
                             ),
                             const SizedBox(height: 8),
 
-                            // Option Checklist
+                            // Option Checklist with Scrollbar
                             ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 180),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: _getOptions().map((opt) {
-                                    final isChecked = _selectedOptions.contains(opt);
-                                    return CheckboxListTile(
-                                      title: Text(
-                                        opt,
-                                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
+                              constraints: const BoxConstraints(maxHeight: 220),
+                              child: Scrollbar(
+                                controller: scrollController,
+                                thumbVisibility: true,
+                                child: options.isEmpty
+                                    ? Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 20),
+                                        child: Center(
+                                          child: Text(
+                                            'No matching ${widget.columnName.toLowerCase()} found',
+                                            style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                          ),
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        controller: scrollController,
+                                        shrinkWrap: true,
+                                        itemCount: options.length,
+                                        itemBuilder: (context, idx) {
+                                          final opt = options[idx];
+                                          final isChecked = _selectedOptions.contains(opt);
+                                          return CheckboxListTile(
+                                            title: Text(
+                                              opt,
+                                              style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B)),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            value: isChecked,
+                                            controlAffinity: ListTileControlAffinity.leading,
+                                            dense: true,
+                                            activeColor: AppTheme.primaryBlue,
+                                            contentPadding: EdgeInsets.zero,
+                                            visualDensity: VisualDensity.compact,
+                                            onChanged: (val) {
+                                              setStatePopup(() {
+                                                if (val == true) {
+                                                  _selectedOptions.add(opt);
+                                                } else {
+                                                  _selectedOptions.remove(opt);
+                                                }
+                                              });
+                                            },
+                                          );
+                                        },
                                       ),
-                                      value: isChecked,
-                                      controlAffinity: ListTileControlAffinity.leading,
-                                      dense: true,
-                                      activeColor: AppTheme.primaryBlue,
-                                      contentPadding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      onChanged: (val) {
-                                        setStatePopup(() {
-                                          if (val == true) {
-                                            _selectedOptions.add(opt);
-                                          } else {
-                                            _selectedOptions.remove(opt);
-                                          }
-                                        });
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
                               ),
                             ),
                           ],
@@ -335,6 +403,10 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
       controller.filterStage.assignAll(_selectedOptions);
     } else if (widget.columnKey == 'staff') {
       controller.filterStaff.assignAll(_selectedOptions);
+    } else if (widget.columnKey == 'branch') {
+      controller.filterBranch.assignAll(_selectedOptions);
+    } else if (widget.columnKey == 'hr') {
+      controller.filterHR.assignAll(_selectedOptions);
     }
   }
 
@@ -351,7 +423,10 @@ class _ApplicantColumnFilterState extends State<ApplicantColumnFilter> {
       controller.filterStage.clear();
     } else if (widget.columnKey == 'staff') {
       controller.filterStaff.clear();
+    } else if (widget.columnKey == 'branch') {
+      controller.filterBranch.clear();
+    } else if (widget.columnKey == 'hr') {
+      controller.filterHR.clear();
     }
   }
 }
-

@@ -35,6 +35,8 @@ class ApplicantsListController extends GetxController {
   var filterStatus = <String>[].obs;
   var filterStage = <String>[].obs;
   var filterStaff = <String>[].obs;
+  var filterBranch = <String>[].obs;
+  var filterHR = <String>[].obs;
 
   bool get hasActiveColumnFilters {
     return filterCandidate.value.trim().isNotEmpty ||
@@ -43,6 +45,8 @@ class ApplicantsListController extends GetxController {
         filterStatus.isNotEmpty ||
         filterStage.isNotEmpty ||
         filterStaff.isNotEmpty ||
+        filterBranch.isNotEmpty ||
+        filterHR.isNotEmpty ||
         (selectedBranchFilter.value != null && selectedBranchFilter.value != 'ALL') ||
         (selectedHRFilter.value != null && selectedHRFilter.value != 'ALL');
   }
@@ -54,6 +58,8 @@ class ApplicantsListController extends GetxController {
     filterStatus.clear();
     filterStage.clear();
     filterStaff.clear();
+    filterBranch.clear();
+    filterHR.clear();
     selectedBranchFilter.value = null;
     selectedHRFilter.value = null;
   }
@@ -136,6 +142,36 @@ class ApplicantsListController extends GetxController {
       'Promoted',
       'Rejected',
     ];
+  }
+
+  List<String> get availableBranchFilterOptions {
+    final set = <String>{};
+    for (var b in branchList) {
+      if (b.name.trim().isNotEmpty) set.add(b.name.trim());
+    }
+    for (var a in applicants) {
+      if (a.branchName != null && a.branchName!.trim().isNotEmpty) {
+        set.add(a.branchName!.trim());
+      }
+    }
+    final sorted = set.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    sorted.add('Unassigned');
+    return sorted;
+  }
+
+  List<String> get availableHRFilterOptions {
+    final set = <String>{};
+    for (var h in hrStaffList) {
+      if (h.name.trim().isNotEmpty) set.add(h.name.trim());
+    }
+    for (var a in applicants) {
+      if (a.assignedHRName != null && a.assignedHRName!.trim().isNotEmpty) {
+        set.add(a.assignedHRName!.trim());
+      }
+    }
+    final sorted = set.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    sorted.add('Unassigned');
+    return sorted;
   }
 
   List<StaffModel> get filteredApplicants {
@@ -281,7 +317,33 @@ class ApplicantsListController extends GetxController {
       }).toList();
     }
 
-    // 10. Branch Filter
+    // 10. Branch Column Filter
+    if (filterBranch.isNotEmpty) {
+      final selectedBranchesLower = filterBranch.map((b) => b.toLowerCase().trim()).toSet();
+      final includesUnassigned = selectedBranchesLower.contains('unassigned');
+      list = list.where((a) {
+        final branchName = a.branchName?.trim().toLowerCase();
+        if (branchName == null || branchName.isEmpty) {
+          return includesUnassigned;
+        }
+        return selectedBranchesLower.contains(branchName);
+      }).toList();
+    }
+
+    // 11. Assigned HR Column Filter
+    if (filterHR.isNotEmpty) {
+      final selectedHRNamesLower = filterHR.map((h) => h.toLowerCase().trim()).toSet();
+      final includesUnassigned = selectedHRNamesLower.contains('unassigned');
+      list = list.where((a) {
+        final hrName = a.assignedHRName?.trim().toLowerCase();
+        if (hrName == null || hrName.isEmpty) {
+          return includesUnassigned;
+        }
+        return selectedHRNamesLower.contains(hrName);
+      }).toList();
+    }
+
+    // 12. Top-level Branch Filter
     final bFilter = selectedBranchFilter.value;
     if (bFilter != null && bFilter.isNotEmpty && bFilter != 'ALL') {
       if (bFilter == 'UNASSIGNED') {
@@ -291,7 +353,7 @@ class ApplicantsListController extends GetxController {
       }
     }
 
-    // 11. Assigned HR Filter
+    // 13. Top-level Assigned HR Filter
     final hrFilter = selectedHRFilter.value;
     if (hrFilter != null && hrFilter.isNotEmpty && hrFilter != 'ALL') {
       if (hrFilter == 'UNASSIGNED') {

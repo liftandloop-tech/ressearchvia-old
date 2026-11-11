@@ -421,15 +421,11 @@ class ApplicantsListScreen extends StatelessWidget {
                           filterWidget: ApplicantColumnFilter(columnKey: 'stage', columnName: 'Pipeline Stage'),
                         ),
                       ),
-                      const DataColumn2(
-                        fixedWidth: 130,
-                        label: Text(
-                          'Branch',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
-                          ),
+                      DataColumn2(
+                        fixedWidth: 135,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Branch',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'branch', columnName: 'Branch'),
                         ),
                       ),
                       DataColumn2(
@@ -439,15 +435,11 @@ class ApplicantsListScreen extends StatelessWidget {
                           filterWidget: ApplicantColumnFilter(columnKey: 'staff', columnName: 'Assigned Staff'),
                         ),
                       ),
-                      const DataColumn2(
-                        fixedWidth: 145,
-                        label: Text(
-                          'Assigned HR',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1E293B),
-                          ),
+                      DataColumn2(
+                        fixedWidth: 155,
+                        label: const ApplicantTableHeaderCell(
+                          text: 'Assigned HR',
+                          filterWidget: ApplicantColumnFilter(columnKey: 'hr', columnName: 'Assigned HR'),
                         ),
                       ),
                       const DataColumn2(
