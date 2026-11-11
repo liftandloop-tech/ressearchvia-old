@@ -354,12 +354,23 @@ const leadPoolController = {
             }
 
             // Update assignments array and assignedStaffIds array
-            const currentAssignedSet = new Set((pool.assignedStaffIds || []).map(sid => sid.toString()));
-            const currentAssignments = pool.assignments || [];
+            const newAssignedSet = new Set(validTargetObjectIds.map(id => id.toString()));
+            let updatedAssignments = [];
+
+            if (isSystemAdmin || isOwner) {
+                // Admin or owner manages the full assignment set
+                updatedAssignments = (pool.assignments || []).filter(a => a.staffId && newAssignedSet.has(a.staffId.toString()));
+            } else {
+                // Manager only affects subordinates in supervisedStrSet
+                updatedAssignments = (pool.assignments || []).filter(a => {
+                    const sStr = a.staffId ? a.staffId.toString() : '';
+                    if (!supervisedStrSet.has(sStr)) return true; // keep staff from other teams
+                    return newAssignedSet.has(sStr);
+                });
+            }
 
             for (const targetObjId of validTargetObjectIds) {
                 const targetStr = targetObjId.toString();
-                currentAssignedSet.add(targetStr);
 
                 // Determine if target can delegate: must have reporting subordinates
                 const targetHierarchy = await getSupervisedStaffIds(targetObjId);
@@ -368,14 +379,14 @@ const leadPoolController = {
                     ? Boolean(overrideCanDelegate && targetHasSubordinates) 
                     : targetHasSubordinates;
 
-                const existingIdx = currentAssignments.findIndex(a => a.staffId && a.staffId.toString() === targetStr);
+                const existingIdx = updatedAssignments.findIndex(a => a.staffId && a.staffId.toString() === targetStr);
                 if (existingIdx >= 0) {
-                    currentAssignments[existingIdx].assignedBy = callerId;
-                    currentAssignments[existingIdx].assignedAt = new Date();
-                    currentAssignments[existingIdx].canPull = true;
-                    currentAssignments[existingIdx].canDelegate = targetCanDelegate;
+                    updatedAssignments[existingIdx].assignedBy = callerId;
+                    updatedAssignments[existingIdx].assignedAt = new Date();
+                    updatedAssignments[existingIdx].canPull = true;
+                    updatedAssignments[existingIdx].canDelegate = targetCanDelegate;
                 } else {
-                    currentAssignments.push({
+                    updatedAssignments.push({
                         staffId: targetObjId,
                         assignedBy: callerId,
                         assignedAt: new Date(),
@@ -385,8 +396,8 @@ const leadPoolController = {
                 }
             }
 
-            pool.assignedStaffIds = Array.from(currentAssignedSet).map(sid => new mongoose.Types.ObjectId(sid));
-            pool.assignments = currentAssignments;
+            pool.assignments = updatedAssignments;
+            pool.assignedStaffIds = updatedAssignments.map(a => a.staffId);
             await pool.save();
 
             // Fetch populated staff details for display
@@ -443,8 +454,7 @@ const leadPoolController = {
 
             if (isSystemAdmin) {
                 candidateStaffDocs = await staffModel.find({
-                    companyId,
-                    isActive: { $ne: false },
+                    status: { $ne: 'Inactive' },
                     stage: { $ne: 'Applicant' }
                 })
                 .populate('roleId', 'name roleName')
@@ -455,7 +465,7 @@ const leadPoolController = {
                 const subordinateObjIds = (hierarchy.staffIds || []).filter(sid => sid.toString() !== callerStr);
                 candidateStaffDocs = await staffModel.find({
                     _id: { $in: subordinateObjIds },
-                    isActive: { $ne: false },
+                    status: { $ne: 'Inactive' },
                     stage: { $ne: 'Applicant' }
                 })
                 .populate('roleId', 'name roleName')
