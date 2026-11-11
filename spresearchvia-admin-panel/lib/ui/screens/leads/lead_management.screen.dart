@@ -757,11 +757,22 @@ class LeadManagementScreen extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildCompactTabChip(controller, 'all', 'All Leads', Icons.people_outline),
-                      _buildCompactTabChip(controller, 'admin', 'Admin Leads', Icons.admin_panel_settings_outlined),
-                      _buildCompactTabChip(controller, 'app_onboarded', 'App Onboarded', Icons.phone_android),
-                      _buildCompactTabChip(controller, 'organic', 'Organic Signups', Icons.bolt_outlined),
-                      _buildCompactTabChip(controller, 'ex_staff', 'Ex-Staff Leads', Icons.swap_horiz_outlined),
+                      Builder(builder: (context) {
+                        final authUser = Get.isRegistered<AuthController>() ? Get.find<AuthController>().user.value : null;
+                        final isAdmin = authUser?.isAdmin == true;
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildCompactTabChip(controller, 'all', isAdmin ? 'All Leads' : 'My Leads', Icons.people_outline),
+                            if (isAdmin)
+                              _buildCompactTabChip(controller, 'admin', 'Admin Leads', Icons.admin_panel_settings_outlined),
+                            _buildCompactTabChip(controller, 'app_onboarded', 'App Onboarded', Icons.phone_android),
+                            _buildCompactTabChip(controller, 'organic', 'Organic Signups', Icons.bolt_outlined),
+                            if (isAdmin)
+                              _buildCompactTabChip(controller, 'ex_staff', 'Ex-Staff Leads', Icons.swap_horiz_outlined),
+                          ],
+                        );
+                      }),
                       Obx(() {
                         if (!controller.hasActiveFilters) return const SizedBox.shrink();
                         return Padding(
@@ -1155,12 +1166,17 @@ class LeadManagementScreen extends StatelessWidget {
   }
 
   Widget _buildQuickTabs(LeadsController controller) {
+    final authUser = Get.isRegistered<AuthController>() ? Get.find<AuthController>().user.value : null;
+    final isAdmin = authUser?.isAdmin == true;
+
     final tabs = [
-      {'id': 'all', 'label': 'All Leads', 'icon': Icons.people_outline},
-      {'id': 'admin', 'label': 'Admin Leads', 'icon': Icons.admin_panel_settings_outlined},
+      {'id': 'all', 'label': isAdmin ? 'All Leads' : 'My Leads', 'icon': Icons.people_outline},
+      if (isAdmin)
+        {'id': 'admin', 'label': 'Admin Leads', 'icon': Icons.admin_panel_settings_outlined},
       {'id': 'app_onboarded', 'label': 'App Onboarded', 'icon': Icons.phone_android},
       {'id': 'organic', 'label': 'Organic Signups', 'icon': Icons.bolt_outlined},
-      {'id': 'ex_staff', 'label': 'Ex-Staff Leads', 'icon': Icons.swap_horiz_outlined},
+      if (isAdmin)
+        {'id': 'ex_staff', 'label': 'Ex-Staff Leads', 'icon': Icons.swap_horiz_outlined},
     ];
 
     return Obx(() {

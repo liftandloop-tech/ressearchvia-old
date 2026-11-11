@@ -120,25 +120,24 @@ const leadController = {
             // Data-Scope Enforcement: Non-admins without leads.view_all are restricted to their team or themselves
             const callerId = req.user?._id || req.user?.userId || req.user?.id;
             const isSuper = req.user?.userType === 'admin' || req.user?.userType === 'super_admin' || req.user?.role === 'Admin';
+            let allowedStaffIds = null;
+
             if (!isSuper && callerId) {
                 const hierarchy = await getSupervisedStaffIds(callerId);
                 if (!hierarchy.isSystemAdmin) {
                     const staffMember = hierarchy.staffMember;
-                    const hasViewAll = staffMember?.roleId?.permissionGroups?.some(g =>
-                        g.permissions?.some(p => p.actions?.includes('leads.view_all'))
-                    );
-
-                    // Unless explicitly granted leads.view_all, restrict query to assignedRM
-                    if (!hasViewAll) {
-                        if (hierarchy.staffIds && hierarchy.staffIds.length > 1) {
-                            // Team Leader / Manager: sees all leads assigned to their team
-                            query.assignedRM = { $in: hierarchy.staffIds };
-                        } else {
-                            // Individual Sales Executive: ONLY sees leads assigned to THEMSELVES
-                            const myId = staffMember?._id || (mongoose.isValidObjectId(callerId) ? new mongoose.Types.ObjectId(callerId.toString()) : callerId);
-                            query.assignedRM = myId;
-                        }
+                    if (hierarchy.staffIds && hierarchy.staffIds.length > 0) {
+                        allowedStaffIds = hierarchy.staffIds.map(id => id.toString());
+                    } else {
+                        const myId = staffMember?._id || callerId;
+                        allowedStaffIds = [myId.toString()];
                     }
+
+                    // STRICT ENFORCEMENT: Staff can only see leads currently assigned to them (or their supervised team).
+                    // Cannot view unassigned leads (assignedRM: null) or past leads from other staff/admin.
+                    query.assignedRM = { 
+                        $in: allowedStaffIds.map(id => mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id) : id) 
+                    };
                 }
             }
 
@@ -163,18 +162,25 @@ const leadController = {
             }
             if (stage) query.stage = stage;
             if (assignedRM) {
-                if (assignedRM === 'unassigned' || assignedRM === 'null') {
-                    query.assignedRM = null;
-                } else if (assignedRM === 'admin') {
-                    const adminStaff = await resolveAdminStaff();
-                    query.assignedRM = adminStaff ? adminStaff._id : null;
-                } else if (query.assignedRM && query.assignedRM.$in) {
-                    const allowed = query.assignedRM.$in.map(id => id.toString());
-                    if (allowed.includes(assignedRM.toString())) {
-                        query.assignedRM = assignedRM;
+                if (allowedStaffIds !== null) {
+                    // Non-admin caller attempting to filter assignedRM:
+                    // They CANNOT filter for unassigned, null, or admin leads.
+                    if (allowedStaffIds.includes(assignedRM.toString()) && mongoose.isValidObjectId(assignedRM)) {
+                        query.assignedRM = new mongoose.Types.ObjectId(assignedRM.toString());
+                    } else {
+                        // Attempted to view unassigned, admin, or unauthorized staff leads -> return 0 results
+                        query.assignedRM = new mongoose.Types.ObjectId();
                     }
-                } else if (!query.assignedRM) {
-                    query.assignedRM = assignedRM;
+                } else {
+                    // System Admin caller
+                    if (assignedRM === 'unassigned' || assignedRM === 'null') {
+                        query.assignedRM = null;
+                    } else if (assignedRM === 'admin') {
+                        const adminStaff = await resolveAdminStaff();
+                        query.assignedRM = adminStaff ? adminStaff._id : null;
+                    } else if (mongoose.isValidObjectId(assignedRM)) {
+                        query.assignedRM = new mongoose.Types.ObjectId(assignedRM.toString());
+                    }
                 }
             }
             if (req.query.leadSource && req.query.leadSource.trim() !== '') {

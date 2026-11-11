@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/leads/leads.controller.dart';
+import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 
 class LeadColumnFilter extends StatefulWidget {
   final String columnKey; // 'name', 'mobile', 'stage', 'pool', 'rm', 'location'
@@ -132,7 +133,12 @@ class _LeadColumnFilterState extends State<LeadColumnFilter> {
           .toList();
     }
     if (widget.columnKey == 'rm') {
-      final list = <String>['All RMs', 'Unassigned', 'Admin'];
+      final authUser = Get.isRegistered<AuthController>() ? Get.find<AuthController>().user.value : null;
+      final isAdmin = authUser?.isAdmin == true;
+      final list = <String>[
+        isAdmin ? 'All RMs' : 'My Team',
+        if (isAdmin) ...['Unassigned', 'Admin'],
+      ];
       for (final s in controller.staffList) {
         final label = '${s.name} (${s.role})';
         if (!list.contains(label)) {
