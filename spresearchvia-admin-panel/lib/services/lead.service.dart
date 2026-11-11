@@ -157,14 +157,20 @@ class LeadService extends ApiService {
   Future<Response> createLeadPool(
     String name,
     String? description, {
-    int pullSize = 20,
-    int maxPerStaff = 100,
+    int initialPullSize = 20,
+    int subsequentPullSize = 30,
+    int maxPerStaff = 50,
+    int? pullSize,
+    List<String>? assignedStaffIds,
   }) =>
       post('/leads/pools', {
         'name': name,
         if (description != null) 'description': description,
-        'pullSize': pullSize,
+        'initialPullSize': initialPullSize,
+        'subsequentPullSize': subsequentPullSize,
+        'pullSize': pullSize ?? initialPullSize,
         'maxPerStaff': maxPerStaff,
+        if (assignedStaffIds != null && assignedStaffIds.isNotEmpty) 'assignedStaffIds': assignedStaffIds,
       });
 
   Future<Response> updateLeadPool(String id, Map<String, dynamic> data) =>
@@ -172,6 +178,15 @@ class LeadService extends ApiService {
 
   Future<Response> deleteLeadPool(String id) =>
       delete('/leads/pools/$id');
+
+  Future<Response> assignLeadPool(String poolId, List<String> staffIds, {bool? canDelegate}) =>
+      post('/leads/pools/$poolId/assign', {
+        'staffIds': staffIds,
+        if (canDelegate != null) 'canDelegate': canDelegate,
+      });
+
+  Future<Response> getAssignableStaffForPool(String poolId) =>
+      get('/leads/pools/$poolId/assignable-staff');
 
   Future<Response> pullLeads(String type, {String? poolId}) =>
       post('/leads/pull', {

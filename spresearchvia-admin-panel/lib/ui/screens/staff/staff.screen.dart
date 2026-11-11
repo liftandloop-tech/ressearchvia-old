@@ -81,6 +81,94 @@ class StaffScreen extends StatelessWidget {
                                   ),
                                 );
                               }),
+                              // Branch Filter Dropdown
+                              Obx(() {
+                                final branches = controller.branchList;
+                                final selectedBranches = controller.filterSelectedBranches;
+                                final current = selectedBranches.isNotEmpty ? selectedBranches.first : null;
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: current != null ? Colors.teal.shade50 : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: current != null ? Colors.teal.shade300 : AppTheme.gray300),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String?>(
+                                      value: current,
+                                      hint: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.apartment_rounded, size: 14, color: Colors.teal.shade700),
+                                          const SizedBox(width: 5),
+                                          const Text('All Branches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                        ],
+                                      ),
+                                      icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                      items: [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All Branches', style: TextStyle(fontSize: 12)),
+                                        ),
+                                        ...branches.map((b) => DropdownMenuItem<String?>(
+                                          value: b.name,
+                                          child: Text(b.name, style: const TextStyle(fontSize: 12)),
+                                        )),
+                                      ],
+                                      onChanged: (val) {
+                                        controller.filterSelectedBranches.clear();
+                                        if (val != null) controller.filterSelectedBranches.add(val);
+                                        controller.currentPage.value = 1;
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }),
+                              // Assigned HR Filter Dropdown
+                              Obx(() {
+                                final hrList = controller.hrStaffList;
+                                final selectedHRs = controller.filterSelectedHRs;
+                                final current = selectedHRs.isNotEmpty ? selectedHRs.first : null;
+
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: current != null ? Colors.purple.shade50 : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: current != null ? Colors.purple.shade300 : AppTheme.gray300),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String?>(
+                                      value: current,
+                                      hint: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.badge_outlined, size: 14, color: Colors.purple.shade700),
+                                          const SizedBox(width: 5),
+                                          const Text('All HRs', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                                        ],
+                                      ),
+                                      icon: const Icon(Icons.arrow_drop_down, size: 18),
+                                      items: [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All HRs', style: TextStyle(fontSize: 12)),
+                                        ),
+                                        ...hrList.map((h) => DropdownMenuItem<String?>(
+                                          value: h.name,
+                                          child: Text(h.name, style: const TextStyle(fontSize: 12)),
+                                        )),
+                                      ],
+                                      onChanged: (val) {
+                                        controller.filterSelectedHRs.clear();
+                                        if (val != null) controller.filterSelectedHRs.add(val);
+                                        controller.currentPage.value = 1;
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }),
                               Obx(() {
                                 final selectedStatuses = controller.filterSelectedStatuses;
                                 final isDefaultActive = selectedStatuses.length == 1 && selectedStatuses.contains('Active');
@@ -88,6 +176,8 @@ class StaffScreen extends StatelessWidget {
                                     controller.filterMobile.value.isNotEmpty ||
                                     controller.filterEmail.value.isNotEmpty ||
                                     controller.filterSelectedRoles.isNotEmpty ||
+                                    controller.filterSelectedBranches.isNotEmpty ||
+                                    controller.filterSelectedHRs.isNotEmpty ||
                                     !isDefaultActive;
                                 if (!hasActiveFilters) return const SizedBox.shrink();
                                 return TextButton.icon(

@@ -20,11 +20,33 @@ const leadPoolSchema = new mongoose.Schema({
         default: 20,
         min: 1
     },
-    maxPerStaff: {
+    initialPullSize: {
         type: Number,
-        default: 100,
+        default: 20,
         min: 1
     },
+    subsequentPullSize: {
+        type: Number,
+        default: 30,
+        min: 1
+    },
+    maxPerStaff: {
+        type: Number,
+        default: 50,
+        min: 1
+    },
+    assignedStaffIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'staff',
+        index: true
+    }],
+    assignments: [{
+        staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'staff', required: true },
+        assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'staff', required: true },
+        assignedAt: { type: Date, default: Date.now },
+        canPull: { type: Boolean, default: true },
+        canDelegate: { type: Boolean, default: false }
+    }],
     isActive: {
         type: Boolean,
         default: true

@@ -1,5 +1,6 @@
 import applicantModel from "../models/applicantModel.js";
 import staffModel from "../models/staffModel.js";
+import branchModel from "../models/branchModel.js";
 import emailService from "../services/emailService.js";
 import offerLetterService from "../services/offerLetterService.js";
 import { sendOtpSms } from "../services/smsService.js";
@@ -1282,6 +1283,34 @@ const applicantController = {
             if (Object.keys(searchFilter).length > 0) andConditions.push(searchFilter);
             if (staffScopeFilter) andConditions.push(staffScopeFilter);
 
+            // Branch filter
+            if (req.query.branchId) {
+                if (req.query.branchId === 'unassigned') {
+                    andConditions.push({
+                        $or: [
+                            { branchId: null },
+                            { branchId: { $exists: false } }
+                        ]
+                    });
+                } else if (mongoose.isValidObjectId(req.query.branchId)) {
+                    andConditions.push({ branchId: new mongoose.Types.ObjectId(req.query.branchId.toString()) });
+                }
+            }
+
+            // Assigned HR filter
+            if (req.query.assignedHR) {
+                if (req.query.assignedHR === 'unassigned') {
+                    andConditions.push({
+                        $or: [
+                            { assignedHR: null },
+                            { assignedHR: { $exists: false } }
+                        ]
+                    });
+                } else if (mongoose.isValidObjectId(req.query.assignedHR)) {
+                    andConditions.push({ assignedHR: new mongoose.Types.ObjectId(req.query.assignedHR.toString()) });
+                }
+            }
+
             let filter = {};
             if (andConditions.length === 1) {
                 filter = andConditions[0];
@@ -1505,6 +1534,118 @@ const applicantController = {
         }
     },
 
+    assignApplicantHR: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { hrId, hrName } = req.body;
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            let resolvedHRName = hrName || null;
+            let hrObjectId = null;
+            if (hrId && hrId !== 'unassigned' && mongoose.isValidObjectId(hrId)) {
+                hrObjectId = new mongoose.Types.ObjectId(hrId.toString());
+                if (!resolvedHRName) {
+                    const s = await staffModel.findById(hrObjectId).select('name fullName');
+                    if (s) resolvedHRName = s.fullName || s.name;
+                }
+            }
+
+            applicant.assignedHR = hrObjectId;
+            applicant.assignedHRName = resolvedHRName;
+            await applicant.save();
+
+            // 2-Way Sync to staff record if converted/linked
+            try {
+                const staffLookup = [];
+                if (applicant.convertedStaffId && mongoose.Types.ObjectId.isValid(applicant.convertedStaffId)) {
+                    staffLookup.push({ _id: applicant.convertedStaffId });
+                }
+                if (applicant._id) {
+                    staffLookup.push({ applicantId: applicant._id });
+                }
+                if (applicant.emailAddress && applicant.emailAddress.trim().length > 0) {
+                    staffLookup.push({ emailAddress: applicant.emailAddress.toLowerCase().trim() });
+                }
+                if (staffLookup.length > 0) {
+                    await staffModel.updateMany(
+                        { $or: staffLookup },
+                        { $set: { assignedHR: hrObjectId, assignedHRName: resolvedHRName } }
+                    );
+                }
+            } catch (syncErr) {
+                console.warn('[assignApplicantHR] Staff sync warning:', syncErr.message);
+            }
+
+            return res.status(200).send({
+                status: 200,
+                message: `Assigned HR "${resolvedHRName || 'Unassigned'}" to applicant and synced to staff record`,
+                data: { applicant }
+            });
+        } catch (error) {
+            console.error("[assignApplicantHR Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
+    assignApplicantBranch: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { branchId, branchName } = req.body;
+            const applicant = await findApplicantByIdOrCustomId(id);
+            if (!applicant) {
+                return res.status(404).send({ status: 404, message: "Applicant not found", data: {} });
+            }
+
+            let resolvedBranchName = branchName || null;
+            let branchObjectId = null;
+            if (branchId && branchId !== 'unassigned' && mongoose.isValidObjectId(branchId)) {
+                branchObjectId = new mongoose.Types.ObjectId(branchId.toString());
+                if (!resolvedBranchName) {
+                    const b = await branchModel.findById(branchObjectId).select('name');
+                    if (b) resolvedBranchName = b.name;
+                }
+            }
+
+            applicant.branchId = branchObjectId;
+            applicant.branchName = resolvedBranchName;
+            await applicant.save();
+
+            // 2-Way Sync to staff record if converted/linked
+            try {
+                const staffLookup = [];
+                if (applicant.convertedStaffId && mongoose.Types.ObjectId.isValid(applicant.convertedStaffId)) {
+                    staffLookup.push({ _id: applicant.convertedStaffId });
+                }
+                if (applicant._id) {
+                    staffLookup.push({ applicantId: applicant._id });
+                }
+                if (applicant.emailAddress && applicant.emailAddress.trim().length > 0) {
+                    staffLookup.push({ emailAddress: applicant.emailAddress.toLowerCase().trim() });
+                }
+                if (staffLookup.length > 0) {
+                    await staffModel.updateMany(
+                        { $or: staffLookup },
+                        { $set: { branchId: branchObjectId, branchName: resolvedBranchName } }
+                    );
+                }
+            } catch (syncErr) {
+                console.warn('[assignApplicantBranch] Staff sync warning:', syncErr.message);
+            }
+
+            return res.status(200).send({
+                status: 200,
+                message: `Assigned branch "${resolvedBranchName || 'Unassigned'}" to applicant and synced to staff record`,
+                data: { applicant }
+            });
+        } catch (error) {
+            console.error("[assignApplicantBranch Error]:", error);
+            res.status(500).send({ status: 500, message: error.message, data: {} });
+        }
+    },
+
     deleteApplicant: async (req, res) => {
         try {
             const { id } = req.params;
@@ -1653,8 +1794,31 @@ const applicantController = {
 
             // Resolve role and department gracefully (defaults to applicant info or unassigned)
             const targetRoleId = roleId || applicant.targetRoleId || null;
-            const targetRoleName = role || applicant.targetRole || null;
+            const targetRoleName = role || offerDesignation || applicant.targetRole || null;
             const targetDeptName = deparment || applicant.targetDepartment || null;
+            const effectiveJoiningDate = joiningDate || offerJoiningDate || null;
+
+            let parsedJoiningDate = new Date();
+            if (effectiveJoiningDate) {
+                if (effectiveJoiningDate instanceof Date && !isNaN(effectiveJoiningDate.getTime())) {
+                    parsedJoiningDate = effectiveJoiningDate;
+                } else {
+                    const str = String(effectiveJoiningDate).trim();
+                    if (str.includes('/')) {
+                        const parts = str.split('/');
+                        if (parts.length === 3) {
+                            const d = parseInt(parts[0], 10);
+                            const m = parseInt(parts[1], 10) - 1;
+                            const y = parseInt(parts[2], 10);
+                            const dt = new Date(y, m, d);
+                            if (!isNaN(dt.getTime())) parsedJoiningDate = dt;
+                        }
+                    } else {
+                        const dt = new Date(str);
+                        if (!isNaN(dt.getTime())) parsedJoiningDate = dt;
+                    }
+                }
+            }
 
             let resolved = { roleId: null, roleName: null, departmentId: null, departmentName: null };
             if (targetRoleId || targetRoleName || targetDeptName) {
@@ -1683,6 +1847,34 @@ const applicantController = {
             let staff = await staffModel.findOne({ $or: lookupConditions });
 
             const effectiveMpin = mpin ? mpin.toString().trim() : '0000';
+
+            // Branch Association resolution
+            let promoBranchId = null;
+            let promoBranchName = null;
+            if (req.body.branchId && mongoose.isValidObjectId(req.body.branchId)) {
+                promoBranchId = new mongoose.Types.ObjectId(req.body.branchId);
+                promoBranchName = req.body.branchName || null;
+            } else if (applicant.branchId) {
+                promoBranchId = applicant.branchId;
+                promoBranchName = applicant.branchName;
+            } else if (finalSupervisorId) {
+                const sup = await staffModel.findById(finalSupervisorId).select('branchId branchName');
+                if (sup && sup.branchId) {
+                    promoBranchId = sup.branchId;
+                    promoBranchName = sup.branchName;
+                }
+            }
+
+            // Dedicated Assigned HR resolution
+            let promoHRId = null;
+            let promoHRName = null;
+            if (req.body.assignedHR && mongoose.isValidObjectId(req.body.assignedHR)) {
+                promoHRId = new mongoose.Types.ObjectId(req.body.assignedHR);
+                promoHRName = req.body.assignedHRName || null;
+            } else if (applicant.assignedHR) {
+                promoHRId = applicant.assignedHR;
+                promoHRName = applicant.assignedHRName;
+            }
 
             if (!staff) {
                 // Generate a unique staff ID
@@ -1716,7 +1908,7 @@ const applicantController = {
                     experienceYears: applicant.experienceYears || 0,
                     previousCompany: applicant.previousCompany,
                     lastCtc: applicant.lastCtc,
-                    joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
+                    joiningDate: parsedJoiningDate,
                     status: 'Active',
                     stage: 'Employee',
                     roleId: resolved.roleId,
@@ -1726,6 +1918,10 @@ const applicantController = {
                     mpin: effectiveMpin,
                     assignedDirector: finalSupervisorId,
                     assignedDirectorName: finalSupervisorName,
+                    branchId: promoBranchId,
+                    branchName: promoBranchName,
+                    assignedHR: promoHRId,
+                    assignedHRName: promoHRName,
                     isViewOnly: isViewOnly === true || isViewOnly === 'true',
                     isEmailVerified: applicant.isEmailVerified || false,
                     isMobileVerified: applicant.isMobileVerified || false,
@@ -1761,7 +1957,7 @@ const applicantController = {
                 if (resolved.departmentId) staff.departmentId = resolved.departmentId;
                 if (resolved.departmentName) staff.deparment = resolved.departmentName;
                 if (mpin) staff.mpin = effectiveMpin;
-                staff.joiningDate = joiningDate ? new Date(joiningDate) : (staff.joiningDate || new Date());
+                staff.joiningDate = effectiveJoiningDate ? parsedJoiningDate : (staff.joiningDate || new Date());
                 staff.status = 'Active';
                 staff.stage = 'Employee';
                 if (applicant.isEmailVerified !== undefined) staff.isEmailVerified = applicant.isEmailVerified;
@@ -1770,6 +1966,14 @@ const applicantController = {
                 if (finalSupervisorId || isDirectAdmin) {
                     staff.assignedDirector = finalSupervisorId;
                     staff.assignedDirectorName = finalSupervisorName;
+                }
+                if (promoBranchId) {
+                    staff.branchId = promoBranchId;
+                    staff.branchName = promoBranchName;
+                }
+                if (promoHRId) {
+                    staff.assignedHR = promoHRId;
+                    staff.assignedHRName = promoHRName;
                 }
                 if (isViewOnly !== undefined) {
                     staff.isViewOnly = isViewOnly === true || isViewOnly === 'true';
@@ -1780,12 +1984,20 @@ const applicantController = {
                 await staff.save();
             }
 
-            // Update applicant stage and link
+            // Update applicant stage, branch, HR and link
             applicant.stage = 'PROMOTED';
             applicant.convertedStaffId = staff._id;
             applicant.targetRole = resolved.roleName || staff.role;
             applicant.targetDepartment = resolved.departmentName || staff.deparment;
             applicant.targetRoleId = resolved.roleId || staff.roleId;
+            if (promoBranchId) {
+                applicant.branchId = promoBranchId;
+                applicant.branchName = promoBranchName;
+            }
+            if (promoHRId) {
+                applicant.assignedHR = promoHRId;
+                applicant.assignedHRName = promoHRName;
+            }
             applicant.hiredAt = new Date();
             const changedByUserId = (req.user?._id && mongoose.Types.ObjectId.isValid(req.user._id)) ? req.user._id : null;
             applicant.stageHistory.push({
@@ -1821,6 +2033,11 @@ const applicantController = {
                     const savedUrl = await offerLetterService.saveOfferLetterPdf(applicant._id, offerPdf.pdfBytes, offerPdf.fileName);
 
                     staff.offerLetterUrl = savedUrl;
+                    staff.offerLetterSentAt = new Date();
+                    staff.offerLetterSentBy = changedByUserId;
+                    staff.offerLetterDesignation = offerOptions.designation;
+                    staff.offerLetterJoiningDate = offerOptions.joiningDate;
+                    staff.offerLetterIssueDate = offerOptions.issueDate;
                     await staff.save();
 
                     await offerLetterService.sendOfferLetterEmail(applicant, offerPdf.pdfBytes, offerPdf.fileName, offerOptions);
@@ -1828,6 +2045,10 @@ const applicantController = {
                     applicant.offerLetterUrl = savedUrl;
                     applicant.offerLetterSentAt = new Date();
                     applicant.offerLetterIssuedBy = changedByUserId;
+                    applicant.offerLetterSentBy = changedByUserId;
+                    applicant.offerLetterDesignation = offerOptions.designation;
+                    applicant.offerLetterJoiningDate = offerOptions.joiningDate;
+                    applicant.offerLetterIssueDate = offerOptions.issueDate;
                     await applicant.save();
                     offerLetterResult = { success: true, url: savedUrl };
                 } catch (offerErr) {
@@ -2136,6 +2357,7 @@ const applicantController = {
                         offerLetterSentBy: req.user?._id || req.staff?._id || null,
                         offerLetterDesignation: result.designation,
                         offerLetterJoiningDate: result.joiningDate,
+                        offerLetterIssueDate: result.issueDate || issueDate || null,
                     });
                 } catch (e) {
                     console.error("[sendOfferLetter synthetic staff update error]:", e);
@@ -2147,6 +2369,22 @@ const applicantController = {
                 applicant.offerLetterSentBy = req.user?._id || req.staff?._id || null;
                 applicant.offerLetterDesignation = result.designation;
                 applicant.offerLetterJoiningDate = result.joiningDate;
+                applicant.offerLetterIssueDate = result.issueDate || issueDate || null;
+
+                // Also update corresponding staff record if applicant is already linked/promoted
+                try {
+                    await staffModel.findOneAndUpdate(
+                        { $or: [{ emailAddress: applicant.emailAddress }, { mobileNumber: applicant.mobileNumber }] },
+                        {
+                            offerLetterUrl: saveResult.relativeUrl,
+                            offerLetterSentAt: new Date(),
+                            offerLetterSentBy: req.user?._id || req.staff?._id || null,
+                            offerLetterDesignation: result.designation,
+                            offerLetterJoiningDate: result.joiningDate,
+                            offerLetterIssueDate: result.issueDate || issueDate || null,
+                        }
+                    );
+                } catch (_) {}
 
                 if (!applicant.stageHistory) {
                     applicant.stageHistory = [];

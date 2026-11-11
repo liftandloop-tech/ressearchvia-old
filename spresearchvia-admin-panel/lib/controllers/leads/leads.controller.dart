@@ -692,15 +692,21 @@ class LeadsController extends GetxController {
   Future<bool> createCustomLeadPool(
     String name,
     String? description, {
-    int pullSize = 20,
-    int maxPerStaff = 100,
+    int initialPullSize = 20,
+    int subsequentPullSize = 30,
+    int maxPerStaff = 50,
+    int? pullSize,
+    List<String>? assignedStaffIds,
   }) async {
     try {
       final res = await _leadService.createLeadPool(
         name,
         description,
-        pullSize: pullSize,
+        initialPullSize: initialPullSize,
+        subsequentPullSize: subsequentPullSize,
+        pullSize: pullSize ?? initialPullSize,
         maxPerStaff: maxPerStaff,
+        assignedStaffIds: assignedStaffIds,
       );
       if (!res.status.hasError && res.body != null) {
         await fetchLeadPools();
@@ -724,6 +730,47 @@ class LeadsController extends GetxController {
     } catch (e) {
       Get.snackbar('Error', 'Failed to create lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
       return false;
+    }
+  }
+
+  Future<bool> assignCustomLeadPool(String poolId, List<String> staffIds, {bool? canDelegate}) async {
+    try {
+      final res = await _leadService.assignLeadPool(poolId, staffIds, canDelegate: canDelegate);
+      if (!res.status.hasError) {
+        await fetchLeadPools();
+        await fetchPullStats();
+        Get.snackbar(
+          'Success',
+          res.body?['message'] ?? 'Lead pool assigned successfully',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message'] ?? 'Failed to assign lead pool',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to assign lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAssignableStaffForPool(String poolId) async {
+    try {
+      final res = await _leadService.getAssignableStaffForPool(poolId);
+      if (!res.status.hasError && res.body != null && res.body['data'] is List) {
+        final raw = res.body['data'] as List;
+        return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
     }
   }
 

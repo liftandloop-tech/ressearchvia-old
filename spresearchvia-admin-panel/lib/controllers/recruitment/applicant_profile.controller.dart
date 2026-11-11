@@ -301,9 +301,14 @@ class ApplicantProfileController extends GetxController {
 
   Future<bool> promoteToStaff({
     String? note,
-    bool autoSendOfferLetter = false,
+    bool autoSendOfferLetter = true,
+    String? roleId,
+    String? role,
+    String? department,
+    String? joiningDate,
     String? offerDesignation,
     String? offerJoiningDate,
+    String? offerIssueDate,
   }) async {
     isPromoting.value = true;
     try {
@@ -313,8 +318,13 @@ class ApplicantProfileController extends GetxController {
         assignedDirector: applicant.value?.assignedStaffId,
         assignedDirectorName: applicant.value?.assignedStaffName,
         autoSendOfferLetter: autoSendOfferLetter,
+        roleId: roleId,
+        role: role,
+        department: department,
+        joiningDate: joiningDate,
         offerDesignation: offerDesignation,
         offerJoiningDate: offerJoiningDate,
+        offerIssueDate: offerIssueDate,
       );
       if (result.success) {
         await fetchDetails(showLoading: false);

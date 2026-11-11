@@ -84,7 +84,16 @@ export const salesRevenueService = {
     }
     if (staffId) {
       const sid = staffId.toString();
-      filteredStaffList = filteredStaffList.filter(s => s._id.toString() === sid || s.staffId === sid);
+      if (!isSystemAdmin) {
+        const isAllowed = targetStaffIds.some(id => id.toString() === sid);
+        if (!isAllowed) {
+          filteredStaffList = [];
+        } else {
+          filteredStaffList = filteredStaffList.filter(s => s._id.toString() === sid || s.staffId === sid);
+        }
+      } else {
+        filteredStaffList = filteredStaffList.filter(s => s._id.toString() === sid || s.staffId === sid);
+      }
     }
     const allowedStaffIdSet = new Set(filteredStaffList.map(s => s._id.toString()));
 

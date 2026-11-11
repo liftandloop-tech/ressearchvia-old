@@ -376,4 +376,36 @@ class StaffService extends ApiService {
       return false;
     }
   }
+
+  Future<Response> assignBranch(
+    String staffId,
+    String? branchId, {
+    String? branchName,
+    bool cascade = false,
+  }) {
+    return post('/staff/assign-branch/$staffId', {
+      'branchId': branchId,
+      if (branchName != null) 'branchName': branchName,
+      'cascade': cascade,
+    });
+  }
+
+  Future<Response> assignHR(
+    String staffId,
+    String? hrId, {
+    String? hrName,
+  }) {
+    return post('/staff/assign-hr/$staffId', {
+      'hrId': hrId,
+      if (hrName != null) 'hrName': hrName,
+    });
+  }
+
+  Future<Response> getSubordinatesCount(String staffId) {
+    return get('/staff/$staffId/subordinates-count');
+  }
+
+  Future<Response> getHRStaff() {
+    return get('/staff/hr-staff');
+  }
 }

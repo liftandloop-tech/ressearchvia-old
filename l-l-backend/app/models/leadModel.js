@@ -22,6 +22,11 @@ const leadSchema = new mongoose.Schema({
     leadPoolId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'leadPool',
+        default: null,
+        index: true
+    },
+    pulledAt: {
+        type: Date,
         default: null
     },
     companyId: {
@@ -104,6 +109,9 @@ const leadSchema = new mongoose.Schema({
         createdAt: { type: Date, default: Date.now }
     }]
 }, { timestamps: true, versionKey: false });
+
+// Compound index for high performance pull and quota checks
+leadSchema.index({ companyId: 1, leadPoolId: 1, assignedRM: 1 });
 
 const leadModel = mongoose.model("lead", leadSchema);
 export default leadModel;

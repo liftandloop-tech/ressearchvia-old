@@ -14,6 +14,8 @@ const leadRoutes = () => {
     Router.post("/pools", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.createLeadPool);
     Router.put("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.updateLeadPool);
     Router.delete("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.deleteLeadPool);
+    Router.post("/pools/:id/assign", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.assignLeadPool);
+    Router.get("/pools/:id/assignable-staff", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.getAssignableStaff);
 
     // Pull system
     Router.post("/pull", auth.tokenVerified, leadPullController.pullLeads);

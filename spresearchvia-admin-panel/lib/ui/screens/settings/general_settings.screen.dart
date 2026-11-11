@@ -7,6 +7,7 @@ import '../../../controllers/settings/settings.controller.dart';
 import '../../layouts/dashboard_layout.widget.dart';
 import '../../widgets/button.widget.dart';
 import '../../../models/staff.model.dart';
+import '../../../models/branch.model.dart';
 
 class GeneralSettingsScreen extends StatelessWidget {
   const GeneralSettingsScreen({super.key});
@@ -69,6 +70,7 @@ class GeneralSettingsScreen extends StatelessWidget {
                           _buildBankDetailsCard(controller),
                           _buildDefaultRMCard(controller),
                           _buildRolesPermissionsCard(),
+                          _buildBranchManagementCard(context, controller),
                         ],
                       ),
                     ],
@@ -1060,6 +1062,563 @@ class GeneralSettingsScreen extends StatelessWidget {
             child: const Text('Manage Roles & Permissions', style: TextStyle(fontSize: 13)),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBranchManagementCard(BuildContext context, SettingsController controller) {
+    return Container(
+      width: 580,
+      constraints: const BoxConstraints(maxWidth: 580, minWidth: 320),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.apartment_rounded,
+                      color: Colors.teal,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Branch Locations & Offices',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _showAddBranchDialog(context, controller),
+                icon: const Icon(Icons.add, size: 14),
+                label: const Text('Add Branch', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Configure office branches (Indore, Jabalpur, Bhopal, Jaipur) for physical locations. Directors assigned to a branch automatically cascade the assignment down to their reporting hierarchy.',
+            style: TextStyle(fontSize: 12.5, color: AppTheme.gray500, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          Obx(() {
+            if (controller.isLoadingBranches.value) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal),
+                ),
+              );
+            }
+
+            if (controller.branchList.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Center(
+                  child: Text('No branches configured. Click "+ Add Branch" to add your first branch office.',
+                      style: TextStyle(fontSize: 12.5, color: AppTheme.gray500)),
+                ),
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: controller.branchList.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final branch = controller.branchList[index];
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: branch.isActive ? AppTheme.gray200 : Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  branch.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppTheme.textPrimary),
+                                ),
+                                if (branch.code != null && branch.code!.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.teal.shade200),
+                                    ),
+                                    child: Text(
+                                      branch.code!,
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal.shade800),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: branch.isActive ? Colors.green.shade50 : Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: branch.isActive ? Colors.green.shade200 : Colors.grey.shade300),
+                                  ),
+                                  child: Text(
+                                    branch.isActive ? 'Active' : 'Inactive',
+                                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: branch.isActive ? Colors.green.shade700 : Colors.grey.shade600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                if (branch.city != null || branch.state != null)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.location_on_outlined, size: 12, color: Colors.grey.shade600),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        [branch.city, branch.state].where((e) => e != null && e.isNotEmpty).join(', '),
+                                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+                                      ),
+                                    ],
+                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.people_outline, size: 12, color: Colors.teal.shade700),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${branch.staffCount} Active Staff',
+                                      style: TextStyle(fontSize: 11.5, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                                if (branch.applicantCount > 0)
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.badge_outlined, size: 12, color: Colors.purple.shade700),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        '${branch.applicantCount} Candidates',
+                                        style: TextStyle(fontSize: 11.5, color: Colors.purple.shade700, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.primaryBlue),
+                        tooltip: 'Edit Branch',
+                        onPressed: () => _showEditBranchDialog(context, controller, branch),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, size: 18, color: Colors.red.shade400),
+                        tooltip: 'Delete Branch',
+                        onPressed: () {
+                          Get.defaultDialog(
+                            title: 'Delete Branch',
+                            middleText: 'Are you sure you want to delete branch "${branch.name}"? Only branches with zero assigned staff can be deleted.',
+                            textConfirm: 'Delete',
+                            textCancel: 'Cancel',
+                            confirmTextColor: Colors.white,
+                            buttonColor: Colors.red,
+                            onConfirm: () async {
+                              Get.back();
+                              await controller.deleteBranch(branch.id, branch.name);
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _showAddBranchDialog(BuildContext context, SettingsController controller) {
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    final cityCtrl = TextEditingController();
+    final stateCtrl = TextEditingController(text: 'Madhya Pradesh');
+    final addressCtrl = TextEditingController();
+    final pincodeCtrl = TextEditingController();
+    final isActive = true.obs;
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Container(
+          width: MediaQuery.of(context).size.width > 540 ? 500 : MediaQuery.of(context).size.width * 0.92,
+          padding: const EdgeInsets.all(22),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: const Icon(Icons.apartment_rounded, color: Colors.teal, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text('Add Branch Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Branch Name *',
+                    hintText: 'e.g. Indore, Jabalpur, Bhopal, Jaipur',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: codeCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Branch Code',
+                          hintText: 'e.g. IND, JBP',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: cityCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                          hintText: 'e.g. Indore',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: stateCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: pincodeCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Pincode',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Office Address (Optional)',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Obx(() => SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Branch Active Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text(isActive.value ? 'Available for staff and candidate allocation' : 'Disabled / inactive', style: const TextStyle(fontSize: 11)),
+                  value: isActive.value,
+                  activeColor: Colors.teal,
+                  onChanged: (v) => isActive.value = v,
+                )),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text('Cancel', style: TextStyle(fontSize: 13)),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                      ),
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) {
+                          Get.snackbar('Validation', 'Please enter a branch name',
+                              backgroundColor: Colors.orange.withOpacity(0.1));
+                          return;
+                        }
+                        final success = await controller.createBranch(
+                          name: nameCtrl.text.trim(),
+                          code: codeCtrl.text.trim().isNotEmpty ? codeCtrl.text.trim() : null,
+                          city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : null,
+                          state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : null,
+                          address: addressCtrl.text.trim().isNotEmpty ? addressCtrl.text.trim() : null,
+                          pincode: pincodeCtrl.text.trim().isNotEmpty ? pincodeCtrl.text.trim() : null,
+                          isActive: isActive.value,
+                        );
+                        if (success) {
+                          Get.back();
+                        }
+                      },
+                      child: const Text('Create Branch', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditBranchDialog(BuildContext context, SettingsController controller, BranchModel branch) {
+    final nameCtrl = TextEditingController(text: branch.name);
+    final codeCtrl = TextEditingController(text: branch.code ?? '');
+    final cityCtrl = TextEditingController(text: branch.city ?? '');
+    final stateCtrl = TextEditingController(text: branch.state ?? 'Madhya Pradesh');
+    final addressCtrl = TextEditingController(text: branch.address ?? '');
+    final pincodeCtrl = TextEditingController(text: branch.pincode ?? '');
+    final isActive = branch.isActive.obs;
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Container(
+          width: MediaQuery.of(context).size.width > 540 ? 500 : MediaQuery.of(context).size.width * 0.92,
+          padding: const EdgeInsets.all(22),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: const Icon(Icons.edit_outlined, color: AppTheme.primaryBlue, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('Edit Branch: ${branch.name}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Branch Name *',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: codeCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Branch Code',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: cityCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: stateCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: pincodeCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Pincode',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Office Address (Optional)',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Obx(() => SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Branch Active Status', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text(isActive.value ? 'Available for staff and candidate allocation' : 'Disabled / inactive', style: const TextStyle(fontSize: 11)),
+                  value: isActive.value,
+                  activeColor: AppTheme.primaryBlue,
+                  onChanged: (v) => isActive.value = v,
+                )),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text('Cancel', style: TextStyle(fontSize: 13)),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
+                      ),
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) {
+                          Get.snackbar('Validation', 'Please enter a branch name',
+                              backgroundColor: Colors.orange.withOpacity(0.1));
+                          return;
+                        }
+                        final success = await controller.updateBranch(
+                          branch.id,
+                          name: nameCtrl.text.trim(),
+                          code: codeCtrl.text.trim(),
+                          city: cityCtrl.text.trim(),
+                          state: stateCtrl.text.trim(),
+                          address: addressCtrl.text.trim(),
+                          pincode: pincodeCtrl.text.trim(),
+                          isActive: isActive.value,
+                        );
+                        if (success) {
+                          Get.back();
+                        }
+                      },
+                      child: const Text('Save Changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

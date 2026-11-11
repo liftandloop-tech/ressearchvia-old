@@ -369,19 +369,9 @@ export async function resolveUserScope(callerId, module = 'users') {
 
   const modKey = (module || 'users').toLowerCase().trim();
 
-  // 4. Resolve scope based on atomic permissions:
-  // Priority 1: Global scope
-  if (actions.has(`${modKey}.view_all`) || actions.has('view_all')) {
-    return { type: 'global', staffIds: null };
-  }
-
-  // Priority 2: Branch scope
-  if (actions.has(`${modKey}.view_branch`) || actions.has('view_branch')) {
-    const branchStaffIds = await getBranchStaffIds(callerObjectId);
-    return { type: 'branch', staffIds: branchStaffIds };
-  }
-
-  // Priority 3: Assigned scope (default)
+  // 4. Resolve scope based on reporting hierarchy:
+  // Core Rule: A staff member can access their own data and the data of everyone below them in their reporting hierarchy,
+  // but cannot access data of anyone above them or outside their reporting hierarchy.
   return {
     type: 'assigned',
     staffIds: hierarchy.staffIds || [callerObjectId]
@@ -391,7 +381,11 @@ export async function resolveUserScope(callerId, module = 'users') {
 /**
  * Generates the MongoDB filter for Lead Pools based on caller's hierarchy.
  * - System Admin: Sees all pools within company.
- * - Non-Admin: Sees global pools + pools created by themselves + pools created by their upstream managers (owner's team).
+ * - Non-Admin: Strict hierarchical visibility & delegation:
+ *   1. Reserved system pool ('Fresh Leads') or global pools (isGlobal: true)
+ *   2. Pools created by caller (createdBy: callerId)
+ *   3. Pools explicitly assigned to caller (assignedStaffIds: callerId)
+ *   *Note*: Subordinates do NOT automatically inherit visibility unless explicitly assigned.
  */
 export async function getAccessibleLeadPoolFilter(callerId, companyId) {
   const baseFilter = { companyId: companyId || "default_company" };
@@ -402,28 +396,22 @@ export async function getAccessibleLeadPoolFilter(callerId, companyId) {
   }
 
   const callerObjId = mongoose.isValidObjectId(callerId) ? new mongoose.Types.ObjectId(callerId.toString()) : null;
-  const upstreamIds = await getUpstreamSupervisorIds(callerId);
-  const supervisedIds = hierarchy.staffIds || [];
 
-  // Allowed pool creators:
-  // 1. The staff member themselves
-  // 2. Upstream supervisors/directors (who created pools for their team)
-  // 3. Subordinates reporting to this staff member (if caller is a team lead / manager viewing team pools)
-  const allowedCreators = [
-    ...new Set([
-      ...(callerObjId ? [callerObjId] : []),
-      ...upstreamIds,
-      ...supervisedIds
-    ])
+  const orConditions = [
+    { isGlobal: true },
+    { name: "Fresh Leads" }
   ];
+
+  if (callerObjId) {
+    orConditions.push(
+      { createdBy: callerObjId },
+      { assignedStaffIds: callerObjId }
+    );
+  }
 
   return {
     ...baseFilter,
-    $or: [
-      { isGlobal: true },
-      { name: "Fresh Leads" },
-      { createdBy: { $in: allowedCreators } }
-    ]
+    $or: orConditions
   };
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:spresearch_web/config/app.config.dart';
+import 'package:spresearch_web/config/theme.config.dart';
 import 'package:spresearch_web/controllers/staff/staff.controller.dart';
 import 'package:spresearch_web/models/staff.model.dart';
 import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
@@ -361,6 +362,12 @@ class AddStaffDialog extends StatelessWidget {
                                   } else {
                                     controller.assignedDirector.value =
                                         validDirectors.firstWhereOrNull((d) => d.id == selectedId);
+                                    // Automatic branch inheritance from Director
+                                    if (controller.assignedDirector.value?.branchId != null &&
+                                        (controller.selectedBranchId.value == null || controller.selectedBranchId.value!.isEmpty)) {
+                                      controller.selectedBranchId.value = controller.assignedDirector.value!.branchId;
+                                      controller.selectedBranchName.value = controller.assignedDirector.value!.branchName;
+                                    }
                                   }
                                 },
                               ),
@@ -371,6 +378,115 @@ class AddStaffDialog extends StatelessWidget {
                       );
                     }
                   }),
+                  // Branch Office & HR Representative Assignment
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('Branch Office Location'),
+                            const SizedBox(height: 6),
+                            Obx(() {
+                              final branches = controller.branchList;
+                              final currentBranchId = controller.selectedBranchId.value;
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.gray300),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String?>(
+                                    value: branches.any((b) => b.id == currentBranchId) ? currentBranchId : null,
+                                    isExpanded: true,
+                                    hint: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text('Select Branch (Optional)', style: TextStyle(fontSize: 13, color: AppTheme.gray400)),
+                                    ),
+                                    items: [
+                                      const DropdownMenuItem<String?>(
+                                        value: null,
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 12),
+                                          child: Text('— Unassigned —', style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
+                                        ),
+                                      ),
+                                      ...branches.map((b) => DropdownMenuItem<String?>(
+                                        value: b.id,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          child: Text('${b.name}${b.code != null ? ' (${b.code})' : ''}', style: const TextStyle(fontSize: 13)),
+                                        ),
+                                      )),
+                                    ],
+                                    onChanged: (val) {
+                                      controller.selectedBranchId.value = val;
+                                      final b = branches.firstWhereOrNull((x) => x.id == val);
+                                      controller.selectedBranchName.value = b?.name;
+                                    },
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildLabel('Assigned HR Representative'),
+                            const SizedBox(height: 6),
+                            Obx(() {
+                              final hrList = controller.hrStaffList;
+                              final currentHRId = controller.selectedHRId.value;
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.gray300),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String?>(
+                                    value: hrList.any((h) => h.id == currentHRId) ? currentHRId : null,
+                                    isExpanded: true,
+                                    hint: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text('Select HR (Optional)', style: TextStyle(fontSize: 13, color: AppTheme.gray400)),
+                                    ),
+                                    items: [
+                                      const DropdownMenuItem<String?>(
+                                        value: null,
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 12),
+                                          child: Text('— Unassigned —', style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
+                                        ),
+                                      ),
+                                      ...hrList.map((h) => DropdownMenuItem<String?>(
+                                        value: h.id,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          child: Text(h.name, style: const TextStyle(fontSize: 13)),
+                                        ),
+                                      )),
+                                    ],
+                                    onChanged: (val) {
+                                      controller.selectedHRId.value = val;
+                                      final h = hrList.firstWhereOrNull((x) => x.id == val);
+                                      controller.selectedHRName.value = h?.name;
+                                    },
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
                   // Additional Profile Information
                   const SizedBox(height: 14),
                   Row(

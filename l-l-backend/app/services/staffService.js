@@ -1,5 +1,6 @@
 import staffModel from "../models/staffModel.js";
 import applicantModel from "../models/applicantModel.js";
+import branchModel from "../models/branchModel.js";
 import staffAssigmentModel from "../models/staffAssignmentModel.js";
 import userModel from "../models/userModel.js"
 import axios from "axios"
@@ -309,6 +310,31 @@ const staffService = {
         const dept = await departmentModel.findById(body.departmentId);
         if (dept && !body.deparment) {
           body.deparment = dept.name;
+        }
+      }
+
+      // Branch handling & automatic inheritance from Supervisor/Director
+      if (body.branchId && body.branchId !== 'unassigned' && mongoose.isValidObjectId(body.branchId)) {
+        body.branchId = new mongoose.Types.ObjectId(body.branchId.toString());
+        if (!body.branchName) {
+          const b = await branchModel.findById(body.branchId);
+          body.branchName = b ? b.name : null;
+        }
+      } else if (body.assignedDirector && mongoose.isValidObjectId(body.assignedDirector)) {
+        // Automatically inherit Director's branch!
+        const dir = await staffModel.findById(body.assignedDirector).select('branchId branchName');
+        if (dir && dir.branchId) {
+          body.branchId = dir.branchId;
+          body.branchName = dir.branchName;
+        }
+      }
+
+      // HR Representative handling
+      if (body.assignedHR && body.assignedHR !== 'unassigned' && mongoose.isValidObjectId(body.assignedHR)) {
+        body.assignedHR = new mongoose.Types.ObjectId(body.assignedHR.toString());
+        if (!body.assignedHRName) {
+          const hr = await staffModel.findById(body.assignedHR).select('fullName name');
+          body.assignedHRName = hr ? (hr.fullName || hr.name) : null;
         }
       }
 
@@ -805,6 +831,56 @@ const staffService = {
           : ((body.assignedDirector === 'admin' || body.assignedDirectorName === 'Admin') ? 'Admin' : null);
       }
 
+      // Branch handling
+      let branchChanged = false;
+      if (body.branchId !== undefined) {
+        const rawBranch = body.branchId;
+        if (!rawBranch || rawBranch === 'unassigned' || !mongoose.isValidObjectId(rawBranch)) {
+          if (staff.branchId) branchChanged = true;
+          staff.branchId = null;
+          staff.branchName = null;
+        } else {
+          const newBranchId = new mongoose.Types.ObjectId(rawBranch.toString());
+          if (!staff.branchId || staff.branchId.toString() !== newBranchId.toString()) {
+            branchChanged = true;
+          }
+          staff.branchId = newBranchId;
+          if (body.branchName) {
+            staff.branchName = body.branchName;
+          } else {
+            const b = await branchModel.findById(staff.branchId);
+            staff.branchName = b ? b.name : null;
+          }
+        }
+      } else if (body.branchName !== undefined) {
+        staff.branchName = body.branchName || null;
+      }
+
+      // HR Representative handling
+      let hrChanged = false;
+      if (body.assignedHR !== undefined) {
+        const rawHR = body.assignedHR;
+        if (!rawHR || rawHR === 'unassigned' || !mongoose.isValidObjectId(rawHR)) {
+          if (staff.assignedHR) hrChanged = true;
+          staff.assignedHR = null;
+          staff.assignedHRName = null;
+        } else {
+          const newHRId = new mongoose.Types.ObjectId(rawHR.toString());
+          if (!staff.assignedHR || staff.assignedHR.toString() !== newHRId.toString()) {
+            hrChanged = true;
+          }
+          staff.assignedHR = newHRId;
+          if (body.assignedHRName) {
+            staff.assignedHRName = body.assignedHRName;
+          } else {
+            const hr = await staffModel.findById(staff.assignedHR);
+            staff.assignedHRName = hr ? (hr.fullName || hr.name) : null;
+          }
+        }
+      } else if (body.assignedHRName !== undefined) {
+        staff.assignedHRName = body.assignedHRName || null;
+      }
+
       if (body.mpin) {
         staff.mpin = body.mpin.toString();
       }
@@ -857,12 +933,46 @@ const staffService = {
       console.log('Final staff object before save (isViewOnly):', staff.isViewOnly);
       await staff.save()
       console.log('Staff saved successfully. DB state isViewOnly:', staff.isViewOnly);
+
+      // 2-Way Sync to linked applicant record
+      try {
+        const applicantLookup = [];
+        if (staff.applicantId) applicantLookup.push({ _id: staff.applicantId });
+        if (staff.emailAddress) applicantLookup.push({ emailAddress: staff.emailAddress.toLowerCase().trim() });
+        if (applicantLookup.length > 0) {
+          const appSync = {};
+          if (body.branchId !== undefined || body.branchName !== undefined) {
+            appSync.branchId = staff.branchId;
+            appSync.branchName = staff.branchName;
+          }
+          if (body.assignedHR !== undefined || body.assignedHRName !== undefined) {
+            appSync.assignedHR = staff.assignedHR;
+            appSync.assignedHRName = staff.assignedHRName;
+          }
+          if (Object.keys(appSync).length > 0) {
+            await applicantModel.updateMany({ $or: applicantLookup }, { $set: appSync });
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[staffReset] Candidate sync warning:', syncErr.message);
+      }
+
+      // Recursive Cascade for Directors/Supervisors if requested or if branch changed
+      let cascadedCount = 0;
+      if (branchChanged && (body.cascadeBranch === true || body.cascadeBranch === 'true' || body.cascade === true)) {
+        const cascadeRes = await staffService.cascadeBranchToSubordinates(staff._id, staff.branchId, staff.branchName);
+        cascadedCount = cascadeRes.cascadedCount;
+      }
+
       return {
         status: 200,
-        message: "staff",
+        message: cascadedCount > 0 
+          ? `Staff updated and branch cascaded to ${cascadedCount} subordinate(s)`
+          : "staff updated successfully",
         data: {
           staff,
-          transferredLeadsCount: transferredCount
+          transferredLeadsCount: transferredCount,
+          cascadedCount
         }
       }
 
@@ -981,6 +1091,36 @@ const staffService = {
       } else {
         // DEFAULT: Show only active staff
         mongoQuery.status = { $in: ['Active', 'active'] };
+      }
+
+      // Branch filter
+      if (query?.branchId) {
+        if (query.branchId === 'unassigned') {
+          mongoQuery.$and = mongoQuery.$and || [];
+          mongoQuery.$and.push({
+            $or: [
+              { branchId: null },
+              { branchId: { $exists: false } }
+            ]
+          });
+        } else if (mongoose.isValidObjectId(query.branchId)) {
+          mongoQuery.branchId = new mongoose.Types.ObjectId(query.branchId.toString());
+        }
+      }
+
+      // Assigned HR filter
+      if (query?.assignedHR) {
+        if (query.assignedHR === 'unassigned') {
+          mongoQuery.$and = mongoQuery.$and || [];
+          mongoQuery.$and.push({
+            $or: [
+              { assignedHR: null },
+              { assignedHR: { $exists: false } }
+            ]
+          });
+        } else if (mongoose.isValidObjectId(query.assignedHR)) {
+          mongoQuery.assignedHR = new mongoose.Types.ObjectId(query.assignedHR.toString());
+        }
       }
 
       console.log('=== staffList called ===');
@@ -2173,6 +2313,220 @@ const staffService = {
       return { status: 200, data: fileBytes, contentType: 'application/pdf', filename: fileName };
     } catch (error) {
       return { status: 500, message: error.message };
+    }
+  },
+
+  /**
+   * Recursively cascades a branch assignment down all subordinate staff in a director/supervisor's hierarchy.
+   */
+  cascadeBranchToSubordinates: async (directorId, branchId, branchName) => {
+    try {
+      if (!directorId) return { cascadedCount: 0 };
+      const hierarchy = await getSupervisedStaffIds(directorId);
+      const subordinateIds = (hierarchy.staffIds || []).filter(
+        id => id && id.toString() !== directorId.toString()
+      );
+      if (subordinateIds.length === 0) return { cascadedCount: 0 };
+
+      const updateResult = await staffModel.updateMany(
+        { _id: { $in: subordinateIds }, isDeleted: false },
+        {
+          $set: {
+            branchId: (branchId && mongoose.isValidObjectId(branchId)) ? new mongoose.Types.ObjectId(branchId.toString()) : null,
+            branchName: branchName || null
+          }
+        }
+      );
+
+      // Also sync linked applicant records for these subordinates
+      await applicantModel.updateMany(
+        { convertedStaffId: { $in: subordinateIds } },
+        {
+          $set: {
+            branchId: (branchId && mongoose.isValidObjectId(branchId)) ? new mongoose.Types.ObjectId(branchId.toString()) : null,
+            branchName: branchName || null
+          }
+        }
+      );
+
+      console.log(`[Branch Cascade] Director ${directorId} cascaded branch "${branchName}" to ${updateResult.modifiedCount} subordinates.`);
+      return { cascadedCount: updateResult.modifiedCount };
+    } catch (error) {
+      console.error("[cascadeBranchToSubordinates Error]:", error);
+      return { cascadedCount: 0, error: error.message };
+    }
+  },
+
+  /**
+   * Returns reporting subordinates count and list for confirmation modals.
+   */
+  getSubordinatesCount: async (staffId) => {
+    try {
+      if (!staffId || !mongoose.isValidObjectId(staffId)) {
+        return { status: 400, message: "Invalid staff ID", data: { count: 0, subordinates: [] } };
+      }
+      const hierarchy = await getSupervisedStaffIds(staffId);
+      const subordinateIds = (hierarchy.staffIds || []).filter(
+        id => id && id.toString() !== staffId.toString()
+      );
+      const subordinates = await staffModel.find({
+        _id: { $in: subordinateIds },
+        isDeleted: false
+      }).select('_id staffId fullName role deparment branchName').lean();
+
+      return {
+        status: 200,
+        message: "Subordinates retrieved successfully",
+        data: {
+          count: subordinates.length,
+          subordinates
+        }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: { count: 0, subordinates: [] } };
+    }
+  },
+
+  /**
+   * Directly assigns a branch to a staff member with optional recursive hierarchy cascade.
+   */
+  assignBranch: async ({ staffId, branchId, branchName, cascade = false, user }) => {
+    try {
+      const staff = await staffModel.findById(staffId);
+      if (!staff) {
+        return { status: 404, message: "Staff not found", data: {} };
+      }
+
+      let resolvedBranchName = branchName || null;
+      let branchObjectId = null;
+
+      if (branchId && branchId !== 'unassigned' && mongoose.isValidObjectId(branchId)) {
+        const branch = await branchModel.findById(branchId);
+        if (!branch) {
+          return { status: 404, message: "Branch not found", data: {} };
+        }
+        branchObjectId = branch._id;
+        resolvedBranchName = branch.name;
+      }
+
+      staff.branchId = branchObjectId;
+      staff.branchName = resolvedBranchName;
+      await staff.save();
+
+      // 2-Way Sync to linked applicant record
+      const applicantLookup = [];
+      if (staff.applicantId) applicantLookup.push({ _id: staff.applicantId });
+      if (staff.emailAddress) applicantLookup.push({ emailAddress: staff.emailAddress.toLowerCase().trim() });
+      if (applicantLookup.length > 0) {
+        await applicantModel.updateMany(
+          { $or: applicantLookup },
+          { $set: { branchId: branchObjectId, branchName: resolvedBranchName } }
+        );
+      }
+
+      let cascadedCount = 0;
+      if (cascade === true || cascade === 'true') {
+        const cascadeResult = await staffService.cascadeBranchToSubordinates(staff._id, branchObjectId, resolvedBranchName);
+        cascadedCount = cascadeResult.cascadedCount;
+      }
+
+      return {
+        status: 200,
+        message: cascadedCount > 0 
+          ? `Branch "${resolvedBranchName || 'Unassigned'}" assigned to ${staff.fullName} and cascaded to ${cascadedCount} subordinate(s)`
+          : `Branch "${resolvedBranchName || 'Unassigned'}" assigned to ${staff.fullName}`,
+        data: {
+          staff,
+          cascadedCount
+        }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: {} };
+    }
+  },
+
+  /**
+   * Assigns an HR representative to a staff record and performs 2-way sync to candidate record.
+   */
+  assignHR: async ({ staffId, hrId, hrName, user }) => {
+    try {
+      const staff = await staffModel.findById(staffId);
+      if (!staff) {
+        return { status: 404, message: "Staff not found", data: {} };
+      }
+
+      let resolvedHRName = hrName || null;
+      let hrObjectId = null;
+
+      if (hrId && hrId !== 'unassigned' && mongoose.isValidObjectId(hrId)) {
+        const hrMember = await staffModel.findById(hrId);
+        if (!hrMember) {
+          return { status: 404, message: "HR staff member not found", data: {} };
+        }
+        hrObjectId = hrMember._id;
+        resolvedHRName = hrMember.fullName || hrMember.name;
+      }
+
+      staff.assignedHR = hrObjectId;
+      staff.assignedHRName = resolvedHRName;
+      await staff.save();
+
+      // 2-Way Sync to linked candidate record
+      const applicantLookup = [];
+      if (staff.applicantId) applicantLookup.push({ _id: staff.applicantId });
+      if (staff.emailAddress) applicantLookup.push({ emailAddress: staff.emailAddress.toLowerCase().trim() });
+      if (applicantLookup.length > 0) {
+        await applicantModel.updateMany(
+          { $or: applicantLookup },
+          { $set: { assignedHR: hrObjectId, assignedHRName: resolvedHRName } }
+        );
+      }
+
+      return {
+        status: 200,
+        message: `HR representative "${resolvedHRName || 'Unassigned'}" assigned to ${staff.fullName} and synced to candidate record`,
+        data: { staff }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: {} };
+    }
+  },
+
+  /**
+   * Retrieves active staff members in the HR pool (recommended first, plus all active staff).
+   */
+  getEligibleHRStaff: async () => {
+    try {
+      const hrDepts = await departmentModel.find({
+        name: { $regex: /hr|human\s*resource|recruitment/i }
+      }).select('_id');
+      const hrDeptIds = hrDepts.map(d => d._id);
+
+      const hrStaff = await staffModel.find({
+        isDeleted: false,
+        status: 'Active',
+        $or: [
+          { departmentId: { $in: hrDeptIds } },
+          { deparment: { $regex: /hr|human\s*resource/i } },
+          { role: { $regex: /hr|recruiter|talent/i } }
+        ]
+      }).select('_id staffId fullName emailAddress mobileNumber role deparment designation').sort({ fullName: 1 }).lean();
+
+      const allActiveStaff = await staffModel.find({
+        isDeleted: false,
+        status: 'Active'
+      }).select('_id staffId fullName emailAddress mobileNumber role deparment designation branchName').sort({ fullName: 1 }).lean();
+
+      return {
+        status: 200,
+        message: "HR staff retrieved successfully",
+        data: {
+          recommended: hrStaff,
+          all: allActiveStaff
+        }
+      };
+    } catch (error) {
+      return { status: 400, message: error.message, data: { recommended: [], all: [] } };
     }
   }
 

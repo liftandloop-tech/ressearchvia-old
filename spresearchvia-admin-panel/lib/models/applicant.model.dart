@@ -70,6 +70,10 @@ class ApplicantModel {
   final EmergencyContactModel? emergencyContact;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? branchId;
+  final String? branchName;
+  final String? assignedHR;
+  final String? assignedHRName;
   final Map<String, dynamic>? rawJson;
 
   ApplicantModel({
@@ -110,6 +114,10 @@ class ApplicantModel {
     this.emergencyContact,
     this.createdAt,
     this.updatedAt,
+    this.branchId,
+    this.branchName,
+    this.assignedHR,
+    this.assignedHRName,
     this.rawJson,
   });
 
@@ -202,6 +210,10 @@ class ApplicantModel {
       emergencyContact: contact,
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
+      branchId: _safeString(json['branchId'] is Map ? (json['branchId']['_id'] ?? json['branchId']['id']) : json['branchId']),
+      branchName: _safeString(json['branchName'] ?? (json['branchId'] is Map ? json['branchId']['name'] : null)),
+      assignedHR: _safeString(json['assignedHR'] is Map ? (json['assignedHR']['_id'] ?? json['assignedHR']['id']) : json['assignedHR']),
+      assignedHRName: _safeString(json['assignedHRName'] ?? (json['assignedHR'] is Map ? (json['assignedHR']['fullName'] ?? json['assignedHR']['name']) : null)),
       rawJson: json,
     );
   }
@@ -238,6 +250,10 @@ class ApplicantModel {
       'previousCompany': previousCompany,
       'lastCtc': lastCtc,
       'localAddress': localAddress,
+      if (branchId != null) 'branchId': branchId,
+      if (branchName != null) 'branchName': branchName,
+      if (assignedHR != null) 'assignedHR': assignedHR,
+      if (assignedHRName != null) 'assignedHRName': assignedHRName,
       'permanentAddress': permanentAddress,
       'emergencyContact': emergencyContact?.toJson(),
       if (walkInForm != null) 'walkInForm': walkInForm!.toJson(),

@@ -7,7 +7,10 @@ import 'package:spresearch_web/ui/layouts/dashboard_layout.widget.dart';
 import 'package:spresearch_web/ui/widgets/skeleton_loader.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
+import '../../../models/role.model.dart';
+import '../../../models/branch.model.dart';
 import '../../../controllers/auth/auth.controller.dart';
+import '../../widgets/offer_letter_dialog.widget.dart';
 import 'widgets/applicant_column_filter.widget.dart';
 
 class ApplicantsListScreen extends StatelessWidget {
@@ -158,6 +161,104 @@ class ApplicantsListScreen extends StatelessWidget {
                   }),
                   const SizedBox(width: 12),
 
+                  // Branch Filter Dropdown
+                  Obx(() {
+                    final branches = controller.branchList;
+                    return Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: controller.selectedBranchFilter.value ?? 'ALL',
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+                          onChanged: (val) {
+                            controller.selectedBranchFilter.value = val;
+                            controller.fetchApplicants();
+                          },
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'ALL',
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.apartment_rounded, size: 14, color: Color(0xFF64748B)),
+                                  SizedBox(width: 6),
+                                  Text('All Branches'),
+                                ],
+                              ),
+                            ),
+                            const DropdownMenuItem(
+                              value: 'UNASSIGNED',
+                              child: Text('Unassigned Only'),
+                            ),
+                            ...branches.map((b) {
+                              return DropdownMenuItem(
+                                value: b.id,
+                                child: Text(b.name),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 12),
+
+                  // HR Filter Dropdown
+                  Obx(() {
+                    final hrStaff = controller.hrStaffList;
+                    return Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: controller.selectedHRFilter.value ?? 'ALL',
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+                          onChanged: (val) {
+                            controller.selectedHRFilter.value = val;
+                            controller.fetchApplicants();
+                          },
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'ALL',
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.badge_outlined, size: 14, color: Color(0xFF64748B)),
+                                  SizedBox(width: 6),
+                                  Text('All HR Staff'),
+                                ],
+                              ),
+                            ),
+                            const DropdownMenuItem(
+                              value: 'UNASSIGNED',
+                              child: Text('Unassigned Only'),
+                            ),
+                            ...hrStaff.map((h) {
+                              return DropdownMenuItem(
+                                value: h.id,
+                                child: Text(h.name.isNotEmpty ? h.name : h.email),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 12),
+
                   // Search Box
                   SizedBox(
                     width: 240,
@@ -183,6 +284,42 @@ class ApplicantsListScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+
+                  // Clear Column Filters Button (shown only when any column filter is active)
+                  Obx(() {
+                    if (!controller.hasActiveColumnFilters) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: InkWell(
+                        onTap: controller.resetColumnFilters,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 38,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFFCA5A5)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.filter_alt_off_rounded, size: 15, color: Color(0xFFDC2626)),
+                              SizedBox(width: 5),
+                              Text(
+                                'Clear Filters',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFFDC2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -245,7 +382,7 @@ class ApplicantsListScreen extends StatelessWidget {
                   child: DataTable2(
                     columnSpacing: 12,
                     horizontalMargin: 8,
-                    minWidth: 1050,
+                    minWidth: 1350,
                     dataRowHeight: 54,
                     headingRowHeight: 44,
                     columns: [
@@ -257,38 +394,60 @@ class ApplicantsListScreen extends StatelessWidget {
                         ),
                       ),
                       DataColumn2(
-                        size: ColumnSize.L,
+                        size: ColumnSize.M,
                         label: const ApplicantTableHeaderCell(
                           text: 'Applied Role',
                           filterWidget: ApplicantColumnFilter(columnKey: 'role', columnName: 'Applied Role'),
                         ),
                       ),
                       DataColumn2(
-                        size: ColumnSize.L,
+                        size: ColumnSize.M,
                         label: const ApplicantTableHeaderCell(
                           text: 'Contact Details',
                           filterWidget: ApplicantColumnFilter(columnKey: 'contact', columnName: 'Contact Details'),
                         ),
                       ),
                       DataColumn2(
-                        fixedWidth: 125,
+                        fixedWidth: 115,
                         label: const ApplicantTableHeaderCell(
                           text: 'Status',
                           filterWidget: ApplicantColumnFilter(columnKey: 'status', columnName: 'Status'),
                         ),
                       ),
                       DataColumn2(
-                        fixedWidth: 140,
+                        fixedWidth: 125,
                         label: const ApplicantTableHeaderCell(
                           text: 'Pipeline Stage',
                           filterWidget: ApplicantColumnFilter(columnKey: 'stage', columnName: 'Pipeline Stage'),
                         ),
                       ),
+                      const DataColumn2(
+                        fixedWidth: 130,
+                        label: Text(
+                          'Branch',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
                       DataColumn2(
-                        fixedWidth: 175,
+                        fixedWidth: 155,
                         label: const ApplicantTableHeaderCell(
                           text: 'Assigned Staff',
                           filterWidget: ApplicantColumnFilter(columnKey: 'staff', columnName: 'Assigned Staff'),
+                        ),
+                      ),
+                      const DataColumn2(
+                        fixedWidth: 145,
+                        label: Text(
+                          'Assigned HR',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E293B),
+                          ),
                         ),
                       ),
                       const DataColumn2(
@@ -461,22 +620,7 @@ class ApplicantsListScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    (() {
-                                      if (applicant.role.isNotEmpty && applicant.role.toLowerCase() != 'staff' && applicant.role.toLowerCase() != 'applicant') {
-                                        return applicant.role;
-                                      }
-                                      final rawTarget = raw['targetRole']?.toString() ??
-                                          raw['walkInForm']?['appliedPosition']?.toString() ??
-                                          raw['walkInForm']?['positionApplied']?.toString() ??
-                                          raw['appliedPosition']?.toString();
-                                      if (rawTarget != null && rawTarget.trim().isNotEmpty && rawTarget.toLowerCase() != 'staff' && rawTarget.toLowerCase() != 'applicant') {
-                                        return rawTarget.trim();
-                                      }
-                                      if (applicant.currentDesignation?.isNotEmpty == true && applicant.currentDesignation!.toLowerCase() != 'staff') {
-                                        return applicant.currentDesignation!;
-                                      }
-                                      return 'Business Development executive';
-                                    })(),
+                                    controller.resolveApplicantRole(applicant),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -593,6 +737,60 @@ class ApplicantsListScreen extends StatelessWidget {
                               ),
                             ),
 
+                            // Branch
+                            DataCell(
+                              InkWell(
+                                onTap: canAssign ? () => _showBranchPicker(context, controller, applicant) : null,
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: (applicant.branchName != null && applicant.branchName!.isNotEmpty)
+                                        ? Colors.teal.shade50
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: (applicant.branchName != null && applicant.branchName!.isNotEmpty)
+                                          ? Colors.teal.shade200
+                                          : const Color(0xFFCBD5E1),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.apartment_rounded,
+                                        size: 13,
+                                        color: (applicant.branchName != null && applicant.branchName!.isNotEmpty)
+                                            ? Colors.teal.shade700
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          applicant.branchName?.isNotEmpty == true ? applicant.branchName! : '—',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: (applicant.branchName != null && applicant.branchName!.isNotEmpty)
+                                                ? FontWeight.w600
+                                                : FontWeight.w500,
+                                            color: (applicant.branchName != null && applicant.branchName!.isNotEmpty)
+                                                ? Colors.teal.shade800
+                                                : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ),
+                                      if (canAssign) ...[
+                                        const SizedBox(width: 2),
+                                        Icon(Icons.arrow_drop_down, size: 14, color: Colors.grey.shade600),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
                             // Assigned Staff
                             DataCell(
                               InkWell(
@@ -649,6 +847,60 @@ class ApplicantsListScreen extends StatelessWidget {
                                             ? const Color(0xFF4338CA)
                                             : const Color(0xFF94A3B8),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Assigned HR
+                            DataCell(
+                              InkWell(
+                                onTap: canAssign ? () => _showHRPicker(context, controller, applicant) : null,
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: (applicant.assignedHRName != null && applicant.assignedHRName!.isNotEmpty)
+                                        ? Colors.purple.shade50
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: (applicant.assignedHRName != null && applicant.assignedHRName!.isNotEmpty)
+                                          ? Colors.purple.shade200
+                                          : const Color(0xFFCBD5E1),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.badge_outlined,
+                                        size: 13,
+                                        color: (applicant.assignedHRName != null && applicant.assignedHRName!.isNotEmpty)
+                                            ? Colors.purple.shade700
+                                            : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          applicant.assignedHRName?.isNotEmpty == true ? applicant.assignedHRName! : '—',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: (applicant.assignedHRName != null && applicant.assignedHRName!.isNotEmpty)
+                                                ? FontWeight.w600
+                                                : FontWeight.w500,
+                                            color: (applicant.assignedHRName != null && applicant.assignedHRName!.isNotEmpty)
+                                                ? Colors.purple.shade800
+                                                : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ),
+                                      if (canAssign) ...[
+                                        const SizedBox(width: 2),
+                                        Icon(Icons.arrow_drop_down, size: 14, color: Colors.grey.shade600),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -721,209 +973,410 @@ class ApplicantsListScreen extends StatelessWidget {
 
   void _showQuickPromoteDialog(BuildContext context, ApplicantsListController controller, StaffModel applicant) {
     bool autoSendOfferLetter = true;
-    final defaultRole = applicant.role.isNotEmpty && applicant.role != 'Applicant'
-        ? applicant.role
-        : (applicant.targetRole?.isNotEmpty == true
-            ? applicant.targetRole!
-            : (applicant.currentDesignation?.isNotEmpty == true
-                ? applicant.currentDesignation!
-                : 'Business Development Executive'));
+    final roles = controller.availableRoles;
+    RoleModel? initialRole;
+    if (applicant.targetRoleId != null && applicant.targetRoleId!.isNotEmpty) {
+      initialRole = roles.firstWhereOrNull((r) => r.id == applicant.targetRoleId);
+    }
+    if (initialRole == null && applicant.role.isNotEmpty && applicant.role != 'Applicant') {
+      initialRole = roles.firstWhereOrNull((r) => r.id == applicant.role || r.name.toLowerCase() == applicant.role.toLowerCase());
+    }
+    if (initialRole == null && applicant.targetRole != null && applicant.targetRole!.isNotEmpty) {
+      initialRole = roles.firstWhereOrNull((r) => r.id == applicant.targetRole || r.name.toLowerCase() == applicant.targetRole!.toLowerCase());
+    }
+    if (initialRole == null && applicant.currentDesignation != null && applicant.currentDesignation!.isNotEmpty) {
+      initialRole = roles.firstWhereOrNull((r) => r.name.toLowerCase() == applicant.currentDesignation!.toLowerCase());
+    }
+    initialRole ??= roles.firstWhereOrNull((r) => r.name.toLowerCase().contains('business development')) ?? (roles.isNotEmpty ? roles.first : null);
+
+    String? selectedRoleId = initialRole?.id;
+    String selectedRoleName = initialRole?.name ?? 'Business Development Executive';
+    String? selectedDepartment = initialRole?.departmentName;
+
+    String? selectedBranchId = applicant.branchId;
+    String? selectedBranchName = applicant.branchName;
+    String? selectedHRId = applicant.assignedHR;
+    String? selectedHRName = applicant.assignedHRName;
 
     final defaultJoinDt = applicant.joiningDate ?? DateTime.now().add(const Duration(days: 7));
     final defaultJoinStr = '${defaultJoinDt.day.toString().padLeft(2, '0')}/${defaultJoinDt.month.toString().padLeft(2, '0')}/${defaultJoinDt.year}';
 
-    final roleCtrl = TextEditingController(text: defaultRole);
     final joinDateCtrl = TextEditingController(text: defaultJoinStr);
+    final now = DateTime.now();
+    final defaultIssueStr = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final issueDateCtrl = TextEditingController(text: defaultIssueStr);
+    bool isGeneratingPreview = false;
 
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
-                ),
-                child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF16A34A), size: 20),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Promote ${applicant.name} to Staff',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 460,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Promote this candidate to an active employee account. Role hierarchy, reporting supervisor, and MPIN can also be updated from the Staff page.',
-                    style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
-                  ),
-                  const SizedBox(height: 16),
+        builder: (context, setDialogState) {
+          final currentRoles = controller.availableRoles;
+          if (currentRoles.isNotEmpty && (selectedRoleId == null || !currentRoles.any((r) => r.id == selectedRoleId))) {
+            selectedRoleId = currentRoles.first.id;
+            selectedRoleName = currentRoles.first.name;
+            selectedDepartment = currentRoles.first.departmentName;
+          }
 
-                  // Offer Letter Delivery Card (Automatic vs Manual)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: autoSendOfferLetter ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: autoSendOfferLetter ? const Color(0xFFA5B4FC) : const Color(0xFFE2E8F0),
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: const Icon(Icons.how_to_reg_rounded, color: Color(0xFF16A34A), size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Promote ${applicant.name} to Staff',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 460,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Promote this candidate to an active employee account. Role hierarchy, reporting supervisor, and MPIN can also be updated from the Staff page.',
+                      style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Offer Designation Dropdown (dynamic roles from database, 5 visible at a time with vertical scroll)
+                    const Text(
+                      'Offer Designation *',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: currentRoles.any((r) => r.id == selectedRoleId) ? selectedRoleId : null,
+                      menuMaxHeight: 240, // 5 roles in view (~48px each), vertical scroll for the rest
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: currentRoles.map((r) => DropdownMenuItem<String>(
+                        value: r.id,
+                        child: Text(
+                          r.name,
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          final match = currentRoles.firstWhereOrNull((r) => r.id == val);
+                          if (match != null) {
+                            setDialogState(() {
+                              selectedRoleId = match.id;
+                              selectedRoleName = match.name;
+                              selectedDepartment = match.departmentName;
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Branch Dropdown
+                    const Text(
+                      'Assigned Branch',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String?>(
+                      value: selectedBranchId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.apartment_rounded, size: 18),
+                      ),
+                      hint: const Text('— Unassigned —', style: TextStyle(fontSize: 13)),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('— Unassigned —', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                        ),
+                        ...controller.branchList.map((b) => DropdownMenuItem<String?>(
+                          value: b.id,
+                          child: Text(b.name, style: const TextStyle(fontSize: 13)),
+                        )),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedBranchId = val;
+                          final b = controller.branchList.firstWhereOrNull((x) => x.id == val);
+                          selectedBranchName = b?.name;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Assigned HR Dropdown
+                    const Text(
+                      'Assigned HR Representative',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String?>(
+                      value: selectedHRId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.badge_outlined, size: 18),
+                      ),
+                      hint: const Text('— Unassigned —', style: TextStyle(fontSize: 13)),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('— Unassigned —', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                        ),
+                        ...controller.hrStaffList.map((h) => DropdownMenuItem<String?>(
+                          value: h.id,
+                          child: Text(h.name.isNotEmpty ? h.name : h.email, style: const TextStyle(fontSize: 13)),
+                        )),
+                      ],
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedHRId = val;
+                          final h = controller.hrStaffList.firstWhereOrNull((x) => x.id == val);
+                          selectedHRName = h?.name;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Joining Date (Always visible regardless of offer letter checkbox)
+                    const Text(
+                      'Joining Date (DD/MM/YYYY) *',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: joinDateCtrl,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                          padding: EdgeInsets.zero,
+                          onPressed: () async {
+                            final parts = joinDateCtrl.text.split('/');
+                            DateTime initial = DateTime.now();
+                            if (parts.length == 3) {
+                              try {
+                                initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                              } catch (_) {}
+                            }
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              joinDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                            }
+                          },
+                        ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        InkWell(
-                          onTap: () {
-                            setDialogState(() {
-                              autoSendOfferLetter = !autoSendOfferLetter;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(6),
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: autoSendOfferLetter,
-                                activeColor: const Color(0xFF4F46E5),
-                                onChanged: (v) {
-                                  setDialogState(() {
-                                    autoSendOfferLetter = v ?? false;
-                                  });
-                                },
-                              ),
-                              const Expanded(
-                                child: Text(
-                                  'Automatic: Email Official Offer Letter on Promotion',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1E293B),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                    const SizedBox(height: 16),
+
+                    // Offer Letter Delivery Card (Only for previewing and sending offer letter)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: autoSendOfferLetter ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: autoSendOfferLetter ? const Color(0xFFA5B4FC) : const Color(0xFFE2E8F0),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 40, right: 8, bottom: 4),
-                          child: Text(
-                            autoSendOfferLetter
-                                ? 'Generates the official SP Researchvia letterhead PDF and emails it to ${applicant.email.isNotEmpty ? applicant.email : "candidate"} upon promotion.'
-                                : 'Manual Option: Staff will be promoted without an email. You can preview and send the offer letter manually anytime from the Staff or Applicant page.',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: autoSendOfferLetter ? const Color(0xFF4338CA) : const Color(0xFF64748B),
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                        if (autoSendOfferLetter) ...[
-                          const SizedBox(height: 10),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                autoSendOfferLetter = !autoSendOfferLetter;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(6),
+                            child: Row(
                               children: [
-                                const Text(
-                                  'Offer Designation *',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                Checkbox(
+                                  value: autoSendOfferLetter,
+                                  activeColor: const Color(0xFF4F46E5),
+                                  onChanged: (v) {
+                                    setDialogState(() {
+                                      autoSendOfferLetter = v ?? false;
+                                    });
+                                  },
                                 ),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: roleCtrl,
-                                  style: const TextStyle(fontSize: 12.5),
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Joining Date (DD/MM/YYYY) *',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-                                ),
-                                const SizedBox(height: 4),
-                                TextField(
-                                  controller: joinDateCtrl,
-                                  style: const TextStyle(fontSize: 12.5),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                    border: const OutlineInputBorder(),
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
-                                      padding: EdgeInsets.zero,
-                                      onPressed: () async {
-                                        final parts = joinDateCtrl.text.split('/');
-                                        DateTime initial = DateTime.now();
-                                        if (parts.length == 3) {
-                                          try {
-                                            initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
-                                          } catch (_) {}
-                                        }
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
-                                          firstDate: DateTime(2000),
-                                          lastDate: DateTime(2100),
-                                        );
-                                        if (picked != null) {
-                                          joinDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                                        }
-                                      },
+                                const Expanded(
+                                  child: Text(
+                                    'Automatic: Email Official Offer Letter on Promotion',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1E293B),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 40, right: 8, bottom: 4),
+                            child: Text(
+                              autoSendOfferLetter
+                                  ? 'Generates the official SP Researchvia letterhead PDF and emails it to ${applicant.email.isNotEmpty ? applicant.email : "candidate"} upon promotion.'
+                                  : 'Manual Option: Staff will be promoted without emailing an offer letter. You can preview and send the offer letter manually anytime from the Staff or Applicant page.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: autoSendOfferLetter ? const Color(0xFF4338CA) : const Color(0xFF64748B),
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                          if (autoSendOfferLetter) ...[
+                            const SizedBox(height: 12),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 40, right: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Date of Issue (DD/MM/YYYY) *',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    controller: issueDateCtrl,
+                                    style: const TextStyle(fontSize: 12.5),
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: const OutlineInputBorder(),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                                        padding: EdgeInsets.zero,
+                                        onPressed: () async {
+                                          final parts = issueDateCtrl.text.split('/');
+                                          DateTime initial = DateTime.now();
+                                          if (parts.length == 3) {
+                                            try {
+                                              initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                                            } catch (_) {}
+                                          }
+                                          final picked = await showDatePicker(
+                                            context: context,
+                                            initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
+                                            firstDate: DateTime(2000),
+                                            lastDate: DateTime(2100),
+                                          );
+                                          if (picked != null) {
+                                            issueDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton.icon(
+                                    onPressed: isGeneratingPreview
+                                        ? null
+                                        : () async {
+                                            setDialogState(() => isGeneratingPreview = true);
+                                            try {
+                                              await OfferLetterDialog.previewPdf(
+                                                context: context,
+                                                applicant: applicant,
+                                                designation: selectedRoleName,
+                                                joiningDate: joinDateCtrl.text.trim(),
+                                                issueDate: issueDateCtrl.text.trim(),
+                                              );
+                                            } finally {
+                                              setDialogState(() => isGeneratingPreview = false);
+                                            }
+                                          },
+                                    icon: isGeneratingPreview
+                                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF4F46E5)))
+                                        : const Icon(Icons.picture_as_pdf_outlined, size: 14),
+                                    label: Text(isGeneratingPreview ? 'Generating Preview...' : 'Preview Offer Letter PDF', style: const TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF4F46E5),
+                                      side: const BorderSide(color: Color(0xFFA5B4FC)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(dialogCtx).pop();
-                await controller.promoteApplicant(
-                  applicant.id,
-                  autoSendOfferLetter: autoSendOfferLetter,
-                  offerDesignation: roleCtrl.text.trim(),
-                  offerJoiningDate: joinDateCtrl.text.trim(),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF16A34A),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('Cancel'),
               ),
-              child: Text(autoSendOfferLetter ? 'Promote & Send Letter' : 'Promote Staff Only'),
-            ),
-          ],
-        ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.of(dialogCtx).pop();
+                  await controller.promoteApplicant(
+                    applicant.id,
+                    autoSendOfferLetter: autoSendOfferLetter,
+                    roleId: selectedRoleId,
+                    role: selectedRoleName,
+                    department: selectedDepartment,
+                    joiningDate: joinDateCtrl.text.trim(),
+                    offerDesignation: selectedRoleName,
+                    offerJoiningDate: joinDateCtrl.text.trim(),
+                    offerIssueDate: issueDateCtrl.text.trim(),
+                    branchId: selectedBranchId,
+                    branchName: selectedBranchName,
+                    assignedHR: selectedHRId,
+                    assignedHRName: selectedHRName,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(autoSendOfferLetter ? 'Promote & Send Letter' : 'Promote Staff Only'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1250,6 +1703,210 @@ class ApplicantsListScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _showBranchPicker(BuildContext context, ApplicantsListController controller, StaffModel applicant) async {
+    if (controller.branchList.isEmpty) {
+      await controller.loadBranchesAndHR();
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: 420,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.apartment_rounded, color: Colors.teal, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Assign Branch: ${applicant.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const Text('Candidate branch will sync to employee profile upon promotion', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.clear, color: Colors.grey, size: 18),
+                title: const Text('— Unassigned —', style: TextStyle(fontStyle: FontStyle.italic)),
+                onTap: () async {
+                  Navigator.of(dialogCtx).pop();
+                  await controller.assignBranchToApplicant(applicant.id, null);
+                },
+              ),
+              const Divider(height: 1),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: Obx(() {
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: controller.branchList.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (ctx, idx) {
+                      final b = controller.branchList[idx];
+                      final isCurrent = applicant.branchId == b.id || applicant.branchName?.toLowerCase() == b.name.toLowerCase();
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(Icons.location_city, color: isCurrent ? Colors.teal : Colors.grey.shade600, size: 18),
+                        title: Row(
+                          children: [
+                            Text(b.name, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500, fontSize: 13)),
+                            if (b.code != null) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(b.code!, style: TextStyle(fontSize: 9.5, color: Colors.teal.shade800, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: Text([b.city, b.state].where((e) => e != null && e.isNotEmpty).join(', '), style: const TextStyle(fontSize: 11)),
+                        trailing: isCurrent ? const Icon(Icons.check, color: Colors.teal, size: 18) : null,
+                        onTap: () async {
+                          Navigator.of(dialogCtx).pop();
+                          await controller.assignBranchToApplicant(applicant.id, b.id, branchName: b.name);
+                        },
+                      );
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showHRPicker(BuildContext context, ApplicantsListController controller, StaffModel applicant) async {
+    if (controller.hrStaffList.isEmpty) {
+      await controller.loadBranchesAndHR();
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: 420,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.badge_outlined, color: Colors.purple, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Assign HR: ${applicant.name}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const Text('Dedicated HR representative for interview & onboarding', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.clear, color: Colors.grey, size: 18),
+                title: const Text('— Unassigned —', style: TextStyle(fontStyle: FontStyle.italic)),
+                onTap: () async {
+                  Navigator.of(dialogCtx).pop();
+                  await controller.assignHRToApplicant(applicant.id, null);
+                },
+              ),
+              const Divider(height: 1),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: Obx(() {
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: controller.hrStaffList.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (ctx, idx) {
+                      final h = controller.hrStaffList[idx];
+                      final isCurrent = applicant.assignedHR == h.id || applicant.assignedHRName?.toLowerCase() == h.name.toLowerCase();
+                      return ListTile(
+                        dense: true,
+                        leading: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: isCurrent ? Colors.purple.shade100 : Colors.grey.shade200,
+                          child: Text(
+                            h.name.isNotEmpty ? h.name[0].toUpperCase() : 'H',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isCurrent ? Colors.purple.shade800 : Colors.grey.shade700),
+                          ),
+                        ),
+                        title: Text(h.name.isNotEmpty ? h.name : h.email, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500, fontSize: 13)),
+                        subtitle: Text(h.role.isNotEmpty ? h.role : (h.department.isNotEmpty ? h.department : h.email), style: const TextStyle(fontSize: 11)),
+                        trailing: isCurrent ? const Icon(Icons.check, color: Colors.purple, size: 18) : null,
+                        onTap: () async {
+                          Navigator.of(dialogCtx).pop();
+                          await controller.assignHRToApplicant(applicant.id, h.id, hrName: h.name);
+                        },
+                      );
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

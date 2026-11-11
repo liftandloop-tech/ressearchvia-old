@@ -294,9 +294,37 @@ const staffSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    offerLetterIssueDate: {
+        type: String,
+        default: null
+    },
     isDeleted: {
         type: Boolean,
         default: false
+    },
+
+    // Branch Association
+    branchId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+        default: null,
+        index: true
+    },
+    branchName: {
+        type: String,
+        default: null
+    },
+
+    // Assigned HR Representative
+    assignedHR: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'staff',
+        default: null,
+        index: true
+    },
+    assignedHRName: {
+        type: String,
+        default: null
     },
 }, { timestamps: true, versionKey: false });
 

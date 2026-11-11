@@ -15,6 +15,7 @@ import roleModel from "./app/models/roleModel.js";
 import permissionGroupModel from "./app/models/permissionGroupModel.js";
 import userModel from "./app/models/userModel.js";
 import expiryAlertSettingsModel from "./app/models/expiryAlertSettingsModel.js";
+import branchService from "./app/services/branchService.js";
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -195,6 +196,9 @@ try {
         { email: 'info@researchvia.in' },
         { $set: { userType: 'super_admin', role: 'super_admin', adminAccessGranted: true } }
     );
+
+    // Ensure default branches exist
+    await branchService.seedDefaultBranches();
 
     // Sanitize any legacy alert templates stored in the database
     const expirySettings = await expiryAlertSettingsModel.findOne();

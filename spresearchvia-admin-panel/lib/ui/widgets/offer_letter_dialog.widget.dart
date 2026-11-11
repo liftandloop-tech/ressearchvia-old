@@ -11,17 +11,23 @@ import 'package:web/web.dart' as web;
 class OfferLetterDialog extends StatefulWidget {
   final StaffModel applicant;
   final VoidCallback? onSuccess;
+  final String? initialDesignation;
+  final String? initialJoiningDate;
 
   const OfferLetterDialog({
     super.key,
     required this.applicant,
     this.onSuccess,
+    this.initialDesignation,
+    this.initialJoiningDate,
   });
 
   static Future<void> show(
     BuildContext context, {
     required StaffModel applicant,
     VoidCallback? onSuccess,
+    String? initialDesignation,
+    String? initialJoiningDate,
   }) {
     return showDialog(
       context: context,
@@ -29,8 +35,62 @@ class OfferLetterDialog extends StatefulWidget {
       builder: (_) => OfferLetterDialog(
         applicant: applicant,
         onSuccess: onSuccess,
+        initialDesignation: initialDesignation,
+        initialJoiningDate: initialJoiningDate,
       ),
     );
+  }
+
+  static Future<void> previewPdf({
+    required BuildContext context,
+    required StaffModel applicant,
+    required String designation,
+    required String joiningDate,
+    required String issueDate,
+  }) async {
+    final applicantService = Get.isRegistered<ApplicantService>()
+        ? Get.find<ApplicantService>()
+        : Get.put(ApplicantService());
+
+    try {
+      final res = await applicantService.previewOfferLetter(
+        applicant.id,
+        applicant: applicant,
+        designation: designation.trim(),
+        joiningDate: joiningDate.trim(),
+        issueDate: issueDate.trim(),
+      );
+
+      if (res.success && res.bytes != null) {
+        try {
+          await Printing.layoutPdf(
+            onLayout: (_) async => res.bytes!,
+            name: res.fileName ?? 'Offer_Letter.pdf',
+          );
+        } catch (_) {
+          final blob = web.Blob(
+            [res.bytes!.toJS].toJS,
+            web.BlobPropertyBag(type: 'application/pdf'),
+          );
+          final blobUrl = web.URL.createObjectURL(blob);
+          web.window.open(blobUrl, '_blank');
+        }
+      } else {
+        Get.snackbar(
+          'Preview Failed',
+          res.message ?? 'Could not generate offer letter PDF.',
+          backgroundColor: Colors.red.withValues(alpha: 0.15),
+          colorText: Colors.red.shade900,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Preview Error',
+        e.toString(),
+        backgroundColor: Colors.red.withValues(alpha: 0.15),
+        colorText: Colors.red.shade900,
+      );
+    }
   }
 
   @override
@@ -61,15 +121,19 @@ class _OfferLetterDialogState extends State<OfferLetterDialog> {
     final applicant = widget.applicant;
 
     // Resolve prefilled role/designation
-    String defaultRole = applicant.role.isNotEmpty && applicant.role != 'Applicant'
-        ? applicant.role
-        : (applicant.currentDesignation?.isNotEmpty == true
-            ? applicant.currentDesignation!
-            : 'Business Development Executive');
+    String defaultRole = widget.initialDesignation?.trim().isNotEmpty == true
+        ? widget.initialDesignation!.trim()
+        : (applicant.role.isNotEmpty && applicant.role != 'Applicant'
+            ? applicant.role
+            : (applicant.currentDesignation?.isNotEmpty == true
+                ? applicant.currentDesignation!
+                : 'Business Development Executive'));
 
-    // Default joining date: existing joiningDate or +7 days
+    // Default joining date: explicit initial, existing joiningDate, or +7 days
     DateTime defaultJoinDt = applicant.joiningDate ?? DateTime.now().add(const Duration(days: 7));
-    String joinStr = _formatDate(defaultJoinDt);
+    String joinStr = widget.initialJoiningDate?.trim().isNotEmpty == true
+        ? widget.initialJoiningDate!.trim()
+        : _formatDate(defaultJoinDt);
 
     // Default issue date: Today
     String issueStr = _formatDate(DateTime.now());

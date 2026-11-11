@@ -2,18 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../services/settings.service.dart';
 import '../../services/staff.service.dart';
+import '../../services/branch.service.dart';
 import '../../models/staff.model.dart';
+import '../../models/branch.model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:spresearch_web/config/app.config.dart';
 import 'package:spresearch_web/config/theme.config.dart';
 
 class SettingsController extends GetxController {
   final SettingsService _settingsService = Get.find<SettingsService>();
+  final BranchService _branchService = Get.isRegistered<BranchService>() ? Get.find<BranchService>() : Get.put(BranchService());
 
   final isLoading = false.obs;
   final isSaving = false.obs;
   final isUploadingQR = false.obs;
   final isEditing = false.obs; // view-only by default
+
+  // Branch Management State
+  final branchList = <BranchModel>[].obs;
+  final isLoadingBranches = false.obs;
+  final isSavingBranch = false.obs;
 
   // Bank Details Controllers
   final bankNameController = TextEditingController();
@@ -44,6 +52,7 @@ class SettingsController extends GetxController {
     fetchBankDetails();
     fetchDefaultRM();
     loadStaffList();
+    fetchBranches();
   }
 
   void startEditing() => isEditing.value = true;
@@ -300,6 +309,126 @@ class SettingsController extends GetxController {
     final url = '$base/${qrCodePath.value}';
     print('[QR Display] Loading QR from: $url');
     return url;
+  }
+
+  // ================= BRANCH MANAGEMENT =================
+  Future<void> fetchBranches() async {
+    isLoadingBranches.value = true;
+    try {
+      final res = await _branchService.getBranches();
+      if (res.statusCode == 200 && res.body != null) {
+        final list = (res.body['data'] as List? ?? [])
+            .map((e) => BranchModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        branchList.assignAll(list);
+      }
+    } catch (e) {
+      debugPrint('Error fetching branches: $e');
+    } finally {
+      isLoadingBranches.value = false;
+    }
+  }
+
+  Future<bool> createBranch({
+    required String name,
+    String? code,
+    String? city,
+    String? state,
+    String? address,
+    String? pincode,
+    bool isActive = true,
+  }) async {
+    isSavingBranch.value = true;
+    try {
+      final res = await _branchService.createBranch({
+        'name': name.trim(),
+        if (code != null && code.trim().isNotEmpty) 'code': code.trim().toUpperCase(),
+        if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
+        if (state != null && state.trim().isNotEmpty) 'state': state.trim(),
+        if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+        if (pincode != null && pincode.trim().isNotEmpty) 'pincode': pincode.trim(),
+        'isActive': isActive,
+      });
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        await fetchBranches();
+        Get.snackbar('Success', res.body?['message'] ?? 'Branch created successfully',
+            backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade800);
+        return true;
+      } else {
+        Get.snackbar('Error', res.body?['message'] ?? 'Failed to create branch',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to create branch: $e',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+      return false;
+    } finally {
+      isSavingBranch.value = false;
+    }
+  }
+
+  Future<bool> updateBranch(
+    String id, {
+    String? name,
+    String? code,
+    String? city,
+    String? state,
+    String? address,
+    String? pincode,
+    bool? isActive,
+  }) async {
+    isSavingBranch.value = true;
+    try {
+      final data = <String, dynamic>{
+        if (name != null) 'name': name.trim(),
+        if (code != null) 'code': code.trim().toUpperCase(),
+        if (city != null) 'city': city.trim(),
+        if (state != null) 'state': state.trim(),
+        if (address != null) 'address': address.trim(),
+        if (pincode != null) 'pincode': pincode.trim(),
+        if (isActive != null) 'isActive': isActive,
+      };
+
+      final res = await _branchService.updateBranch(id, data);
+      if (res.statusCode == 200) {
+        await fetchBranches();
+        Get.snackbar('Success', res.body?['message'] ?? 'Branch updated successfully',
+            backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade800);
+        return true;
+      } else {
+        Get.snackbar('Error', res.body?['message'] ?? 'Failed to update branch',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to update branch: $e',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+      return false;
+    } finally {
+      isSavingBranch.value = false;
+    }
+  }
+
+  Future<bool> deleteBranch(String id, String branchName) async {
+    try {
+      final res = await _branchService.deleteBranch(id);
+      if (res.statusCode == 200) {
+        await fetchBranches();
+        Get.snackbar('Success', res.body?['message'] ?? 'Branch "$branchName" deleted successfully',
+            backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade800);
+        return true;
+      } else {
+        Get.snackbar('Error', res.body?['message'] ?? 'Failed to delete branch',
+            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to delete branch: $e',
+          backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+      return false;
+    }
   }
 
   @override

@@ -31,14 +31,26 @@ const leadController = {
                 targetPool = await ensureDefaultFreshPool(companyId);
             }
 
-            // Leads must be added to a pool as unassigned (assignedRM: null).
-            // Staff subsequently pull from the pool based on lead distribution quotas.
-            // Only administrators can directly pre-assign leads at creation time.
-            const assignedRM = isSuper && req.body.assignedRM ? req.body.assignedRM : null;
+            // If caller is super admin, they can explicitly assign or leave unassigned in pool.
+            // If caller is a staff member (e.g. Prakash Haldar / BDE / TL), assign to themselves (or their team member)
+            // so they can immediately see, track, and work on the lead they added!
+            let assignedRM = null;
+            if (isSuper) {
+                assignedRM = req.body.assignedRM || null;
+            } else if (callerId) {
+                const hierarchy = await getSupervisedStaffIds(callerId);
+                const allowedStaffIds = (hierarchy.staffIds || [callerId]).map(id => id.toString());
+                if (req.body.assignedRM && allowedStaffIds.includes(req.body.assignedRM.toString())) {
+                    assignedRM = req.body.assignedRM;
+                } else {
+                    assignedRM = callerId;
+                }
+            }
 
             const lead = await leadModel.create({
                 ...req.body,
                 companyId,
+                leadSource: req.body.leadSource || 'MANUAL_ENTRY',
                 leadPoolId: targetPool._id,
                 assignedRM
             });

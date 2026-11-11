@@ -261,6 +261,58 @@ const staffController = {
         } catch (error) {
             res.status(500).send({ status: 500, message: error.message });
         }
+    },
+
+    assignBranch: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { branchId, branchName, cascade } = req.body;
+            const response = await staffService.assignBranch({
+                staffId: id,
+                branchId,
+                branchName,
+                cascade,
+                user: req.user
+            });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: {} });
+        }
+    },
+
+    assignHR: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { hrId, hrName } = req.body;
+            const response = await staffService.assignHR({
+                staffId: id,
+                hrId,
+                hrName,
+                user: req.user
+            });
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: {} });
+        }
+    },
+
+    getHRStaffList: async (req, res) => {
+        try {
+            const response = await staffService.getEligibleHRStaff();
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: { recommended: [], all: [] } });
+        }
+    },
+
+    getSubordinatesCount: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const response = await staffService.getSubordinatesCount(id);
+            res.status(response.status).send(response);
+        } catch (error) {
+            res.status(400).send({ status: 400, message: error.message, data: { count: 0, subordinates: [] } });
+        }
     }
 };
 export default staffController;

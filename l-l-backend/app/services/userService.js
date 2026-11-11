@@ -2832,11 +2832,33 @@ const userService = {
       let targetStaffIds = [];
 
       if (currentUserId) {
-        const scope = await resolveUserScope(currentUserId, 'users');
-        isSystemAdmin = (scope.type === 'global');
+        const hierarchy = await getSupervisedStaffIds(currentUserId);
+        isSystemAdmin = hierarchy.isSystemAdmin;
 
         if (!isSystemAdmin) {
-          const rawStaffIds = scope.staffIds || [currentUserId];
+          let rawStaffIds = hierarchy.staffIds || [currentUserId];
+
+          // If a specific staffId was requested in the dashboard query,
+          // strictly enforce that it belongs to the caller's supervised reporting hierarchy!
+          if (staffId && mongoose.isValidObjectId(staffId)) {
+            const requestedIdStr = staffId.toString();
+            const isSubordinate = rawStaffIds.some(id => id.toString() === requestedIdStr);
+            if (isSubordinate) {
+              rawStaffIds = [new mongoose.Types.ObjectId(requestedIdStr)];
+            } else {
+              rawStaffIds = []; // Deny cross-hierarchy access
+            }
+          } else if (staffMember && staffMember !== 'All Staff' && staffMember !== 'All Managers') {
+            const staffList = await staffModel.find({ _id: { $in: rawStaffIds } }).select('_id fullName');
+            const sm = staffMember.trim().toLowerCase();
+            const matchedStaff = staffList.find(s => (s.fullName || '').trim().toLowerCase() === sm);
+            if (matchedStaff) {
+              rawStaffIds = [matchedStaff._id];
+            } else {
+              rawStaffIds = []; // Staff member outside supervised hierarchy
+            }
+          }
+
           const staffObjIds = rawStaffIds
             .filter(sid => sid && mongoose.isValidObjectId(sid))
             .map(sid => new mongoose.Types.ObjectId(sid.toString()));

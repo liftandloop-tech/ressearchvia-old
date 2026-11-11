@@ -9,16 +9,30 @@ import 'package:spresearch_web/controllers/auth/auth.controller.dart';
 import 'package:spresearch_web/services/role_permission.service.dart';
 import 'package:spresearch_web/models/role.model.dart';
 import 'package:spresearch_web/models/department.model.dart';
+import 'package:spresearch_web/models/branch.model.dart';
+import 'package:spresearch_web/services/branch.service.dart';
 
 class StaffController extends GetxController {
   late final StaffService _staffService;
   late final AuthController _authController;
   final _rolePermissionService = Get.put(RolePermissionService());
+  final _branchService = Get.isRegistered<BranchService>() ? Get.find<BranchService>() : Get.put(BranchService());
+
   var rolesList = <RoleModel>[].obs;
   var selectedRoleId = RxnString();
   var selectedRole = ''.obs;
   var departmentsList = <DepartmentModel>[].obs;
   var selectedDepartmentId = RxnString();
+
+  // Branch & HR State
+  var branchList = <BranchModel>[].obs;
+  var hrStaffList = <StaffModel>[].obs;
+  var selectedBranchId = RxnString();
+  var selectedBranchName = RxnString();
+  var selectedHRId = RxnString();
+  var selectedHRName = RxnString();
+  var filterSelectedBranches = <String>[].obs;
+  var filterSelectedHRs = <String>[].obs;
 
   final nameController = TextEditingController();
   final mobileController = TextEditingController();
@@ -378,6 +392,7 @@ class StaffController extends GetxController {
 
       // Use backend-scoped staff list directly (backend strictly enforces hierarchy: Admin -> all, Director/Manager -> self + supervised team, Staff -> self)
       staffList.value = list;
+      loadBranchesAndHR();
 
       if (list.isEmpty) {
         debugPrint('No staff members found');
@@ -404,6 +419,122 @@ class StaffController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> loadBranchesAndHR() async {
+    try {
+      final bRes = await _branchService.getBranches(isActive: true);
+      if (bRes.statusCode == 200 && bRes.body != null) {
+        final list = (bRes.body['data'] as List? ?? [])
+            .map((e) => BranchModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        branchList.assignAll(list);
+      }
+
+      final hrRes = await _staffService.getHRStaff();
+      if (hrRes.statusCode == 200 && hrRes.body != null) {
+        final raw = hrRes.body['data'];
+        final all = (raw['all'] as List? ?? [])
+            .map((e) => StaffModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        hrStaffList.assignAll(all);
+      }
+    } catch (e) {
+      debugPrint('Error loading branches and HR: $e');
+    }
+  }
+
+  Future<bool> assignBranchToStaff(
+    String staffId,
+    String? branchId, {
+    String? branchName,
+    bool cascade = false,
+  }) async {
+    try {
+      final res = await _staffService.assignBranch(
+        staffId,
+        branchId,
+        branchName: branchName,
+        cascade: cascade,
+      );
+      if (res.statusCode == 200) {
+        await fetchStaffList();
+        Get.snackbar(
+          'Success',
+          res.body?['message'] ?? 'Branch updated successfully',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message'] ?? 'Failed to update branch',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to update branch: $e',
+        backgroundColor: Colors.red.withOpacity(0.1),
+        colorText: Colors.red,
+      );
+      return false;
+    }
+  }
+
+  Future<bool> assignHRToStaff(
+    String staffId,
+    String? hrId, {
+    String? hrName,
+  }) async {
+    try {
+      final res = await _staffService.assignHR(staffId, hrId, hrName: hrName);
+      if (res.statusCode == 200) {
+        await fetchStaffList();
+        Get.snackbar(
+          'Success',
+          res.body?['message'] ?? 'HR assigned successfully',
+          backgroundColor: Colors.green.withOpacity(0.1),
+          colorText: Colors.green.shade800,
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          res.body?['message'] ?? 'Failed to assign HR',
+          backgroundColor: Colors.red.withOpacity(0.1),
+          colorText: Colors.red,
+        );
+        return false;
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Failed to assign HR: $e',
+        backgroundColor: Colors.red.withOpacity(0.1),
+        colorText: Colors.red,
+      );
+      return false;
+    }
+  }
+
+  Future<({int count, List<dynamic> subordinates})> getSubordinatesCount(String staffId) async {
+    try {
+      final res = await _staffService.getSubordinatesCount(staffId);
+      if (res.statusCode == 200 && res.body != null) {
+        final data = res.body['data'];
+        final count = (data['count'] as num?)?.toInt() ?? 0;
+        final list = data['subordinates'] as List? ?? [];
+        return (count: count, subordinates: list);
+      }
+    } catch (e) {
+      debugPrint('Error getting subordinates count: $e');
+    }
+    return (count: 0, subordinates: []);
   }
 
   String _normalizeDepartment(String department) {
@@ -497,6 +628,11 @@ class StaffController extends GetxController {
         }
       }
     }
+
+    selectedBranchId.value = staff.branchId;
+    selectedBranchName.value = staff.branchName;
+    selectedHRId.value = staff.assignedHR;
+    selectedHRName.value = staff.assignedHRName;
 
     final w = staff.walkInForm;
     if (w != null) {
@@ -823,6 +959,23 @@ class StaffController extends GetxController {
         data["assignedDirectorName"] = null;
       }
 
+      // Branch & HR Association
+      if (selectedBranchId.value != null && selectedBranchId.value!.isNotEmpty) {
+        data["branchId"] = selectedBranchId.value;
+        data["branchName"] = selectedBranchName.value;
+      } else {
+        data["branchId"] = null;
+        data["branchName"] = null;
+      }
+
+      if (selectedHRId.value != null && selectedHRId.value!.isNotEmpty) {
+        data["assignedHR"] = selectedHRId.value;
+        data["assignedHRName"] = selectedHRName.value;
+      } else {
+        data["assignedHR"] = null;
+        data["assignedHRName"] = null;
+      }
+
       // Only include staffId for update operations
       if (isEditing.value) {
         data["staffId"] = autoGeneratedStaffId.value;
@@ -1000,6 +1153,10 @@ class StaffController extends GetxController {
     isActive.value = true;
     isViewOnly.value = false;
     assignedDirector.value = null;
+    selectedBranchId.value = null;
+    selectedBranchName.value = null;
+    selectedHRId.value = null;
+    selectedHRName.value = null;
   }
 
 
@@ -1066,6 +1223,20 @@ class StaffController extends GetxController {
         }
       }
 
+      if (filterSelectedBranches.isNotEmpty) {
+        final bName = s.branchName?.trim() ?? 'Unassigned';
+        if (!filterSelectedBranches.contains(bName)) {
+          return false;
+        }
+      }
+
+      if (filterSelectedHRs.isNotEmpty) {
+        final hrName = s.assignedHRName?.trim() ?? 'Unassigned';
+        if (!filterSelectedHRs.contains(hrName)) {
+          return false;
+        }
+      }
+
       return true;
     }).toList();
   }
@@ -1075,6 +1246,8 @@ class StaffController extends GetxController {
     filterMobile.value = '';
     filterEmail.value = '';
     filterSelectedRoles.clear();
+    filterSelectedBranches.clear();
+    filterSelectedHRs.clear();
     filterSelectedStatuses.assignAll(['Active']);
     currentPage.value = 1;
   }

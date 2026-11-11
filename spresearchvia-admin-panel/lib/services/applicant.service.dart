@@ -324,11 +324,18 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<({List<StaffModel> applicants, String? error})> getApplicantsList({String stage = 'ALL', String? search}) async {
+  Future<({List<StaffModel> applicants, String? error})> getApplicantsList({
+    String stage = 'ALL',
+    String? search,
+    String? branchId,
+    String? assignedHR,
+  }) async {
     try {
       final queryParams = <String, String>{};
       if (stage.isNotEmpty) queryParams['stage'] = stage;
       if (search != null && search.trim().isNotEmpty) queryParams['search'] = search.trim();
+      if (branchId != null && branchId.trim().isNotEmpty) queryParams['branchId'] = branchId.trim();
+      if (assignedHR != null && assignedHR.trim().isNotEmpty) queryParams['assignedHR'] = assignedHR.trim();
       final queryString = queryParams.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
       final url = '/staff/applicants${queryString.isNotEmpty ? '?$queryString' : ''}';
 
@@ -345,11 +352,18 @@ class ApplicantService extends ApiService {
     }
   }
 
-  Future<({List<ApplicantModel> applicants, String? error})> getApplicantsModelList({String stage = 'ALL', String? search}) async {
+  Future<({List<ApplicantModel> applicants, String? error})> getApplicantsModelList({
+    String stage = 'ALL',
+    String? search,
+    String? branchId,
+    String? assignedHR,
+  }) async {
     try {
       final queryParams = <String, String>{};
       if (stage.isNotEmpty) queryParams['stage'] = stage;
       if (search != null && search.trim().isNotEmpty) queryParams['search'] = search.trim();
+      if (branchId != null && branchId.trim().isNotEmpty) queryParams['branchId'] = branchId.trim();
+      if (assignedHR != null && assignedHR.trim().isNotEmpty) queryParams['assignedHR'] = assignedHR.trim();
       final queryString = queryParams.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
       final url = '/staff/applicants${queryString.isNotEmpty ? '?$queryString' : ''}';
 
@@ -389,28 +403,54 @@ class ApplicantService extends ApiService {
     String? assignedDirector,
     String? assignedDirectorName,
     bool autoSendOfferLetter = false,
+    String? roleId,
+    String? role,
+    String? department,
+    String? joiningDate,
     String? offerDesignation,
     String? offerJoiningDate,
+    String? offerIssueDate,
+    String? branchId,
+    String? branchName,
+    String? assignedHR,
+    String? assignedHRName,
   }) async {
+    final effectiveRole = role?.trim().isNotEmpty == true
+        ? role!.trim()
+        : (offerDesignation?.trim().isNotEmpty == true ? offerDesignation!.trim() : null);
+    final effectiveJoiningDate = joiningDate?.trim().isNotEmpty == true
+        ? joiningDate!.trim()
+        : (offerJoiningDate?.trim().isNotEmpty == true ? offerJoiningDate!.trim() : null);
+
     final res = await approveApplicant(id, {
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
       if (assignedDirector != null && assignedDirector.trim().isNotEmpty) 'assignedDirector': assignedDirector.trim(),
       if (assignedDirectorName != null && assignedDirectorName.trim().isNotEmpty) 'assignedDirectorName': assignedDirectorName.trim(),
+      if (roleId != null && roleId.trim().isNotEmpty) 'roleId': roleId.trim(),
+      if (effectiveRole != null) 'role': effectiveRole,
+      if (department != null && department.trim().isNotEmpty) 'deparment': department.trim(),
+      if (effectiveJoiningDate != null) 'joiningDate': effectiveJoiningDate,
+      if (branchId != null && branchId.trim().isNotEmpty) 'branchId': branchId.trim(),
+      if (branchName != null && branchName.trim().isNotEmpty) 'branchName': branchName.trim(),
+      if (assignedHR != null && assignedHR.trim().isNotEmpty) 'assignedHR': assignedHR.trim(),
+      if (assignedHRName != null && assignedHRName.trim().isNotEmpty) 'assignedHRName': assignedHRName.trim(),
       'autoSendOfferLetter': autoSendOfferLetter,
-      if (offerDesignation != null && offerDesignation.trim().isNotEmpty) 'offerDesignation': offerDesignation.trim(),
-      if (offerJoiningDate != null && offerJoiningDate.trim().isNotEmpty) 'offerJoiningDate': offerJoiningDate.trim(),
+      if (effectiveRole != null) 'offerDesignation': effectiveRole,
+      if (effectiveJoiningDate != null) 'offerJoiningDate': effectiveJoiningDate,
+      if (offerIssueDate != null && offerIssueDate.trim().isNotEmpty) 'offerIssueDate': offerIssueDate.trim(),
     });
 
     if (res.success && autoSendOfferLetter) {
       try {
         await sendOfferLetter(
           id,
-          designation: offerDesignation?.trim().isNotEmpty == true
-              ? offerDesignation!.trim()
+          designation: effectiveRole?.isNotEmpty == true
+              ? effectiveRole!
               : 'Business Development Executive',
-          joiningDate: offerJoiningDate?.trim().isNotEmpty == true
-              ? offerJoiningDate!.trim()
+          joiningDate: effectiveJoiningDate?.isNotEmpty == true
+              ? effectiveJoiningDate!
               : '10/11/2026',
+          issueDate: offerIssueDate?.trim().isNotEmpty == true ? offerIssueDate!.trim() : null,
           customNote: note,
         );
       } catch (e) {
@@ -722,5 +762,27 @@ class ApplicantService extends ApiService {
       offerLetterUrl: null,
       message: 'Remote mailer service is pending deployment on production server. Please use "Preview PDF" to review and download the official letter.',
     );
+  }
+
+  Future<Response> assignApplicantBranch(
+    String applicantId,
+    String? branchId, {
+    String? branchName,
+  }) {
+    return post('/staff/applicant/assign-branch/$applicantId', {
+      'branchId': branchId,
+      if (branchName != null) 'branchName': branchName,
+    });
+  }
+
+  Future<Response> assignApplicantHR(
+    String applicantId,
+    String? hrId, {
+    String? hrName,
+  }) {
+    return post('/staff/applicant/assign-hr/$applicantId', {
+      'hrId': hrId,
+      if (hrName != null) 'hrName': hrName,
+    });
   }
 }

@@ -19,6 +19,7 @@ import permissionGroupRoutes from "./permissionGroupRoutes/index.js";
 import refundRoutes from "./refundRoutes/index.js";
 import departmentRoutes from "./departmentRoutes/index.js";
 import telephonyRoutes from "./telephonyRoutes/index.js";
+import branchRoutes from "./branchRoutes/index.js";
 
 const initRoutes = (app) => {
     app.get('/', (req, res) => res.status(200).send({
@@ -48,6 +49,8 @@ const initRoutes = (app) => {
     app.use('/api/permission-groups', permissionGroupRoutes())
     app.use('/api/departments', departmentRoutes())
     app.use('/api/refund', refundRoutes())
+    app.use('/api/branches', branchRoutes())
+    app.use('/api/branch', branchRoutes())
 
     // Central error handler for upload and security errors
     app.use((err, req, res, next) => {

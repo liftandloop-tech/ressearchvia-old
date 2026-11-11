@@ -27,11 +27,13 @@ class StaffTable extends StatelessWidget {
       columnWidths: const {
         0: FlexColumnWidth(1.3), // Name
         1: FlexColumnWidth(1.1), // Mobile No.
-        2: FlexColumnWidth(1.4), // Email
+        2: FlexColumnWidth(1.3), // Email
         3: FlexColumnWidth(1.0), // Role
-        4: FlexColumnWidth(1.5), // Reporting To dropdown
-        5: FlexColumnWidth(1.0), // Status switch + text
-        6: FlexColumnWidth(1.6), // Actions (Badge, Login As, View, Edit, Delete)
+        4: FlexColumnWidth(1.1), // Branch
+        5: FlexColumnWidth(1.2), // Assigned HR
+        6: FlexColumnWidth(1.4), // Reporting To dropdown
+        7: FlexColumnWidth(0.9), // Status switch + text
+        8: FlexColumnWidth(1.6), // Actions (Badge, Login As, View, Edit, Delete)
       },
       children: [
         TableRow(
@@ -52,6 +54,12 @@ class StaffTable extends StatelessWidget {
             const StaffTableHeaderCell(
               text: 'Role',
               filterIcon: StaffColumnFilter(columnKey: 'role', columnName: 'Role'),
+            ),
+            const StaffTableHeaderCell(
+              text: 'Branch',
+            ),
+            const StaffTableHeaderCell(
+              text: 'Assigned HR',
             ),
             const StaffTableHeaderCell(
               text: 'Reporting To',

@@ -8,6 +8,7 @@ import 'package:spresearch_web/ui/widgets/file_preview_dialog.widget.dart';
 import '../../widgets/offer_letter_dialog.widget.dart';
 import '../../../config/app.config.dart';
 import '../../../models/staff.model.dart';
+import '../../../models/role.model.dart';
 
 class ApplicantProfileScreen extends StatelessWidget {
   const ApplicantProfileScreen({super.key});
@@ -1360,29 +1361,51 @@ class ApplicantProfileScreen extends StatelessWidget {
       return;
     }
 
-    final noteController = TextEditingController();
     bool autoSendOfferLetter = true;
 
-    final defaultRole = applicant.role.isNotEmpty && applicant.role != 'Applicant'
-        ? applicant.role
-        : (applicant.targetRole?.isNotEmpty == true
-            ? applicant.targetRole!
-            : (applicant.currentDesignation?.isNotEmpty == true
-                ? applicant.currentDesignation!
-                : 'Business Development Executive'));
+    final roles = controller.availableRoles;
+    RoleModel? initialRole;
+    if (applicant.targetRoleId != null && applicant.targetRoleId!.isNotEmpty) {
+      initialRole = roles.firstWhereOrNull((r) => r.id == applicant.targetRoleId);
+    }
+    if (initialRole == null && applicant.role.isNotEmpty && applicant.role != 'Applicant') {
+      initialRole = roles.firstWhereOrNull((r) => r.id == applicant.role || r.name.toLowerCase() == applicant.role.toLowerCase());
+    }
+    if (initialRole == null && applicant.targetRole != null && applicant.targetRole!.isNotEmpty) {
+      initialRole = roles.firstWhereOrNull((r) => r.id == applicant.targetRole || r.name.toLowerCase() == applicant.targetRole!.toLowerCase());
+    }
+    if (initialRole == null && applicant.currentDesignation != null && applicant.currentDesignation!.isNotEmpty) {
+      initialRole = roles.firstWhereOrNull((r) => r.name.toLowerCase() == applicant.currentDesignation!.toLowerCase());
+    }
+    initialRole ??= roles.firstWhereOrNull((r) => r.name.toLowerCase().contains('business development')) ?? (roles.isNotEmpty ? roles.first : null);
+
+    String? selectedRoleId = initialRole?.id;
+    String selectedRoleName = initialRole?.name ?? 'Business Development Executive';
+    String? selectedDepartment = initialRole?.departmentName;
 
     final defaultJoinDt = applicant.joiningDate ?? DateTime.now().add(const Duration(days: 7));
     final defaultJoinStr = '${defaultJoinDt.day.toString().padLeft(2, '0')}/${defaultJoinDt.month.toString().padLeft(2, '0')}/${defaultJoinDt.year}';
 
-    final roleCtrl = TextEditingController(text: defaultRole);
     final joinDateCtrl = TextEditingController(text: defaultJoinStr);
+    final now = DateTime.now();
+    final defaultIssueStr = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final issueDateCtrl = TextEditingController(text: defaultIssueStr);
+    bool isGeneratingPreview = false;
 
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) => Dialog(
+          builder: (context, setDialogState) {
+            final currentRoles = controller.availableRoles;
+            if (currentRoles.isNotEmpty && (selectedRoleId == null || !currentRoles.any((r) => r.id == selectedRoleId))) {
+              selectedRoleId = currentRoles.first.id;
+              selectedRoleName = currentRoles.first.name;
+              selectedDepartment = currentRoles.first.departmentName;
+            }
+
+            return Dialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: Container(
               width: 480,
@@ -1425,6 +1448,83 @@ class ApplicantProfileScreen extends StatelessWidget {
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
                     ),
                     const SizedBox(height: 12),
+
+                    // Offer Designation Dropdown (dynamic roles from database, 5 visible at a time with vertical scroll)
+                    const Text(
+                      'Offer Designation *',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: currentRoles.any((r) => r.id == selectedRoleId) ? selectedRoleId : null,
+                      menuMaxHeight: 240, // 5 roles in view (~48px each), vertical scroll for the rest
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: currentRoles.map((r) => DropdownMenuItem<String>(
+                        value: r.id,
+                        child: Text(
+                          r.name,
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          final match = currentRoles.firstWhereOrNull((r) => r.id == val);
+                          if (match != null) {
+                            setDialogState(() {
+                              selectedRoleId = match.id;
+                              selectedRoleName = match.name;
+                              selectedDepartment = match.departmentName;
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Joining Date (Always visible)
+                    const Text(
+                      'Joining Date (DD/MM/YYYY) *',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: joinDateCtrl,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                          padding: EdgeInsets.zero,
+                          onPressed: () async {
+                            final parts = joinDateCtrl.text.split('/');
+                            DateTime initial = DateTime.now();
+                            if (parts.length == 3) {
+                              try {
+                                initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+                              } catch (_) {}
+                            }
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              joinDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
                     // Offer Letter Option (Automatic vs Manual)
                     Container(
@@ -1484,34 +1584,19 @@ class ApplicantProfileScreen extends StatelessWidget {
                             ),
                           ),
                           if (autoSendOfferLetter) ...[
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             Padding(
-                              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                              padding: const EdgeInsets.only(left: 40, right: 8),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    'Offer Designation *',
+                                    'Date of Issue (DD/MM/YYYY) *',
                                     style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                                   ),
                                   const SizedBox(height: 4),
                                   TextField(
-                                    controller: roleCtrl,
-                                    style: const TextStyle(fontSize: 12.5),
-                                    decoration: const InputDecoration(
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Joining Date (DD/MM/YYYY) *',
-                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  TextField(
-                                    controller: joinDateCtrl,
+                                    controller: issueDateCtrl,
                                     style: const TextStyle(fontSize: 12.5),
                                     decoration: InputDecoration(
                                       isDense: true,
@@ -1521,42 +1606,60 @@ class ApplicantProfileScreen extends StatelessWidget {
                                         icon: const Icon(Icons.calendar_month_outlined, size: 16),
                                         padding: EdgeInsets.zero,
                                         onPressed: () async {
-                                          final parts = joinDateCtrl.text.split('/');
+                                          final parts = issueDateCtrl.text.split('/');
                                           DateTime initial = DateTime.now();
                                           if (parts.length == 3) {
                                             try {
                                               initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
                                             } catch (_) {}
-                                         }
-                                         final picked = await showDatePicker(
-                                           context: context,
-                                           initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
-                                           firstDate: DateTime(2000),
-                                           lastDate: DateTime(2100),
-                                         );
-                                         if (picked != null) {
-                                           joinDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-                                         }
-                                       },
-                                     ),
-                                   ),
-                                 ),
+                                          }
+                                          final picked = await showDatePicker(
+                                            context: context,
+                                            initialDate: (initial.year >= 2000 && initial.year <= 2100) ? initial : DateTime.now(),
+                                            firstDate: DateTime(2000),
+                                            lastDate: DateTime(2100),
+                                          );
+                                          if (picked != null) {
+                                            issueDateCtrl.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton.icon(
+                                    onPressed: isGeneratingPreview
+                                        ? null
+                                        : () async {
+                                            setDialogState(() => isGeneratingPreview = true);
+                                            try {
+                                              await OfferLetterDialog.previewPdf(
+                                                context: context,
+                                                applicant: applicant,
+                                                designation: selectedRoleName,
+                                                joiningDate: joinDateCtrl.text.trim(),
+                                                issueDate: issueDateCtrl.text.trim(),
+                                              );
+                                            } finally {
+                                              setDialogState(() => isGeneratingPreview = false);
+                                            }
+                                          },
+                                    icon: isGeneratingPreview
+                                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF4F46E5)))
+                                        : const Icon(Icons.picture_as_pdf_outlined, size: 14),
+                                    label: Text(isGeneratingPreview ? 'Generating Preview...' : 'Preview Offer Letter PDF', style: const TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF4F46E5),
+                                      side: const BorderSide(color: Color(0xFFA5B4FC)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ],
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    TextField(
-                      controller: noteController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Promotion Note (Optional)',
-                        hintText: 'e.g. Selected in final interview round',
-                        border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -1572,12 +1675,15 @@ class ApplicantProfileScreen extends StatelessWidget {
                               onPressed: controller.isPromoting.value
                                   ? null
                                   : () async {
-                                      final note = noteController.text.trim();
                                       final success = await controller.promoteToStaff(
-                                        note: note.isNotEmpty ? note : null,
                                         autoSendOfferLetter: autoSendOfferLetter,
-                                        offerDesignation: roleCtrl.text.trim(),
+                                        roleId: selectedRoleId,
+                                        role: selectedRoleName,
+                                        department: selectedDepartment,
+                                        joiningDate: joinDateCtrl.text.trim(),
+                                        offerDesignation: selectedRoleName,
                                         offerJoiningDate: joinDateCtrl.text.trim(),
+                                        offerIssueDate: issueDateCtrl.text.trim(),
                                       );
                                       if (success && dialogContext.mounted) {
                                         Navigator.of(dialogContext).pop();
@@ -1603,11 +1709,12 @@ class ApplicantProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
-  }
+          );
+        },
+      );
+    },
+  );
+}
 
   void _showRejectDialog(BuildContext context, ApplicantProfileController controller, StaffModel applicant) {
     final authController = Get.isRegistered<AuthController>() ? Get.find<AuthController>() : null;

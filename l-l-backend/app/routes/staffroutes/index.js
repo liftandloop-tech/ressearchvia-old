@@ -22,6 +22,15 @@ const staffRoutes = () => {
     Router.get("/list", auth.tokenVerified, adminOnly, staffController.staffList)
     Router.delete("/cancle/:id", auth.tokenVerified, checkPermission('Staff', 'delete'), staffController.cancleStaff)
     Router.post("/staff-assignment", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.StaffAssignment)
+    
+    // Branch & HR Management
+    Router.get("/hr-staff", auth.tokenVerified, staffController.getHRStaffList)
+    Router.post("/assign-branch/:id", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.assignBranch)
+    Router.put("/assign-branch/:id", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.assignBranch)
+    Router.post("/assign-hr/:id", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.assignHR)
+    Router.put("/assign-hr/:id", auth.tokenVerified, checkPermission('Staff', 'update'), staffController.assignHR)
+    Router.get("/:id/subordinates-count", auth.tokenVerified, staffController.getSubordinatesCount)
+
     // Staff Self-Profile & Account Settings (Authenticated Staff / Admin)
     Router.get("/me", auth.tokenVerified, staffController.getStaffProfileMe)
     Router.put("/me", auth.tokenVerified, staffController.updateStaffProfileMe)
@@ -65,6 +74,10 @@ const staffRoutes = () => {
     Router.post("/applicant/reject/:id", auth.tokenVerified, adminOnly, applicantController.rejectApplicant)
     Router.post("/applicant/assign/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicant)
     Router.put("/applicant/assign/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicant)
+    Router.post("/applicant/assign-hr/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicantHR)
+    Router.put("/applicant/assign-hr/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicantHR)
+    Router.post("/applicant/assign-branch/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicantBranch)
+    Router.put("/applicant/assign-branch/:id", auth.tokenVerified, adminOnly, applicantController.assignApplicantBranch)
     Router.delete("/applicant/:id", auth.tokenVerified, adminOnly, applicantController.deleteApplicant)
     Router.post("/applicant/delete/:id", auth.tokenVerified, adminOnly, applicantController.deleteApplicant)
     Router.post("/applicant/evaluation-remarks/:id", auth.tokenVerified, adminOnly, applicantController.saveEvaluationRemarks)

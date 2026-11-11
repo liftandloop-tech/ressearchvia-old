@@ -412,9 +412,22 @@ class StaffModel {
   final String? assignedStaffId;
   final String? assignedStaffName;
   final String? assignedRecruiterId;
+  final String? branchId;
+  final String? branchName;
+  final String? assignedHR;
+  final String? assignedHRName;
   final Map<String, dynamic>? rawJson;
 
+  String? get targetRoleId => rawJson?['targetRoleId']?.toString() ?? roleId;
   String? get targetRole => rawJson?['targetRole']?.toString() ?? rawJson?['jobRole']?.toString() ?? currentDesignation;
+  String? get offerLetterUrl => rawJson?['offerLetterUrl']?.toString();
+  String? get offerLetterDesignation => rawJson?['offerLetterDesignation']?.toString();
+  String? get offerLetterJoiningDate => rawJson?['offerLetterJoiningDate']?.toString();
+  String? get offerLetterIssueDate => rawJson?['offerLetterIssueDate']?.toString();
+  DateTime? get offerLetterSentAt {
+    final v = rawJson?['offerLetterSentAt'];
+    return v != null ? DateTime.tryParse(v.toString()) : null;
+  }
 
   StaffModel({
     required this.id,
@@ -500,6 +513,10 @@ class StaffModel {
     this.assignedStaffId,
     this.assignedStaffName,
     this.assignedRecruiterId,
+    this.branchId,
+    this.branchName,
+    this.assignedHR,
+    this.assignedHRName,
     this.rawJson,
   });
 
@@ -662,6 +679,10 @@ class StaffModel {
       assignedStaffId: _safeString(json['assignedStaffId'] is Map ? (json['assignedStaffId']['_id'] ?? json['assignedStaffId']['id']) : (json['assignedStaffId'] ?? json['assignedRecruiterId'])),
       assignedStaffName: _safeString(json['assignedStaffName'] ?? (json['assignedStaffId'] is Map ? (json['assignedStaffId']['fullName'] ?? json['assignedStaffId']['name']) : (json['assignedRecruiterId'] is Map ? (json['assignedRecruiterId']['fullName'] ?? json['assignedRecruiterId']['name']) : null))),
       assignedRecruiterId: _safeString(json['assignedRecruiterId'] is Map ? (json['assignedRecruiterId']['_id'] ?? json['assignedRecruiterId']['id']) : json['assignedRecruiterId']),
+      branchId: _safeString(json['branchId'] is Map ? (json['branchId']['_id'] ?? json['branchId']['id']) : json['branchId']),
+      branchName: _safeString(json['branchName'] ?? (json['branchId'] is Map ? json['branchId']['name'] : null)),
+      assignedHR: _safeString(json['assignedHR'] is Map ? (json['assignedHR']['_id'] ?? json['assignedHR']['id']) : json['assignedHR']),
+      assignedHRName: _safeString(json['assignedHRName'] ?? (json['assignedHR'] is Map ? (json['assignedHR']['fullName'] ?? json['assignedHR']['name']) : null)),
       rawJson: json,
     );
   }
@@ -682,6 +703,10 @@ class StaffModel {
       'remark': remark,
       'assignedDirector': assignedDirector,
       'assignedDirectorName': assignedDirectorName,
+      if (branchId != null) 'branchId': branchId,
+      if (branchName != null) 'branchName': branchName,
+      if (assignedHR != null) 'assignedHR': assignedHR,
+      if (assignedHRName != null) 'assignedHRName': assignedHRName,
       'mpin': mpin,
       if (plainPassword != null) 'plainPassword': plainPassword,
       'isViewOnly': isViewOnly,

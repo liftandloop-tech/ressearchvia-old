@@ -444,6 +444,34 @@ const applicantSchema = new mongoose.Schema({
   offerLetterJoiningDate: {
     type: String,
     default: null
+  },
+  offerLetterIssueDate: {
+    type: String,
+    default: null
+  },
+
+  // Branch Preference / Assigned Branch
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    default: null,
+    index: true
+  },
+  branchName: {
+    type: String,
+    default: null
+  },
+
+  // Dedicated Assigned HR
+  assignedHR: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'staff',
+    default: null,
+    index: true
+  },
+  assignedHRName: {
+    type: String,
+    default: null
   }
 }, { timestamps: true, versionKey: false });
 
