@@ -10,12 +10,39 @@ import { checkPermission } from "../../middleware/accessMiddleware.js";
 const Router = express.Router();
 
 const leadRoutes = () => {
+    // Lead Pools
     Router.get("/pools", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.listLeadPools);
     Router.post("/pools", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.createLeadPool);
     Router.put("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.updateLeadPool);
     Router.delete("/pools/:id", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.deleteLeadPool);
     Router.post("/pools/:id/assign", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.assignLeadPool);
     Router.get("/pools/:id/assignable-staff", auth.tokenVerified, checkPermission('leads.view_pools'), leadPoolController.getAssignableStaff);
+
+    // Campaigns
+    Router.get("/campaigns", auth.tokenVerified, checkPermission('leads.view'), leadController.listCampaigns);
+    Router.post("/campaigns", auth.tokenVerified, checkPermission('leads.create'), leadController.createCampaign);
+    Router.put("/campaigns/:id", auth.tokenVerified, checkPermission('leads.update'), leadController.updateCampaign);
+    Router.delete("/campaigns/:id", auth.tokenVerified, checkPermission('leads.update'), leadController.deleteCampaign);
+
+    // Vendors
+    Router.get("/vendors", auth.tokenVerified, checkPermission('leads.view'), leadController.listVendors);
+    Router.post("/vendors", auth.tokenVerified, checkPermission('leads.create'), leadController.createVendor);
+    Router.put("/vendors/:id", auth.tokenVerified, checkPermission('leads.update'), leadController.updateVendor);
+    Router.delete("/vendors/:id", auth.tokenVerified, checkPermission('leads.update'), leadController.deleteVendor);
+
+    // Segments for Leads
+    Router.get("/segments", auth.tokenVerified, checkPermission('leads.view'), leadController.listLeadSegments);
+    Router.post("/:id/segments", auth.tokenVerified, checkPermission('leads.update'), leadController.assignLeadSegments);
+
+    // Free Trial
+    Router.patch("/:id/free-trial", auth.tokenVerified, checkPermission('leads.update'), leadController.updateFreeTrial);
+
+    // Timeline & Activity History
+    Router.get("/:id/timeline", auth.tokenVerified, checkPermission('leads.view'), leadController.getLeadTimeline);
+
+    // Dedicated Pending Follow-ups View
+    Router.get("/pending-followups", auth.tokenVerified, checkPermission('leads.view'), leadController.getPendingFollowups);
+    Router.patch("/:id/follow-up/:followUpId", auth.tokenVerified, checkPermission('leads.follow_up'), leadController.updateFollowUpStatus);
 
     // Pull system
     Router.post("/pull", auth.tokenVerified, leadPullController.pullLeads);

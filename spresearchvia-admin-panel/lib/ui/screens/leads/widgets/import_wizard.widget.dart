@@ -42,9 +42,24 @@ class _ImportWizardState extends State<ImportWizard> {
   String? _selectedTemplateId;
   
   // Options State
-  String _duplicateStrategy = 'skip';
+  String _duplicateStrategy = 'overwrite';
   String? _assignedRM;
   String _leadStage = 'New';
+  String? _selectedCampaignId;
+  String? _selectedVendorId;
+
+  // Validation Metrics State
+  int _valTotalRows = 0;
+  int _valValidRows = 0;
+  int _valDuplicateRows = 0;
+  int _valInvalidRows = 0;
+  int _valMissingMobileRows = 0;
+  int _valDuplicateInFileRows = 0;
+
+  // Created/Updated metrics
+  int _createdRows = 0;
+  int _updatedRows = 0;
+  int _skippedRows = 0;
 
   // Lead Pools State
   List<dynamic> _leadPools = [];
@@ -276,8 +291,21 @@ class _ImportWizardState extends State<ImportWizard> {
     final apiMappings = _fieldMappings.map((key, val) => MapEntry(key, val.toString()));
     final res = await _leadsController.leadService.getImportPreview(widget.importId, apiMappings);
     if (!res.status.hasError && res.body != null) {
+      final data = res.body['data'];
       setState(() {
-        _previewValidationRows = res.body['data'] as List? ?? [];
+        if (data is Map) {
+          _valTotalRows = data['totalRows'] ?? 0;
+          _valValidRows = data['validRows'] ?? 0;
+          _valDuplicateRows = data['duplicateRows'] ?? 0;
+          _valInvalidRows = data['invalidRows'] ?? 0;
+          _valMissingMobileRows = data['missingMobileRows'] ?? 0;
+          _valDuplicateInFileRows = data['duplicateInFileRows'] ?? 0;
+          _previewValidationRows = data['sampleRows'] as List? ?? [];
+        } else if (data is List) {
+          _previewValidationRows = data;
+          _valTotalRows = data.length;
+          _valValidRows = data.where((r) => r['isValid'] == true).length;
+        }
       });
     }
     setState(() => _loadingPreview = false);
@@ -297,6 +325,9 @@ class _ImportWizardState extends State<ImportWizard> {
           _totalRows = data['totalRows'] ?? 0;
           _processedRows = data['processedRows'] ?? 0;
           _successfulRows = data['successfulRows'] ?? 0;
+          _createdRows = data['createdRows'] ?? data['successfulRows'] ?? 0;
+          _updatedRows = data['updatedRows'] ?? 0;
+          _skippedRows = data['skippedRows'] ?? 0;
           _failedRows = data['failedRows'] ?? 0;
           _duplicateRows = data['duplicateRows'] ?? 0;
         });
@@ -357,9 +388,12 @@ class _ImportWizardState extends State<ImportWizard> {
       'selectedSheet': _selectedSheet,
       'importOptions': {
         'duplicateHandling': _duplicateStrategy,
+        'duplicatePolicy': _duplicateStrategy,
         'assignedRM': _assignedRM,
         'stage': _leadStage,
         'leadPoolId': _selectedLeadPoolId,
+        'campaignId': _selectedCampaignId,
+        'leadVendorId': _selectedVendorId,
       }
     });
 
@@ -708,7 +742,7 @@ class _ImportWizardState extends State<ImportWizard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Import Settings & Default Values',
+          'Import Configuration & Duplicate Strategy',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
         ),
         const SizedBox(height: 18),
@@ -717,12 +751,11 @@ class _ImportWizardState extends State<ImportWizard> {
             // Duplicate Resolution
             Expanded(
               child: DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Duplicate Handling Strategy', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'Duplicate Handling Strategy *', border: OutlineInputBorder()),
                 value: _duplicateStrategy,
                 items: const [
-                  DropdownMenuItem(value: 'skip', child: Text('Skip Duplicates (Recommended)')),
-                  DropdownMenuItem(value: 'update', child: Text('Overwrite/Update existing lead')),
-                  DropdownMenuItem(value: 'create', child: Text('Create duplicate record')),
+                  DropdownMenuItem(value: 'overwrite', child: Text('Overwrite (Update existing records)')),
+                  DropdownMenuItem(value: 'skip', child: Text('Skip Duplicate (Keep existing records)')),
                 ],
                 onChanged: (val) {
                   if (val != null) setState(() => _duplicateStrategy = val);
@@ -744,7 +777,7 @@ class _ImportWizardState extends State<ImportWizard> {
                       : null;
 
                   return DropdownButtonFormField<String?>(
-                    decoration: const InputDecoration(labelText: 'Default Owner / RM', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Assigned To / Default RM', border: OutlineInputBorder()),
                     value: safeAssignedRM,
                     hint: const Text('None'),
                     items: [
@@ -763,7 +796,51 @@ class _ImportWizardState extends State<ImportWizard> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            // Campaign Selection
+            Expanded(
+              child: Obx(() {
+                final campaigns = _leadsController.campaignsList;
+                return DropdownButtonFormField<String?>(
+                  decoration: const InputDecoration(labelText: 'Campaign Name (Optional)', border: OutlineInputBorder()),
+                  value: _selectedCampaignId,
+                  hint: const Text('Select Campaign'),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('No Campaign')),
+                    ...campaigns.map((c) => DropdownMenuItem<String?>(
+                          value: c.id,
+                          child: Text(c.name),
+                        )),
+                  ],
+                  onChanged: (val) => setState(() => _selectedCampaignId = val),
+                );
+              }),
+            ),
+            const SizedBox(width: 24),
+            // Vendor Selection
+            Expanded(
+              child: Obx(() {
+                final vendors = _leadsController.vendorsList;
+                return DropdownButtonFormField<String?>(
+                  decoration: const InputDecoration(labelText: 'Lead Vendor (Optional)', border: OutlineInputBorder()),
+                  value: _selectedVendorId,
+                  hint: const Text('Select Vendor'),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('No Vendor')),
+                    ...vendors.map((v) => DropdownMenuItem<String?>(
+                          value: v.id,
+                          child: Text(v.name),
+                        )),
+                  ],
+                  onChanged: (val) => setState(() => _selectedVendorId = val),
+                );
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -772,7 +849,7 @@ class _ImportWizardState extends State<ImportWizard> {
               child: Column(
                 children: [
                   DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Default Lead Stage', border: OutlineInputBorder()),
+                    decoration: const InputDecoration(labelText: 'Default Lead Status *', border: OutlineInputBorder()),
                     value: _leadStage,
                     items: const [
                       DropdownMenuItem(value: 'New', child: Text('New')),
@@ -811,7 +888,7 @@ class _ImportWizardState extends State<ImportWizard> {
                                 : null;
 
                             return DropdownButtonFormField<String?>(
-                              decoration: const InputDecoration(labelText: 'Target Lead Pool', border: OutlineInputBorder()),
+                              decoration: const InputDecoration(labelText: 'Target Lead Pool / Source', border: OutlineInputBorder()),
                               value: safePoolId,
                               hint: const Text('None'),
                               items: [
@@ -872,9 +949,29 @@ class _ImportWizardState extends State<ImportWizard> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
-        const Divider(color: AppTheme.gray200),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
+        // Validation Preview Metrics Bar
+        if (_valTotalRows > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.gray50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.gray300),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildValChip('Total Records', _valTotalRows, Colors.black87),
+                _buildValChip('Valid', _valValidRows, AppTheme.successGreen),
+                _buildValChip('Duplicates', _valDuplicateRows, Colors.amber.shade900),
+                _buildValChip('Invalid', _valInvalidRows, AppTheme.errorRed),
+                _buildValChip('Missing Phone', _valMissingMobileRows, Colors.orange.shade800),
+                _buildValChip('In-File Dups', _valDuplicateInFileRows, Colors.purple.shade700),
+              ],
+            ),
+          ),
+        const SizedBox(height: 12),
         const Text(
           'Mapped Row Validation Previews',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.textPrimary),
@@ -991,6 +1088,16 @@ class _ImportWizardState extends State<ImportWizard> {
     );
   }
 
+  Widget _buildValChip(String label, int val, Color color) {
+    return Column(
+      children: [
+        Text(val.toString(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.gray600)),
+      ],
+    );
+  }
+
   Widget _buildStatsSummary() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1003,8 +1110,9 @@ class _ImportWizardState extends State<ImportWizard> {
         children: [
           _buildStatRow('Total Leads Processed:', _totalRows),
           const Divider(),
-          _buildStatRow('Added Successfully:', _successfulRows, color: AppTheme.successGreen),
-          _buildStatRow('Skipped (Duplicates):', _duplicateRows, color: AppTheme.primaryBlue),
+          _buildStatRow('Created Leads (New):', _createdRows > 0 ? _createdRows : _successfulRows, color: AppTheme.successGreen),
+          _buildStatRow('Updated Leads (Overwrite):', _updatedRows, color: AppTheme.primaryBlue),
+          _buildStatRow('Skipped Leads (Duplicates):', _skippedRows > 0 ? _skippedRows : _duplicateRows, color: Colors.amber.shade900),
           _buildStatRow('Failed (Validation errors):', _failedRows, color: AppTheme.errorRed),
         ],
       ),

@@ -14,6 +14,9 @@ class LeadService extends ApiService {
     String stage = '',
     String assignedRM = '',
     String? leadPoolId,
+    String? campaignId,
+    String? leadVendorId,
+    String? segmentId,
     String? leadSource,
     bool? isAppUser,
     String? sortBy,
@@ -30,6 +33,9 @@ class LeadService extends ApiService {
         if (stage.isNotEmpty) 'stage': stage,
         if (assignedRM.isNotEmpty) 'assignedRM': assignedRM,
         if (leadPoolId != null && leadPoolId.isNotEmpty) 'leadPoolId': leadPoolId,
+        if (campaignId != null && campaignId.isNotEmpty) 'campaignId': campaignId,
+        if (leadVendorId != null && leadVendorId.isNotEmpty) 'leadVendorId': leadVendorId,
+        if (segmentId != null && segmentId.isNotEmpty) 'segmentId': segmentId,
         if (leadSource != null && leadSource.isNotEmpty) 'leadSource': leadSource,
         if (isAppUser != null) 'isAppUser': isAppUser.toString(),
         if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
@@ -95,6 +101,153 @@ class LeadService extends ApiService {
     }
   }
 
+  Future<bool> updateFollowUpStatus(
+    String leadId,
+    String followUpId, {
+    String? status,
+    String? notes,
+    DateTime? rescheduleDate,
+    DateTime? nextFollowUpDate,
+  }) async {
+    try {
+      final response = await patch('/leads/$leadId/follow-up/$followUpId', {
+        if (status != null) 'status': status,
+        if (notes != null) 'notes': notes,
+        if (rescheduleDate != null) 'rescheduleDate': rescheduleDate.toIso8601String(),
+        if (nextFollowUpDate != null) 'nextFollowUpDate': nextFollowUpDate.toIso8601String(),
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating follow-up: $e');
+      return false;
+    }
+  }
+
+  Future<({List<PendingFollowUpModel> followUps, int total, String? error})> getPendingFollowups({
+    int page = 1,
+    int limit = 20,
+    bool isOverdue = false,
+  }) async {
+    try {
+      final query = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (isOverdue) 'isOverdue': 'true',
+      };
+      final response = await get('/leads/pending-followups', query: query, forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final data = response.body['data'];
+        final total = data['total'] as int? ?? 0;
+        final list = data['followUps'] as List<dynamic>? ?? [];
+        final followUps = list.map((x) => PendingFollowUpModel.fromJson(x as Map<String, dynamic>)).toList();
+        return (followUps: followUps, total: total, error: null);
+      }
+      return (followUps: <PendingFollowUpModel>[], total: 0, error: (response.body?['message'] ?? 'Failed to load followups').toString());
+    } catch (e) {
+      debugPrint('Error getting pending followups: $e');
+      return (followUps: <PendingFollowUpModel>[], total: 0, error: e.toString());
+    }
+  }
+
+  Future<List<LeadTimelineModel>> getLeadTimeline(String leadId) async {
+    try {
+      final response = await get('/leads/$leadId/timeline', forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final list = response.body['data'] as List<dynamic>? ?? [];
+        return list.map((x) => LeadTimelineModel.fromJson(x as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting lead timeline: $e');
+      return [];
+    }
+  }
+
+  Future<bool> assignLeadSegments(String leadId, List<String> segmentIds) async {
+    try {
+      final response = await post('/leads/$leadId/segments', {'segmentIds': segmentIds});
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error assigning segments: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateFreeTrial(String leadId, DateTime? startDate, DateTime? endDate) async {
+    try {
+      final response = await patch('/leads/$leadId/free-trial', {
+        'startDate': startDate?.toIso8601String(),
+        'endDate': endDate?.toIso8601String(),
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updating free trial: $e');
+      return false;
+    }
+  }
+
+  Future<List<LeadCampaignModel>> getCampaigns() async {
+    try {
+      final response = await get('/leads/campaigns', forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final list = response.body['data'] as List<dynamic>? ?? [];
+        return list.map((x) => LeadCampaignModel.fromJson(x as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error loading campaigns: $e');
+      return [];
+    }
+  }
+
+  Future<bool> createCampaign(Map<String, dynamic> data) async {
+    try {
+      final response = await post('/leads/campaigns', data);
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error creating campaign: $e');
+      return false;
+    }
+  }
+
+  Future<List<LeadVendorModel>> getVendors() async {
+    try {
+      final response = await get('/leads/vendors', forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final list = response.body['data'] as List<dynamic>? ?? [];
+        return list.map((x) => LeadVendorModel.fromJson(x as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error loading vendors: $e');
+      return [];
+    }
+  }
+
+  Future<bool> createVendor(Map<String, dynamic> data) async {
+    try {
+      final response = await post('/leads/vendors', data);
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error creating vendor: $e');
+      return false;
+    }
+  }
+
+  Future<List<LeadSegmentModel>> getSegments() async {
+    try {
+      final response = await get('/leads/segments', forceRefresh: true);
+      if (response.statusCode == 200 && response.body != null) {
+        final list = response.body['data'] as List<dynamic>? ?? [];
+        return list.map((x) => LeadSegmentModel.fromJson(x as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error loading segments: $e');
+      return [];
+    }
+  }
+
   Future<Response> uploadBulkLeads(List<int> bytes, String filename) async {
     final formData = FormData({
       'file': MultipartFile(bytes, filename: filename),
@@ -105,17 +258,23 @@ class LeadService extends ApiService {
   Future<Response> bulkPasteLeads({
     required String rawText,
     String? leadPoolId,
+    String? campaignId,
+    String? leadVendorId,
     String? assignedRM,
     String stage = 'New',
     String duplicateStrategy = 'skip',
+    String duplicatePolicy = 'skip',
     String defaultName = '',
   }) async {
     return post('/leads/bulk-paste', {
       'rawText': rawText,
       if (leadPoolId != null && leadPoolId.isNotEmpty) 'leadPoolId': leadPoolId,
+      if (campaignId != null && campaignId.isNotEmpty) 'campaignId': campaignId,
+      if (leadVendorId != null && leadVendorId.isNotEmpty) 'leadVendorId': leadVendorId,
       if (assignedRM != null && assignedRM.isNotEmpty) 'assignedRM': assignedRM,
       'stage': stage,
       'duplicateStrategy': duplicateStrategy,
+      'duplicatePolicy': duplicatePolicy,
       'defaultName': defaultName,
     });
   }

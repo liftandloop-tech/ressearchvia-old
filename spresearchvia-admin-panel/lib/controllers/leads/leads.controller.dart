@@ -21,6 +21,18 @@ class LeadsController extends GetxController {
   var leadsList = <LeadModel>[].obs;
   var totalLeads = 0.obs;
 
+  // View Mode: 'leads' vs 'pending_followups'
+  var activeViewMode = 'leads'.obs;
+
+  void switchViewMode(String mode) {
+    activeViewMode.value = mode;
+    if (mode == 'pending_followups') {
+      fetchPendingFollowUps();
+    } else {
+      fetchLeads();
+    }
+  }
+
   // Filter values
   var currentPage = 1.obs;
   final int itemsPerPage = 50;
@@ -31,12 +43,31 @@ class LeadsController extends GetxController {
   var selectedStage = ''.obs;
   var selectedRMId = ''.obs;
   var selectedFilterPoolId = ''.obs;
+  var filterCampaignId = ''.obs;
+  var filterVendorId = ''.obs;
+  var filterSegmentId = ''.obs;
   var activeQuickTab = 'all'.obs;
   var selectedLeadSource = ''.obs;
   var filterIsAppUser = Rxn<bool>();
 
   var sortColumn = RxnString();
   var sortAscending = true.obs;
+
+  // Master Data collections
+  var campaignsList = <LeadCampaignModel>[].obs;
+  var vendorsList = <LeadVendorModel>[].obs;
+  var segmentsList = <LeadSegmentModel>[].obs;
+
+  // Pending Follow-ups state
+  var pendingFollowUpsList = <PendingFollowUpModel>[].obs;
+  var totalPendingFollowUps = 0.obs;
+  var isPendingFollowUpsLoading = false.obs;
+  var pendingFollowUpsPage = 1.obs;
+  var pendingFollowUpsOverdueOnly = false.obs;
+
+  // Lead Timeline state
+  var selectedLeadTimeline = <LeadTimelineModel>[].obs;
+  var isTimelineLoading = false.obs;
 
   bool get hasActiveFilters =>
       searchQuery.value.isNotEmpty ||
@@ -46,6 +77,9 @@ class LeadsController extends GetxController {
       selectedStage.value.isNotEmpty ||
       selectedRMId.value.isNotEmpty ||
       selectedFilterPoolId.value.isNotEmpty ||
+      filterCampaignId.value.isNotEmpty ||
+      filterVendorId.value.isNotEmpty ||
+      filterSegmentId.value.isNotEmpty ||
       activeQuickTab.value != 'all' ||
       selectedLeadSource.value.isNotEmpty ||
       filterIsAppUser.value != null;
@@ -119,11 +153,16 @@ class LeadsController extends GetxController {
   // Add/Edit Form controllers
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
+  final altPhoneController = TextEditingController();
   final emailController = TextEditingController();
   final cityController = TextEditingController();
   final stateController = TextEditingController();
+  final remarksController = TextEditingController();
   final assignRMId = ''.obs;
   final assignLeadPoolId = ''.obs;
+  final assignCampaignId = ''.obs;
+  final assignLeadVendorId = ''.obs;
+  final selectedSegmentIds = <String>[].obs;
   final leadStage = 'New'.obs;
 
   // Follow-up Form controllers
@@ -142,20 +181,24 @@ class LeadsController extends GetxController {
     if (auth != null && !auth.isAuthenticated.value) {
       ever(auth.isAuthenticated, (bool isAuth) {
         if (isAuth) {
-          fetchLeadPools();
-          fetchLeads();
-          fetchStaffDropdown();
-          fetchPullStats();
-          _startOnboardingPolling();
+          _initializeAll();
         }
       });
     } else {
-      fetchLeadPools();
-      fetchLeads();
-      fetchStaffDropdown();
-      fetchPullStats();
-      _startOnboardingPolling();
+      _initializeAll();
     }
+  }
+
+  void _initializeAll() {
+    fetchLeadPools();
+    fetchCampaigns();
+    fetchVendors();
+    fetchSegments();
+    fetchLeads();
+    fetchPendingFollowUps();
+    fetchStaffDropdown();
+    fetchPullStats();
+    _startOnboardingPolling();
   }
 
   @override
@@ -253,6 +296,141 @@ class LeadsController extends GetxController {
     );
   }
 
+  // --- FETCH MASTER DATA ---
+  Future<void> fetchCampaigns() async {
+    try {
+      final list = await _leadService.getCampaigns();
+      campaignsList.assignAll(list);
+    } catch (e) {
+      debugPrint('Error loading campaigns: $e');
+    }
+  }
+
+  Future<void> fetchVendors() async {
+    try {
+      final list = await _leadService.getVendors();
+      vendorsList.assignAll(list);
+    } catch (e) {
+      debugPrint('Error loading vendors: $e');
+    }
+  }
+
+  Future<void> fetchSegments() async {
+    try {
+      final list = await _leadService.getSegments();
+      segmentsList.assignAll(list);
+    } catch (e) {
+      debugPrint('Error loading segments: $e');
+    }
+  }
+
+  Future<void> fetchPendingFollowUps({bool? isOverdue}) async {
+    isPendingFollowUpsLoading.value = true;
+    try {
+      if (isOverdue != null) {
+        pendingFollowUpsOverdueOnly.value = isOverdue;
+      }
+      final res = await _leadService.getPendingFollowups(
+        page: pendingFollowUpsPage.value,
+        limit: 50,
+        isOverdue: pendingFollowUpsOverdueOnly.value,
+      );
+      if (res.error == null) {
+        pendingFollowUpsList.assignAll(res.followUps);
+        totalPendingFollowUps.value = res.total;
+      }
+    } finally {
+      isPendingFollowUpsLoading.value = false;
+    }
+  }
+
+  Future<void> fetchLeadTimeline(String leadId) async {
+    isTimelineLoading.value = true;
+    try {
+      final timeline = await _leadService.getLeadTimeline(leadId);
+      selectedLeadTimeline.assignAll(timeline);
+    } finally {
+      isTimelineLoading.value = false;
+    }
+  }
+
+  Future<bool> assignLeadSegments(String leadId, List<String> segmentIds) async {
+    isLoading.value = true;
+    try {
+      final success = await _leadService.assignLeadSegments(leadId, segmentIds);
+      if (success) {
+        fetchLeads();
+        fetchLeadTimeline(leadId);
+        Get.snackbar('Success', 'Segments updated successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
+        return true;
+      }
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> updateLeadFreeTrial(String leadId, DateTime? start, DateTime? end) async {
+    isLoading.value = true;
+    try {
+      final success = await _leadService.updateFreeTrial(leadId, start, end);
+      if (success) {
+        fetchLeads();
+        fetchLeadTimeline(leadId);
+        Get.snackbar('Success', 'Free trial updated successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
+        return true;
+      }
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> completeFollowUp(String leadId, String followUpId, String notes) async {
+    isLoading.value = true;
+    try {
+      final success = await _leadService.updateFollowUpStatus(
+        leadId,
+        followUpId,
+        status: 'Completed',
+        notes: notes,
+      );
+      if (success) {
+        fetchLeads();
+        fetchPendingFollowUps();
+        fetchLeadTimeline(leadId);
+        Get.snackbar('Follow-up Completed', 'Marked follow-up as completed', backgroundColor: Colors.green.withValues(alpha: 0.1));
+        return true;
+      }
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> rescheduleFollowUp(String leadId, String followUpId, DateTime newDate, String notes) async {
+    isLoading.value = true;
+    try {
+      final success = await _leadService.updateFollowUpStatus(
+        leadId,
+        followUpId,
+        status: 'Rescheduled',
+        notes: notes,
+        rescheduleDate: newDate,
+      );
+      if (success) {
+        fetchLeads();
+        fetchPendingFollowUps();
+        fetchLeadTimeline(leadId);
+        Get.snackbar('Follow-up Rescheduled', 'Follow-up moved to ${newDate.toLocal()}', backgroundColor: Colors.blue.withValues(alpha: 0.1));
+        return true;
+      }
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> fetchLeadPools() async {
     isPoolsLoading.value = true;
     try {
@@ -292,6 +470,9 @@ class LeadsController extends GetxController {
         stage: selectedStage.value,
         assignedRM: selectedRMId.value,
         leadPoolId: selectedFilterPoolId.value.isNotEmpty ? selectedFilterPoolId.value : null,
+        campaignId: filterCampaignId.value.isNotEmpty ? filterCampaignId.value : null,
+        leadVendorId: filterVendorId.value.isNotEmpty ? filterVendorId.value : null,
+        segmentId: filterSegmentId.value.isNotEmpty ? filterSegmentId.value : null,
         leadSource: selectedLeadSource.value.isNotEmpty ? selectedLeadSource.value : null,
         isAppUser: filterIsAppUser.value,
         sortBy: sortColumn.value,
@@ -301,7 +482,7 @@ class LeadsController extends GetxController {
         leadsList.assignAll(res.leads);
         totalLeads.value = res.total;
       } else {
-        Get.snackbar('Error', res.error!, backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+        Get.snackbar('Error', res.error!, backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
       }
     } finally {
       isLoading.value = false;
@@ -365,6 +546,9 @@ class LeadsController extends GetxController {
     String? stage,
     String? rmId,
     String? poolId,
+    String? campaignId,
+    String? vendorId,
+    String? segmentId,
     String? leadSource,
     bool? isAppUser,
   }) {
@@ -375,6 +559,9 @@ class LeadsController extends GetxController {
     if (stage != null) selectedStage.value = stage;
     if (rmId != null) selectedRMId.value = rmId;
     if (poolId != null) selectedFilterPoolId.value = poolId;
+    if (campaignId != null) filterCampaignId.value = campaignId;
+    if (vendorId != null) filterVendorId.value = vendorId;
+    if (segmentId != null) filterSegmentId.value = segmentId;
     if (leadSource != null) selectedLeadSource.value = leadSource;
     if (isAppUser != null) filterIsAppUser.value = isAppUser;
     currentPage.value = 1;
@@ -390,6 +577,9 @@ class LeadsController extends GetxController {
     selectedStage.value = '';
     selectedRMId.value = '';
     selectedFilterPoolId.value = '';
+    filterCampaignId.value = '';
+    filterVendorId.value = '';
+    filterSegmentId.value = '';
     selectedLeadSource.value = '';
     filterIsAppUser.value = null;
     sortColumn.value = null;
@@ -401,17 +591,22 @@ class LeadsController extends GetxController {
   void resetForm() {
     nameController.clear();
     phoneController.clear();
+    altPhoneController.clear();
     emailController.clear();
     cityController.clear();
     stateController.clear();
+    remarksController.clear();
     assignRMId.value = '';
     assignLeadPoolId.value = '';
+    assignCampaignId.value = '';
+    assignLeadVendorId.value = '';
+    selectedSegmentIds.clear();
     leadStage.value = 'New';
   }
 
   Future<void> saveLead({String? existingId}) async {
     if (phoneController.text.trim().isEmpty) {
-      Get.snackbar('Validation Alert', 'Phone Number is required', backgroundColor: Colors.orange.withOpacity(0.1));
+      Get.snackbar('Validation Alert', 'Phone Number is required', backgroundColor: Colors.orange.withValues(alpha: 0.1));
       return;
     }
 
@@ -420,10 +615,15 @@ class LeadsController extends GetxController {
       final data = {
         'fullName': nameController.text.trim(),
         'mobileNumber': phoneController.text.trim(),
+        if (altPhoneController.text.trim().isNotEmpty) 'alternateMobile': altPhoneController.text.trim(),
         'emailAddress': emailController.text.trim().isEmpty ? null : emailController.text.trim(),
         'assignedRM': assignRMId.value.isEmpty ? null : assignRMId.value,
         if (assignLeadPoolId.value.isNotEmpty) 'leadPoolId': assignLeadPoolId.value,
+        if (assignCampaignId.value.isNotEmpty) 'campaignId': assignCampaignId.value,
+        if (assignLeadVendorId.value.isNotEmpty) 'leadVendorId': assignLeadVendorId.value,
+        if (selectedSegmentIds.isNotEmpty) 'segmentIds': selectedSegmentIds.toList(),
         'stage': leadStage.value,
+        'remarks': remarksController.text.trim(),
         'personalDetails': {
           'city': cityController.text.trim().isEmpty ? null : cityController.text.trim(),
           'state': stateController.text.trim().isEmpty ? null : stateController.text.trim(),
@@ -442,9 +642,9 @@ class LeadsController extends GetxController {
         fetchLeads();
         fetchLeadPools();
         fetchPullStats();
-        Get.snackbar('Success', existingId != null ? 'Lead updated successfully' : 'Lead created successfully', backgroundColor: Colors.green.withOpacity(0.1));
+        Get.snackbar('Success', existingId != null ? 'Lead updated successfully' : 'Lead created successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Error', 'Failed to save lead', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', 'Failed to save lead', backgroundColor: Colors.red.withValues(alpha: 0.1));
       }
     } finally {
       isLoading.value = false;
@@ -457,9 +657,9 @@ class LeadsController extends GetxController {
       final success = await _leadService.updateLead(leadId, {'stage': newStage});
       if (success) {
         fetchLeads();
-        Get.snackbar('Success', 'Lead stage updated successfully', backgroundColor: Colors.green.withOpacity(0.1));
+        Get.snackbar('Success', 'Lead stage updated successfully', backgroundColor: Colors.green.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Error', 'Failed to update lead stage', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', 'Failed to update lead stage', backgroundColor: Colors.red.withValues(alpha: 0.1));
       }
     } catch (e) {
       Get.snackbar('Error', e.toString());
@@ -470,7 +670,7 @@ class LeadsController extends GetxController {
 
   Future<void> addFollowUpLog(String leadId) async {
     if (followUpNotesController.text.trim().isEmpty) {
-      Get.snackbar('Validation Alert', 'Follow-up notes cannot be empty', backgroundColor: Colors.orange.withOpacity(0.1));
+      Get.snackbar('Validation Alert', 'Follow-up notes cannot be empty', backgroundColor: Colors.orange.withValues(alpha: 0.1));
       return;
     }
 
@@ -487,9 +687,10 @@ class LeadsController extends GetxController {
         Get.back();
         followUpNotesController.clear();
         fetchLeads();
-        Get.snackbar('Success', 'Follow-up log recorded', backgroundColor: Colors.green.withOpacity(0.1));
+        fetchPendingFollowUps();
+        Get.snackbar('Success', 'Follow-up log recorded', backgroundColor: Colors.green.withValues(alpha: 0.1));
       } else {
-        Get.snackbar('Error', 'Failed to add follow-up', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', 'Failed to add follow-up', backgroundColor: Colors.red.withValues(alpha: 0.1));
       }
     } catch (e) {
       Get.snackbar('Error', e.toString());
@@ -525,21 +726,24 @@ class LeadsController extends GetxController {
           );
         } else {
           final msg = res.body?['message'] ?? 'An error occurred during file upload';
-          Get.snackbar('Import Failed', msg, backgroundColor: Colors.red.withOpacity(0.1));
+          Get.snackbar('Import Failed', msg, backgroundColor: Colors.red.withValues(alpha: 0.1));
         }
       }
     } catch (e) {
       isLoading.value = false;
-      Get.snackbar('Error', 'Failed to read file: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to read file: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
     }
   }
 
   Future<bool> bulkPasteLeads({
     required String rawText,
     String? leadPoolId,
+    String? campaignId,
+    String? leadVendorId,
     String? assignedRM,
     String stage = 'New',
     String duplicateStrategy = 'skip',
+    String duplicatePolicy = 'skip',
     String defaultName = '',
   }) async {
     try {
@@ -547,36 +751,41 @@ class LeadsController extends GetxController {
       final res = await _leadService.bulkPasteLeads(
         rawText: rawText,
         leadPoolId: leadPoolId,
+        campaignId: campaignId,
+        leadVendorId: leadVendorId,
         assignedRM: assignedRM,
         stage: stage,
         duplicateStrategy: duplicateStrategy,
+        duplicatePolicy: duplicatePolicy,
         defaultName: defaultName,
       );
       isLoading.value = false;
 
       if (!res.status.hasError && res.body != null) {
         final data = res.body['data'] as Map<String, dynamic>? ?? {};
-        final inserted = data['insertedCount'] ?? 0;
+        final inserted = data['insertedCount'] ?? data['createdCount'] ?? 0;
+        final updated = data['updatedCount'] ?? 0;
+        final skipped = data['skippedCount'] ?? 0;
         final dups = data['duplicateCount'] ?? 0;
         final invalid = data['invalidCount'] ?? 0;
 
         Get.snackbar(
-          'Bulk Paste Complete',
-          '$inserted leads created | $dups duplicates | $invalid invalid',
-          backgroundColor: Colors.green.withOpacity(0.1),
-          duration: const Duration(seconds: 4),
+          'Bulk Ingestion Complete',
+          '$inserted created | $updated updated | $skipped skipped | $dups dups | $invalid invalid',
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
+          duration: const Duration(seconds: 5),
         );
         fetchLeads();
         fetchPullStats();
         return true;
       } else {
         final msg = res.body?['message'] ?? 'Failed to import pasted leads';
-        Get.snackbar('Import Failed', msg, backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Import Failed', msg, backgroundColor: Colors.red.withValues(alpha: 0.1));
         return false;
       }
     } catch (e) {
       isLoading.value = false;
-      Get.snackbar('Error', 'Failed to paste leads: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to paste leads: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
       return false;
     }
   }
@@ -598,6 +807,7 @@ class LeadsController extends GetxController {
               .map((item) => LeadPoolModel.fromJson(item as Map<String, dynamic>))
               .toList();
           leadPoolsList.assignAll(poolsList);
+
           if (leadPoolsList.isNotEmpty) {
             if (selectedPullPoolId.value.isEmpty || !leadPoolsList.any((p) => p.id == selectedPullPoolId.value)) {
               selectedPullPoolId.value = leadPoolsList.first.id;
@@ -714,7 +924,7 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Success',
           'Lead pool "$name" created successfully',
-          backgroundColor: Colors.green.withOpacity(0.1),
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
           colorText: Colors.green.shade800,
         );
         return true;
@@ -722,13 +932,13 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Error',
           res.body?['message'] ?? 'Failed to create lead pool',
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
           colorText: Colors.red,
         );
         return false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to create lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to create lead pool: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
       return false;
     }
   }
@@ -742,7 +952,7 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Success',
           res.body?['message'] ?? 'Lead pool assigned successfully',
-          backgroundColor: Colors.green.withOpacity(0.1),
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
           colorText: Colors.green.shade800,
         );
         return true;
@@ -750,13 +960,13 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Error',
           res.body?['message'] ?? 'Failed to assign lead pool',
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
           colorText: Colors.red,
         );
         return false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to assign lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to assign lead pool: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
       return false;
     }
   }
@@ -783,7 +993,7 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Success',
           'Lead pool updated successfully',
-          backgroundColor: Colors.green.withOpacity(0.1),
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
           colorText: Colors.green.shade800,
         );
         return true;
@@ -791,13 +1001,13 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Error',
           res.body?['message'] ?? 'Failed to update lead pool',
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
           colorText: Colors.red,
         );
         return false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to update lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to update lead pool: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
       return false;
     }
   }
@@ -817,7 +1027,7 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Success',
           'Lead pool deleted successfully',
-          backgroundColor: Colors.green.withOpacity(0.1),
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
           colorText: Colors.green.shade800,
         );
         return true;
@@ -825,13 +1035,13 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Error',
           res.body?['message'] ?? 'Failed to delete lead pool',
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
           colorText: Colors.red,
         );
         return false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to delete lead pool: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to delete lead pool: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
       return false;
     }
   }
@@ -840,10 +1050,10 @@ class LeadsController extends GetxController {
     try {
       final url = Uri.parse('${AppConfig.apiBaseUrl}/leads/template');
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        Get.snackbar('Error', 'Could not download template', backgroundColor: Colors.red.withOpacity(0.1));
+        Get.snackbar('Error', 'Could not download template', backgroundColor: Colors.red.withValues(alpha: 0.1));
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to start download: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to start download: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
     }
   }
 
@@ -877,15 +1087,15 @@ class LeadsController extends GetxController {
       final res = await _leadService.bulkAssignLeads(selectedLeadIds.toList(), staffId);
       if (!res.status.hasError) {
         Get.snackbar('Success', 'Leads assigned successfully',
-            backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green.shade800);
+            backgroundColor: Colors.green.withValues(alpha: 0.1), colorText: Colors.green.shade800);
         selectedLeadIds.clear();
         fetchLeads();
       } else {
         Get.snackbar('Error', res.body?['message'] ?? 'Failed to assign leads',
-            backgroundColor: Colors.red.withOpacity(0.1), colorText: Colors.red);
+            backgroundColor: Colors.red.withValues(alpha: 0.1), colorText: Colors.red);
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to assign leads: $e', backgroundColor: Colors.red.withOpacity(0.1));
+      Get.snackbar('Error', 'Failed to assign leads: $e', backgroundColor: Colors.red.withValues(alpha: 0.1));
     } finally {
       isLoading.value = false;
     }
@@ -906,7 +1116,7 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Success',
           msg.toString(),
-          backgroundColor: Colors.green.withOpacity(0.1),
+          backgroundColor: Colors.green.withValues(alpha: 0.1),
           colorText: Colors.green.shade800,
           duration: const Duration(seconds: 4),
         );
@@ -916,7 +1126,7 @@ class LeadsController extends GetxController {
         Get.snackbar(
           'Error',
           res.body?['message']?.toString() ?? 'Failed to assign leads',
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
           colorText: Colors.red,
         );
         return false;
@@ -925,7 +1135,7 @@ class LeadsController extends GetxController {
       Get.snackbar(
         'Error',
         'Failed to assign leads: $e',
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
       );
       return false;
     } finally {

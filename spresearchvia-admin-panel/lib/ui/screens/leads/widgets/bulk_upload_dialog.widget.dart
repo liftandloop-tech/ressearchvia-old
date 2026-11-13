@@ -29,10 +29,12 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
   bool _isSubmitting = false;
 
   // Options for Ingestion
-  String _duplicateStrategy = 'skip';
+  String _duplicatePolicy = 'overwrite';
   String? _assignedRM;
   String _leadStage = 'New';
   String? _selectedLeadPoolId;
+  String? _selectedCampaignId;
+  String? _selectedVendorId;
   List<dynamic> _leadPools = [];
   bool _isLoadingPools = true;
 
@@ -127,14 +129,33 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
     int dups = 0;
     int invalids = 0;
 
-    // Split on line breaks (Enter key \r\n, \r, \n, unicode breaks), commas, and semicolons
-    final rawTokens = text.split(RegExp(r'[\r\n\u2028\u2029,;]+'));
+    final lines = text.split(RegExp(r'[\r\n\u2028\u2029]+'));
 
-    for (final token in rawTokens) {
-      final trimmed = token.trim();
-      if (trimmed.isEmpty) continue;
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
 
-      final normalized10 = _normalizePhone(trimmed);
+      String name = '';
+      String rawPhone = line;
+      String email = '';
+
+      if (line.contains('\t')) {
+        final parts = line.split('\t').map((p) => p.trim()).toList();
+        if (parts.length >= 2) {
+          name = parts[0];
+          rawPhone = parts[1];
+          if (parts.length >= 3) email = parts[2];
+        }
+      } else if (line.contains(',')) {
+        final parts = line.split(',').map((p) => p.trim()).toList();
+        if (parts.length >= 2) {
+          name = parts[0];
+          rawPhone = parts[1];
+          if (parts.length >= 3) email = parts[2];
+        }
+      }
+
+      final normalized10 = _normalizePhone(rawPhone);
 
       // Validate: exactly 10 digits starting with 6, 7, 8, or 9
       if (normalized10.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(normalized10)) {
@@ -145,8 +166,10 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
           valid.add(normalized10);
           if (preview.length < 50) {
             preview.add({
-              'raw': trimmed,
-              'normalized': normalized10,
+              'name': name.isNotEmpty ? name : 'Lead',
+              'phone': normalized10,
+              'email': email,
+              'raw': line,
             });
           }
         }
@@ -170,7 +193,7 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
       Get.snackbar(
         'No Valid Numbers',
         'Please enter or paste at least one valid 10-digit mobile number.',
-        backgroundColor: Colors.amber.withOpacity(0.2),
+        backgroundColor: Colors.amber.withValues(alpha: 0.2),
       );
       return;
     }
@@ -180,9 +203,12 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
     final success = await widget.controller.bulkPasteLeads(
       rawText: _pasteController.text,
       leadPoolId: _selectedLeadPoolId,
+      campaignId: _selectedCampaignId,
+      leadVendorId: _selectedVendorId,
       assignedRM: _assignedRM,
       stage: _leadStage,
-      duplicateStrategy: _duplicateStrategy,
+      duplicateStrategy: _duplicatePolicy,
+      duplicatePolicy: _duplicatePolicy,
     );
 
     setState(() => _isSubmitting = false);
@@ -618,105 +644,50 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Ingestion Settings', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+              const Text('Import Configuration', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
               const SizedBox(height: 12),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Target Lead Pool
+                  // Campaign Selection
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Target Lead Pool', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const Text('Campaign Name *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
                         const SizedBox(height: 6),
-                        _isLoadingPools
-                            ? const LinearProgressIndicator()
-                            : DropdownButtonFormField<String>(
-                                initialValue: _selectedLeadPoolId,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  isDense: true,
-                                ),
-                                items: _leadPools.map((p) {
-                                  return DropdownMenuItem<String>(
-                                    value: p['_id']?.toString(),
-                                    child: Text(p['name']?.toString() ?? 'Pool', overflow: TextOverflow.ellipsis),
-                                  );
-                                }).toList(),
-                                onChanged: (val) => setState(() => _selectedLeadPoolId = val),
-                              ),
+                        Obx(() {
+                          final campaigns = widget.controller.campaignsList;
+                          return DropdownButtonFormField<String?>(
+                            value: _selectedCampaignId,
+                            isExpanded: true,
+                            hint: const Text('Select Campaign (Optional)'),
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(value: null, child: Text('No Campaign', overflow: TextOverflow.ellipsis)),
+                              ...campaigns.map((c) => DropdownMenuItem<String?>(
+                                    value: c.id,
+                                    child: Text(c.name, overflow: TextOverflow.ellipsis),
+                                  )),
+                            ],
+                            onChanged: (val) => setState(() => _selectedCampaignId = val),
+                          );
+                        }),
                       ],
                     ),
                   ),
                   const SizedBox(width: 14),
 
-                  // Duplicate Handling Strategy
+                  // Assigned RM
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Duplicate Handling', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          initialValue: _duplicateStrategy,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            isDense: true,
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'skip', child: Text('Skip Existing', overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: 'update', child: Text('Update Existing', overflow: TextOverflow.ellipsis)),
-                          ],
-                          onChanged: (val) => setState(() => _duplicateStrategy = val ?? 'skip'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Stage Selection
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Initial Stage', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          initialValue: _leadStage,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            isDense: true,
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'New', child: Text('New')),
-                            DropdownMenuItem(value: 'Contacted', child: Text('Contacted')),
-                            DropdownMenuItem(value: 'Interested', child: Text('Interested')),
-                            DropdownMenuItem(value: 'Qualified', child: Text('Qualified')),
-                          ],
-                          onChanged: (val) => setState(() => _leadStage = val ?? 'New'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-
-                  // Assigned RM (Optional)
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Assign RM (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const Text('Assigned To *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
                           value: safeAssignedRM,
@@ -742,6 +713,218 @@ class _BulkUploadDialogState extends State<BulkUploadDialog> {
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Target Lead Pool / Source
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Lead Source / Pool *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        _isLoadingPools
+                            ? const LinearProgressIndicator()
+                            : DropdownButtonFormField<String>(
+                                initialValue: _selectedLeadPoolId,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  isDense: true,
+                                ),
+                                items: _leadPools.map((p) {
+                                  return DropdownMenuItem<String>(
+                                    value: p['_id']?.toString(),
+                                    child: Text(p['name']?.toString() ?? 'Pool', overflow: TextOverflow.ellipsis),
+                                  );
+                                }).toList(),
+                                onChanged: (val) => setState(() => _selectedLeadPoolId = val),
+                              ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Lead Vendor
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Lead Vendor', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        Obx(() {
+                          final vendors = widget.controller.vendorsList;
+                          return DropdownButtonFormField<String?>(
+                            value: _selectedVendorId,
+                            isExpanded: true,
+                            hint: const Text('Select Vendor (Optional)'),
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(value: null, child: Text('No Vendor', overflow: TextOverflow.ellipsis)),
+                              ...vendors.map((v) => DropdownMenuItem<String?>(
+                                    value: v.id,
+                                    child: Text(v.name, overflow: TextOverflow.ellipsis),
+                                  )),
+                            ],
+                            onChanged: (val) => setState(() => _selectedVendorId = val),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Default Lead Status
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Default Lead Status *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          initialValue: _leadStage,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'New', child: Text('New')),
+                            DropdownMenuItem(value: 'Contacted', child: Text('Contacted')),
+                            DropdownMenuItem(value: 'Interested', child: Text('Interested')),
+                            DropdownMenuItem(value: 'Qualified', child: Text('Qualified')),
+                            DropdownMenuItem(value: 'Demo / Meeting Scheduled', child: Text('Demo / Meeting Scheduled')),
+                            DropdownMenuItem(value: 'Demo / Meeting Completed', child: Text('Demo / Meeting Completed')),
+                            DropdownMenuItem(value: 'Proposal Sent', child: Text('Proposal Sent')),
+                            DropdownMenuItem(value: 'Negotiation', child: Text('Negotiation')),
+                            DropdownMenuItem(value: 'Follow-up', child: Text('Follow-up')),
+                            DropdownMenuItem(value: 'Won', child: Text('Won')),
+                            DropdownMenuItem(value: 'Lost', child: Text('Lost')),
+                            DropdownMenuItem(value: 'On Hold', child: Text('On Hold')),
+                            DropdownMenuItem(value: 'Not Interested', child: Text('Not Interested')),
+                            DropdownMenuItem(value: 'Invalid', child: Text('Invalid')),
+                          ],
+                          onChanged: (val) => setState(() => _leadStage = val ?? 'New'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  // Duplicate Handling (Overwrite vs Skip Duplicate)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Duplicate Handling *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.gray600)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _duplicatePolicy = 'overwrite'),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: _duplicatePolicy == 'overwrite' ? AppTheme.primaryBlue.withValues(alpha: 0.1) : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _duplicatePolicy == 'overwrite' ? AppTheme.primaryBlue : AppTheme.gray300,
+                                      width: _duplicatePolicy == 'overwrite' ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: const [
+                                      Text('Overwrite', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      Text('Update existing', style: TextStyle(fontSize: 10, color: AppTheme.gray500)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _duplicatePolicy = 'skip'),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: _duplicatePolicy == 'skip' ? AppTheme.primaryBlue.withValues(alpha: 0.1) : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _duplicatePolicy == 'skip' ? AppTheme.primaryBlue : AppTheme.gray300,
+                                      width: _duplicatePolicy == 'skip' ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: const [
+                                      Text('Skip Duplicate', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                      Text('Keep existing', style: TextStyle(fontSize: 10, color: AppTheme.gray500)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_previewItems.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('Validation Preview (First few parsed records):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                const SizedBox(height: 6),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  decoration: BoxDecoration(
+                    color: AppTheme.gray50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.gray200),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _previewItems.length > 5 ? 5 : _previewItems.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, idx) {
+                      final item = _previewItems[idx];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: Row(
+                          children: [
+                            Text('${idx + 1}.', style: const TextStyle(fontSize: 11, color: AppTheme.gray400)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${item['name']} | ${item['phone']} ${item['email'] != null && item['email']!.isNotEmpty ? "| ${item['email']}" : ""}',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.check_circle, size: 14, color: AppTheme.successGreen),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ],
           ),
         ),

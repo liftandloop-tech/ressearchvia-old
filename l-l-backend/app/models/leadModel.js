@@ -9,6 +9,10 @@ const leadSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    alternateMobile: {
+        type: String,
+        default: ""
+    },
     emailAddress: {
         type: String,
         default: null
@@ -24,6 +28,35 @@ const leadSchema = new mongoose.Schema({
         ref: 'leadPool',
         default: null,
         index: true
+    },
+    campaignId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'leadCampaign',
+        default: null,
+        index: true
+    },
+    leadVendorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'leadVendor',
+        default: null,
+        index: true
+    },
+    segmentIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'segments'
+    }],
+    freeTrial: {
+        startDate: { type: Date, default: null },
+        endDate: { type: Date, default: null }
+    },
+    remarks: {
+        type: String,
+        default: ""
+    },
+    importBatchId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'importJob',
+        default: null
     },
     pulledAt: {
         type: Date,
@@ -112,6 +145,8 @@ const leadSchema = new mongoose.Schema({
 
 // Compound index for high performance pull and quota checks
 leadSchema.index({ companyId: 1, leadPoolId: 1, assignedRM: 1 });
+leadSchema.index({ companyId: 1, mobileNumber: 1 });
+leadSchema.index({ "followUps.status": 1, "followUps.followUpDate": 1 });
 
 const leadModel = mongoose.model("lead", leadSchema);
 export default leadModel;

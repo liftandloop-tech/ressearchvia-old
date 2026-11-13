@@ -3,6 +3,7 @@ import fs from "fs";
 import csvParser from "csv-parser";
 import leadModel from "../models/leadModel.js";
 import importJobModel from "../models/importJobModel.js";
+import leadTimelineModel from "../models/leadTimelineModel.js";
 import { ensureDefaultFreshPool } from "../controller/leadPoolController.js";
 
 // Helper to generate A, B, C... AA column letters
@@ -56,17 +57,26 @@ function transformAndValidateRow(row, mapping, rowNum) {
 
     const fullName = String(getRowValue(row, 'fullName') || '').trim();
     const rawPhone = String(getRowValue(row, 'mobileNumber') || '').trim();
+    const rawAltPhone = String(getRowValue(row, 'alternateMobile') || '').trim();
     const email = String(getRowValue(row, 'emailAddress') || '').trim();
     const city = String(getRowValue(row, 'city') || '').trim();
     const state = String(getRowValue(row, 'state') || '').trim();
+    const remarks = String(getRowValue(row, 'remarks') || '').trim();
 
     const errors = [];
+    let isMissingMobile = false;
 
+    if (!rawPhone) {
+        isMissingMobile = true;
+        errors.push("Missing phone number");
+    }
 
     const phone = normalizePhone(rawPhone);
-    if (!phone || phone.length < 10) {
-        errors.push(`Invalid or missing phone number: "${rawPhone}"`);
+    if (rawPhone && (!phone || phone.length < 10)) {
+        errors.push(`Invalid phone number: "${rawPhone}"`);
     }
+
+    const altPhone = rawAltPhone ? normalizePhone(rawAltPhone) : "";
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         errors.push(`Invalid email address: "${email}"`);
@@ -75,11 +85,14 @@ function transformAndValidateRow(row, mapping, rowNum) {
     return {
         rowNumber: rowNum,
         isValid: errors.length === 0,
+        isMissingMobile,
         errors,
         mappedData: {
             fullName,
             mobileNumber: phone || rawPhone,
+            alternateMobile: altPhone,
             emailAddress: email || null,
+            remarks: remarks || "",
             personalDetails: {
                 city: city || null,
                 state: state || null
@@ -93,9 +106,11 @@ const importService = {
     LEAD_IMPORT_FIELDS: [
         { key: "fullName", label: "Full Name", type: "text", required: false },
         { key: "mobileNumber", label: "Mobile Number", type: "phone", required: true },
+        { key: "alternateMobile", label: "Alternate Mobile", type: "phone", required: false },
         { key: "emailAddress", label: "Email Address", type: "email", required: false },
         { key: "city", label: "City", type: "text", required: false, path: "personalDetails.city" },
-        { key: "state", label: "State", type: "text", required: false, path: "personalDetails.state" }
+        { key: "state", label: "State", type: "text", required: false, path: "personalDetails.state" },
+        { key: "remarks", label: "Remarks / Notes", type: "text", required: false }
     ],
 
     parseUploadedFile: async (filePath, ext) => {
@@ -126,34 +141,38 @@ const importService = {
                         index: colIdx,
                         letter: getColumnLetter(colIdx),
                         header: header,
-                        sampleValues: sampleValues.map(String)
+                        sampleValues: sampleValues.map(v => String(v))
                     };
                 });
             }
         } else {
-            // Excel parsing
+            // Excel File handling
             const workbook = xlsx.readFile(filePath);
             sheetNames = workbook.SheetNames;
-            const defaultSheet = workbook.Sheets[sheetNames[0]];
-            const rawData = xlsx.utils.sheet_to_json(defaultSheet, { header: 1 });
+            const firstSheet = workbook.Sheets[sheetNames[0]];
+            const jsonData = xlsx.utils.sheet_to_json(firstSheet, { header: 1 });
 
-            if (rawData.length > 0) {
-                const headers = rawData[0].map(h => String(h || '').trim());
-                previewRows = xlsx.utils.sheet_to_json(defaultSheet).slice(0, 10);
+            if (jsonData.length > 0) {
+                const rawHeaders = jsonData[0] || [];
+                const headers = rawHeaders.map((h, i) => (h ? String(h).trim() : `Column ${getColumnLetter(i + 1)}`));
+                const dataRows = jsonData.slice(1, 11);
+
+                previewRows = dataRows.map(row => {
+                    const obj = {};
+                    headers.forEach((h, i) => {
+                        obj[h] = row[i] !== undefined ? row[i] : null;
+                    });
+                    return obj;
+                });
 
                 columnPreview = headers.map((header, index) => {
                     const colIdx = index + 1;
-                    const sampleValues = [];
-                    for (let r = 1; r < Math.min(rawData.length, 6); r++) {
-                        if (rawData[r] && rawData[r][index] !== undefined) {
-                            sampleValues.push(String(rawData[r][index]));
-                        }
-                    }
+                    const sampleValues = dataRows.map(r => r[index]).filter(v => v !== undefined && v !== null);
                     return {
                         index: colIdx,
                         letter: getColumnLetter(colIdx),
-                        header: header || `Column ${colIdx}`,
-                        sampleValues: sampleValues
+                        header: header,
+                        sampleValues: sampleValues.map(v => String(v))
                     };
                 });
             }
@@ -162,89 +181,114 @@ const importService = {
         return { sheetNames, previewRows, columnPreview };
     },
 
-    calculateSuggestions: (columns) => {
-        const fieldAliases = {
-            fullName: [/name/i, /full.*name/i, /customer.*name/i, /fname/i],
-            mobileNumber: [/phone/i, /mobile/i, /contact/i, /whatsapp/i, /tel/i, /number/i],
-            emailAddress: [/email/i, /mail/i, /e-mail/i],
-            city: [/city/i, /town/i, /location/i],
-            state: [/state/i, /region/i, /province/i]
-        };
-
-        const suggested = {};
-
-        for (const field of importService.LEAD_IMPORT_FIELDS) {
-            let bestCol = null;
-            let maxConfidence = 0;
-
-            for (const col of columns) {
-                const header = col.header.toLowerCase();
-                const aliases = fieldAliases[field.key] || [];
-
-                for (let i = 0; i < aliases.length; i++) {
-                    if (aliases[i].test(header)) {
-                        // Earlier match rules in the array have higher confidence
-                        const confidence = Math.max(0, 100 - (i * 15));
-                        if (confidence > maxConfidence) {
-                            maxConfidence = confidence;
-                            bestCol = col.index;
-                        }
-                    }
-                }
+    calculateSuggestions: (columnPreview) => {
+        const mapping = {};
+        columnPreview.forEach(col => {
+            const h = col.header.toLowerCase();
+            if (h.includes("full name") || h.includes("client name") || h.includes("customer name") || (h.includes("name") && !h.includes("company"))) {
+                mapping["fullName"] = col.header;
+            } else if (h.includes("alt") || h.includes("alternate") || h.includes("whatsapp") || h.includes("secondary")) {
+                mapping["alternateMobile"] = col.header;
+            } else if (h.includes("phone") || h.includes("mobile") || h.includes("contact") || h.includes("cell")) {
+                mapping["mobileNumber"] = col.header;
+            } else if (h.includes("email") || h.includes("mail")) {
+                mapping["emailAddress"] = col.header;
+            } else if (h.includes("city") || h.includes("town") || h.includes("district")) {
+                mapping["city"] = col.header;
+            } else if (h.includes("state") || h.includes("province") || h.includes("region")) {
+                mapping["state"] = col.header;
+            } else if (h.includes("remark") || h.includes("note") || h.includes("comment") || h.includes("description")) {
+                mapping["remarks"] = col.header;
             }
-
-            if (bestCol) {
-                suggested[field.key] = {
-                    columnIndex: bestCol,
-                    confidence: maxConfidence
-                };
-            }
-        }
-
-        return suggested;
+        });
+        return mapping;
     },
 
-    // Executed on the frontend mapped data preview pass
-    runPreviewValidation: async (jobId, mapping) => {
-        const job = await importJobModel.findById(jobId);
+    runPreviewValidation: async (importId, mapping) => {
+        const job = await importJobModel.findById(importId);
         if (!job) throw new Error("Import job not found");
 
-        const ext = job.fileName.split('.').pop().toLowerCase();
         const filePath = job.filePath;
+        const ext = filePath.split('.').pop().toLowerCase();
         let rows = [];
 
         if (ext === 'csv') {
             await new Promise((resolve, reject) => {
                 fs.createReadStream(filePath)
                     .pipe(csvParser())
-                    .on('data', (data) => {
-                        if (rows.length < 10) rows.push(data);
-                    })
+                    .on('data', (data) => rows.push(data))
                     .on('end', resolve)
                     .on('error', reject);
             });
         } else {
             const workbook = xlsx.readFile(filePath);
-            const sheetName = job.selectedSheet || workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            rows = xlsx.utils.sheet_to_json(sheet).slice(0, 10);
+            const sheet = workbook.Sheets[job.selectedSheet || workbook.SheetNames[0]];
+            rows = xlsx.utils.sheet_to_json(sheet);
         }
 
-        return rows.map((row, index) => {
-            return transformAndValidateRow(row, mapping, index + 2);
-        });
+        const totalRows = rows.length;
+        let validRows = 0;
+        let invalidRows = 0;
+        let missingMobileRows = 0;
+        let duplicateInFileRows = 0;
+        const seenInFile = new Set();
+        const validPhones = [];
+        const validatedRows = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const validated = transformAndValidateRow(row, mapping, i + 2);
+
+            if (validated.isMissingMobile) {
+                missingMobileRows++;
+            }
+
+            if (!validated.isValid) {
+                invalidRows++;
+            } else {
+                validRows++;
+                const p = validated.mappedData.mobileNumber;
+                if (seenInFile.has(p)) {
+                    duplicateInFileRows++;
+                } else {
+                    seenInFile.add(p);
+                }
+                validPhones.push(p);
+            }
+
+            if (i < 10) {
+                validatedRows.push(validated);
+            }
+        }
+
+        // Check duplicates against database
+        const existingLeads = await leadModel.find({
+            companyId: job.companyId,
+            mobileNumber: { $in: validPhones }
+        }).select('mobileNumber').lean();
+
+        const dbDuplicateCount = existingLeads.length;
+        const totalDuplicateRows = dbDuplicateCount + duplicateInFileRows;
+
+        return {
+            totalRows,
+            validRows,
+            invalidRows,
+            missingMobileRows,
+            duplicateInFileRows,
+            dbDuplicateCount,
+            duplicateRows: totalDuplicateRows,
+            sampleRows: validatedRows
+        };
     },
 
-    runImportJob: async (jobId) => {
-        const job = await importJobModel.findById(jobId);
+    runImportJob: async (importId) => {
+        const job = await importJobModel.findById(importId);
         if (!job) return;
 
-        job.status = 'processing';
-        await job.save();
-
         try {
-            const ext = job.fileName.split('.').pop().toLowerCase();
             const filePath = job.filePath;
+            const ext = filePath.split('.').pop().toLowerCase();
             let rows = [];
 
             if (ext === 'csv') {
@@ -257,28 +301,30 @@ const importService = {
                 });
             } else {
                 const workbook = xlsx.readFile(filePath);
-                const sheetName = job.selectedSheet || workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
+                const sheet = workbook.Sheets[job.selectedSheet || workbook.SheetNames[0]];
                 rows = xlsx.utils.sheet_to_json(sheet);
             }
 
             job.totalRows = rows.length;
             await job.save();
 
-            const batchSize = 100;
-            const duplicateStrategy = job.importOptions.duplicateHandling || 'skip';
-            const assignedRM = job.importOptions.assignedRM || null;
-            const leadStage = job.importOptions.stage || 'New';
-            const companyId = job.companyId || "default_company";
-
-            // Resolve pool: use explicitly selected pool or default to Fresh Leads
-            let leadPoolId = job.importOptions.leadPoolId || null;
+            const companyId = job.companyId;
+            let leadPoolId = job.importOptions?.leadPoolId;
             if (!leadPoolId) {
-                const freshPool = await ensureDefaultFreshPool(companyId);
-                leadPoolId = freshPool._id;
+                const defaultFreshPool = await ensureDefaultFreshPool(companyId);
+                leadPoolId = defaultFreshPool._id;
             }
 
-            let successfulCount = 0;
+            const assignedRM = job.importOptions?.assignedRM || null;
+            const campaignId = job.importOptions?.campaignId || null;
+            const leadVendorId = job.importOptions?.leadVendorId || null;
+            const leadStage = job.importOptions?.stage || 'New';
+            const duplicateStrategy = job.importOptions?.duplicatePolicy || job.importOptions?.duplicateHandling || 'skip';
+
+            const batchSize = 100;
+            let createdCount = 0;
+            let updatedCount = 0;
+            let skippedCount = 0;
             let failedCount = 0;
             let duplicateCount = 0;
             const errorLogs = [];
@@ -287,10 +333,11 @@ const importService = {
             for (let i = 0; i < rows.length; i += batchSize) {
                 const batch = rows.slice(i, i + batchSize);
                 const leadsToInsert = [];
+                const timelineToInsert = [];
 
                 for (let r = 0; r < batch.length; r++) {
                     const row = batch[r];
-                    const rowNum = i + r + 2; // +1 header row +1 1-based index
+                    const rowNum = i + r + 2;
 
                     const result = transformAndValidateRow(row, job.mapping, rowNum);
                     if (!result.isValid) {
@@ -300,67 +347,110 @@ const importService = {
                     }
 
                     const phone = result.mappedData.mobileNumber;
+                    const altPhone = result.mappedData.alternateMobile;
                     const email = result.mappedData.emailAddress;
                     const fullName = result.mappedData.fullName;
                     const city = result.mappedData.personalDetails.city;
                     const state = result.mappedData.personalDetails.state;
+                    const remarks = result.mappedData.remarks;
 
-                    // Duplicate Lead Resolution
+                    // Check existing duplicate in DB or current batch
                     const existingLead = await leadModel.findOne({ mobileNumber: phone, companyId });
-                    if (existingLead || seenPhones.has(phone)) {
+                    const isDupInBatch = seenPhones.has(phone);
+
+                    if (existingLead || isDupInBatch) {
                         duplicateCount++;
                         if (duplicateStrategy === 'skip') {
+                            skippedCount++;
                             continue;
-                        } else if (duplicateStrategy === 'update') {
+                        } else if (duplicateStrategy === 'overwrite' || duplicateStrategy === 'update') {
                             if (existingLead) {
-                                existingLead.fullName = fullName;
-                                if (email) existingLead.emailAddress = email;
+                                const changes = [];
+                                if (fullName && existingLead.fullName !== fullName) {
+                                    changes.push(`Name: ${existingLead.fullName || 'empty'} -> ${fullName}`);
+                                    existingLead.fullName = fullName;
+                                }
+                                if (altPhone) existingLead.alternateMobile = altPhone;
+                                if (email && existingLead.emailAddress !== email) {
+                                    changes.push(`Email: ${existingLead.emailAddress || 'empty'} -> ${email}`);
+                                    existingLead.emailAddress = email;
+                                }
                                 if (city) existingLead.personalDetails.city = city;
                                 if (state) existingLead.personalDetails.state = state;
-                                if (assignedRM) existingLead.assignedRM = assignedRM;
+                                if (remarks) existingLead.remarks = remarks;
+                                if (campaignId) existingLead.campaignId = campaignId;
+                                if (leadVendorId) existingLead.leadVendorId = leadVendorId;
                                 if (leadPoolId) existingLead.leadPoolId = leadPoolId;
-                                await existingLead.save();
-                            } else {
-                                // Update inside current insert batch
-                                const match = leadsToInsert.find(l => l.mobileNumber === phone);
-                                if (match) {
-                                    match.fullName = fullName;
-                                    if (email) match.emailAddress = email;
-                                    if (city) match.personalDetails.city = city;
-                                    if (state) match.personalDetails.state = state;
-                                    if (leadPoolId) match.leadPoolId = leadPoolId;
+                                if (assignedRM) existingLead.assignedRM = assignedRM;
+                                if (leadStage && !['Won', 'Lost', 'Invalid'].includes(existingLead.stage)) {
+                                    existingLead.stage = leadStage;
                                 }
+                                existingLead.importBatchId = job._id;
+                                await existingLead.save();
+
+                                // Audit timeline entry for overwrite
+                                await leadTimelineModel.create({
+                                    leadId: existingLead._id,
+                                    companyId,
+                                    eventType: 'LEAD_OVERWRITTEN',
+                                    title: 'Lead Overwritten via Import',
+                                    description: `Lead updated from file "${job.fileName}" (Overwrite mode). ${changes.join(', ')}`,
+                                    metadata: { importBatchId: job._id, fileName: job.fileName },
+                                    performedBy: { staffId: job.userId, name: 'Import System' }
+                                });
                             }
-                            successfulCount++;
+                            updatedCount++;
                             continue;
                         }
                     }
                     seenPhones.add(phone);
 
-                    // Prepare for insert
-                    leadsToInsert.push({
+                    // New lead document
+                    const newLeadDoc = {
                         fullName,
                         mobileNumber: phone,
+                        alternateMobile: altPhone,
                         emailAddress: email || null,
                         stage: leadStage,
                         assignedRM: assignedRM,
+                        campaignId: campaignId,
+                        leadVendorId: leadVendorId,
                         leadPoolId: leadPoolId,
                         companyId: companyId,
+                        remarks: remarks || "",
+                        importBatchId: job._id,
+                        leadSource: 'IMPORTED_POOL',
                         personalDetails: {
                             city: city || null,
                             state: state || null
                         }
-                    });
+                    };
+                    leadsToInsert.push(newLeadDoc);
                 }
 
                 if (leadsToInsert.length > 0) {
-                    await leadModel.insertMany(leadsToInsert);
-                    successfulCount += leadsToInsert.length;
+                    const inserted = await leadModel.insertMany(leadsToInsert);
+                    createdCount += inserted.length;
+
+                    // Create timeline entries for created leads
+                    const timelines = inserted.map(l => ({
+                        leadId: l._id,
+                        companyId,
+                        eventType: 'LEAD_CREATED',
+                        title: 'Lead Created via File Import',
+                        description: `Lead ingested from "${job.fileName}" into pool`,
+                        metadata: { importBatchId: job._id, fileName: job.fileName },
+                        performedBy: { staffId: job.userId, name: 'Import Wizard' }
+                    }));
+                    await leadTimelineModel.insertMany(timelines);
                 }
 
                 // Update job metrics periodically
                 job.processedRows = i + batch.length;
-                job.successfulRows = successfulCount;
+                job.successfulRows = createdCount + updatedCount;
+                job.createdRows = createdCount;
+                job.updatedRows = updatedCount;
+                job.skippedRows = skippedCount;
                 job.failedRows = failedCount;
                 job.duplicateRows = duplicateCount;
                 await job.save();

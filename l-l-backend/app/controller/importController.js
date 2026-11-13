@@ -61,7 +61,6 @@ const importController = {
                 return res.status(404).send({ status: 404, message: "Import job not found", data: {} });
             }
 
-            // Verify company access
             if (job.companyId !== companyId) {
                 return res.status(403).send({ status: 403, message: "Unauthorized access to import job", data: {} });
             }
@@ -82,11 +81,15 @@ const importController = {
             job.mapping = mapping;
             if (selectedSheet) job.selectedSheet = selectedSheet;
             if (importOptions) {
+                const dupPolicy = importOptions.duplicatePolicy || importOptions.duplicateHandling || 'skip';
                 job.importOptions = {
-                    duplicateHandling: importOptions.duplicateHandling || 'skip',
+                    duplicateHandling: dupPolicy,
+                    duplicatePolicy: dupPolicy,
                     assignedRM: importOptions.assignedRM || null,
                     stage: importOptions.stage || 'New',
-                    leadPoolId: leadPoolId
+                    leadPoolId: leadPoolId,
+                    campaignId: importOptions.campaignId || null,
+                    leadVendorId: importOptions.leadVendorId || null
                 };
             }
             job.status = 'processing';
@@ -132,6 +135,9 @@ const importController = {
                     totalRows: job.totalRows,
                     processedRows: job.processedRows,
                     successfulRows: job.successfulRows,
+                    createdRows: job.createdRows || job.successfulRows,
+                    updatedRows: job.updatedRows || 0,
+                    skippedRows: job.skippedRows || 0,
                     failedRows: job.failedRows,
                     duplicateRows: job.duplicateRows,
                     completedAt: job.completedAt

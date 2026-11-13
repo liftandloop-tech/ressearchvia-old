@@ -13,6 +13,9 @@ const importJobSchema = new mongoose.Schema({
     totalRows: { type: Number, default: 0 },
     processedRows: { type: Number, default: 0 },
     successfulRows: { type: Number, default: 0 },
+    createdRows: { type: Number, default: 0 },
+    updatedRows: { type: Number, default: 0 },
+    skippedRows: { type: Number, default: 0 },
     failedRows: { type: Number, default: 0 },
     duplicateRows: { type: Number, default: 0 },
     sheetNames: [String],
@@ -31,10 +34,13 @@ const importJobSchema = new mongoose.Schema({
         rawData: mongoose.Schema.Types.Mixed
     }],
     importOptions: {
-        duplicateHandling: { type: String, enum: ['skip', 'update', 'create'], default: 'skip' },
+        duplicateHandling: { type: String, enum: ['skip', 'update', 'overwrite', 'create'], default: 'skip' },
+        duplicatePolicy: { type: String, enum: ['overwrite', 'skip'], default: 'skip' },
         assignedRM: { type: mongoose.Schema.Types.ObjectId, ref: 'staff', default: null },
         stage: { type: String, default: 'New' },
-        leadPoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'leadPool', default: null }
+        leadPoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'leadPool', default: null },
+        campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'leadCampaign', default: null },
+        leadVendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'leadVendor', default: null }
     },
     completedAt: { type: Date, default: null }
 }, { timestamps: true, versionKey: false, suppressReservedKeysWarning: true });

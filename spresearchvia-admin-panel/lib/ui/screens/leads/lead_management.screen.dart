@@ -17,6 +17,10 @@ import 'widgets/bulk_upload_dialog.widget.dart';
 import 'widgets/bulk_assign_by_numbers_dialog.widget.dart';
 import 'widgets/lead_table_header_cell.widget.dart';
 import 'widgets/lead_column_filter.widget.dart';
+import 'widgets/lead_detail_dialog.widget.dart';
+import 'widgets/pending_followups_view.widget.dart';
+import 'widgets/manage_segments_dialog.widget.dart';
+import 'widgets/set_free_trial_dialog.widget.dart';
 
 class LeadManagementScreen extends StatelessWidget {
   const LeadManagementScreen({super.key});
@@ -146,6 +150,26 @@ class LeadManagementScreen extends StatelessWidget {
                                     color: AppTheme.textSecondary,
                                   ),
                                 ),
+                                const SizedBox(height: 8),
+                                Obx(() => Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _buildViewSwitchButton(
+                                      title: 'View Leads',
+                                      icon: Icons.table_chart_outlined,
+                                      isSelected: controller.activeViewMode.value == 'leads',
+                                      onTap: () => controller.switchViewMode('leads'),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildViewSwitchButton(
+                                      title: 'Pending Follow-ups',
+                                      icon: Icons.alarm_outlined,
+                                      isSelected: controller.activeViewMode.value == 'pending_followups',
+                                      count: controller.pendingFollowUpsList.length,
+                                      onTap: () => controller.switchViewMode('pending_followups'),
+                                    ),
+                                  ],
+                                )),
                               ],
                             );
 
@@ -184,17 +208,26 @@ class LeadManagementScreen extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       // Compressed Lead Distribution Widget Bar
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _buildPullPanel(controller),
-                      ),
+                      Obx(() {
+                        if (controller.activeViewMode.value != 'leads') {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _buildPullPanel(controller),
+                        );
+                      }),
           ],
         ),
       ),
 
-    // Leads Table (Full-Screen Expanded Card)
+    // Leads Table (Full-Screen Expanded Card) or Pending Follow-ups View
     Expanded(
       child: Obx(() {
+        if (controller.activeViewMode.value == 'pending_followups') {
+          return PendingFollowUpsView(controller: controller);
+        }
+
         if (controller.isLoading.value && controller.leadsList.isEmpty) {
           return const TableSkeleton(rowCount: 10, columnCount: 8, isExpanded: true);
         }
@@ -256,9 +289,9 @@ class LeadManagementScreen extends StatelessWidget {
                   child: DataTable2(
                     columnSpacing: 10,
                     horizontalMargin: 10,
-                    minWidth: 1100,
+                    minWidth: 1750,
                     headingRowHeight: 48,
-                    dataRowHeight: 52,
+                    dataRowHeight: 54,
                     headingRowColor: WidgetStateProperty.all(
                       AppTheme.backgroundLight,
                     ),
@@ -274,7 +307,7 @@ class LeadManagementScreen extends StatelessWidget {
                     columns: [
                       DataColumn2(
                         label: const LeadTableHeaderCell(
-                          title: 'Full Name',
+                          title: 'Client Name',
                           sortKey: 'fullName',
                           filterWidget: LeadColumnFilter(
                             columnKey: 'name',
@@ -292,7 +325,7 @@ class LeadManagementScreen extends StatelessWidget {
                             columnName: 'Mobile No.',
                           ),
                         ),
-                        fixedWidth: 140,
+                        fixedWidth: 145,
                       ),
                       DataColumn2(
                         label: const LeadTableHeaderCell(
@@ -307,11 +340,24 @@ class LeadManagementScreen extends StatelessWidget {
                       ),
                       DataColumn2(
                         label: const LeadTableHeaderCell(
-                          title: 'Pool',
+                          title: 'Campaign',
+                          sortKey: 'campaign',
+                        ),
+                        fixedWidth: 130,
+                      ),
+                      DataColumn2(
+                        label: const LeadTableHeaderCell(
+                          title: 'Lead Source / Pool',
                           filterWidget: LeadColumnFilter(
                             columnKey: 'pool',
                             columnName: 'Pool',
                           ),
+                        ),
+                        fixedWidth: 135,
+                      ),
+                      DataColumn2(
+                        label: const LeadTableHeaderCell(
+                          title: 'Vendor',
                         ),
                         fixedWidth: 125,
                       ),
@@ -324,6 +370,18 @@ class LeadManagementScreen extends StatelessWidget {
                           ),
                         ),
                         fixedWidth: 155,
+                      ),
+                      DataColumn2(
+                        label: const LeadTableHeaderCell(
+                          title: 'Segment',
+                        ),
+                        fixedWidth: 140,
+                      ),
+                      DataColumn2(
+                        label: const LeadTableHeaderCell(
+                          title: 'Free Trial',
+                        ),
+                        fixedWidth: 115,
                       ),
                       DataColumn2(
                         label: const LeadTableHeaderCell(
@@ -346,289 +404,478 @@ class LeadManagementScreen extends StatelessWidget {
                           title: 'Actions',
                           isCenter: true,
                         ),
-                        fixedWidth: 75,
+                        fixedWidth: 80,
                       ),
                     ],
-                            rows: controller.leadsList.map((lead) {
-                              return DataRow(
-                                selected: controller.selectedLeadIds.contains(lead.id),
-                                onSelectChanged: (selected) {
-                                  controller.toggleLeadSelection(lead.id);
-                                },
-                                cells: [
-                                  DataCell(
-                                    Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                lead.fullName.isEmpty ? 'Unnamed Lead' : lead.fullName,
-                                                style: const TextStyle(fontWeight: FontWeight.w600),
-                                                overflow: TextOverflow.ellipsis,
-                                                maxLines: 1,
-                                              ),
-                                            ),
-                                            if (lead.isAppUser) ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                                                ),
-                                                child: const Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.phone_android, size: 10, color: Color(0xFF059669)),
-                                                    SizedBox(width: 2),
-                                                    Text(
-                                                      'App User',
-                                                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                            if (lead.leadSource == 'ORPHANED_STAFF') ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(Icons.swap_horiz, size: 10, color: Color(0xFFD97706)),
-                                                    const SizedBox(width: 2),
-                                                    Text(
-                                                      lead.previousRMStaffName != null ? 'Ex: ${lead.previousRMStaffName}' : 'Ex-Staff',
-                                                      style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                            if (lead.leadSource == 'ORGANIC_APP') ...[
-                                              const SizedBox(width: 4),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF6366F1).withValues(alpha: 0.12),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
-                                                ),
-                                                child: const Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.bolt, size: 10, color: Color(0xFF4F46E5)),
-                                                    SizedBox(width: 2),
-                                                    Text(
-                                                      'Organic',
-                                                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                        if (lead.emailAddress != null && lead.emailAddress!.isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(top: 2),
-                                            child: Text(
-                                              lead.emailAddress!,
-                                              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                            ),
+                    rows: controller.leadsList.map((lead) {
+                      return DataRow(
+                        selected: controller.selectedLeadIds.contains(lead.id),
+                        onSelectChanged: (selected) {
+                          controller.toggleLeadSelection(lead.id);
+                        },
+                        cells: [
+                          DataCell(
+                            InkWell(
+                              onTap: () {
+                                Get.dialog(LeadDetailDialog(lead: lead, controller: controller));
+                              },
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          lead.fullName.isEmpty ? 'Unnamed Lead' : lead.fullName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppTheme.primaryBlue,
                                           ),
-                                      ],
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(lead.mobileNumber),
-                                        const SizedBox(width: 6),
-                                        IconButton(
-                                          icon: const Icon(Icons.phone_in_talk, color: Colors.green, size: 17),
-                                          tooltip: 'Call Lead (Airtel Virtual SIM)',
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                          onPressed: () => _showClickToCallDialog(context, lead, controller),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        ),
+                                      ),
+                                      if (lead.isAppUser) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.phone_android, size: 10, color: Color(0xFF059669)),
+                                              SizedBox(width: 2),
+                                              Text(
+                                                'App User',
+                                                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
-                                    ),
+                                      if (lead.leadSource == 'ORPHANED_STAFF') ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.swap_horiz, size: 10, color: Color(0xFFD97706)),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                lead.previousRMStaffName != null ? 'Ex: ${lead.previousRMStaffName}' : 'Ex-Staff',
+                                                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      if (lead.leadSource == 'ORGANIC_APP') ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.bolt, size: 10, color: Color(0xFF4F46E5)),
+                                              SizedBox(width: 2),
+                                              Text(
+                                                'Organic',
+                                                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
-                                  DataCell(
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  if (lead.emailAddress != null && lead.emailAddress!.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        lead.emailAddress!,
+                                        style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(lead.mobileNumber, style: const TextStyle(fontWeight: FontWeight.w500)),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: const Icon(Icons.phone_in_talk, color: Colors.green, size: 16),
+                                      tooltip: 'Call Lead (Airtel Virtual SIM)',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => _showClickToCallDialog(context, lead, controller),
+                                    ),
+                                  ],
+                                ),
+                                if (lead.alternateMobile != null && lead.alternateMobile!.isNotEmpty)
+                                  Text(
+                                    'Alt: ${lead.alternateMobile}',
+                                    style: TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: _getStageColor(lead.stage).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: const ['New', 'App Onboarded', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'].contains(lead.stage)
+                                      ? lead.stage
+                                      : 'New',
+                                  isExpanded: true,
+                                  dropdownColor: Colors.white,
+                                  style: TextStyle(
+                                    color: _getStageColor(lead.stage),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                  icon: Icon(
+                                    Icons.arrow_drop_down,
+                                    color: _getStageColor(lead.stage),
+                                    size: 16,
+                                  ),
+                                  isDense: true,
+                                  items: const ['New', 'App Onboarded', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid']
+                                      .map((s) => DropdownMenuItem<String>(
+                                            value: s,
+                                            child: Text(
+                                              s,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null && val != lead.stage) {
+                                      controller.updateLeadStage(lead.id, val);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: lead.campaignName != null
+                                    ? const Color(0xFF0284C7).withValues(alpha: 0.08)
+                                    : AppTheme.gray100,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: lead.campaignName != null
+                                      ? const Color(0xFF0284C7).withValues(alpha: 0.25)
+                                      : AppTheme.gray300,
+                                ),
+                              ),
+                              child: Text(
+                                lead.campaignName ?? '—',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: lead.campaignName != null ? const Color(0xFF0369A1) : AppTheme.gray600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.indigo.withValues(alpha: 0.2)),
+                              ),
+                              child: Text(
+                                lead.leadPoolName ?? 'Fresh Leads',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.indigo,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: lead.leadVendorName != null
+                                    ? const Color(0xFF7C3AED).withValues(alpha: 0.08)
+                                    : AppTheme.gray100,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: lead.leadVendorName != null
+                                      ? const Color(0xFF7C3AED).withValues(alpha: 0.25)
+                                      : AppTheme.gray300,
+                                ),
+                              ),
+                              child: Text(
+                                lead.leadVendorName ?? '—',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: lead.leadVendorName != null ? const Color(0xFF6D28D9) : AppTheme.gray600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Get.find<AuthController>().user.value?.isAdmin == true ||
+                                    (Get.find<AuthController>().user.value?.has('leads.bulk_assign') ?? false) ||
+                                    (Get.find<AuthController>().user.value?.has('leads.update') ?? false)
+                                ? InkWell(
+                                    onTap: () {
+                                      _showSearchableRMDialog(context, controller, onSelected: (rmId) {
+                                        controller.selectedLeadIds.clear();
+                                        controller.selectedLeadIds.add(lead.id);
+                                        controller.bulkAssignRM(rmId);
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: _getStageColor(lead.stage).withValues(alpha: 0.1),
+                                        border: Border.all(color: AppTheme.gray300),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
-                                      child: DropdownButtonHideUnderline(
-                                        child: DropdownButton<String>(
-                                          value: const ['New', 'App Onboarded', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'].contains(lead.stage)
-                                              ? lead.stage
-                                              : 'New',
-                                          isExpanded: true,
-                                          dropdownColor: Colors.white,
-                                          style: TextStyle(
-                                            color: _getStageColor(lead.stage),
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 12,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              lead.assignedRMName ?? 'Unassigned',
+                                              style: TextStyle(
+                                                color: lead.assignedRMName == null ? AppTheme.gray500 : AppTheme.textPrimary,
+                                                fontStyle: lead.assignedRMName == null ? FontStyle.italic : FontStyle.normal,
+                                                fontSize: 13,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
-                                          icon: Icon(
-                                            Icons.arrow_drop_down,
-                                            color: _getStageColor(lead.stage),
-                                            size: 16,
-                                          ),
-                                          isDense: true,
-                                          items: const ['New', 'App Onboarded', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid']
-                                              .map((s) => DropdownMenuItem<String>(
-                                                    value: s,
-                                                    child: Text(
-                                                      s,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                        color: Colors.black,
-                                                        fontWeight: FontWeight.w600,
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ))
-                                              .toList(),
-                                          onChanged: (val) {
-                                            if (val != null && val != lead.stage) {
-                                              controller.updateLeadStage(lead.id, val);
-                                            }
-                                          },
-                                        ),
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.keyboard_arrow_down, size: 14, color: AppTheme.gray600),
+                                        ],
                                       ),
                                     ),
-                                  ),
-                                  DataCell(
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.indigo.withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.indigo.withValues(alpha: 0.2)),
-                                      ),
-                                      child: Text(
-                                        lead.leadPoolName ?? 'Fresh Leads',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Colors.indigo,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Get.find<AuthController>().user.value?.isAdmin == true ||
-                                            (Get.find<AuthController>().user.value?.has('leads.bulk_assign') ?? false) ||
-                                            (Get.find<AuthController>().user.value?.has('leads.update') ?? false)
-                                        ? InkWell(
-                                            onTap: () {
-                                              _showSearchableRMDialog(context, controller, onSelected: (rmId) {
-                                                controller.selectedLeadIds.clear();
-                                                controller.selectedLeadIds.add(lead.id);
-                                                controller.bulkAssignRM(rmId);
-                                              });
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                  )
+                                : Text(lead.assignedRMName ?? 'Unassigned'),
+                          ),
+                          DataCell(
+                            InkWell(
+                              onTap: () {
+                                Get.dialog(ManageSegmentsDialog(lead: lead, controller: controller));
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: lead.segmentNames.isNotEmpty
+                                    ? Wrap(
+                                        spacing: 4,
+                                        runSpacing: 2,
+                                        children: [
+                                          ...lead.segmentNames.take(2).map((s) => Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF059669).withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.25)),
+                                                ),
+                                                child: Text(
+                                                  s,
+                                                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF047857)),
+                                                ),
+                                              )),
+                                          if (lead.segmentNames.length > 2)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                                               decoration: BoxDecoration(
-                                                border: Border.all(color: AppTheme.gray300),
+                                                color: AppTheme.gray100,
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Flexible(
-                                                    child: Text(
-                                                      lead.assignedRMName ?? 'Unassigned',
-                                                      style: TextStyle(
-                                                        color: lead.assignedRMName == null ? AppTheme.gray500 : AppTheme.textPrimary,
-                                                        fontStyle: lead.assignedRMName == null ? FontStyle.italic : FontStyle.normal,
-                                                        fontSize: 13,
-                                                      ),
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  const Icon(Icons.keyboard_arrow_down, size: 14, color: AppTheme.gray600),
-                                                ],
+                                              child: Text(
+                                                '+${lead.segmentNames.length - 2}',
+                                                style: const TextStyle(fontSize: 10, color: AppTheme.gray600, fontWeight: FontWeight.bold),
                                               ),
                                             ),
-                                          )
-                                        : Text(lead.assignedRMName ?? 'Unassigned'),
-                                  ),
-                                  DataCell(Text(
-                                    [lead.city, lead.state].where((x) => x != null && x.isNotEmpty).join(', '),
-                                  )),
-                                  DataCell(
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            lead.followUps.isEmpty
-                                                ? 'None'
-                                                : 'Last: ${lead.followUps.last.notes}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 13),
+                                        ],
+                                      )
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text('—', style: TextStyle(color: AppTheme.gray500)),
+                                          const SizedBox(width: 4),
+                                          Icon(Icons.add_circle_outline, size: 14, color: AppTheme.gray400),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            InkWell(
+                              onTap: () {
+                                Get.dialog(SetFreeTrialDialog(lead: lead, controller: controller));
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                child: (lead.freeTrialStartDate != null || lead.freeTrialEndDate != null)
+                                    ? Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: lead.hasActiveFreeTrial
+                                              ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                              : const Color(0xFFEF4444).withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: lead.hasActiveFreeTrial
+                                                ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                                                : const Color(0xFFEF4444).withValues(alpha: 0.3),
                                           ),
                                         ),
-                                        Builder(
-                                          builder: (context) {
-                                            final authUser = Get.find<AuthController>().user.value;
-                                            final canFollowUp = (authUser?.isAdmin == true) || (authUser?.has('leads.follow_up') ?? false);
-                                            if (!canFollowUp) return const SizedBox.shrink();
-                                            return IconButton(
-                                              icon: const Icon(Icons.edit_note, color: AppTheme.primaryBlue, size: 20),
-                                              tooltip: 'Log Follow-up',
-                                              onPressed: () => _showFollowUpDialog(context, controller, lead),
-                                              padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(),
-                                            );
-                                          },
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              lead.hasActiveFreeTrial ? Icons.check_circle_outline : Icons.timer_off_outlined,
+                                              size: 11,
+                                              color: lead.hasActiveFreeTrial ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              lead.freeTrialEndDate != null
+                                                  ? DateFormat('dd MMM').format(lead.freeTrialEndDate!)
+                                                  : 'Active',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: lead.hasActiveFreeTrial ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
+                                      )
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text('None', style: TextStyle(fontSize: 11.5, color: AppTheme.gray500)),
+                                          const SizedBox(width: 4),
+                                          Icon(Icons.calendar_today_outlined, size: 12, color: AppTheme.gray400),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ),
+                          DataCell(Text(
+                            [lead.city, lead.state].where((x) => x != null && x.isNotEmpty).join(', '),
+                          )),
+                          DataCell(
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    lead.followUps.isEmpty
+                                        ? 'None'
+                                        : 'Last: ${lead.followUps.last.notes}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13),
                                   ),
-                                  DataCell(
-                                    Builder(
-                                      builder: (context) {
-                                        final authUser = Get.find<AuthController>().user.value;
-                                        final canUpdate = (authUser?.isAdmin == true) || (authUser?.has('leads.update') ?? false);
-                                        if (!canUpdate) return const SizedBox.shrink();
-                                        return IconButton(
-                                          icon: const Icon(Icons.edit, color: Colors.grey, size: 18),
-                                          tooltip: 'Edit details',
-                                          onPressed: () => _showAddLeadDialog(context, controller, lead: lead),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
+                                ),
+                                Builder(
+                                  builder: (context) {
+                                    final authUser = Get.find<AuthController>().user.value;
+                                    final canFollowUp = (authUser?.isAdmin == true) || (authUser?.has('leads.follow_up') ?? false);
+                                    if (!canFollowUp) return const SizedBox.shrink();
+                                    return IconButton(
+                                      icon: const Icon(Icons.edit_note, color: AppTheme.primaryBlue, size: 20),
+                                      tooltip: 'Log Follow-up',
+                                      onPressed: () => _showFollowUpDialog(context, controller, lead),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.history, color: AppTheme.primaryBlue, size: 18),
+                                  tooltip: 'View Details & Timeline',
+                                  onPressed: () {
+                                    Get.dialog(LeadDetailDialog(lead: lead, controller: controller));
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 6),
+                                Builder(
+                                  builder: (context) {
+                                    final authUser = Get.find<AuthController>().user.value;
+                                    final canUpdate = (authUser?.isAdmin == true) || (authUser?.has('leads.update') ?? false);
+                                    if (!canUpdate) return const SizedBox.shrink();
+                                    return IconButton(
+                                      icon: const Icon(Icons.edit, color: Colors.grey, size: 18),
+                                      tooltip: 'Edit details',
+                                      onPressed: () => _showAddLeadDialog(context, controller, lead: lead),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
                           ),
                         ),
                       ),
@@ -644,6 +891,76 @@ class LeadManagementScreen extends StatelessWidget {
     }),
   );
 }
+
+  Widget _buildViewSwitchButton({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    int? count,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryBlue : Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryBlue : AppTheme.gray300,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? Colors.white : AppTheme.gray700,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? Colors.white : AppTheme.gray700,
+              ),
+            ),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : AppTheme.primaryBlue,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  count.toString(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? AppTheme.primaryBlue : Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildPaginationRow(LeadsController controller) {
     return Padding(
@@ -1283,11 +1600,16 @@ class LeadManagementScreen extends StatelessWidget {
     if (lead != null) {
       controller.nameController.text = lead.fullName;
       controller.phoneController.text = lead.mobileNumber;
+      controller.altPhoneController.text = lead.alternateMobile ?? '';
       controller.emailController.text = lead.emailAddress ?? '';
       controller.cityController.text = lead.city ?? '';
       controller.stateController.text = lead.state ?? '';
+      controller.remarksController.text = lead.remarks;
       controller.assignRMId.value = lead.assignedRMId ?? '';
       controller.assignLeadPoolId.value = lead.leadPoolId ?? '';
+      controller.assignCampaignId.value = lead.campaignId ?? '';
+      controller.assignLeadVendorId.value = lead.leadVendorId ?? '';
+      controller.selectedSegmentIds.assignAll(lead.segmentIds);
       controller.leadStage.value = lead.stage;
     } else {
       controller.resetForm();
@@ -1297,7 +1619,7 @@ class LeadManagementScreen extends StatelessWidget {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Container(
-          width: 500,
+          width: 560,
           padding: const EdgeInsets.all(24),
           child: SingleChildScrollView(
             child: Column(
@@ -1308,22 +1630,82 @@ class LeadManagementScreen extends StatelessWidget {
                   lead != null ? 'Edit Lead Details' : 'Add New Lead',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 TextField(
                   controller: controller.nameController,
                   decoration: const InputDecoration(labelText: 'Full Name (Optional)', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller.phoneController,
-                  decoration: const InputDecoration(labelText: 'Mobile Number *', border: OutlineInputBorder()),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller.phoneController,
+                        decoration: const InputDecoration(labelText: 'Mobile Number *', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: controller.altPhoneController,
+                        decoration: const InputDecoration(labelText: 'Alternate Mobile', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 TextField(
                   controller: controller.emailController,
                   decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                // Campaign & Vendor Row
+                Obx(() {
+                  final currentCampId = controller.assignCampaignId.value;
+                  final campItems = [
+                    const DropdownMenuItem<String>(value: '', child: Text('No Campaign')),
+                    ...controller.campaignsList.map((c) => DropdownMenuItem<String>(
+                          value: c.id,
+                          child: Text(c.name, overflow: TextOverflow.ellipsis),
+                        )),
+                  ];
+                  final safeCampId = campItems.any((c) => c.value == currentCampId) ? currentCampId : '';
+
+                  final currentVendorId = controller.assignLeadVendorId.value;
+                  final vendorItems = [
+                    const DropdownMenuItem<String>(value: '', child: Text('No Vendor')),
+                    ...controller.vendorsList.map((v) => DropdownMenuItem<String>(
+                          value: v.id,
+                          child: Text(v.name, overflow: TextOverflow.ellipsis),
+                        )),
+                  ];
+                  final safeVendorId = vendorItems.any((v) => v.value == currentVendorId) ? currentVendorId : '';
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey('camp_$safeCampId'),
+                          initialValue: safeCampId,
+                          decoration: const InputDecoration(labelText: 'Campaign', border: OutlineInputBorder()),
+                          items: campItems,
+                          onChanged: (val) => controller.assignCampaignId.value = val ?? '',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey('vendor_$safeVendorId'),
+                          initialValue: safeVendorId,
+                          decoration: const InputDecoration(labelText: 'Lead Vendor', border: OutlineInputBorder()),
+                          items: vendorItems,
+                          onChanged: (val) => controller.assignLeadVendorId.value = val ?? '',
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 14),
                 // Target Lead Pool Selection
                 Obx(() {
                   final currentPoolId = controller.assignLeadPoolId.value;
@@ -1361,7 +1743,7 @@ class LeadManagementScreen extends StatelessWidget {
                     ],
                   );
                 }),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 // RM Assign
                 Obx(() {
                   final currentRMId = controller.assignRMId.value;
@@ -1384,7 +1766,7 @@ class LeadManagementScreen extends StatelessWidget {
                     ),
                   );
                 }),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 // Stage Selection
                 Obx(() {
                   const allowedStages = ['New', 'App Onboarded', 'Contacted', 'Interested', 'Qualified', 'Demo / Meeting Scheduled', 'Demo / Meeting Completed', 'Proposal Sent', 'Negotiation', 'Follow-up', 'Won', 'Lost', 'On Hold', 'Not Interested', 'Invalid'];
@@ -1399,15 +1781,29 @@ class LeadManagementScreen extends StatelessWidget {
                     onChanged: (val) => controller.leadStage.value = val ?? 'New',
                   );
                 }),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller.cityController,
-                  decoration: const InputDecoration(labelText: 'City', border: OutlineInputBorder()),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller.cityController,
+                        decoration: const InputDecoration(labelText: 'City', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: controller.stateController,
+                        decoration: const InputDecoration(labelText: 'State', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 TextField(
-                  controller: controller.stateController,
-                  decoration: const InputDecoration(labelText: 'State', border: OutlineInputBorder()),
+                  controller: controller.remarksController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Remarks / Notes', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 24),
                 Row(
